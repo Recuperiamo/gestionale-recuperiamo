@@ -1,4 +1,3 @@
-// src/ClientPortal.js
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase-config';
 import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
@@ -163,17 +162,56 @@ function ClientPortal({ user }) {
         <ul className="package-list">
             {(clientData.packages || []).map(pkg => {
                 const allOccurrences = [];
-                // ... (logica per creare allOccurrences invariata)
+                const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
+                (pkg.bookings || []).forEach(booking => {
+                    const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
+                    if (booking.type === 'single') {
+                        allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
+                    } else {
+                        const startDate = new Date(booking.startDate);
+                        for (let i = 0; i < booking.recurrence.weeks; i++) {
+                            (booking.recurrence.days || []).forEach(day => {
+                                const dayOfWeek = dayMap[day];
+                                const firstDayOfRecurrenceWeek = new Date(startDate);
+                                firstDayOfRecurrenceWeek.setDate(startDate.getDate() + (i * 7));
+                                const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
+                                occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
+                                const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
+                                allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]), isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
+                            });
+                        }
+                    }
+                });
+                allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
+                const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
+                const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
+
                 return (
                     <li key={pkg.id} className="package-item">
-                        {/* ... (dettagli pacchetto invariati) ... */}
+                        <div className="package-details">
+                            <span>{pkg.name}</span>
+                            <span>Ore Totali: {pkg.totalHours}h</span>
+                            <span>Ore Svolte: {totalCompletedHours}h</span>
+                            <span>Ore Rimanenti: {pkg.remainingHours}h</span>
+                        </div>
                         <ul className="booking-list">
                             <h3>Le Tue Lezioni</h3>
                             {visibleOccurrences.map(occurrence => {
-                                // ... (logica visualizzazione lezione invariata, ma con il form corretto) ...
+                                const startTime = occurrence.effectiveDate;
+                                const isPast = startTime < new Date();
+                                const isCancellable = (startTime - new Date()) > (7 * 24 * 60 * 60 * 1000);
+                                const isUrgent7Days = (startTime - new Date()) < (7 * 24 * 60 * 60 * 1000);
+                                const dateString = startTime.toISOString().split('T')[0];
+                                const requestStatus = (occurrence.requests || {})[dateString]?.status;
+
                                 return (
                                 <React.Fragment key={occurrence.uniqueId}>
-                                    {/* ... (JSX della lezione) ... */}
+                                    <li className="booking-item">
+                                        <span>Data: {startTime.toLocaleDateString()}</span>
+                                        <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                        <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
+                                        {!isPast && !requestStatus && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
+                                    </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
                                         <li className="booking-form-container">
                                             <form onSubmit={handleSubmitRequestChange} className="booking-form">
@@ -201,7 +239,7 @@ function ClientPortal({ user }) {
                                                                         {isChecked && (
                                                                             <>
                                                                                 dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
-                                                                                alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
+                                                                                alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.g.target.value)} required/>
                                                                             </>
                                                                         )}
                                                                     </div>
@@ -236,4 +274,5 @@ function ClientPortal({ user }) {
     </div>
   );
 }
+
 export default ClientPortal;
