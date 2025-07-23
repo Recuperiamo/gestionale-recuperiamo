@@ -2,7 +2,6 @@
 import React from 'react';
 
 function DashboardSummary({ clients }) {
-  // Calcola l'inizio e la fine della settimana corrente (da oggi ai prossimi 7 giorni)
   const today = new Date();
   const endOfWeek = new Date();
   endOfWeek.setDate(today.getDate() + 7);
@@ -12,7 +11,6 @@ function DashboardSummary({ clients }) {
 
   clients.forEach(client => {
     (client.packages || []).forEach(pkg => {
-      // Trova i pacchetti con meno di 5 ore rimanenti
       if (pkg.remainingHours < 5) {
         lowHourPackages.push({
           clientName: client.name,
@@ -21,30 +19,38 @@ function DashboardSummary({ clients }) {
         });
       }
 
-      // Trova le lezioni della prossima settimana
       (pkg.bookings || []).forEach(booking => {
         if (booking.type === 'single') {
           const lessonDate = new Date(booking.dateTime);
           if (lessonDate >= today && lessonDate <= endOfWeek && !booking.isProcessed) {
+            const endTime = new Date(lessonDate);
+            endTime.setMinutes(lessonDate.getMinutes() + booking.hoursBooked * 60);
             upcomingLessons.push({
               clientName: client.name,
               date: lessonDate,
+              endDate: endTime,
               duration: booking.hoursBooked
             });
           }
-        } else { // recurring
+        } else {
           const startDate = new Date(booking.startDate);
+          const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
           for (let i = 0; i < booking.recurrence.weeks; i++) {
             (booking.recurrence.days || []).forEach(day => {
-              const dayOfWeek = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 }[day];
-              const d = new Date(startDate);
-              d.setDate(d.getDate() + (i * 7) - d.getDay() + dayOfWeek);
+              const dayOfWeek = dayMap[day];
+              const firstDayOfWeek = new Date(startDate);
+              firstDayOfWeek.setDate(startDate.getDate() + (i * 7));
+              const d = new Date(firstDayOfWeek);
+              d.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay() + dayOfWeek);
               const dateString = d.toISOString().split('T')[0];
 
               if (d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString) && !(booking.cancelledDates || []).includes(dateString)) {
+                const endTime = new Date(d);
+                endTime.setMinutes(d.getMinutes() + booking.hoursBooked * 60);
                 upcomingLessons.push({
                   clientName: client.name,
                   date: d,
+                  endDate: endTime,
                   duration: booking.hoursBooked
                 });
               }
@@ -55,7 +61,6 @@ function DashboardSummary({ clients }) {
     });
   });
 
-  // Ordina le lezioni per data
   upcomingLessons.sort((a, b) => a.date - b.date);
 
   return (
@@ -66,7 +71,7 @@ function DashboardSummary({ clients }) {
           <ul>
             {upcomingLessons.map((lesson, index) => (
               <li key={index}>
-                <strong>{lesson.clientName}</strong> - {lesson.date.toLocaleDateString()} @ {lesson.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ({lesson.duration}h)
+                <strong>{lesson.clientName}</strong> - {lesson.date.toLocaleDateString()} ({lesson.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {lesson.endDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
               </li>
             ))}
           </ul>
