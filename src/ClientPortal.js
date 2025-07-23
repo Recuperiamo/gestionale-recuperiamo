@@ -204,14 +204,12 @@ function ClientPortal({ user }) {
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
-                                
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
                                 const lessonDateOnly = new Date(startTime);
                                 lessonDateOnly.setHours(0, 0, 0, 0);
                                 const eightDaysFromNow = new Date(today);
                                 eightDaysFromNow.setDate(today.getDate() + 8);
-
                                 const isCancellable = lessonDateOnly >= eightDaysFromNow;
                                 const isUrgent = !isCancellable;
 
@@ -255,7 +253,7 @@ function ClientPortal({ user }) {
                                                                             <div className="time-inputs">
                                                                                 dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
                                                                                 alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
-                                                                            </>
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 );
