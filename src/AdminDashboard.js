@@ -28,12 +28,15 @@ function AdminDashboard() {
       setClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
     return () => unsubscribe();
-  }, [clientsCollectionRef]);
+  }, []);
 
   useEffect(() => {
-    const processBookings = () => {
+    const processBookings = async () => {
       const now = new Date();
-      clients.forEach(async (client) => {
+      const querySnapshot = await getDocs(clientsCollectionRef);
+      const clientsFromDB = querySnapshot.docs.map(d => ({...d.data(), id: d.id}));
+
+      for (const client of clientsFromDB) {
         let clientWasUpdated = false;
         const updatedPackages = (client.packages || []).map(pkg => {
           let wasUpdated = false;
@@ -91,14 +94,15 @@ function AdminDashboard() {
         });
         if (clientWasUpdated) {
           const clientDoc = doc(db, "clients", client.id);
-          updateDoc(clientDoc, { packages: updatedPackages });
+          await updateDoc(clientDoc, { packages: updatedPackages });
         }
-      });
+      }
     };
+    
     const intervalId = setInterval(processBookings, 30000);
     return () => clearInterval(intervalId);
-  }, [clients]);
-
+  }, [clients, clientsCollectionRef]);
+  
   const handleAddClient = async (e) => { e.preventDefault(); if (!newClientName.trim()) return; await addDoc(clientsCollectionRef, { name: newClientName, email: newClientEmail, packages: [] }); setNewClientName(''); setNewClientEmail(''); };
   const handleDeleteClient = async (clientId) => { if (window.confirm('Sei sicuro?')) await deleteDoc(doc(db, "clients", clientId)); };
   const handleUpdateClient = async (e) => { e.preventDefault(); if (!editingClient || !editingClient.name.trim()) return; const clientDoc = doc(db, "clients", editingClient.id); await updateDoc(clientDoc, { name: editingClient.name, email: editingClient.email || '' }); setEditingClient(null); };
@@ -146,7 +150,10 @@ function AdminDashboard() {
         });
     }
 
-    delete bookingToUpdate.requests[dateString];
+    bookingToUpdate.requests[dateString].resolved = true;
+    bookingToUpdate.requests[dateString].status = `Approvata e Spostata`;
+    bookingToUpdate.requests[dateString].notified = false;
+    bookingToUpdate.requests[dateString].notification = { message: notificationMessage };
 
     await updateDoc(doc(db, "clients", client.id), { packages: clientToUpdate.packages });
     setManagingRequest(null);
@@ -157,17 +164,25 @@ function AdminDashboard() {
     if(!clientToUpdate) return;
     const pkg = clientToUpdate.packages.find(p => p.id === packageId);
     const booking = pkg.bookings.find(b => b.id === bookingId);
-    if(!booking || !booking.requests || !booking.requests[dateString]) return;
+    const request = (booking.requests || {})[dateString];
+    if(!request) return;
+    const originalStatus = request.status;
 
-    if (resolution === 'approved' && booking.requests[dateString].status.includes('Cancellazione')) {
+    booking.requests[dateString].resolved = true;
+    booking.requests[dateString].notified = false;
+    
+    if(resolution === 'rejected') {
+        booking.requests[dateString].status = `Rifiutata: ${originalStatus}`;
+        booking.requests[dateString].notification = { message: `La tua richiesta di modifica per la lezione del ${new Date(dateString).toLocaleDateString()} è stata rifiutata.` };
+    } else if (resolution === 'approved' && originalStatus.includes('Cancellazione')) {
+        booking.requests[dateString].status = `Cancellazione Approvata`;
+        booking.requests[dateString].notification = { message: `La tua richiesta di cancellazione per la lezione del ${new Date(dateString).toLocaleDateString()} è stata approvata.` };
         if(booking.type === 'single'){
             pkg.bookings = pkg.bookings.filter(b => b.id !== bookingId);
         } else {
             booking.cancelledDates = [...(booking.cancelledDates || []), dateString];
             delete booking.requests[dateString];
         }
-    } else {
-        delete booking.requests[dateString];
     }
     
     let newCompletedHours = 0;
