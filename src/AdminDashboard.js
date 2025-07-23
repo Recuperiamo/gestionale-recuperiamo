@@ -20,7 +20,9 @@ function RequestManager({ clients, onUpdateRequest }) {
         });
     });
 
-    if (allRequests.length === 0) { return <h2>Nessuna Richiesta di Modifica</h2>; }
+    if (allRequests.length === 0) {
+        return <h2>Nessuna Richiesta di Modifica</h2>;
+    }
 
     return (
         <div className="request-manager">
@@ -97,7 +99,7 @@ function AdminDashboard() {
                   d.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay() + dayOfWeek);
                   const dateString = d.toISOString().split('T')[0];
                   const isCancelled = (tempBooking.cancelledDates || []).includes(dateString);
-                  const hasRequest = tempBooking.requests && tempBooking.requests[dateString];
+                  const hasRequest = tempBooking.requests && tempBooking.requests[dateString] && !tempBooking.requests[dateString].resolved;
                   if (!isCancelled && !hasRequest && d < now && !newProcessedDates.has(dateString)) {
                     newProcessedDates.add(dateString);
                     recurringUpdated = true;
@@ -137,7 +139,7 @@ function AdminDashboard() {
     const intervalId = setInterval(processBookings, 60000);
     return () => clearInterval(intervalId);
   }, [clients]);
-  
+
   const handleAddClient = async (e) => { e.preventDefault(); if (!newClientName.trim()) return; await addDoc(clientsCollectionRef, { name: newClientName, email: newClientEmail, packages: [] }); setNewClientName(''); setNewClientEmail(''); };
   const handleDeleteClient = async (clientId) => { if (window.confirm('Sei sicuro?')) await deleteDoc(doc(db, "clients", clientId)); };
   const handleUpdateClient = async (e) => { e.preventDefault(); if (!editingClient || !editingClient.name.trim()) return; const clientDoc = doc(db, "clients", editingClient.id); await updateDoc(clientDoc, { name: editingClient.name, email: editingClient.email || '' }); setEditingClient(null); };
@@ -208,7 +210,7 @@ function AdminDashboard() {
                                                     <input type="date" value={bookingDetails.date} onChange={(e) => setBookingDetails({ ...bookingDetails, date: e.target.value })} required />
                                                     <input type="time" value={bookingDetails.time} onChange={(e) => setBookingDetails({ ...bookingDetails, time: e.target.value })} required />
                                                     <input type="number" min="0.1" step="0.1" placeholder="Durata" value={bookingDetails.hours} onChange={(e) => setBookingDetails({ ...bookingDetails, hours: e.target.value })} required />
-                                                    {bookingType === 'recurring' ? ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> ) : null }
+                                                    {bookingType === 'recurring' && ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> )}
                                                     <div className="form-actions"><button type="submit">Conferma</button><button type="button" onClick={() => setBookingForm(null)}>Annulla</button></div>
                                                 </form>
                                             )}
@@ -219,8 +221,12 @@ function AdminDashboard() {
                                                     const endTime = new Date(startTime);
                                                     endTime.setMinutes(startTime.getMinutes() + (occurrence.hoursBooked * 60));
                                                     const dateString = startTime.toISOString().split('T')[0];
-                                                    const requestStatus = (occurrence.requests || {})[dateString]?.status;
-                                                    
+                                                    const request = (occurrence.requests || {})[dateString];
+                                                    const requestStatus = request?.status;
+                                                    let itemStyle = {};
+                                                    if (request && !request.resolved) {
+                                                        if (requestStatus.includes('Urgente')) { itemStyle = { backgroundColor: '#5c3333' }; } else { itemStyle = { backgroundColor: '#4a412a' }; }
+                                                    }
                                                     return (
                                                         <li key={occurrence.uniqueId}>
                                                           { editingOccurrence && editingOccurrence.uniqueId === occurrence.uniqueId ? (
@@ -232,8 +238,8 @@ function AdminDashboard() {
                                                               <button type="button" onClick={() => setEditingOccurrence(null)}>Annulla</button>
                                                             </form>
                                                           ) : (
-                                                            <div className="booking-item">
-                                                                {requestStatus && <span>⚠️</span>}
+                                                            <div className="booking-item" style={itemStyle}>
+                                                                {requestStatus && !request.resolved && <span>⚠️</span>}
                                                                 <span>Data: {startTime.toLocaleDateString()}</span>
                                                                 <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                                 <span>Fine: {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
