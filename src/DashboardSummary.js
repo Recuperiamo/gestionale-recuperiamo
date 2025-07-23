@@ -2,8 +2,15 @@ import React from 'react';
 
 function DashboardSummary({ clients }) {
   const today = new Date();
-  const endOfWeek = new Date();
-  endOfWeek.setDate(today.getDate() + 7);
+  const startOfWeek = new Date(today);
+  const day = today.getDay();
+  const diff = today.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  startOfWeek.setDate(diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 5); // Sabato
+  endOfWeek.setHours(23, 59, 59, 999);
 
   const upcomingLessons = [];
   const lowHourPackages = [];
@@ -21,7 +28,7 @@ function DashboardSummary({ clients }) {
       (pkg.bookings || []).forEach(booking => {
         if (booking.type === 'single') {
           const lessonDate = new Date(booking.dateTime);
-          if (lessonDate >= today && lessonDate <= endOfWeek && !booking.isProcessed) {
+          if (lessonDate >= startOfWeek && lessonDate <= endOfWeek && !booking.isProcessed) {
             const endTime = new Date(lessonDate);
             endTime.setMinutes(lessonDate.getMinutes() + booking.hoursBooked * 60);
             upcomingLessons.push({
@@ -44,7 +51,7 @@ function DashboardSummary({ clients }) {
               const isCancelled = (booking.cancelledDates || []).includes(dateString);
               const hasRequest = (booking.requests || {})[dateString];
 
-              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString)) {
+              if (!isCancelled && !hasRequest && d >= startOfWeek && d <= endOfWeek && !(booking.processedDates || []).includes(dateString)) {
                 const endTime = new Date(d);
                 endTime.setMinutes(d.getMinutes() + booking.hoursBooked * 60);
                 upcomingLessons.push({
@@ -65,17 +72,17 @@ function DashboardSummary({ clients }) {
   return (
     <div className="dashboard-summary">
       <div className="summary-box">
-        <h3>Lezioni della Settimana</h3>
+        <h3>Lezioni della Settimana (Lun-Sab)</h3>
         {upcomingLessons.length > 0 ? (
           <ul>
             {upcomingLessons.map((lesson, index) => (
               <li key={index}>
-                <strong>{lesson.clientName}</strong> - {lesson.date.toLocaleDateString()} ({lesson.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {lesson.endDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
+                <strong>{lesson.clientName}</strong> - {lesson.date.toLocaleDateString([], {weekday: 'long', day: 'numeric'})} ({lesson.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {lesson.endDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
               </li>
             ))}
           </ul>
         ) : (
-          <p>Nessuna lezione in programma per i prossimi 7 giorni.</p>
+          <p>Nessuna lezione in programma per questa settimana.</p>
         )}
       </div>
       <div className="summary-box">

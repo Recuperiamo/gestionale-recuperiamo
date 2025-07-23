@@ -51,66 +51,22 @@ function ClientPortal({ user }) {
   }, [user]);
 
   const handleRequestChangeClick = (occurrence) => {
-    const now = new Date();
-    const lessonDate = occurrence.effectiveDate;
-    const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
-    if (lessonDate - now < threeDaysInMs) {
-      const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
-      if (window.confirm(message)) {
-        submitUrgentRequest(occurrence);
-      }
-    } else {
-      setRequestForm(occurrence);
-      setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-    }
+    setRequestForm(occurrence);
+    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
   };
   
-  const submitUrgentRequest = async (occurrence) => {
-    const newStatus = 'Richiesta Urgente (meno di 3gg)';
-    const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
-    const clientDocRef = doc(db, "clients", clientData.id);
-    const newPackages = clientData.packages.map(pkg => {
-      if (pkg.id === occurrence.packageId) {
-        const newBookings = pkg.bookings.map(b => {
-          if (b.id === occurrence.bookingId) {
-            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus, resolved: false, notified: false } };
-            return { ...b, requests: newRequests };
-          }
-          return b;
-        });
-        return { ...pkg, bookings: newBookings };
-      }
-      return pkg;
-    });
-    await updateDoc(clientDocRef, { packages: newPackages });
-  };
-
-  const handleAvailabilityChange = (dateString, field, value) => {
-    const currentAvailability = { ...requestDetails.availability };
-    if (field === 'day') {
-      if (currentAvailability[dateString]) {
-        delete currentAvailability[dateString];
-      } else {
-        currentAvailability[dateString] = { from: '', to: '' };
-      }
-    } else {
-      currentAvailability[dateString][field] = value;
-    }
-    setRequestDetails({...requestDetails, availability: currentAvailability});
-  };
-
   const handleSubmitRequestChange = async (e) => {
     e.preventDefault();
     const occurrence = requestForm;
     const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-    const isUrgent7Days = (occurrence.effectiveDate - new Date() < sevenDaysInMs);
+    const isUrgent = (occurrence.effectiveDate - new Date() < sevenDaysInMs);
     let newStatus = '';
     let changeDetails = { type: requestDetails.type };
 
     if (requestDetails.type === 'cancella') {
         newStatus = 'Cancellazione Richiesta';
     } else {
-        if (isUrgent7Days) {
+        if (isUrgent) {
             const availableSlots = Object.entries(requestDetails.availability);
             if (availableSlots.length === 0 || availableSlots.some(([_, times]) => !times.from || !times.to)) {
                 alert('Per favore, seleziona almeno un giorno e compila entrambi gli orari.');
@@ -151,6 +107,20 @@ function ClientPortal({ user }) {
     await updateDoc(clientDocRef, { packages: newPackages });
     setRequestForm(null);
   };
+  
+  const handleAvailabilityChange = (dateString, field, value) => {
+    const currentAvailability = { ...requestDetails.availability };
+    if (field === 'day') {
+      if (currentAvailability[dateString]) {
+        delete currentAvailability[dateString];
+      } else {
+        currentAvailability[dateString] = { from: '', to: '' };
+      }
+    } else {
+      currentAvailability[dateString][field] = value;
+    }
+    setRequestDetails({...requestDetails, availability: currentAvailability});
+  };
 
   if (loading) return <div>Caricamento in corso...</div>;
   if (!clientData) return (
@@ -177,7 +147,7 @@ function ClientPortal({ user }) {
     }
     return days;
   };
-  
+
   return (
     <div className="App">
       <header className="App-header">
@@ -243,7 +213,7 @@ function ClientPortal({ user }) {
                                 eightDaysFromNow.setDate(today.getDate() + 8);
 
                                 const isCancellable = lessonDateOnly >= eightDaysFromNow;
-                                const isUrgent7Days = !isCancellable;
+                                const isUrgent = !isCancellable;
 
                                 const dateString = startTime.toISOString().split('T')[0];
                                 const request = (occurrence.requests || {})[dateString];
@@ -269,7 +239,7 @@ function ClientPortal({ user }) {
                                                 </div>
                                                 
                                                 {requestDetails.type === 'sposta' && (
-                                                    isUrgent7Days ? (
+                                                    isUrgent ? (
                                                         <div className="days-selector">
                                                             <p>Seleziona i giorni e gli orari in cui saresti disponibile:</p>
                                                             {getAvailableDays(startTime).map(day => {
@@ -282,23 +252,23 @@ function ClientPortal({ user }) {
                                                                             {day.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
                                                                         </label>
                                                                         {isChecked && (
-                                                                            <>
+                                                                            <div className="time-inputs">
                                                                                 dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
                                                                                 alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
-                                                                            </>
+                                                                            </div>
                                                                         )}
                                                                     </div>
                                                                 );
                                                             })}
                                                         </div>
                                                     ) : (
-                                                        <>
+                                                        <div>
                                                             <input type="date" value={requestDetails.newDate} onChange={(e) => setRequestDetails({...requestDetails, newDate: e.target.value})} required />
                                                             dalle
                                                             <input type="time" value={requestDetails.newTimeFrom} onChange={(e) => setRequestDetails({...requestDetails, newTimeFrom: e.target.value})} required />
                                                             alle
                                                             <input type="time" value={requestDetails.newTimeTo} onChange={(e) => setRequestDetails({...requestDetails, newTimeTo: e.target.value})} required />
-                                                        </>
+                                                        </div>
                                                     )
                                                 )}
                                                 
