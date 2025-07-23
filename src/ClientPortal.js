@@ -150,7 +150,7 @@ function ClientPortal({ user }) {
     }
     return days;
   };
-
+  
   return (
     <div className="App">
       <header className="App-header">
@@ -185,6 +185,13 @@ function ClientPortal({ user }) {
                 allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
                 const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
                 const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
+                let pendingRequestsCount = 0;
+                visibleOccurrences.forEach(occ => {
+                    const dateString = occ.effectiveDate.toISOString().split('T')[0];
+                    if (occ.requests && occ.requests[dateString] && !occ.requests[dateString].resolved) {
+                        pendingRequestsCount++;
+                    }
+                });
 
                 return (
                     <li key={pkg.id} className="package-item">
@@ -196,6 +203,7 @@ function ClientPortal({ user }) {
                         </div>
                         <ul className="booking-list">
                             <h3>Le Tue Lezioni</h3>
+                            {pendingRequestsCount >= 2 && <p className="warning-message">Hai 2 richieste in sospeso. Attendi una risposta prima di inviarne altre.</p>}
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
@@ -210,7 +218,7 @@ function ClientPortal({ user }) {
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && !requestStatus && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
+                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
                                     </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
                                         <li className="booking-form-container">
@@ -239,7 +247,7 @@ function ClientPortal({ user }) {
                                                                         {isChecked && (
                                                                             <>
                                                                                 dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
-                                                                                alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.g.target.value)} required/>
+                                                                                alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
                                                                             </>
                                                                         )}
                                                                     </div>

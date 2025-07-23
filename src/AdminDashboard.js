@@ -3,49 +3,7 @@ import { db } from './firebase-config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, signOut } from "firebase/auth";
 import DashboardSummary from './DashboardSummary';
-
-function RequestManager({ clients, onUpdateRequest }) {
-    const allRequests = [];
-    clients.forEach(client => {
-        (client.packages || []).forEach(pkg => {
-            (pkg.bookings || []).forEach(booking => {
-                if (booking.requests) {
-                    Object.entries(booking.requests).forEach(([dateString, request]) => {
-                        if (request.status && !request.resolved) {
-                            allRequests.push({ client, pkg, booking, dateString, request });
-                        }
-                    });
-                }
-            });
-        });
-    });
-
-    if (allRequests.length === 0) {
-        return <h2>Nessuna Richiesta di Modifica</h2>;
-    }
-
-    return (
-        <div className="request-manager">
-            <h2>Richieste di Modifica in Sospeso</h2>
-            <ul>
-                {allRequests.map(({ client, pkg, booking, dateString, request }) => {
-                    const key = `${client.id}-${pkg.id}-${booking.id}-${dateString}`;
-                    return (
-                        <li key={key} className="request-item">
-                            <span><strong>Cliente:</strong> {client.name}</span>
-                            <span><strong>Lezione del:</strong> {new Date(dateString).toLocaleDateString()}</span>
-                            <span><strong>Richiesta:</strong> {request.status}</span>
-                            <div>
-                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'approved')}>Approva</button>
-                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'rejected')}>Rifiuta</button>
-                            </div>
-                        </li>
-                    );
-                })}
-            </ul>
-        </div>
-    );
-}
+import RequestManager from './RequestManager';
 
 function AdminDashboard() {
   const [clients, setClients] = useState([]);
@@ -157,110 +115,108 @@ function AdminDashboard() {
   const filteredClients = clients.filter(client => client.name.toLowerCase().includes(searchTerm.toLowerCase()));
   
   return (
-    <div>
-      <header className="App-header"><h1>Dashboard Admin</h1><button onClick={() => signOut(auth)}>Esci</button></header>
-      <main>
-        <DashboardSummary clients={clients} />
-        <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} />
-        <form className="add-client-form" onSubmit={handleAddClient}><input type="text" placeholder="Nome nuovo cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required /><input type="email" placeholder="Email cliente (opzionale)" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} /><button type="submit">Aggiungi Cliente</button></form>
-        <div className="client-list">
-          <h2>Clienti</h2>
-          <div className="search-bar"><input type="text" placeholder="Cerca cliente per nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-          <ul>
-            {filteredClients.map(client => (
-              <li key={client.id}>
-                {editingClient && editingClient.id === client.id ? ( <form onSubmit={handleUpdateClient} className="edit-client-form"><input type="text" value={editingClient.name} onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })} required /><input type="email" placeholder="Email cliente (opzionale)" value={editingClient.email || ''} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })} /><button type="submit">Salva Modifiche</button><button type="button" onClick={() => setEditingClient(null)}>Annulla</button></form> ) : ( <div className="client-header"><span>{client.name} {client.email && `(${client.email})`}</span><div><button onClick={() => setEditingClient(client)}>Modifica Cliente</button><button onClick={() => showPackageForm(client.id)}>Aggiungi Pacchetto</button><button onClick={() => handleDeleteClient(client.id)}>Elimina Cliente</button></div></div> )}
-                {packageFormClientId === client.id && ( <form onSubmit={(e) => handleAddPackage(e, client.id)} className="add-package-form"><input type="text" placeholder="Nome pacchetto" value={newPackageDetails.name} onChange={(e) => setNewPackageDetails({...newPackageDetails, name: e.target.value})} required /><input type="number" min="1" placeholder="Ore totali" value={newPackageDetails.totalHours} onChange={(e) => setNewPackageDetails({...newPackageDetails, totalHours: e.target.value})} required /><button type="submit">Crea</button><button type="button" onClick={() => setPackageFormClientId(null)}>Annulla</button></form> )}
-                <ul className="package-list">
-                  {(client.packages || []).map(pkg => {
-                    const allOccurrences = [];
-                    const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
-                    (pkg.bookings || []).forEach(booking => {
-                      const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
-                      if (booking.type === 'single') {
-                        allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
-                      } else {
-                        const startDate = new Date(booking.startDate);
-                        for (let i = 0; i < booking.recurrence.weeks; i++) {
-                          (booking.recurrence.days || []).forEach(day => {
-                            const dayOfWeek = dayMap[day];
-                            const firstDayOfRecurrenceWeek = new Date(startDate);
-                            firstDayOfRecurrenceWeek.setDate(startDate.getDate() + (i * 7));
-                            const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
-                            occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
-                            const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
-                            allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]), isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
-                          });
-                        }
-                      }
-                    });
-                    allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
-                    const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
-                    const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
-                    const totalBookedHours = visibleOccurrences.reduce((sum, occ) => sum + occ.hoursBooked, 0);
-                    const bookableHours = pkg.totalHours - totalBookedHours;
-                    const showWarning = pkg.remainingHours < 5 || bookableHours < 5;
-                    return (
-                      <li key={pkg.id} className="package-item">
-                        {editingPackage && editingPackage.id === pkg.id ? ( <form onSubmit={(e) => handleUpdatePackage(e, client.id, pkg.id)} className="edit-package-form"><input type="text" value={editingPackage.name} onChange={(e) => setEditingPackage({ ...editingPackage, name: e.target.value })} /><input type="number" value={editingPackage.totalHours} onChange={(e) => setEditingPackage({ ...editingPackage, totalHours: e.target.value })} /><button type="submit">Salva</button><button type="button" onClick={() => setEditingPackage(null)}>Annulla</button></form> ) : ( <div className="package-details"><span>{pkg.name}</span><span>Ore Totali: {pkg.totalHours}h</span><span>Ore Svolte: {totalCompletedHours}h</span><span>Ore Rimanenti: {pkg.remainingHours}h</span><span>Ore Prenotabili: {bookableHours}h</span><button onClick={() => showBookingForm(pkg.id)}>Aggiungi Prenotazione</button><button onClick={() => setEditingPackage(pkg)}>Modifica</button><button onClick={() => handleDeletePackage(client.id, pkg.id)}>Elimina</button></div> )}
-                        {showWarning && (<div className="warning-message">Attenzione: Le ore rimanenti o prenotabili sono meno di 5.</div>)}
-                        {bookingForm === pkg.id && (
-                          <form onSubmit={(e) => handleAddBooking(e, client.id, pkg.id)} className="booking-form">
-                            <select value={bookingType} onChange={(e) => setBookingType(e.target.value)}><option value="single">Singola</option><option value="recurring">Ricorrente</option></select>
-                            <input type="date" value={bookingDetails.date} onChange={(e) => setBookingDetails({ ...bookingDetails, date: e.target.value })} required />
-                            <input type="time" value={bookingDetails.time} onChange={(e) => setBookingDetails({ ...bookingDetails, time: e.target.value })} required />
-                            <input type="number" min="0.1" step="0.1" placeholder="Durata" value={bookingDetails.hours} onChange={(e) => setBookingDetails({ ...bookingDetails, hours: e.target.value })} required />
-                            {bookingType === 'recurring' ? ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.g.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> ) : null }
-                            <div className="form-actions"><button type="submit">Conferma</button><button type="button" onClick={() => setBookingForm(null)}>Annulla</button></div>
-                          </form>
-                        )}
-                        <ul className="booking-list">
-                          {allOccurrences.map(occurrence => {
-                            if (occurrence.isCancelled) return null;
-                            const startTime = occurrence.effectiveDate;
-                            const endTime = new Date(startTime);
-                            endTime.setMinutes(startTime.getMinutes() + (occurrence.hoursBooked * 60));
-                            const dateString = startTime.toISOString().split('T')[0];
-                            const requestStatus = (occurrence.requests || {})[dateString]?.status;
-                            let itemStyle = {};
-                            if (requestStatus) {
-                                if (requestStatus.includes('Urgente')) { itemStyle = { backgroundColor: '#5c3333' }; } else { itemStyle = { backgroundColor: '#4a412a' }; }
-                            }
-                            return (
-                                <li key={occurrence.uniqueId}>
-                                  { editingOccurrence && editingOccurrence.uniqueId === occurrence.uniqueId ? (
-                                    <form onSubmit={(e) => handleUpdateOccurrence(e, client.id, pkg.id)} className="booking-form">
-                                      <input type="date" value={editingOccurrence.date} onChange={e => setEditingOccurrence({...editingOccurrence, date: e.target.value})} />
-                                      <input type="time" value={editingOccurrence.time} onChange={e => setEditingOccurrence({...editingOccurrence, time: e.target.value})} />
-                                      <input type="number" step="0.1" value={editingOccurrence.hours} onChange={e => setEditingOccurrence({...editingOccurrence, hours: e.target.value})} />
-                                      <button type="submit">Salva</button>
-                                      <button type="button" onClick={() => setEditingOccurrence(null)}>Annulla</button>
-                                    </form>
-                                  ) : (
-                                    <div className="booking-item" style={itemStyle}>
-                                        <span>Data: {startTime.toLocaleDateString()}</span>
-                                        <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        <span>Fine: {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        <span>Durata: {occurrence.hoursBooked}h</span>
-                                        <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {occurrence.type === 'single' && !occurrence.isProcessed && !requestStatus && <button onClick={() => setEditingOccurrence({uniqueId: occurrence.uniqueId, bookingId: occurrence.bookingId, date: startTime.toISOString().split('T')[0], time: startTime.toTimeString().split(' ')[0].substring(0,5), hours: occurrence.hoursBooked })}>Modifica</button>}
-                                        <button className="delete-btn" onClick={() => handleDeleteOccurrence(client.id, pkg.id, occurrence)}>Elimina</button>
-                                    </div>
-                                  )}
-                                </li>
-                            );
-                          })}
-                        </ul>
-                      </li>
-                    );
-                  })}
+      <div>
+        <header className="App-header"><h1>Dashboard Admin</h1><button onClick={() => signOut(auth)}>Esci</button></header>
+        <main>
+            <DashboardSummary clients={clients} />
+            <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} />
+            <form className="add-client-form" onSubmit={handleAddClient}><input type="text" placeholder="Nome nuovo cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required /><input type="email" placeholder="Email cliente (opzionale)" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} /><button type="submit">Aggiungi Cliente</button></form>
+            <div className="client-list">
+                <h2>Clienti</h2>
+                <div className="search-bar"><input type="text" placeholder="Cerca cliente per nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+                <ul>
+                    {filteredClients.map(client => (
+                        <li key={client.id}>
+                            {editingClient && editingClient.id === client.id ? ( <form onSubmit={handleUpdateClient} className="edit-client-form"><input type="text" value={editingClient.name} onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })} required /><input type="email" placeholder="Email cliente (opzionale)" value={editingClient.email || ''} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })} /><button type="submit">Salva Modifiche</button><button type="button" onClick={() => setEditingClient(null)}>Annulla</button></form> ) : ( <div className="client-header"><span>{client.name} {client.email && `(${client.email})`}</span><div><button onClick={() => setEditingClient(client)}>Modifica Cliente</button><button onClick={() => showPackageForm(client.id)}>Aggiungi Pacchetto</button><button onClick={() => handleDeleteClient(client.id)}>Elimina Cliente</button></div></div> )}
+                            {packageFormClientId === client.id && ( <form onSubmit={(e) => handleAddPackage(e, client.id)} className="add-package-form"><input type="text" placeholder="Nome pacchetto" value={newPackageDetails.name} onChange={(e) => setNewPackageDetails({...newPackageDetails, name: e.target.value})} required /><input type="number" min="1" placeholder="Ore totali" value={newPackageDetails.totalHours} onChange={(e) => setNewPackageDetails({...newPackageDetails, totalHours: e.target.value})} required /><button type="submit">Crea</button><button type="button" onClick={() => setPackageFormClientId(null)}>Annulla</button></form> )}
+                            <ul className="package-list">
+                                {(client.packages || []).map(pkg => {
+                                    const allOccurrences = [];
+                                    const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
+                                    (pkg.bookings || []).forEach(booking => {
+                                        const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
+                                        if (booking.type === 'single') {
+                                            allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
+                                        } else {
+                                            const startDate = new Date(booking.startDate);
+                                            for (let i = 0; i < booking.recurrence.weeks; i++) {
+                                                (booking.recurrence.days || []).forEach(day => {
+                                                    const dayOfWeek = dayMap[day];
+                                                    const firstDayOfRecurrenceWeek = new Date(startDate);
+                                                    firstDayOfRecurrenceWeek.setDate(startDate.getDate() + (i * 7));
+                                                    const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
+                                                    occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
+                                                    const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
+                                                    allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]), isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
+                                                });
+                                            }
+                                        }
+                                    });
+                                    allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
+                                    const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
+                                    const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
+                                    const totalBookedHours = visibleOccurrences.reduce((sum, occ) => sum + occ.hoursBooked, 0);
+                                    const bookableHours = pkg.totalHours - totalBookedHours;
+                                    const showWarning = pkg.remainingHours < 5 || bookableHours < 5;
+                                    return (
+                                        <li key={pkg.id} className="package-item">
+                                            {editingPackage && editingPackage.id === pkg.id ? ( <form onSubmit={(e) => handleUpdatePackage(e, client.id, pkg.id)} className="edit-package-form"><input type="text" value={editingPackage.name} onChange={(e) => setEditingPackage({ ...editingPackage, name: e.target.value })} /><input type="number" value={editingPackage.totalHours} onChange={(e) => setEditingPackage({ ...editingPackage, totalHours: e.target.value })} /><button type="submit">Salva</button><button type="button" onClick={() => setEditingPackage(null)}>Annulla</button></form> ) : ( <div className="package-details"><span>{pkg.name}</span><span>Ore Totali: {pkg.totalHours}h</span><span>Ore Svolte: {totalCompletedHours}h</span><span>Ore Rimanenti: {pkg.remainingHours}h</span><span>Ore Prenotabili: {bookableHours}h</span><button onClick={() => showBookingForm(pkg.id)}>Aggiungi Prenotazione</button><button onClick={() => setEditingPackage(pkg)}>Modifica</button><button onClick={() => handleDeletePackage(client.id, pkg.id)}>Elimina</button></div> )}
+                                            {showWarning && (<div className="warning-message">Attenzione: Le ore rimanenti o prenotabili sono meno di 5.</div>)}
+                                            {bookingForm === pkg.id && (
+                                                <form onSubmit={(e) => handleAddBooking(e, client.id, pkg.id)} className="booking-form">
+                                                    <select value={bookingType} onChange={(e) => setBookingType(e.target.value)}><option value="single">Singola</option><option value="recurring">Ricorrente</option></select>
+                                                    <input type="date" value={bookingDetails.date} onChange={(e) => setBookingDetails({ ...bookingDetails, date: e.target.value })} required />
+                                                    <input type="time" value={bookingDetails.time} onChange={(e) => setBookingDetails({ ...bookingDetails, time: e.target.value })} required />
+                                                    <input type="number" min="0.1" step="0.1" placeholder="Durata" value={bookingDetails.hours} onChange={(e) => setBookingDetails({ ...bookingDetails, hours: e.target.value })} required />
+                                                    {bookingType === 'recurring' ? ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> ) : null }
+                                                    <div className="form-actions"><button type="submit">Conferma</button><button type="button" onClick={() => setBookingForm(null)}>Annulla</button></div>
+                                                </form>
+                                            )}
+                                            <ul className="booking-list">
+                                                {allOccurrences.map(occurrence => {
+                                                    if (occurrence.isCancelled) return null;
+                                                    const startTime = occurrence.effectiveDate;
+                                                    const endTime = new Date(startTime);
+                                                    endTime.setMinutes(startTime.getMinutes() + (occurrence.hoursBooked * 60));
+                                                    const dateString = startTime.toISOString().split('T')[0];
+                                                    const requestStatus = (occurrence.requests || {})[dateString]?.status;
+                                                    
+                                                    return (
+                                                        <li key={occurrence.uniqueId}>
+                                                          { editingOccurrence && editingOccurrence.uniqueId === occurrence.uniqueId ? (
+                                                            <form onSubmit={(e) => handleUpdateOccurrence(e, client.id, pkg.id)} className="booking-form">
+                                                              <input type="date" value={editingOccurrence.date} onChange={e => setEditingOccurrence({...editingOccurrence, date: e.target.value})} />
+                                                              <input type="time" value={editingOccurrence.time} onChange={e => setEditingOccurrence({...editingOccurrence, time: e.target.value})} />
+                                                              <input type="number" step="0.1" value={editingOccurrence.hours} onChange={e => setEditingOccurrence({...editingOccurrence, hours: e.target.value})} />
+                                                              <button type="submit">Salva</button>
+                                                              <button type="button" onClick={() => setEditingOccurrence(null)}>Annulla</button>
+                                                            </form>
+                                                          ) : (
+                                                            <div className="booking-item">
+                                                                <span>{requestStatus && '⚠️'}</span>
+                                                                <span>Data: {startTime.toLocaleDateString()}</span>
+                                                                <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span>Fine: {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span>Durata: {occurrence.hoursBooked}h</span>
+                                                                <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
+                                                                {occurrence.type === 'single' && !occurrence.isProcessed && !requestStatus && <button onClick={() => setEditingOccurrence({uniqueId: occurrence.uniqueId, bookingId: occurrence.bookingId, date: startTime.toISOString().split('T')[0], time: startTime.toTimeString().split(' ')[0].substring(0,5), hours: occurrence.hoursBooked })}>Modifica</button>}
+                                                                <button className="delete-btn" onClick={() => handleDeleteOccurrence(client.id, pkg.id, occurrence)}>Elimina</button>
+                                                            </div>
+                                                          )}
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </li>
+                    ))}
                 </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </main>
-    </div>
+            </div>
+        </main>
+      </div>
   );
 }
 

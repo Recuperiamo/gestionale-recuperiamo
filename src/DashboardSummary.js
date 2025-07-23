@@ -1,4 +1,3 @@
-// src/DashboardSummary.js
 import React from 'react';
 
 function DashboardSummary({ clients }) {
