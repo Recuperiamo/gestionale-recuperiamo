@@ -28,15 +28,12 @@ function AdminDashboard() {
       setClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
     return () => unsubscribe();
-  }, []);
+  }, [clientsCollectionRef]);
 
   useEffect(() => {
-    const processBookings = async () => {
+    const processBookings = () => {
       const now = new Date();
-      const querySnapshot = await getDocs(clientsCollectionRef);
-      const clientsFromDB = querySnapshot.docs.map(d => ({...d.data(), id: d.id}));
-
-      for (const client of clientsFromDB) {
+      clients.forEach(async (client) => {
         let clientWasUpdated = false;
         const updatedPackages = (client.packages || []).map(pkg => {
           let wasUpdated = false;
@@ -44,7 +41,7 @@ function AdminDashboard() {
             let tempBooking = { ...booking };
             if (tempBooking.type === 'single' && !tempBooking.isProcessed && new Date(tempBooking.dateTime) < now) {
               const dateString = new Date(tempBooking.dateTime).toISOString().split('T')[0];
-              if (!tempBooking.requests || !tempBooking.requests[dateString] || tempBooking.requests[dateString].resolved) {
+              if (!(tempBooking.requests && tempBooking.requests[dateString] && !tempBooking.requests[dateString].resolved)) {
                 tempBooking.isProcessed = true;
                 wasUpdated = true;
               }
@@ -94,11 +91,10 @@ function AdminDashboard() {
         });
         if (clientWasUpdated) {
           const clientDoc = doc(db, "clients", client.id);
-          await updateDoc(clientDoc, { packages: updatedPackages });
+          updateDoc(clientDoc, { packages: updatedPackages });
         }
-      }
+      });
     };
-    
     const intervalId = setInterval(processBookings, 30000);
     return () => clearInterval(intervalId);
   }, [clients]);
@@ -118,7 +114,7 @@ function AdminDashboard() {
     setManagingRequest({ 
         client, pkg, booking, dateString, 
         newDate: originalDate.toISOString().split('T')[0], 
-        newTime: originalDate.toTimeString().split(' ')[0].substring(0, 5) 
+        newTime: originalDate.toTimeString().split(' ')[0].substring(0,5) 
     });
   };
 
@@ -134,7 +130,7 @@ function AdminDashboard() {
     if (!bookingToUpdate || !request) return;
 
     const newDateTime = `${managingRequest.newDate}T${managingRequest.newTime}`;
-    const notificationMessage = `La tua richiesta di spostamento per la lezione del ${new Date(dateString).toLocaleDateString()} è stata approvata. Nuova data: ${new Date(newDateTime).toLocaleString()}`;
+    const notificationMessage = `La tua richiesta di spostamento per la lezione del ${new Date(dateString).toLocaleDateString()} è stata approvata. Nuova data: ${new Date(newDateTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
     
     if (bookingToUpdate.type === 'single') {
         bookingToUpdate.dateTime = newDateTime;
@@ -150,37 +146,28 @@ function AdminDashboard() {
         });
     }
 
-    bookingToUpdate.requests[dateString].resolved = true;
-    bookingToUpdate.requests[dateString].status = `Approvata e Spostata`;
-    bookingToUpdate.requests[dateString].notification = { message: notificationMessage, seen: false };
+    delete bookingToUpdate.requests[dateString];
 
     await updateDoc(doc(db, "clients", client.id), { packages: clientToUpdate.packages });
     setManagingRequest(null);
   };
-
+  
   const handleUpdateRequest = async (clientId, packageId, bookingId, dateString, resolution) => {
     const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId)));
     if(!clientToUpdate) return;
     const pkg = clientToUpdate.packages.find(p => p.id === packageId);
     const booking = pkg.bookings.find(b => b.id === bookingId);
-    const request = (booking.requests || {})[dateString];
-    if(!request) return;
-    const originalStatus = request.status;
+    if(!booking || !booking.requests || !booking.requests[dateString]) return;
 
-    booking.requests[dateString].resolved = true;
-    booking.requests[dateString].notified = false; // Flag for client notification
-    
-    if(resolution === 'rejected') {
-        booking.requests[dateString].status = `Rifiutata: ${originalStatus}`;
-        booking.requests[dateString].notification = { message: `La tua richiesta di modifica per la lezione del ${new Date(dateString).toLocaleDateString()} è stata rifiutata.` };
-    } else if (resolution === 'approved' && originalStatus.includes('Cancellazione')) {
-        booking.requests[dateString].status = `Cancellazione Approvata`;
-        booking.requests[dateString].notification = { message: `La tua richiesta di cancellazione per la lezione del ${new Date(dateString).toLocaleDateString()} è stata approvata.` };
+    if (resolution === 'approved' && booking.requests[dateString].status.includes('Cancellazione')) {
         if(booking.type === 'single'){
             pkg.bookings = pkg.bookings.filter(b => b.id !== bookingId);
         } else {
             booking.cancelledDates = [...(booking.cancelledDates || []), dateString];
+            delete booking.requests[dateString];
         }
+    } else {
+        delete booking.requests[dateString];
     }
     
     let newCompletedHours = 0;
@@ -197,118 +184,118 @@ function AdminDashboard() {
   const filteredClients = clients.filter(client => client.name.toLowerCase().includes(searchTerm.toLowerCase()));
   
   return (
-    <div>
-      <header className="App-header"><h1>Dashboard Admin</h1><button onClick={() => signOut(auth)}>Esci</button></header>
-      <main>
-        <DashboardSummary clients={clients} />
-        <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} onManageReschedule={handleManageReschedule} />
-        {managingRequest && (
-            <div className="edit-client-form">
-                <h3>Approva Spostamento per {managingRequest.client.name}</h3>
-                <p><strong>Richiesta:</strong> {managingRequest.request.status}</p>
-                <div>
-                    <label>Nuova Data:</label>
-                    <input type="date" value={managingRequest.newDate} onChange={e => setManagingRequest({...managingRequest, newDate: e.target.value})} />
-                    <label>Nuova Ora:</label>
-                    <input type="time" value={managingRequest.newTime} onChange={e => setManagingRequest({...managingRequest, newTime: e.target.value})} />
+      <div>
+        <header className="App-header"><h1>Dashboard Admin</h1><button onClick={() => signOut(auth)}>Esci</button></header>
+        <main>
+            <DashboardSummary clients={clients} />
+            <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} onManageReschedule={handleManageReschedule} />
+            {managingRequest && (
+                <div className="edit-client-form">
+                    <h3>Approva Spostamento per {managingRequest.client.name}</h3>
+                    <p><strong>Richiesta del cliente:</strong> {managingRequest.request.status}</p>
+                    <div>
+                        <label>Nuova Data:</label>
+                        <input type="date" value={managingRequest.newDate} onChange={e => setManagingRequest({...managingRequest, newDate: e.target.value})} />
+                        <label>Nuova Ora:</label>
+                        <input type="time" value={managingRequest.newTime} onChange={e => setManagingRequest({...managingRequest, newTime: e.target.value})} />
+                    </div>
+                    <button onClick={handleApproveReschedule} disabled={!managingRequest.newDate || !managingRequest.newTime}>Approva e Salva Spostamento</button>
+                    <button type="button" onClick={() => setManagingRequest(null)}>Annulla</button>
                 </div>
-                <button onClick={handleApproveReschedule}>Approva e Salva</button>
-                <button onClick={() => setManagingRequest(null)}>Annulla</button>
-            </div>
-        )}
-        <form className="add-client-form" onSubmit={handleAddClient}><input type="text" placeholder="Nome nuovo cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required /><input type="email" placeholder="Email cliente (opzionale)" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} /><button type="submit">Aggiungi Cliente</button></form>
-        <div className="client-list">
-          <h2>Clienti</h2>
-          <div className="search-bar"><input type="text" placeholder="Cerca cliente per nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-          <ul>
-            {filteredClients.map(client => (
-              <li key={client.id}>
-                {editingClient && editingClient.id === client.id ? ( <form onSubmit={handleUpdateClient} className="edit-client-form"><input type="text" value={editingClient.name} onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })} required /><input type="email" placeholder="Email cliente (opzionale)" value={editingClient.email || ''} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })} /><button type="submit">Salva Modifiche</button><button type="button" onClick={() => setEditingClient(null)}>Annulla</button></form> ) : ( <div className="client-header"><span>{client.name} {client.email && `(${client.email})`}</span><div><button onClick={() => setEditingClient(client)}>Modifica Cliente</button><button onClick={() => showPackageForm(client.id)}>Aggiungi Pacchetto</button><button onClick={() => handleDeleteClient(client.id)}>Elimina Cliente</button></div></div> )}
-                {packageFormClientId === client.id && ( <form onSubmit={(e) => handleAddPackage(e, client.id)} className="add-package-form"><input type="text" placeholder="Nome pacchetto" value={newPackageDetails.name} onChange={(e) => setNewPackageDetails({...newPackageDetails, name: e.target.value})} required /><input type="number" min="1" placeholder="Ore totali" value={newPackageDetails.totalHours} onChange={(e) => setNewPackageDetails({...newPackageDetails, totalHours: e.target.value})} required /><button type="submit">Crea</button><button type="button" onClick={() => setPackageFormClientId(null)}>Annulla</button></form> )}
-                <ul className="package-list">
-                  {(client.packages || []).map(pkg => {
-                    const allOccurrences = [];
-                    const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
-                    (pkg.bookings || []).forEach(booking => {
-                        const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
-                        if (booking.type === 'single') {
-                            allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
-                        } else {
-                            const startDate = new Date(booking.startDate);
-                            for (let i = 0; i < booking.recurrence.weeks; i++) {
-                                (booking.recurrence.days || []).forEach(day => {
-                                    const dayOfWeek = dayMap[day];
-                                    const firstDayOfRecurrenceWeek = new Date(startDate);
-                                    firstDayOfRecurrenceWeek.setDate(startDate.getDate() + (i * 7));
-                                    const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
-                                    occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
-                                    const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
-                                    allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]), isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
-                                });
-                            }
-                        }
-                    });
-                    allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
-                    const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
-                    const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
-                    const totalBookedHours = visibleOccurrences.reduce((sum, occ) => sum + occ.hoursBooked, 0);
-                    const bookableHours = pkg.totalHours - totalBookedHours;
-                    const showWarning = pkg.remainingHours < 5 || bookableHours < 5;
-                    return (
-                        <li key={pkg.id} className="package-item">
-                            {editingPackage && editingPackage.id === pkg.id ? ( <form onSubmit={(e) => handleUpdatePackage(e, client.id, pkg.id)} className="edit-package-form"><input type="text" value={editingPackage.name} onChange={(e) => setEditingPackage({ ...editingPackage, name: e.target.value })} /><input type="number" value={editingPackage.totalHours} onChange={(e) => setEditingPackage({ ...editingPackage, totalHours: e.target.value })} /><button type="submit">Salva</button><button type="button" onClick={() => setEditingPackage(null)}>Annulla</button></form> ) : ( <div className="package-details"><span>{pkg.name}</span><span>Ore Totali: {pkg.totalHours}h</span><span>Ore Svolte: {totalCompletedHours}h</span><span>Ore Rimanenti: {pkg.remainingHours}h</span><span>Ore Prenotabili: {bookableHours}h</span><button onClick={() => showBookingForm(pkg.id)}>Aggiungi Prenotazione</button><button onClick={() => setEditingPackage(pkg)}>Modifica</button><button onClick={() => handleDeletePackage(client.id, pkg.id)}>Elimina</button></div> )}
-                            {showWarning && (<div className="warning-message">Attenzione: Le ore rimanenti o prenotabili sono meno di 5.</div>)}
-                            {bookingForm === pkg.id && (
-                                <form onSubmit={(e) => handleAddBooking(e, client.id, pkg.id)} className="booking-form">
-                                    <select value={bookingType} onChange={(e) => setBookingType(e.target.value)}><option value="single">Singola</option><option value="recurring">Ricorrente</option></select>
-                                    <input type="date" value={bookingDetails.date} onChange={(e) => setBookingDetails({ ...bookingDetails, date: e.target.value })} required />
-                                    <input type="time" value={bookingDetails.time} onChange={(e) => setBookingDetails({ ...bookingDetails, time: e.target.value })} required />
-                                    <input type="number" min="0.1" step="0.1" placeholder="Durata" value={bookingDetails.hours} onChange={(e) => setBookingDetails({ ...bookingDetails, hours: e.target.value })} required />
-                                    <div className="form-actions">
-                                        {bookingType === 'recurring' && ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> )}
-                                        <button type="submit">Conferma</button>
-                                        <button type="button" onClick={() => setBookingForm(null)}>Annulla</button>
-                                    </div>
-                                </form>
-                            )}
-                            <ul className="booking-list">
-                                {allOccurrences.map(occurrence => {
-                                    if (occurrence.isCancelled) return null;
-                                    const startTime = occurrence.effectiveDate;
-                                    const endTime = new Date(startTime);
-                                    endTime.setMinutes(startTime.getMinutes() + (occurrence.hoursBooked * 60));
-                                    const dateString = startTime.toISOString().split('T')[0];
-                                    const request = (occurrence.requests || {})[dateString];
-                                    const requestStatus = request?.status;
+            )}
+            <form className="add-client-form" onSubmit={handleAddClient}><input type="text" placeholder="Nome nuovo cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required /><input type="email" placeholder="Email cliente (opzionale)" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} /><button type="submit">Aggiungi Cliente</button></form>
+            <div className="client-list">
+                <h2>Clienti</h2>
+                <div className="search-bar"><input type="text" placeholder="Cerca cliente per nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+                <ul>
+                    {filteredClients.map(client => (
+                        <li key={client.id}>
+                            {editingClient && editingClient.id === client.id ? ( <form onSubmit={handleUpdateClient} className="edit-client-form"><input type="text" value={editingClient.name} onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })} required /><input type="email" placeholder="Email cliente (opzionale)" value={editingClient.email || ''} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })} /><button type="submit">Salva Modifiche</button><button type="button" onClick={() => setEditingClient(null)}>Annulla</button></form> ) : ( <div className="client-header"><span>{client.name} {client.email && `(${client.email})`}</span><div><button onClick={() => setEditingClient(client)}>Modifica Cliente</button><button onClick={() => showPackageForm(client.id)}>Aggiungi Pacchetto</button><button onClick={() => handleDeleteClient(client.id)}>Elimina Cliente</button></div></div> )}
+                            {packageFormClientId === client.id && ( <form onSubmit={(e) => handleAddPackage(e, client.id)} className="add-package-form"><input type="text" placeholder="Nome pacchetto" value={newPackageDetails.name} onChange={(e) => setNewPackageDetails({...newPackageDetails, name: e.target.value})} required /><input type="number" min="1" placeholder="Ore totali" value={newPackageDetails.totalHours} onChange={(e) => setNewPackageDetails({...newPackageDetails, totalHours: e.target.value})} required /><button type="submit">Crea</button><button type="button" onClick={() => setPackageFormClientId(null)}>Annulla</button></form> )}
+                            <ul className="package-list">
+                                {(client.packages || []).map(pkg => {
+                                    const allOccurrences = [];
+                                    const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
+                                    (pkg.bookings || []).forEach(booking => {
+                                        const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
+                                        if (booking.type === 'single') {
+                                            allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
+                                        } else {
+                                            const startDate = new Date(booking.startDate);
+                                            for (let i = 0; i < booking.recurrence.weeks; i++) {
+                                                (booking.recurrence.days || []).forEach(day => {
+                                                    const dayOfWeek = dayMap[day];
+                                                    const firstDayOfRecurrenceWeek = new Date(startDate);
+                                                    firstDayOfRecurrenceWeek.setDate(startDate.getDate() + (i * 7));
+                                                    const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
+                                                    occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
+                                                    const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
+                                                    allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]), isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
+                                                });
+                                            }
+                                        }
+                                    });
+                                    allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
+                                    const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
+                                    const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
+                                    const totalBookedHours = visibleOccurrences.reduce((sum, occ) => sum + occ.hoursBooked, 0);
+                                    const bookableHours = pkg.totalHours - totalBookedHours;
+                                    const showWarning = pkg.remainingHours < 5 || bookableHours < 5;
                                     return (
-                                        <li key={occurrence.uniqueId}>
-                                          { editingOccurrence && editingOccurrence.uniqueId === occurrence.uniqueId ? (
-                                            <form onSubmit={(e) => handleUpdateOccurrence(e, client.id, pkg.id)} className="booking-form">
-                                              <input type="date" value={editingOccurrence.date} onChange={e => setEditingOccurrence({...editingOccurrence, date: e.target.value})} />
-                                              <input type="time" value={editingOccurrence.time} onChange={e => setEditingOccurrence({...editingOccurrence, time: e.target.value})} />
-                                              <input type="number" step="0.1" value={editingOccurrence.hours} onChange={e => setEditingOccurrence({...editingOccurrence, hours: e.target.value})} />
-                                              <button type="submit">Salva</button>
-                                              <button type="button" onClick={() => setEditingOccurrence(null)}>Annulla</button>
-                                            </form>
-                                          ) : (
-                                            <div className="booking-item">
-                                                {request && !request.resolved && <span>⚠️</span>}
-                                                <span>Data: {startTime.toLocaleDateString()}</span>
-                                                <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                <span>Fine: {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                <span>Durata: {occurrence.hoursBooked}h</span>
-                                                <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                                {!occurrence.isProcessed && !requestStatus && <button onClick={() => setEditingOccurrence({uniqueId: occurrence.uniqueId, bookingId: occurrence.bookingId, type: occurrence.type, date: startTime.toISOString().split('T')[0], time: startTime.toTimeString().split(' ')[0].substring(0,5), hours: occurrence.hoursBooked })}>Modifica</button>}
-                                                <button className="delete-btn" onClick={() => handleDeleteOccurrence(client.id, pkg.id, occurrence)}>Elimina</button>
-                                            </div>
-                                          )}
+                                        <li key={pkg.id} className="package-item">
+                                            {editingPackage && editingPackage.id === pkg.id ? ( <form onSubmit={(e) => handleUpdatePackage(e, client.id, pkg.id)} className="edit-package-form"><input type="text" value={editingPackage.name} onChange={(e) => setEditingPackage({ ...editingPackage, name: e.target.value })} /><input type="number" value={editingPackage.totalHours} onChange={(e) => setEditingPackage({ ...editingPackage, totalHours: e.target.value })} /><button type="submit">Salva</button><button type="button" onClick={() => setEditingPackage(null)}>Annulla</button></form> ) : ( <div className="package-details"><span>{pkg.name}</span><span>Ore Totali: {pkg.totalHours}h</span><span>Ore Svolte: {totalCompletedHours}h</span><span>Ore Rimanenti: {pkg.remainingHours}h</span><span>Ore Prenotabili: {bookableHours}h</span><button onClick={() => showBookingForm(pkg.id)}>Aggiungi Prenotazione</button><button onClick={() => setEditingPackage(pkg)}>Modifica</button><button onClick={() => handleDeletePackage(client.id, pkg.id)}>Elimina</button></div> )}
+                                            {showWarning && (<div className="warning-message">Attenzione: Le ore rimanenti o prenotabili sono meno di 5.</div>)}
+                                            {bookingForm === pkg.id && (
+                                                <form onSubmit={(e) => handleAddBooking(e, client.id, pkg.id)} className="booking-form">
+                                                    <select value={bookingType} onChange={(e) => setBookingType(e.target.value)}><option value="single">Singola</option><option value="recurring">Ricorrente</option></select>
+                                                    <input type="date" value={bookingDetails.date} onChange={(e) => setBookingDetails({ ...bookingDetails, date: e.target.value })} required />
+                                                    <input type="time" value={bookingDetails.time} onChange={(e) => setBookingDetails({ ...bookingDetails, time: e.target.value })} required />
+                                                    <input type="number" min="0.1" step="0.1" placeholder="Durata" value={bookingDetails.hours} onChange={(e) => setBookingDetails({ ...bookingDetails, hours: e.target.value })} required />
+                                                    <div className="form-actions">
+                                                        {bookingType === 'recurring' && ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> )}
+                                                        <button type="submit">Conferma</button>
+                                                        <button type="button" onClick={() => setBookingForm(null)}>Annulla</button>
+                                                    </div>
+                                                </form>
+                                            )}
+                                            <ul className="booking-list">
+                                                {allOccurrences.map(occurrence => {
+                                                    if (occurrence.isCancelled) return null;
+                                                    const startTime = occurrence.effectiveDate;
+                                                    const endTime = new Date(startTime);
+                                                    endTime.setMinutes(startTime.getMinutes() + (occurrence.hoursBooked * 60));
+                                                    const dateString = startTime.toISOString().split('T')[0];
+                                                    const request = (occurrence.requests || {})[dateString];
+                                                    const requestStatus = request?.status;
+                                                    return (
+                                                        <li key={occurrence.uniqueId}>
+                                                          { editingOccurrence && editingOccurrence.uniqueId === occurrence.uniqueId ? (
+                                                            <form onSubmit={(e) => handleUpdateOccurrence(e, client.id, pkg.id)} className="booking-form">
+                                                              <input type="date" value={editingOccurrence.date} onChange={e => setEditingOccurrence({...editingOccurrence, date: e.target.value})} />
+                                                              <input type="time" value={editingOccurrence.time} onChange={e => setEditingOccurrence({...editingOccurrence, time: e.target.value})} />
+                                                              <input type="number" step="0.1" value={editingOccurrence.hours} onChange={e => setEditingOccurrence({...editingOccurrence, hours: e.target.value})} />
+                                                              <button type="submit">Salva</button>
+                                                              <button type="button" onClick={() => setEditingOccurrence(null)}>Annulla</button>
+                                                            </form>
+                                                          ) : (
+                                                            <div className="booking-item">
+                                                                {request && !request.resolved && <span>⚠️</span>}
+                                                                <span>Data: {startTime.toLocaleDateString()}</span>
+                                                                <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span>Fine: {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span>Durata: {occurrence.hoursBooked}h</span>
+                                                                <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
+                                                                {!occurrence.isProcessed && !requestStatus && <button onClick={() => setEditingOccurrence({uniqueId: occurrence.uniqueId, bookingId: occurrence.bookingId, type: occurrence.type, date: startTime.toISOString().split('T')[0], time: startTime.toTimeString().split(' ')[0].substring(0,5), hours: occurrence.hoursBooked })}>Modifica</button>}
+                                                                <button className="delete-btn" onClick={() => handleDeleteOccurrence(client.id, pkg.id, occurrence)}>Elimina</button>
+                                                            </div>
+                                                          )}
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
                                         </li>
                                     );
                                 })}
-                            </ul>
-                        </li>
-                    );
-                })}
                             </ul>
                         </li>
                     ))}

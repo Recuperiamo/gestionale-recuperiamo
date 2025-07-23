@@ -51,10 +51,54 @@ function ClientPortal({ user }) {
   }, [user]);
 
   const handleRequestChangeClick = (occurrence) => {
-    setRequestForm(occurrence);
-    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
+    const now = new Date();
+    const lessonDate = occurrence.effectiveDate;
+    const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
+    if (lessonDate - now < threeDaysInMs) {
+      const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
+      if (window.confirm(message)) {
+        submitUrgentRequest(occurrence);
+      }
+    } else {
+      setRequestForm(occurrence);
+      setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
+    }
   };
   
+  const submitUrgentRequest = async (occurrence) => {
+    const newStatus = 'Richiesta Urgente (meno di 3gg)';
+    const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
+    const clientDocRef = doc(db, "clients", clientData.id);
+    const newPackages = clientData.packages.map(pkg => {
+      if (pkg.id === occurrence.packageId) {
+        const newBookings = pkg.bookings.map(b => {
+          if (b.id === occurrence.bookingId) {
+            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus, resolved: false, notified: false } };
+            return { ...b, requests: newRequests };
+          }
+          return b;
+        });
+        return { ...pkg, bookings: newBookings };
+      }
+      return pkg;
+    });
+    await updateDoc(clientDocRef, { packages: newPackages });
+  };
+
+  const handleAvailabilityChange = (dateString, field, value) => {
+    const currentAvailability = { ...requestDetails.availability };
+    if (field === 'day') {
+      if (currentAvailability[dateString]) {
+        delete currentAvailability[dateString];
+      } else {
+        currentAvailability[dateString] = { from: '', to: '' };
+      }
+    } else {
+      currentAvailability[dateString][field] = value;
+    }
+    setRequestDetails({...requestDetails, availability: currentAvailability});
+  };
+
   const handleSubmitRequestChange = async (e) => {
     e.preventDefault();
     const occurrence = requestForm;
@@ -106,20 +150,6 @@ function ClientPortal({ user }) {
     });
     await updateDoc(clientDocRef, { packages: newPackages });
     setRequestForm(null);
-  };
-  
-  const handleAvailabilityChange = (dateString, field, value) => {
-    const currentAvailability = { ...requestDetails.availability };
-    if (field === 'day') {
-      if (currentAvailability[dateString]) {
-        delete currentAvailability[dateString];
-      } else {
-        currentAvailability[dateString] = { from: '', to: '' };
-      }
-    } else {
-      currentAvailability[dateString][field] = value;
-    }
-    setRequestDetails({...requestDetails, availability: currentAvailability});
   };
 
   if (loading) return <div>Caricamento in corso...</div>;
