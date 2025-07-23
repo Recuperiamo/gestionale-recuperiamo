@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/gestionale-recuperiamo/static/css/main.550c61b6.css",
-    "main.js": "/gestionale-recuperiamo/static/js/main.de35c56e.js",
+    "main.js": "/gestionale-recuperiamo/static/js/main.020d8d2d.js",
     "static/js/453.627760c3.chunk.js": "/gestionale-recuperiamo/static/js/453.627760c3.chunk.js",
     "index.html": "/gestionale-recuperiamo/index.html",
     "main.550c61b6.css.map": "/gestionale-recuperiamo/static/css/main.550c61b6.css.map",
-    "main.de35c56e.js.map": "/gestionale-recuperiamo/static/js/main.de35c56e.js.map",
+    "main.020d8d2d.js.map": "/gestionale-recuperiamo/static/js/main.020d8d2d.js.map",
     "453.627760c3.chunk.js.map": "/gestionale-recuperiamo/static/js/453.627760c3.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.550c61b6.css",
-    "static/js/main.de35c56e.js"
+    "static/js/main.020d8d2d.js"
   ]
 }
