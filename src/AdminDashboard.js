@@ -3,7 +3,6 @@ import { db } from './firebase-config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, signOut } from "firebase/auth";
 import DashboardSummary from './DashboardSummary';
-import RequestManager from './RequestManager';
 
 function AdminDashboard() {
   const [clients, setClients] = useState([]);
