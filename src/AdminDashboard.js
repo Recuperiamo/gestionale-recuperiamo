@@ -3,7 +3,54 @@ import { db } from './firebase-config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, signOut } from "firebase/auth";
 import DashboardSummary from './DashboardSummary';
-import RequestManager from './RequestManager';
+
+function RequestManager({ clients, onUpdateRequest, onManageReschedule }) {
+    const allRequests = [];
+    clients.forEach(client => {
+        (client.packages || []).forEach(pkg => {
+            (pkg.bookings || []).forEach(booking => {
+                if (booking.requests) {
+                    Object.entries(booking.requests).forEach(([dateString, request]) => {
+                        if (request.status && !request.resolved) {
+                            allRequests.push({ client, pkg, booking, dateString, request });
+                        }
+                    });
+                }
+            });
+        });
+    });
+
+    if (allRequests.length === 0) {
+        return <h2>Nessuna Richiesta di Modifica</h2>;
+    }
+
+    return (
+        <div className="request-manager">
+            <h2>Richieste di Modifica in Sospeso</h2>
+            <ul>
+                {allRequests.map(({ client, pkg, booking, dateString, request }) => {
+                    const key = `${client.id}-${pkg.id}-${booking.id}-${dateString}`;
+                    const isReschedule = request.status.toLowerCase().includes('spostamento');
+                    return (
+                        <li key={key} className="request-item">
+                            <span><strong>Cliente:</strong> {client.name}</span>
+                            <span><strong>Lezione del:</strong> {new Date(dateString).toLocaleDateString()}</span>
+                            <span><strong>Richiesta:</strong> {request.status}</span>
+                            <div>
+                                {isReschedule ? (
+                                    <button onClick={() => onManageReschedule(client, pkg, booking, dateString, request)}>Gestisci</button>
+                                ) : (
+                                    <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'approved')}>Approva Cancellazione</button>
+                                )}
+                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'rejected')}>Rifiuta</button>
+                            </div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+}
 
 function AdminDashboard() {
   const [clients, setClients] = useState([]);
@@ -18,6 +65,7 @@ function AdminDashboard() {
   const [editingClient, setEditingClient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingOccurrence, setEditingOccurrence] = useState(null);
+  const [managingRequest, setManagingRequest] = useState(null); // Stato per il form di approvazione spostamento
 
   const clientsCollectionRef = collection(db, "clients");
   const auth = getAuth();
@@ -31,16 +79,16 @@ function AdminDashboard() {
 
   useEffect(() => {
     const processBookings = () => {
-      clients.forEach(client => {
+      const now = new Date();
+      clients.forEach(async (client) => {
         let clientWasUpdated = false;
         const updatedPackages = (client.packages || []).map(pkg => {
           let wasUpdated = false;
           const newBookings = (pkg.bookings || []).map(booking => {
             let tempBooking = { ...booking };
-            const now = new Date();
             if (tempBooking.type === 'single' && !tempBooking.isProcessed && new Date(tempBooking.dateTime) < now) {
               const dateString = new Date(tempBooking.dateTime).toISOString().split('T')[0];
-              if (!(tempBooking.requests && tempBooking.requests[dateString] && !tempBooking.requests[dateString].resolved)) {
+              if (!tempBooking.requests || !tempBooking.requests[dateString] || tempBooking.requests[dateString].resolved) {
                 tempBooking.isProcessed = true;
                 wasUpdated = true;
               }
@@ -90,14 +138,14 @@ function AdminDashboard() {
         });
         if (clientWasUpdated) {
           const clientDoc = doc(db, "clients", client.id);
-          updateDoc(clientDoc, { packages: updatedPackages });
+          await updateDoc(clientDoc, { packages: updatedPackages });
         }
       });
     };
-    const intervalId = setInterval(processBookings, 60000);
+    const intervalId = setInterval(processBookings, 30000);
     return () => clearInterval(intervalId);
   }, [clients]);
-
+  
   const handleAddClient = async (e) => { e.preventDefault(); if (!newClientName.trim()) return; await addDoc(clientsCollectionRef, { name: newClientName, email: newClientEmail, packages: [] }); setNewClientName(''); setNewClientEmail(''); };
   const handleDeleteClient = async (clientId) => { if (window.confirm('Sei sicuro?')) await deleteDoc(doc(db, "clients", clientId)); };
   const handleUpdateClient = async (e) => { e.preventDefault(); if (!editingClient || !editingClient.name.trim()) return; const clientDoc = doc(db, "clients", editingClient.id); await updateDoc(clientDoc, { name: editingClient.name, email: editingClient.email || '' }); setEditingClient(null); };
@@ -111,6 +159,8 @@ function AdminDashboard() {
   const showBookingForm = (packageId) => { setBookingForm(packageId); setBookingDetails({ date: '', time: '', hours: 1, weeks: 4, days: [] }); setBookingType('single'); };
   const handleDayChange = (day) => { const currentDays = bookingDetails.days; if (currentDays.includes(day)) { setBookingDetails({ ...bookingDetails, days: currentDays.filter(d => d !== day) }); } else { setBookingDetails({ ...bookingDetails, days: [...currentDays, day] }); } };
   const handleUpdateOccurrence = async (e, clientId, packageId) => { e.preventDefault(); const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if(!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if(!pkg) return; const newBookings = pkg.bookings.map(b => { if(b.id === editingOccurrence.bookingId) { if (b.type === 'single') { return { ...b, dateTime: `${editingOccurrence.date}T${editingOccurrence.time}`, hoursBooked: parseFloat(editingOccurrence.hours) }; } } return b; }); pkg.bookings = newBookings; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); setEditingOccurrence(null); };
+  const handleManageReschedule = (client, pkg, booking, dateString, request) => { const newDate = new Date(dateString); setManagingRequest({ client, pkg, booking, dateString, request, newDate: newDate.toISOString().split('T')[0], newTime: newDate.toTimeString().split(' ')[0].substring(0,5) }); };
+  const handleApproveReschedule = async () => { if(!managingRequest.newDate || !managingRequest.newTime) return alert("Seleziona nuova data e ora"); const { client, pkg, booking, dateString } = managingRequest; const clientToUpdate = JSON.parse(JSON.stringify(client)); const pkgToUpdate = clientToUpdate.packages.find(p => p.id === pkg.id); const bookingToUpdate = pkgToUpdate.bookings.find(b => b.id === booking.id); if(bookingToUpdate.type === 'single') { bookingToUpdate.dateTime = `${managingRequest.newDate}T${managingRequest.newTime}`; } else { const newCancelled = [...(bookingToUpdate.cancelledDates || []), dateString]; const newBooking = { ...bookingToUpdate, id: Date.now(), type: 'single', dateTime: `${managingRequest.newDate}T${managingRequest.newTime}`, hoursBooked: bookingToUpdate.hoursBooked, isProcessed: false, requests: {} }; bookingToUpdate.cancelledDates = newCancelled; pkgToUpdate.bookings.push(newBooking); } delete bookingToUpdate.requests[dateString]; await updateDoc(doc(db, "clients", client.id), { packages: clientToUpdate.packages }); setManagingRequest(null); };
 
   const filteredClients = clients.filter(client => client.name.toLowerCase().includes(searchTerm.toLowerCase()));
   
@@ -119,7 +169,22 @@ function AdminDashboard() {
         <header className="App-header"><h1>Dashboard Admin</h1><button onClick={() => signOut(auth)}>Esci</button></header>
         <main>
             <DashboardSummary clients={clients} />
-            <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} />
+            <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} onManageReschedule={handleManageReschedule} />
+            {managingRequest && (
+                <div className="edit-client-form">
+                    <h3>Approva Spostamento per {managingRequest.client.name}</h3>
+                    <p>Lezione del: {new Date(managingRequest.dateString).toLocaleString()}</p>
+                    <p>Richiesta del cliente: {managingRequest.request.status}</p>
+                    <div>
+                        <label>Nuova Data:</label>
+                        <input type="date" value={managingRequest.newDate} onChange={e => setManagingRequest({...managingRequest, newDate: e.target.value})} />
+                        <label>Nuova Ora:</label>
+                        <input type="time" value={managingRequest.newTime} onChange={e => setManagingRequest({...managingRequest, newTime: e.target.value})} />
+                    </div>
+                    <button onClick={handleApproveReschedule}>Approva e Salva</button>
+                    <button onClick={() => setManagingRequest(null)}>Annulla</button>
+                </div>
+            )}
             <form className="add-client-form" onSubmit={handleAddClient}><input type="text" placeholder="Nome nuovo cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required /><input type="email" placeholder="Email cliente (opzionale)" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} /><button type="submit">Aggiungi Cliente</button></form>
             <div className="client-list">
                 <h2>Clienti</h2>

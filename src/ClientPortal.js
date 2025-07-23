@@ -135,15 +135,16 @@ function ClientPortal({ user }) {
   
   const getAvailableDays = (lessonDate) => {
     const days = [];
-    let today = new Date();
-    today.setDate(today.getDate() + 1);
-    today.setHours(0,0,0,0);
-    while (today < lessonDate) {
-        const dayOfWeek = today.getDay();
+    let currentDay = new Date();
+    if(currentDay.getHours() > 0) currentDay.setDate(currentDay.getDate() + 1);
+    currentDay.setHours(0,0,0,0);
+    
+    while (currentDay < lessonDate) {
+        const dayOfWeek = currentDay.getDay();
         if (dayOfWeek !== 6 && dayOfWeek !== 0) {
-            days.push(new Date(today));
+            days.push(new Date(currentDay));
         }
-        today.setDate(today.getDate() + 1);
+        currentDay.setDate(currentDay.getDate() + 1);
     }
     return days;
   };
@@ -204,12 +205,14 @@ function ClientPortal({ user }) {
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
+                                
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
                                 const lessonDateOnly = new Date(startTime);
                                 lessonDateOnly.setHours(0, 0, 0, 0);
                                 const eightDaysFromNow = new Date(today);
                                 eightDaysFromNow.setDate(today.getDate() + 8);
+
                                 const isCancellable = lessonDateOnly >= eightDaysFromNow;
                                 const isUrgent = !isCancellable;
 
