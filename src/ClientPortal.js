@@ -255,7 +255,7 @@ function ClientPortal({ user }) {
                                                                             <div className="time-inputs">
                                                                                 dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
                                                                                 alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
-                                                                            </div>
+                                                                            </>
                                                                         )}
                                                                     </div>
                                                                 );

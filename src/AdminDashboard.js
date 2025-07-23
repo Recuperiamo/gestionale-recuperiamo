@@ -3,50 +3,7 @@ import { db } from './firebase-config';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, signOut } from "firebase/auth";
 import DashboardSummary from './DashboardSummary';
-
-// DEFINIZIONE LOCALE DEL COMPONENTE, NESSUN IMPORT NECESSARIO
-function RequestManager({ clients, onUpdateRequest }) {
-    const allRequests = [];
-    clients.forEach(client => {
-        (client.packages || []).forEach(pkg => {
-            (pkg.bookings || []).forEach(booking => {
-                if (booking.requests) {
-                    Object.entries(booking.requests).forEach(([dateString, request]) => {
-                        if (request.status && !request.resolved) {
-                            allRequests.push({ client, pkg, booking, dateString, request });
-                        }
-                    });
-                }
-            });
-        });
-    });
-
-    if (allRequests.length === 0) {
-        return <h2>Nessuna Richiesta di Modifica</h2>;
-    }
-
-    return (
-        <div className="request-manager">
-            <h2>Richieste di Modifica in Sospeso</h2>
-            <ul>
-                {allRequests.map(({ client, pkg, booking, dateString, request }) => {
-                    const key = `${client.id}-${pkg.id}-${booking.id}-${dateString}`;
-                    return (
-                        <li key={key} className="request-item">
-                            <span><strong>Cliente:</strong> {client.name}</span>
-                            <span><strong>Lezione del:</strong> {new Date(dateString).toLocaleDateString()}</span>
-                            <span><strong>Richiesta:</strong> {request.status}</span>
-                            <div>
-                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'approved')}>Approva</button>
-                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'rejected')}>Rifiuta</button>
-                            </div>
-                        </li>
-                    );
-                })}
-            </ul>
-        </div>
-    );
-}
+import RequestManager from './RequestManager';
 
 function AdminDashboard() {
   const [clients, setClients] = useState([]);
@@ -83,7 +40,7 @@ function AdminDashboard() {
             const now = new Date();
             if (tempBooking.type === 'single' && !tempBooking.isProcessed && new Date(tempBooking.dateTime) < now) {
               const dateString = new Date(tempBooking.dateTime).toISOString().split('T')[0];
-              if (!(tempBooking.requests && tempBooking.requests[dateString])) {
+              if (!(tempBooking.requests && tempBooking.requests[dateString] && !tempBooking.requests[dateString].resolved)) {
                 tempBooking.isProcessed = true;
                 wasUpdated = true;
               }
@@ -211,8 +168,11 @@ function AdminDashboard() {
                                                     <input type="date" value={bookingDetails.date} onChange={(e) => setBookingDetails({ ...bookingDetails, date: e.target.value })} required />
                                                     <input type="time" value={bookingDetails.time} onChange={(e) => setBookingDetails({ ...bookingDetails, time: e.target.value })} required />
                                                     <input type="number" min="0.1" step="0.1" placeholder="Durata" value={bookingDetails.hours} onChange={(e) => setBookingDetails({ ...bookingDetails, hours: e.target.value })} required />
-                                                    {bookingType === 'recurring' ? ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> ) : null }
-                                                    <div className="form-actions"><button type="submit">Conferma</button><button type="button" onClick={() => setBookingForm(null)}>Annulla</button></div>
+                                                    <div className="form-actions">
+                                                        {bookingType === 'recurring' && ( <div className="recurring-controls"><input type="number" min="1" placeholder="N° settimane" value={bookingDetails.weeks} onChange={(e) => setBookingDetails({ ...bookingDetails, weeks: e.target.value })} required /><div className="days-selector">{['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(day => (<label key={day}><input type="checkbox" checked={bookingDetails.days.includes(day)} onChange={() => handleDayChange(day)} />{day.toUpperCase()}</label>))}</div></div> )}
+                                                        <button type="submit">Conferma</button>
+                                                        <button type="button" onClick={() => setBookingForm(null)}>Annulla</button>
+                                                    </div>
                                                 </form>
                                             )}
                                             <ul className="booking-list">
@@ -224,10 +184,6 @@ function AdminDashboard() {
                                                     const dateString = startTime.toISOString().split('T')[0];
                                                     const request = (occurrence.requests || {})[dateString];
                                                     const requestStatus = request?.status;
-                                                    let itemStyle = {};
-                                                    if (request && !request.resolved) {
-                                                        if (requestStatus.includes('Urgente')) { itemStyle = { backgroundColor: '#5c3333' }; } else { itemStyle = { backgroundColor: '#4a412a' }; }
-                                                    }
                                                     return (
                                                         <li key={occurrence.uniqueId}>
                                                           { editingOccurrence && editingOccurrence.uniqueId === occurrence.uniqueId ? (
@@ -239,7 +195,7 @@ function AdminDashboard() {
                                                               <button type="button" onClick={() => setEditingOccurrence(null)}>Annulla</button>
                                                             </form>
                                                           ) : (
-                                                            <div className="booking-item" style={itemStyle}>
+                                                            <div className="booking-item">
                                                                 {request && !request.resolved && <span>⚠️</span>}
                                                                 <span>Data: {startTime.toLocaleDateString()}</span>
                                                                 <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
