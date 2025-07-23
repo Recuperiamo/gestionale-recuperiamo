@@ -4,6 +4,47 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'fireb
 import { getAuth, signOut } from "firebase/auth";
 import DashboardSummary from './DashboardSummary';
 
+function RequestManager({ clients, onUpdateRequest }) {
+    const allRequests = [];
+    clients.forEach(client => {
+        (client.packages || []).forEach(pkg => {
+            (pkg.bookings || []).forEach(booking => {
+                if (booking.requests) {
+                    Object.entries(booking.requests).forEach(([dateString, request]) => {
+                        if (request.status && !request.resolved) {
+                            allRequests.push({ client, pkg, booking, dateString, request });
+                        }
+                    });
+                }
+            });
+        });
+    });
+
+    if (allRequests.length === 0) { return <h2>Nessuna Richiesta di Modifica</h2>; }
+
+    return (
+        <div className="request-manager">
+            <h2>Richieste di Modifica in Sospeso</h2>
+            <ul>
+                {allRequests.map(({ client, pkg, booking, dateString, request }) => {
+                    const key = `${client.id}-${pkg.id}-${booking.id}-${dateString}`;
+                    return (
+                        <li key={key} className="request-item">
+                            <span><strong>Cliente:</strong> {client.name}</span>
+                            <span><strong>Lezione del:</strong> {new Date(dateString).toLocaleDateString()}</span>
+                            <span><strong>Richiesta:</strong> {request.status}</span>
+                            <div>
+                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'approved')}>Approva</button>
+                                <button onClick={() => onUpdateRequest(client.id, pkg.id, booking.id, dateString, 'rejected')}>Rifiuta</button>
+                            </div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+}
+
 function AdminDashboard() {
   const [clients, setClients] = useState([]);
   const [newClientName, setNewClientName] = useState('');
@@ -30,13 +71,13 @@ function AdminDashboard() {
 
   useEffect(() => {
     const processBookings = () => {
-      const now = new Date();
       clients.forEach(client => {
         let clientWasUpdated = false;
         const updatedPackages = (client.packages || []).map(pkg => {
           let wasUpdated = false;
           const newBookings = (pkg.bookings || []).map(booking => {
             let tempBooking = { ...booking };
+            const now = new Date();
             if (tempBooking.type === 'single' && !tempBooking.isProcessed && new Date(tempBooking.dateTime) < now) {
               const dateString = new Date(tempBooking.dateTime).toISOString().split('T')[0];
               if (!(tempBooking.requests && tempBooking.requests[dateString])) {
@@ -96,7 +137,7 @@ function AdminDashboard() {
     const intervalId = setInterval(processBookings, 60000);
     return () => clearInterval(intervalId);
   }, [clients]);
-
+  
   const handleAddClient = async (e) => { e.preventDefault(); if (!newClientName.trim()) return; await addDoc(clientsCollectionRef, { name: newClientName, email: newClientEmail, packages: [] }); setNewClientName(''); setNewClientEmail(''); };
   const handleDeleteClient = async (clientId) => { if (window.confirm('Sei sicuro?')) await deleteDoc(doc(db, "clients", clientId)); };
   const handleUpdateClient = async (e) => { e.preventDefault(); if (!editingClient || !editingClient.name.trim()) return; const clientDoc = doc(db, "clients", editingClient.id); await updateDoc(clientDoc, { name: editingClient.name, email: editingClient.email || '' }); setEditingClient(null); };
@@ -109,7 +150,7 @@ function AdminDashboard() {
   const handleUpdateRequest = async (clientId, packageId, bookingId, dateString, resolution) => { const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if(!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); const booking = pkg.bookings.find(b => b.id === bookingId); const request = (booking.requests || {})[dateString]; if(!request) return; booking.requests[dateString].resolved = true; booking.requests[dateString].status = `${resolution === 'approved' ? 'Approvata' : 'Rifiutata'}: ${request.status}`; if (resolution === 'approved' && request.status.includes('Cancellazione')) { if(booking.type === 'single'){ pkg.bookings = pkg.bookings.filter(b => b.id !== bookingId); } else { booking.cancelledDates = [...(booking.cancelledDates || []), dateString]; delete booking.requests[dateString]; } } let newCompletedHours = 0; (pkg.bookings || []).forEach(b => { if (b.type === 'single' && b.isProcessed) newCompletedHours += b.hoursBooked; else if (b.type === 'recurring') { const processedAndNotCancelled = (b.processedDates || []).filter(d => !(b.cancelledDates || []).includes(d)); newCompletedHours += processedAndNotCancelled.length * b.hoursBooked; } }); pkg.remainingHours = pkg.totalHours - newCompletedHours; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); };
   const showBookingForm = (packageId) => { setBookingForm(packageId); setBookingDetails({ date: '', time: '', hours: 1, weeks: 4, days: [] }); setBookingType('single'); };
   const handleDayChange = (day) => { const currentDays = bookingDetails.days; if (currentDays.includes(day)) { setBookingDetails({ ...bookingDetails, days: currentDays.filter(d => d !== day) }); } else { setBookingDetails({ ...bookingDetails, days: [...currentDays, day] }); } };
-  const handleUpdateOccurrence = async (e, clientId, packageId) => { e.preventDefault(); const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if(!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if(!pkg) return; const newBookings = pkg.bookings.map(b => { if(b.id === editingOccurrence.bookingId) { return { ...b, dateTime: `${editingOccurrence.date}T${editingOccurrence.time}`, hoursBooked: parseFloat(editingOccurrence.hours) }; } return b; }); pkg.bookings = newBookings; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); setEditingOccurrence(null); };
+  const handleUpdateOccurrence = async (e, clientId, packageId) => { e.preventDefault(); const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if(!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if(!pkg) return; const newBookings = pkg.bookings.map(b => { if(b.id === editingOccurrence.bookingId) { if (b.type === 'single') { return { ...b, dateTime: `${editingOccurrence.date}T${editingOccurrence.time}`, hoursBooked: parseFloat(editingOccurrence.hours) }; } } return b; }); pkg.bookings = newBookings; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); setEditingOccurrence(null); };
 
   const filteredClients = clients.filter(client => client.name.toLowerCase().includes(searchTerm.toLowerCase()));
   
@@ -192,13 +233,13 @@ function AdminDashboard() {
                                                             </form>
                                                           ) : (
                                                             <div className="booking-item">
-                                                                <span>{requestStatus && '⚠️'}</span>
+                                                                {requestStatus && <span>⚠️</span>}
                                                                 <span>Data: {startTime.toLocaleDateString()}</span>
                                                                 <span>Inizio: {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                                 <span>Fine: {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                                 <span>Durata: {occurrence.hoursBooked}h</span>
                                                                 <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                                                {occurrence.type === 'single' && !occurrence.isProcessed && !requestStatus && <button onClick={() => setEditingOccurrence({uniqueId: occurrence.uniqueId, bookingId: occurrence.bookingId, date: startTime.toISOString().split('T')[0], time: startTime.toTimeString().split(' ')[0].substring(0,5), hours: occurrence.hoursBooked })}>Modifica</button>}
+                                                                {!occurrence.isProcessed && !requestStatus && <button onClick={() => setEditingOccurrence({uniqueId: occurrence.uniqueId, bookingId: occurrence.bookingId, type: occurrence.type, date: startTime.toISOString().split('T')[0], time: startTime.toTimeString().split(' ')[0].substring(0,5), hours: occurrence.hoursBooked })}>Modifica</button>}
                                                                 <button className="delete-btn" onClick={() => handleDeleteOccurrence(client.id, pkg.id, occurrence)}>Elimina</button>
                                                             </div>
                                                           )}

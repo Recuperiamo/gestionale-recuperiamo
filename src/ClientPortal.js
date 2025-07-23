@@ -16,7 +16,34 @@ function ClientPortal({ user }) {
     const clientsQuery = query(collection(db, "clients"), where("email", "==", user.email));
     const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
       if (!snapshot.empty) {
-        setClientData({ ...snapshot.docs[0].data(), id: snapshot.docs[0].id });
+        const clientDocData = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id };
+        
+        let notifications = [];
+        (clientDocData.packages || []).forEach(pkg => {
+            (pkg.bookings || []).forEach(booking => {
+                if(booking.requests) {
+                    Object.entries(booking.requests).forEach(([dateString, request]) => {
+                        if(request.resolved && !request.notified) {
+                            notifications.push(`La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata: ${request.status}`);
+                            booking.requests[dateString].notified = true;
+                        }
+                        const lessonDate = new Date(dateString);
+                        if(!request.resolved && lessonDate < new Date() && !request.notified) {
+                            notifications.push(`La tua richiesta per la lezione del ${lessonDate.toLocaleDateString()} è scaduta senza una valutazione.`);
+                            booking.requests[dateString].notified = true;
+                        }
+                    });
+                }
+            });
+        });
+
+        if(notifications.length > 0) {
+            alert(notifications.join('\n\n'));
+            const clientDocRef = doc(db, "clients", clientDocData.id);
+            updateDoc(clientDocRef, { packages: clientDocData.packages });
+        }
+        
+        setClientData(clientDocData);
       }
       setLoading(false);
     });
@@ -24,66 +51,22 @@ function ClientPortal({ user }) {
   }, [user]);
 
   const handleRequestChangeClick = (occurrence) => {
-    const now = new Date();
-    const lessonDate = occurrence.effectiveDate;
-    const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
-    if (lessonDate - now < threeDaysInMs) {
-      const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
-      if (window.confirm(message)) {
-        submitUrgentRequest(occurrence);
-      }
-    } else {
-      setRequestForm(occurrence);
-      setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-    }
+    setRequestForm(occurrence);
+    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
   };
   
-  const submitUrgentRequest = async (occurrence) => {
-    const newStatus = 'Richiesta Urgente (meno di 3gg)';
-    const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
-    const clientDocRef = doc(db, "clients", clientData.id);
-    const newPackages = clientData.packages.map(pkg => {
-      if (pkg.id === occurrence.packageId) {
-        const newBookings = pkg.bookings.map(b => {
-          if (b.id === occurrence.bookingId) {
-            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus } };
-            return { ...b, requests: newRequests };
-          }
-          return b;
-        });
-        return { ...pkg, bookings: newBookings };
-      }
-      return pkg;
-    });
-    await updateDoc(clientDocRef, { packages: newPackages });
-  };
-
-  const handleAvailabilityChange = (dateString, field, value) => {
-    const currentAvailability = { ...requestDetails.availability };
-    if (field === 'day') {
-      if (currentAvailability[dateString]) {
-        delete currentAvailability[dateString];
-      } else {
-        currentAvailability[dateString] = { from: '', to: '' };
-      }
-    } else {
-      currentAvailability[dateString][field] = value;
-    }
-    setRequestDetails({...requestDetails, availability: currentAvailability});
-  };
-
   const handleSubmitRequestChange = async (e) => {
     e.preventDefault();
     const occurrence = requestForm;
     const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-    const isUrgent7Days = (occurrence.effectiveDate - new Date() < sevenDaysInMs);
+    const isUrgent = (occurrence.effectiveDate - new Date() < sevenDaysInMs);
     let newStatus = '';
     let changeDetails = { type: requestDetails.type };
 
     if (requestDetails.type === 'cancella') {
         newStatus = 'Cancellazione Richiesta';
     } else {
-        if (isUrgent7Days) {
+        if (isUrgent) {
             const availableSlots = Object.entries(requestDetails.availability);
             if (availableSlots.length === 0 || availableSlots.some(([_, times]) => !times.from || !times.to)) {
                 alert('Per favore, seleziona almeno un giorno e compila entrambi gli orari.');
@@ -92,7 +75,7 @@ function ClientPortal({ user }) {
             const formattedDates = availableSlots.map(([date, times]) => 
                 `${new Date(date).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
             ).join('; ');
-            newStatus = `Spostamento Urgente Richiesto (Disponibile: ${formattedDates})`;
+            newStatus = `Spostamento Richiesto (Disponibile: ${formattedDates})`;
             changeDetails.availability = requestDetails.availability;
         } else {
             if (!requestDetails.newDate || !requestDetails.newTimeFrom || !requestDetails.newTimeTo) {
@@ -112,7 +95,7 @@ function ClientPortal({ user }) {
       if (pkg.id === occurrence.packageId) {
         const newBookings = pkg.bookings.map(b => {
           if (b.id === occurrence.bookingId) {
-            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus, details: changeDetails } };
+            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus, details: changeDetails, resolved: false, notified: false } };
             return { ...b, requests: newRequests };
           }
           return b;
@@ -123,6 +106,20 @@ function ClientPortal({ user }) {
     });
     await updateDoc(clientDocRef, { packages: newPackages });
     setRequestForm(null);
+  };
+  
+  const handleAvailabilityChange = (dateString, field, value) => {
+    const currentAvailability = { ...requestDetails.availability };
+    if (field === 'day') {
+      if (currentAvailability[dateString]) {
+        delete currentAvailability[dateString];
+      } else {
+        currentAvailability[dateString] = { from: '', to: '' };
+      }
+    } else {
+      currentAvailability[dateString][field] = value;
+    }
+    setRequestDetails({...requestDetails, availability: currentAvailability});
   };
 
   if (loading) return <div>Caricamento in corso...</div>;
@@ -150,7 +147,7 @@ function ClientPortal({ user }) {
     }
     return days;
   };
-  
+
   return (
     <div className="App">
       <header className="App-header">
