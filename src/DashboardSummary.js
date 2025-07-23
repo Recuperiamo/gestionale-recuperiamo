@@ -28,8 +28,7 @@ function DashboardSummary({ clients }) {
             upcomingLessons.push({
               clientName: client.name,
               date: lessonDate,
-              endDate: endTime,
-              duration: booking.hoursBooked
+              endDate: endTime
             });
           }
         } else {
@@ -43,15 +42,16 @@ function DashboardSummary({ clients }) {
               const d = new Date(firstDayOfWeek);
               d.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay() + dayOfWeek);
               const dateString = d.toISOString().split('T')[0];
+              const isCancelled = (booking.cancelledDates || []).includes(dateString);
+              const hasRequest = (booking.requests || {})[dateString];
 
-              if (d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString) && !(booking.cancelledDates || []).includes(dateString)) {
+              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString)) {
                 const endTime = new Date(d);
                 endTime.setMinutes(d.getMinutes() + booking.hoursBooked * 60);
                 upcomingLessons.push({
                   clientName: client.name,
                   date: d,
-                  endDate: endTime,
-                  duration: booking.hoursBooked
+                  endDate: endTime
                 });
               }
             });
