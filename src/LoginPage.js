@@ -1,16 +1,16 @@
 // src/LoginPage.js
 import React, { useState } from 'react';
-import { getAuth, signInWithEmailAndPassword, sendSignInLinkToEmail } from "firebase/auth";
-
-const actionCodeSettings = {
-  url: window.location.href, // La pagina a cui tornare dopo il login
-  handleCodeInApp: true,
-};
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 
 function LoginPage() {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  
   const [clientEmail, setClientEmail] = useState('');
+  const [clientPassword, setClientPassword] = useState('');
+  
+  const [isRegistering, setIsRegistering] = useState(false); // Stato per mostrare/nascondere form
+  
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -22,22 +22,32 @@ function LoginPage() {
     setMessage('');
     try {
       await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-      // Il login va a buon fine, l'app principale se ne accorgerà
     } catch (err) {
       setError("Credenziali admin errate.");
     }
   };
 
-  const handleClientLogin = async (e) => {
+  const handleClientAuth = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
-    try {
-      await sendSignInLinkToEmail(auth, clientEmail, actionCodeSettings);
-      window.localStorage.setItem('emailForSignIn', clientEmail); // Salva l'email per dopo
-      setMessage(`Link di accesso inviato a ${clientEmail}. Controlla la tua posta!`);
-    } catch (err) {
-      setError("Impossibile inviare il link. Controlla l'email.");
+    
+    if (isRegistering) {
+      // Logica di Registrazione
+      try {
+        await createUserWithEmailAndPassword(auth, clientEmail, clientPassword);
+        setMessage('Registrazione completata! Ora puoi accedere.');
+        setIsRegistering(false); // Torna al form di login
+      } catch (err) {
+        setError("Errore in registrazione. L'email potrebbe essere già in uso.");
+      }
+    } else {
+      // Logica di Login
+      try {
+        await signInWithEmailAndPassword(auth, clientEmail, clientPassword);
+      } catch (err) {
+        setError("Email o password non corrette.");
+      }
     }
   };
 
@@ -67,9 +77,9 @@ function LoginPage() {
           <button type="submit">Entra come Admin</button>
         </form>
 
-        <form onSubmit={handleClientLogin} className="login-form">
-          <h2>Accesso Clienti</h2>
-          <p>Inserisci la tua email per ricevere un link di accesso.</p>
+        <form onSubmit={handleClientAuth} className="login-form">
+          <h2>Area Clienti</h2>
+          <p>{isRegistering ? 'Crea il tuo account per visualizzare i pacchetti.' : 'Accedi alla tua area personale.'}</p>
           <input 
             type="email" 
             value={clientEmail}
@@ -77,7 +87,17 @@ function LoginPage() {
             placeholder="La tua email"
             required
           />
-          <button type="submit">Invia Link di Accesso</button>
+          <input 
+            type="password"
+            value={clientPassword}
+            onChange={(e) => setClientPassword(e.target.value)}
+            placeholder="Password"
+            required
+          />
+          <button type="submit">{isRegistering ? 'Registrati' : 'Accedi'}</button>
+          <button type="button" onClick={() => setIsRegistering(!isRegistering)}>
+            {isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+          </button>
         </form>
       </div>
     </div>

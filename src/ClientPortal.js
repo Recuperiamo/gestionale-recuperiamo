@@ -8,7 +8,6 @@ function ClientPortal({ user }) {
   const [loading, setLoading] = useState(true);
 
   const [requestForm, setRequestForm] = useState(null);
-  // Stato modificato per gestire la disponibilità con orari
   const [requestDetails, setRequestDetails] = useState({ type: 'sposta', newDate: '', newTime: '', availability: {} });
   
   const auth = getAuth();
@@ -47,12 +46,15 @@ function ClientPortal({ user }) {
   
   const submitUrgentRequest = async (occurrence) => {
     const newStatus = 'Richiesta Urgente (meno di 3gg)';
+    const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
+    
     const clientDocRef = doc(db, "clients", clientData.id);
     const newPackages = clientData.packages.map(pkg => {
       if (pkg.id === occurrence.packageId) {
         const newBookings = pkg.bookings.map(b => {
           if (b.id === occurrence.bookingId) {
-            return { ...b, requestStatus: newStatus };
+            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus } };
+            return { ...b, requests: newRequests };
           }
           return b;
         });
@@ -63,18 +65,15 @@ function ClientPortal({ user }) {
     await updateDoc(clientDocRef, { packages: newPackages });
   };
 
+
   const handleAvailabilityChange = (dateString, field, value) => {
     const currentAvailability = { ...requestDetails.availability };
     
-    if (!currentAvailability[dateString]) {
-      // Se il giorno non è selezionato, lo aggiunge con l'orario
-      currentAvailability[dateString] = { from: '', to: '' };
-    }
-    
     if (field === 'day') {
-      // Se si clicca la checkbox del giorno
-      if (currentAvailability[dateString].from !== undefined) {
-        delete currentAvailability[dateString]; // Deseleziona
+      if (currentAvailability[dateString]) {
+        delete currentAvailability[dateString]; // Deseleziona il giorno
+      } else {
+        currentAvailability[dateString] = { from: '', to: '' }; // Seleziona il giorno
       }
     } else {
       // Se si modifica un orario
@@ -96,11 +95,11 @@ function ClientPortal({ user }) {
 
     if (requestDetails.type === 'cancella') {
         newStatus = 'Cancellazione Richiesta';
-    } else { // sposta
+    } else {
         if (isUrgent7Days) {
             const availableSlots = Object.entries(requestDetails.availability);
-            if (availableSlots.length === 0) {
-                alert('Per favore, seleziona almeno un giorno e compila gli orari.');
+            if (availableSlots.length === 0 || availableSlots.some(([_, times]) => !times.from || !times.to)) {
+                alert('Per favore, seleziona almeno un giorno e compila entrambi gli orari.');
                 return;
             }
             const formattedDates = availableSlots.map(([date, times]) => 
@@ -119,16 +118,18 @@ function ClientPortal({ user }) {
         }
     }
 
-    if (isUrgent7Days) {
+    if (isUrgent7Days && requestDetails.type !== 'cancella') {
       newStatus += ' (Urgente)';
     }
 
+    const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
     const clientDocRef = doc(db, "clients", clientData.id);
     const newPackages = clientData.packages.map(pkg => {
       if (pkg.id === occurrence.packageId) {
         const newBookings = pkg.bookings.map(b => {
           if (b.id === occurrence.bookingId) {
-            return { ...b, requestStatus: newStatus, requestedChange: changeDetails };
+            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus, details: changeDetails } };
+            return { ...b, requests: newRequests };
           }
           return b;
         });
@@ -160,13 +161,24 @@ function ClientPortal({ user }) {
     let today = new Date();
     today.setDate(today.getDate() + 1);
     today.setHours(0,0,0,0);
-
     while (today < lessonDate) {
         days.push(new Date(today));
         today.setDate(today.getDate() + 1);
     }
     return days;
   };
+
+  // Calcola il numero di richieste in sospeso per questo cliente
+  let pendingRequestsCount = 0;
+  if (clientData && clientData.packages) {
+      clientData.packages.forEach(pkg => {
+          (pkg.bookings || []).forEach(booking => {
+              if(booking.requests) {
+                  pendingRequestsCount += Object.keys(booking.requests).length;
+              }
+          });
+      });
+  }
 
   return (
     <div className="App">
@@ -180,9 +192,9 @@ function ClientPortal({ user }) {
             {(clientData.packages || []).map(pkg => {
                 const allOccurrences = [];
                 (pkg.bookings || []).forEach(booking => {
-                    const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requestStatus: booking.requestStatus };
+                    const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
                     if (booking.type === 'single') {
-                        allOccurrences.push({ ...baseBookingInfo, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime), isProcessed: booking.isProcessed });
+                        allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
                     } else {
                         const startDate = new Date(booking.startDate);
                         const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
@@ -196,6 +208,7 @@ function ClientPortal({ user }) {
                                 const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
                                 allOccurrences.push({
                                     ...baseBookingInfo,
+                                    ...booking,
                                     uniqueId: uniqueId,
                                     effectiveDate: occurrenceDate,
                                     isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]),
@@ -219,19 +232,22 @@ function ClientPortal({ user }) {
                         </div>
                         <ul className="booking-list">
                             <h3>Le Tue Lezioni</h3>
+                            {pendingRequestsCount >= 2 && <p className="warning-message">Hai 2 richieste in sospeso. Attendi una risposta prima di inviarne altre.</p>}
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
                                 const isCancellable = (startTime - new Date()) > (7 * 24 * 60 * 60 * 1000);
                                 const isUrgent7Days = (startTime - new Date()) < (7 * 24 * 60 * 60 * 1000);
+                                const dateString = startTime.toISOString().split('T')[0];
+                                const requestStatus = (occurrence.requests || {})[dateString]?.status;
 
                                 return (
                                 <React.Fragment key={occurrence.uniqueId}>
                                     <li className="booking-item">
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                        <span>Stato: {occurrence.requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && !occurrence.requestStatus && (
+                                        <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
+                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (
                                             <button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>
                                         )}
                                     </li>
@@ -252,17 +268,17 @@ function ClientPortal({ user }) {
                                                             <p>Seleziona i giorni e gli orari in cui saresti disponibile:</p>
                                                             {getAvailableDays(startTime).map(day => {
                                                                 const dayString = day.toISOString().split('T')[0];
-                                                                const isChecked = requestDetails.availability[dayString] !== undefined;
+                                                                const isChecked = requestDetails.availability[dayString];
                                                                 return (
                                                                     <div key={dayString}>
                                                                         <label>
-                                                                            <input type="checkbox" checked={isChecked} onChange={() => handleAvailabilityChange(dayString, 'day')} />
+                                                                            <input type="checkbox" checked={!!isChecked} onChange={() => handleAvailabilityChange(dayString, 'day')} />
                                                                             {day.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
                                                                         </label>
                                                                         {isChecked && (
                                                                             <>
-                                                                                dalle <input type="time" onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
-                                                                                alle <input type="time" onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
+                                                                                dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
+                                                                                alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
                                                                             </>
                                                                         )}
                                                                     </div>
@@ -272,7 +288,7 @@ function ClientPortal({ user }) {
                                                     ) : (
                                                         <>
                                                             <input type="date" value={requestDetails.newDate} onChange={(e) => setRequestDetails({...requestDetails, newDate: e.target.value})} required />
-                                                            <input type="time" value={requestDetails.newTime} onChange={(e) => setRequestDetails({...requestDetails, time: e.target.value})} required />
+                                                            <input type="time" value={requestDetails.newTime} onChange={(e) => setRequestDetails({...requestDetails, newTime: e.target.value})} required />
                                                         </>
                                                     )
                                                 )}
