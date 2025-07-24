@@ -49,17 +49,8 @@ function ClientPortal({ user }) {
   }, [user]);
 
   const handleRequestChangeClick = (occurrence) => {
-    const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
-    const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
-    if ((occurrence.effectiveDate - new Date()) < threeDaysInMs) {
-      if (window.confirm(message)) {
-        setRequestForm(occurrence);
-        setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-      }
-    } else {
-      setRequestForm(occurrence);
-      setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-    }
+    setRequestForm(occurrence);
+    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
   };
   
   const handleSubmitRequestChange = async (e) => {
@@ -211,17 +202,20 @@ function ClientPortal({ user }) {
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
+                                
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
                                 const lessonDateOnly = new Date(startTime);
                                 lessonDateOnly.setHours(0, 0, 0, 0);
                                 const eightDaysFromNow = new Date(today);
                                 eightDaysFromNow.setDate(today.getDate() + 8);
+
                                 const isCancellable = lessonDateOnly >= eightDaysFromNow;
                                 const isUrgent = !isCancellable;
+
                                 const dateString = startTime.toISOString().split('T')[0];
                                 const request = (occurrence.requests || {})[dateString];
-                                const requestStatus = request?.status;
+                                const requestStatus = request && !request.resolved ? request.status : null;
 
                                 return (
                                 <React.Fragment key={occurrence.uniqueId}>
@@ -229,7 +223,7 @@ function ClientPortal({ user }) {
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         <span>Stato: {requestStatus || (isPast ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && (!request || request.resolved) && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
+                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
                                     </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
                                         <li className="booking-form-container">

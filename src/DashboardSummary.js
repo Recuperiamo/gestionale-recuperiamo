@@ -39,10 +39,14 @@ function DashboardSummary({ clients }) {
       (pkg.bookings || []).forEach(booking => {
         if (booking.type === 'single') {
           const lessonDate = new Date(booking.dateTime);
-          if (lessonDate >= today && lessonDate <= endOfWeek) {
+          if (lessonDate >= today && lessonDate <= endOfWeek && !booking.isProcessed) {
             const endTime = new Date(lessonDate);
             endTime.setMinutes(lessonDate.getMinutes() + booking.hoursBooked * 60);
-            upcomingLessons.push({ clientName: client.name, date: lessonDate, endDate: endTime });
+            upcomingLessons.push({
+              clientName: client.name,
+              date: lessonDate,
+              endDate: endTime
+            });
           }
         } else {
           const startDate = new Date(booking.startDate);
@@ -57,10 +61,15 @@ function DashboardSummary({ clients }) {
               const dateString = d.toISOString().split('T')[0];
               const isCancelled = (booking.cancelledDates || []).includes(dateString);
               const hasRequest = (booking.requests || {})[dateString];
-              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek) {
+
+              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString)) {
                 const endTime = new Date(d);
                 endTime.setMinutes(d.getMinutes() + booking.hoursBooked * 60);
-                upcomingLessons.push({ clientName: client.name, date: d, endDate: endTime });
+                upcomingLessons.push({
+                  clientName: client.name,
+                  date: d,
+                  endDate: endTime
+                });
               }
             });
           }
