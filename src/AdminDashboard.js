@@ -28,7 +28,7 @@ function AdminDashboard() {
       setClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
     return () => unsubscribe();
-  }, []);
+  }, [clientsCollectionRef]);
 
   useEffect(() => {
     const processBookings = async () => {
@@ -112,7 +112,84 @@ function AdminDashboard() {
   const handleDeletePackage = async (clientId, packageId) => { if (!window.confirm('Sei sicuro?')) return; const clientToUpdate = clients.find(c => c.id === clientId); if (!clientToUpdate) return; const newPackages = clientToUpdate.packages.filter(pkg => pkg.id !== packageId); await updateDoc(doc(db, "clients", clientId), { packages: newPackages }); };
   const handleAddBooking = async (e, clientId, packageId) => { e.preventDefault(); const clientToUpdate = clients.find(c => c.id === clientId); if (!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if (!pkg) return; let newBooking; const hours = parseFloat(bookingDetails.hours); const startDate = `${bookingDetails.date}T${bookingDetails.time}`; if (bookingType === 'single') { newBooking = { id: Date.now(), type: 'single', dateTime: startDate, hoursBooked: hours, isProcessed: false, requests: {} }; } else { if (bookingDetails.days.length === 0) return alert('Seleziona un giorno.'); newBooking = { id: Date.now(), type: 'recurring', startDate, hoursBooked: hours, recurrence: { weeks: parseInt(bookingDetails.weeks, 10), days: bookingDetails.days }, processedDates: [], cancelledDates: [], requests: {} }; } const totalHoursToBook = bookingType === 'recurring' ? hours * newBooking.recurrence.weeks * newBooking.recurrence.days.length : hours; if (pkg.remainingHours < totalHoursToBook) return alert('Ore insufficienti.'); const newPackages = clientToUpdate.packages.map(p => { if (p.id === packageId) { return { ...p, bookings: [...(p.bookings || []), newBooking] }; } return p; }); await updateDoc(doc(db, "clients", clientId), { packages: newPackages }); setBookingForm(null); };
   const handleDeleteOccurrence = async (clientId, packageId, occurrence) => { if (!window.confirm(`Eliminare la lezione del ${occurrence.effectiveDate.toLocaleDateString()}?`)) return; const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if (!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if (!pkg) return; if (occurrence.type === 'single') { pkg.bookings = pkg.bookings.filter(b => b.id !== occurrence.bookingId); } else { const bookingToUpdate = pkg.bookings.find(b => b.id === occurrence.bookingId); if (bookingToUpdate) { const cancelledDateString = occurrence.effectiveDate.toISOString().split('T')[0]; bookingToUpdate.cancelledDates = [...new Set([...(bookingToUpdate.cancelledDates || []), cancelledDateString])]; } } let newCompletedHours = 0; (pkg.bookings || []).forEach(b => { if (b.type === 'single' && b.isProcessed) { newCompletedHours += b.hoursBooked; } else if (b.type === 'recurring') { const processedAndNotCancelled = (b.processedDates || []).filter(d => !(b.cancelledDates || []).includes(d)); newCompletedHours += processedAndNotCancelled.length * b.hoursBooked; } }); pkg.remainingHours = pkg.totalHours - newCompletedHours; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); };
-  const handleUpdateRequest = async (clientId, packageId, bookingId, dateString, resolution) => { const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if(!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); const booking = pkg.bookings.find(b => b.id === bookingId); const request = (booking.requests || {})[dateString]; if(!request) return; if (resolution === 'approved' && request.status.includes('Cancellazione')) { if(booking.type === 'single'){ pkg.bookings = pkg.bookings.filter(b => b.id !== bookingId); } else { booking.cancelledDates = [...(booking.cancelledDates || []), dateString]; } } delete booking.requests[dateString]; let newCompletedHours = 0; (pkg.bookings || []).forEach(b => { if (b.type === 'single' && b.isProcessed) newCompletedHours += b.hoursBooked; else if (b.type === 'recurring') { const processedAndNotCancelled = (b.processedDates || []).filter(d => !(b.cancelledDates || []).includes(d)); newCompletedHours += processedAndNotCancelled.length * b.hoursBooked; } }); pkg.remainingHours = pkg.totalHours - newCompletedHours; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); };
+  
+  // --- FUNZIONI MANCANTI REINSERITE ---
+  const handleManageReschedule = (client, pkg, booking, dateString, request) => {
+    const originalDate = new Date(dateString);
+    setManagingRequest({ 
+        client, pkg, booking, dateString, request,
+        newDate: originalDate.toISOString().split('T')[0], 
+        newTime: originalDate.toTimeString().split(' ')[0].substring(0,5) 
+    });
+  };
+
+  const handleApproveReschedule = async () => {
+    if(!managingRequest || !managingRequest.newDate || !managingRequest.newTime) return alert("Seleziona nuova data e ora");
+    
+    const { client, pkg, booking, dateString } = managingRequest;
+    const clientToUpdate = JSON.parse(JSON.stringify(client));
+    const pkgToUpdate = clientToUpdate.packages.find(p => p.id === pkg.id);
+    const bookingToUpdate = pkgToUpdate.bookings.find(b => b.id === booking.id);
+    const request = (bookingToUpdate.requests || {})[dateString];
+
+    if (!bookingToUpdate || !request) return;
+
+    const newDateTime = `${managingRequest.newDate}T${managingRequest.newTime}`;
+    const notificationMessage = `La tua richiesta di spostamento per la lezione del ${new Date(dateString).toLocaleDateString()} è stata approvata. Nuova data: ${new Date(newDateTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
+    
+    if (bookingToUpdate.type === 'single') {
+        bookingToUpdate.dateTime = newDateTime;
+    } else {
+        bookingToUpdate.cancelledDates = [...(bookingToUpdate.cancelledDates || []), dateString];
+        pkgToUpdate.bookings.push({
+            id: Date.now(),
+            type: 'single',
+            dateTime: newDateTime,
+            hoursBooked: bookingToUpdate.hoursBooked,
+            isProcessed: false,
+            requests: {}
+        });
+    }
+
+    // Rimuovi la richiesta dopo averla gestita
+    delete bookingToUpdate.requests[dateString];
+
+    await updateDoc(doc(db, "clients", client.id), { packages: clientToUpdate.packages });
+    setManagingRequest(null);
+  };
+
+  const handleUpdateRequest = async (clientId, packageId, bookingId, dateString, resolution) => {
+    const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId)));
+    if(!clientToUpdate) return;
+    const pkg = clientToUpdate.packages.find(p => p.id === packageId);
+    const booking = pkg.bookings.find(b => b.id === bookingId);
+    if(!booking || !booking.requests || !booking.requests[dateString]) return;
+
+    // Se approvi una cancellazione, la lezione viene eliminata e le ore ricalcolate
+    if (resolution === 'approved' && booking.requests[dateString].status.includes('Cancellazione')) {
+        if(booking.type === 'single'){
+            pkg.bookings = pkg.bookings.filter(b => b.id !== bookingId);
+        } else {
+            booking.cancelledDates = [...(booking.cancelledDates || []), dateString];
+        }
+    }
+    
+    // In ogni caso (approvata o rifiutata), la richiesta viene eliminata per far tornare lo stato normale
+    delete booking.requests[dateString];
+    
+    let newCompletedHours = 0;
+    (pkg.bookings || []).forEach(b => { 
+        if (b.type === 'single' && b.isProcessed) newCompletedHours += b.hoursBooked; 
+        else if (b.type === 'recurring') { 
+            const processedAndNotCancelled = (b.processedDates || []).filter(d => !(b.cancelledDates || []).includes(d)); 
+            newCompletedHours += processedAndNotCancelled.length * b.hoursBooked; 
+        } 
+    });
+    pkg.remainingHours = pkg.totalHours - newCompletedHours;
+
+    await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages });
+  };
+  
   const showBookingForm = (packageId) => { setBookingForm(packageId); setBookingDetails({ date: '', time: '', hours: 1, weeks: 4, days: [] }); setBookingType('single'); };
   const handleDayChange = (day) => { const currentDays = bookingDetails.days; if (currentDays.includes(day)) { setBookingDetails({ ...bookingDetails, days: currentDays.filter(d => d !== day) }); } else { setBookingDetails({ ...bookingDetails, days: [...currentDays, day] }); } };
   const handleUpdateOccurrence = async (e, clientId, packageId) => { e.preventDefault(); const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if(!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if(!pkg) return; const newBookings = pkg.bookings.map(b => { if(b.id === editingOccurrence.bookingId) { if (b.type === 'single') { return { ...b, dateTime: `${editingOccurrence.date}T${editingOccurrence.time}`, hoursBooked: parseFloat(editingOccurrence.hours) }; } } return b; }); pkg.bookings = newBookings; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); setEditingOccurrence(null); };
