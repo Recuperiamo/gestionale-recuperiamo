@@ -17,7 +17,6 @@ function ClientPortal({ user }) {
     const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
       if (!snapshot.empty) {
         const clientDocData = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id };
-        
         let notifications = [];
         let needsUpdate = false;
         (clientDocData.packages || []).forEach(pkg => {
@@ -25,7 +24,7 @@ function ClientPortal({ user }) {
                 if(booking.requests) {
                     Object.entries(booking.requests).forEach(([dateString, request]) => {
                         if(request.resolved && !request.notified) {
-                            notifications.push(`La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata: ${request.status}`);
+                            notifications.push(`La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata.`);
                             booking.requests[dateString].notified = true;
                             needsUpdate = true;
                         }
@@ -50,8 +49,17 @@ function ClientPortal({ user }) {
   }, [user]);
 
   const handleRequestChangeClick = (occurrence) => {
-    setRequestForm(occurrence);
-    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
+    const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
+    const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
+    if ((occurrence.effectiveDate - new Date()) < threeDaysInMs) {
+      if (window.confirm(message)) {
+        setRequestForm(occurrence);
+        setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
+      }
+    } else {
+      setRequestForm(occurrence);
+      setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
+    }
   };
   
   const handleSubmitRequestChange = async (e) => {
@@ -135,7 +143,6 @@ function ClientPortal({ user }) {
   const getAvailableDays = (lessonDate) => {
     const days = [];
     let currentDay = new Date();
-    if(currentDay.getHours() > 0) currentDay.setDate(currentDay.getDate() + 1);
     currentDay.setHours(0,0,0,0);
     
     while (currentDay < lessonDate) {
@@ -174,14 +181,14 @@ function ClientPortal({ user }) {
                                 const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
                                 occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
                                 const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
-                                allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isProcessed: (booking.processedDates || []).includes(occurrenceDate.toISOString().split('T')[0]), isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
+                                allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
                             });
                         }
                     }
                 });
                 allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
                 const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
-                const totalCompletedHours = visibleOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
+                const totalCompletedHours = visibleOccurrences.filter(occ => new Date(occ.effectiveDate) < new Date()).reduce((sum, occ) => sum + occ.hoursBooked, 0);
                 let pendingRequestsCount = 0;
                 visibleOccurrences.forEach(occ => {
                     const dateString = occ.effectiveDate.toISOString().split('T')[0];
@@ -196,7 +203,7 @@ function ClientPortal({ user }) {
                             <span>{pkg.name}</span>
                             <span>Ore Totali: {pkg.totalHours}h</span>
                             <span>Ore Svolte: {totalCompletedHours}h</span>
-                            <span>Ore Rimanenti: {pkg.remainingHours}h</span>
+                            <span>Ore Rimanenti: {pkg.totalHours - totalCompletedHours}h</span>
                         </div>
                         <ul className="booking-list">
                             <h3>Le Tue Lezioni</h3>
@@ -204,17 +211,14 @@ function ClientPortal({ user }) {
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
-                                
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
                                 const lessonDateOnly = new Date(startTime);
                                 lessonDateOnly.setHours(0, 0, 0, 0);
                                 const eightDaysFromNow = new Date(today);
                                 eightDaysFromNow.setDate(today.getDate() + 8);
-
                                 const isCancellable = lessonDateOnly >= eightDaysFromNow;
                                 const isUrgent = !isCancellable;
-
                                 const dateString = startTime.toISOString().split('T')[0];
                                 const request = (occurrence.requests || {})[dateString];
                                 const requestStatus = request?.status;
@@ -224,7 +228,7 @@ function ClientPortal({ user }) {
                                     <li className="booking-item">
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                        <span>Stato: {requestStatus || (occurrence.isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
+                                        <span>Stato: {requestStatus || (isPast ? 'Svolta' : 'Da Svolgere')}</span>
                                         {!isPast && (!request || request.resolved) && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
                                     </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (

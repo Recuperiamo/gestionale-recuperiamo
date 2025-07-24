@@ -17,25 +17,32 @@ function DashboardSummary({ clients }) {
 
   clients.forEach(client => {
     (client.packages || []).forEach(pkg => {
-      if (pkg.remainingHours < 5) {
+      let completedHours = 0;
+      (pkg.bookings || []).forEach(booking => {
+          if (booking.type === 'single' && new Date(booking.dateTime) < new Date()) {
+              completedHours += booking.hoursBooked;
+          } else if (booking.type === 'recurring') {
+              const processedAndNotCancelled = (booking.processedDates || []).filter(d => !(booking.cancelledDates || []).includes(d));
+              completedHours += processedAndNotCancelled.length * booking.hoursBooked;
+          }
+      });
+      const remainingHours = pkg.totalHours - completedHours;
+
+      if (remainingHours < 5) {
         lowHourPackages.push({
           clientName: client.name,
           packageName: pkg.name,
-          remainingHours: pkg.remainingHours
+          remainingHours: remainingHours
         });
       }
 
       (pkg.bookings || []).forEach(booking => {
         if (booking.type === 'single') {
           const lessonDate = new Date(booking.dateTime);
-          if (lessonDate >= today && lessonDate <= endOfWeek && !booking.isProcessed) {
+          if (lessonDate >= today && lessonDate <= endOfWeek) {
             const endTime = new Date(lessonDate);
             endTime.setMinutes(lessonDate.getMinutes() + booking.hoursBooked * 60);
-            upcomingLessons.push({
-              clientName: client.name,
-              date: lessonDate,
-              endDate: endTime
-            });
+            upcomingLessons.push({ clientName: client.name, date: lessonDate, endDate: endTime });
           }
         } else {
           const startDate = new Date(booking.startDate);
@@ -50,15 +57,10 @@ function DashboardSummary({ clients }) {
               const dateString = d.toISOString().split('T')[0];
               const isCancelled = (booking.cancelledDates || []).includes(dateString);
               const hasRequest = (booking.requests || {})[dateString];
-
-              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString)) {
+              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek) {
                 const endTime = new Date(d);
                 endTime.setMinutes(d.getMinutes() + booking.hoursBooked * 60);
-                upcomingLessons.push({
-                  clientName: client.name,
-                  date: d,
-                  endDate: endTime
-                });
+                upcomingLessons.push({ clientName: client.name, date: d, endDate: endTime });
               }
             });
           }
