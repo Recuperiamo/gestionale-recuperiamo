@@ -2,29 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase-config';
 import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
 import { getAuth, signOut } from "firebase/auth";
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 
 function ClientPortal({ user }) {
   const [clientData, setClientData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [requestForm, setRequestForm] = useState(null);
-  const [requestDetails, setRequestDetails] = useState({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-  
-  const auth = getAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [highlightedLessonId, setHighlightedLessonId] = useState(null);
 
   useEffect(() => {
     if (!user || !user.email) return;
+
     const clientsQuery = query(collection(db, "clients"), where("email", "==", user.email));
     const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
       if (!snapshot.empty) {
         const clientDocData = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id };
-        let notifications = [];
+        let newNotifications = [];
         let needsUpdate = false;
+        let lessonIdToHighlight = null;
+
         (clientDocData.packages || []).forEach(pkg => {
             (pkg.bookings || []).forEach(booking => {
                 if(booking.requests) {
                     Object.entries(booking.requests).forEach(([dateString, request]) => {
                         if(request.resolved && !request.notified) {
-                            notifications.push(`La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata.`);
+                            if (request.notification && request.notification.newBookingId) {
+                                lessonIdToHighlight = request.notification.newBookingId;
+                            }
+                            newNotifications.push(request.notification?.message || `La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata.`);
                             booking.requests[dateString].notified = true;
                             needsUpdate = true;
                         }
@@ -33,8 +39,11 @@ function ClientPortal({ user }) {
             });
         });
 
-        if(notifications.length > 0) {
-            alert(notifications.join('\n\n'));
+        if(newNotifications.length > 0) {
+            setNotifications(newNotifications);
+            if (lessonIdToHighlight) {
+                setHighlightedLessonId(lessonIdToHighlight);
+            }
             if (needsUpdate) {
                 const clientDocRef = doc(db, "clients", clientDocData.id);
                 updateDoc(clientDocRef, { packages: clientDocData.packages });
@@ -45,246 +54,148 @@ function ClientPortal({ user }) {
       }
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, [user]);
 
-  const handleRequestChangeClick = (occurrence) => {
-    setRequestForm(occurrence);
-    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-  };
-  
-  const handleSubmitRequestChange = async (e) => {
-    e.preventDefault();
-    const occurrence = requestForm;
-    const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-    const isUrgent = (occurrence.effectiveDate - new Date() < sevenDaysInMs);
-    let newStatus = '';
-    let changeDetails = { type: requestDetails.type };
+  if (loading) return <div className="loading-screen">Caricamento...</div>;
 
-    if (requestDetails.type === 'cancella') {
-        newStatus = 'Cancellazione Richiesta';
-    } else {
-        if (isUrgent) {
-            const availableSlots = Object.entries(requestDetails.availability);
-            if (availableSlots.length === 0 || availableSlots.some(([_, times]) => !times.from || !times.to)) {
-                alert('Per favore, seleziona almeno un giorno e compila entrambi gli orari.');
-                return;
-            }
-            const formattedDates = availableSlots.map(([date, times]) => 
-                `${new Date(date).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
-            ).join('; ');
-            newStatus = `Spostamento Urgente Richiesto (Disponibile: ${formattedDates})`;
-            changeDetails.availability = requestDetails.availability;
-        } else {
-            if (!requestDetails.newDate || !requestDetails.newTimeFrom || !requestDetails.newTimeTo) {
-                alert('Per favore, inserisci nuova data e fascia oraria.');
-                return;
-            }
-            newStatus = `Spostamento Richiesto a: ${new Date(requestDetails.newDate).toLocaleDateString()} (dalle ${requestDetails.newTimeFrom} alle ${requestDetails.newTimeTo})`;
-            changeDetails.newDate = requestDetails.newDate;
-            changeDetails.newTimeFrom = requestDetails.newTimeFrom;
-            changeDetails.newTimeTo = requestDetails.newTimeTo;
-        }
-    }
+  if (!clientData) {
+    return (
+        <div className="App">
+            <header className="App-header"><h1>Portale Clienti</h1></header>
+            <main>
+                <p>Non è stato possibile trovare i tuoi dati. Contatta l'amministratore.</p>
+                <button onClick={() => signOut(getAuth())}>Esci</button>
+            </main>
+        </div>
+    );
+  }
 
-    const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
-    const clientDocRef = doc(db, "clients", clientData.id);
-    const newPackages = clientData.packages.map(pkg => {
-      if (pkg.id === occurrence.packageId) {
-        const newBookings = pkg.bookings.map(b => {
-          if (b.id === occurrence.bookingId) {
-            const newRequests = { ...(b.requests || {}), [dateString]: { status: newStatus, details: changeDetails, resolved: false, notified: false } };
-            return { ...b, requests: newRequests };
-          }
-          return b;
-        });
-        return { ...pkg, bookings: newBookings };
-      }
-      return pkg;
-    });
-    await updateDoc(clientDocRef, { packages: newPackages });
-    setRequestForm(null);
-  };
-  
-  const handleAvailabilityChange = (dateString, field, value) => {
-    const currentAvailability = { ...requestDetails.availability };
-    if (field === 'day') {
-      if (currentAvailability[dateString]) {
-        delete currentAvailability[dateString];
+  const allOccurrences = [];
+  (clientData.packages || []).forEach(pkg => {
+    (pkg.bookings || []).forEach(booking => {
+      const baseInfo = { packageName: pkg.name, hoursBooked: booking.hoursBooked };
+      if (booking.type === 'single') {
+        const dateString = new Date(booking.dateTime).toISOString().split('T')[0];
+        const request = (booking.requests || {})[dateString];
+        allOccurrences.push({ ...baseInfo, ...booking, effectiveDate: new Date(booking.dateTime), status: (request && !request.resolved) ? request.status : (new Date(booking.dateTime) < new Date() ? 'Svolta' : 'Da Svolgere') });
       } else {
-        currentAvailability[dateString] = { from: '', to: '' };
+        const startDate = new Date(booking.startDate);
+        const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
+        for (let i = 0; i < booking.recurrence.weeks; i++) {
+          (booking.recurrence.days || []).forEach(day => {
+            const dayOfWeek = dayMap[day];
+            const firstDay = new Date(startDate);
+            firstDay.setDate(startDate.getDate() + i * 7);
+            const d = new Date(firstDay);
+            d.setDate(firstDay.getDate() - firstDay.getDay() + dayOfWeek);
+            const dateString = d.toISOString().split('T')[0];
+            const isCancelled = (booking.cancelledDates || []).includes(dateString);
+            const isProcessed = (booking.processedDates || []).includes(dateString);
+            const request = (booking.requests || {})[dateString];
+            if (!isCancelled) {
+              allOccurrences.push({ ...baseInfo, ...booking, effectiveDate: d, isProcessed, status: (request && !request.resolved) ? request.status : (isProcessed ? 'Svolta' : 'Da Svolgere') });
+            }
+          });
+        }
       }
-    } else {
-      currentAvailability[dateString][field] = value;
+    });
+  });
+  
+  const tileContent = ({ date, view }) => {
+    if (view === 'month') {
+      const dayString = date.toISOString().split('T')[0];
+      const lessonsOnDay = allOccurrences.filter(occ => occ.effectiveDate.toISOString().split('T')[0] === dayString);
+      if (lessonsOnDay.length > 0) {
+        return <div className="calendar-dot-container">{lessonsOnDay.map((_, i) => <div key={i} className="calendar-dot"></div>)}</div>;
+      }
     }
-    setRequestDetails({...requestDetails, availability: currentAvailability});
+    return null;
   };
 
-  if (loading) return <div>Caricamento in corso...</div>;
-  if (!clientData) return (
-    <div className="App">
-        <header className="App-header"><h1>Portale Clienti</h1></header>
-        <main>
-            <p>Non è stato possibile trovare i tuoi dati. Contatta l'amministratore.</p>
-            <button onClick={() => signOut(auth)}>Esci</button>
-        </main>
-    </div>
-  );
-  
-  const getAvailableDays = (lessonDate) => {
-    const days = [];
-    let currentDay = new Date();
-    currentDay.setHours(0,0,0,0);
-    
-    while (currentDay < lessonDate) {
-        const dayOfWeek = currentDay.getDay();
-        if (dayOfWeek !== 6 && dayOfWeek !== 0) {
-            days.push(new Date(currentDay));
-        }
-        currentDay.setDate(currentDay.getDate() + 1);
-    }
-    return days;
-  };
+  const totalCompletedHours = allOccurrences.filter(occ => occ.isProcessed).reduce((sum, occ) => sum + occ.hoursBooked, 0);
+  const totalRemainingHours = clientData.packages.reduce((sum, pkg) => sum + pkg.remainingHours, 0);
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Ciao, {clientData.name}!</h1>
-        <button onClick={() => signOut(auth)}>Esci</button>
-      </header>
-      <main>
-        <h2>I Tuoi Pacchetti Ore</h2>
-        <ul className="package-list">
-            {(clientData.packages || []).map(pkg => {
-                const allOccurrences = [];
-                const dayMap = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
-                (pkg.bookings || []).forEach(booking => {
-                    const baseBookingInfo = { packageId: pkg.id, bookingId: booking.id, hoursBooked: booking.hoursBooked, type: booking.type, requests: booking.requests };
-                    if (booking.type === 'single') {
-                        allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: booking.id, effectiveDate: new Date(booking.dateTime) });
-                    } else {
-                        const startDate = new Date(booking.startDate);
-                        for (let i = 0; i < booking.recurrence.weeks; i++) {
-                            (booking.recurrence.days || []).forEach(day => {
-                                const dayOfWeek = dayMap[day];
-                                const firstDayOfRecurrenceWeek = new Date(startDate);
-                                firstDayOfRecurrenceWeek.setDate(startDate.getDate() + (i * 7));
-                                const occurrenceDate = new Date(firstDayOfRecurrenceWeek);
-                                occurrenceDate.setDate(firstDayOfRecurrenceWeek.getDate() - firstDayOfRecurrenceWeek.getDay() + dayOfWeek);
-                                const uniqueId = `${booking.id}-${occurrenceDate.toISOString()}`;
-                                allOccurrences.push({ ...baseBookingInfo, ...booking, uniqueId: uniqueId, effectiveDate: occurrenceDate, isCancelled: (booking.cancelledDates || []).includes(occurrenceDate.toISOString().split('T')[0]) });
-                            });
-                        }
-                    }
-                });
-                allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
-                const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
-                const totalCompletedHours = visibleOccurrences.filter(occ => new Date(occ.effectiveDate) < new Date()).reduce((sum, occ) => sum + occ.hoursBooked, 0);
-                let pendingRequestsCount = 0;
-                visibleOccurrences.forEach(occ => {
-                    const dateString = occ.effectiveDate.toISOString().split('T')[0];
-                    if (occ.requests && occ.requests[dateString] && !occ.requests[dateString].resolved) {
-                        pendingRequestsCount++;
-                    }
-                });
-
-                return (
-                    <li key={pkg.id} className="package-item">
-                        <div className="package-details">
-                            <span>{pkg.name}</span>
-                            <span>Ore Totali: {pkg.totalHours}h</span>
-                            <span>Ore Svolte: {totalCompletedHours}h</span>
-                            <span>Ore Rimanenti: {pkg.totalHours - totalCompletedHours}h</span>
+    <>
+      <style>{`
+        body { background-color: #1e3a8a; font-family: 'Source Sans 3', sans-serif; }
+        .logo-wrapper { position: relative; border: 2px solid white; border-top: none; padding: 0.75rem 1.5rem; }
+        .logo-wrapper::before, .logo-wrapper::after { content: ''; position: absolute; top: 0; height: 2px; background: white; }
+        .logo-wrapper::before { left: 0; width: calc(65.5% - 16px); }
+        .logo-wrapper::after { right: 0; width: calc(34.5% - 16px); }
+        .logo-atom { position: absolute; width: 28px; height: 28px; left: 65.5%; top: -14px; transform: translateX(-50%); }
+        .atom-inner { position: relative; width: 100%; height: 100%; background-color: #1e3a8a; padding: 0 4px; border-radius: 50%; }
+        .orbit { position: absolute; top: 50%; left: 50%; border: 1px solid white; border-radius: 50%; box-sizing: border-box; }
+        .orbit-1 { width: 100%; height: 50%; transform: translate(-50%, -50%); }
+        .orbit-2 { width: 100%; height: 50%; transform: translate(-50%, -50%) rotate(60deg); }
+        .orbit-3 { width: 100%; height: 50%; transform: translate(-50%, -50%) rotate(-60deg); }
+        .nucleus { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background-color: white; border-radius: 50%; transform: translate(-50%, -50%); }
+        .react-calendar { background: #fff; border: none; border-radius: 0.5rem; color: #333; }
+        .react-calendar__tile--active { background: #00aaff; }
+        .react-calendar__tile--now { background: #e6f7ff; }
+        .calendar-dot-container { display: flex; justify-content: center; gap: 2px; margin-top: 2px; }
+        .calendar-dot { width: 5px; height: 5px; background-color: #d32f2f; border-radius: 50%; }
+        .highlight-lesson { background-color: #00aaff40; border-radius: 5px; }
+      `}</style>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-slate-200">
+        <header className="text-center py-16 sm:py-20">
+            <div className="mb-10 flex flex-col items-center gap-4">
+                <div className="relative inline-block">
+                    <div className="logo-wrapper">
+                        <h2 className="text-4xl font-medium text-white tracking-tighter">
+                            Re<sup className="text-2xl -top-2.5 relative">2</sup>CUPERIAMO
+                        </h2>
+                    </div>
+                    <div className="logo-atom">
+                        <div className="atom-inner">
+                            <span className="orbit orbit-1"></span>
+                            <span className="orbit orbit-2"></span>
+                            <span className="orbit orbit-3"></span>
+                            <span className="nucleus"></span>
                         </div>
-                        <ul className="booking-list">
-                            <h3>Le Tue Lezioni</h3>
-                            {pendingRequestsCount >= 2 && <p className="warning-message">Hai 2 richieste in sospeso. Attendi una risposta prima di inviarne altre.</p>}
-                            {visibleOccurrences.map(occurrence => {
-                                const startTime = occurrence.effectiveDate;
-                                const isPast = startTime < new Date();
-                                
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                const lessonDateOnly = new Date(startTime);
-                                lessonDateOnly.setHours(0, 0, 0, 0);
-                                const eightDaysFromNow = new Date(today);
-                                eightDaysFromNow.setDate(today.getDate() + 8);
+                    </div>
+                </div>
+                <p className="text-lg font-semibold tracking-widest text-white">TUTOR SCOLASTICO</p>
+            </div>
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-white">Bentornato, {clientData.name}!</h1>
+                <button className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" onClick={() => signOut(getAuth())}>Esci</button>
+            </div>
+        </header>
 
-                                const isCancellable = lessonDateOnly >= eightDaysFromNow;
-                                const isUrgent = !isCancellable;
-
-                                const dateString = startTime.toISOString().split('T')[0];
-                                const request = (occurrence.requests || {})[dateString];
-                                const requestStatus = request && !request.resolved ? request.status : null;
-
-                                return (
-                                <React.Fragment key={occurrence.uniqueId}>
-                                    <li className="booking-item">
-                                        <span>Data: {startTime.toLocaleDateString()}</span>
-                                        <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                        <span>Stato: {requestStatus || (isPast ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
-                                    </li>
-                                    {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
-                                        <li className="booking-form-container">
-                                            <form onSubmit={handleSubmitRequestChange} className="booking-form">
-                                                <h4>Richiedi Modifica Lezione</h4>
-                                                <div>
-                                                    <label><input type="radio" value="sposta" checked={requestDetails.type === 'sposta'} onChange={(e) => setRequestDetails({...requestDetails, type: e.target.value})} />Sposta</label>
-                                                    {isCancellable && (
-                                                        <label><input type="radio" value="cancella" checked={requestDetails.type === 'cancella'} onChange={(e) => setRequestDetails({...requestDetails, type: e.target.value})} />Cancella</label>
-                                                    )}
-                                                </div>
-                                                
-                                                {requestDetails.type === 'sposta' && (
-                                                    isUrgent ? (
-                                                        <div className="days-selector">
-                                                            <p>Seleziona i giorni e gli orari in cui saresti disponibile:</p>
-                                                            {getAvailableDays(startTime).map(day => {
-                                                                const dayString = day.toISOString().split('T')[0];
-                                                                const isChecked = requestDetails.availability[dayString];
-                                                                return (
-                                                                    <div key={dayString}>
-                                                                        <label>
-                                                                            <input type="checkbox" checked={!!isChecked} onChange={() => handleAvailabilityChange(dayString, 'day')} />
-                                                                            {day.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
-                                                                        </label>
-                                                                        {isChecked && (
-                                                                            <div className="time-inputs">
-                                                                                dalle <input type="time" value={requestDetails.availability[dayString]?.from || ''} onChange={(e) => handleAvailabilityChange(dayString, 'from', e.target.value)} required/>
-                                                                                alle <input type="time" value={requestDetails.availability[dayString]?.to || ''} onChange={(e) => handleAvailabilityChange(dayString, 'to', e.target.value)} required/>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ) : (
-                                                        <div>
-                                                            <input type="date" value={requestDetails.newDate} onChange={(e) => setRequestDetails({...requestDetails, newDate: e.target.value})} required />
-                                                            dalle
-                                                            <input type="time" value={requestDetails.newTimeFrom} onChange={(e) => setRequestDetails({...requestDetails, newTimeFrom: e.target.value})} required />
-                                                            alle
-                                                            <input type="time" value={requestDetails.newTimeTo} onChange={(e) => setRequestDetails({...requestDetails, newTimeTo: e.target.value})} required />
-                                                        </div>
-                                                    )
-                                                )}
-                                                
-                                                <button type="submit">Invia Richiesta</button>
-                                                <button type="button" onClick={() => setRequestForm(null)}>Annulla</button>
-                                            </form>
-                                        </li>
-                                    )}
-                                </React.Fragment>
-                                );
-                            })}
-                        </ul>
-                    </li>
-                );
-            })}
-        </ul>
-      </main>
-    </div>
+        <main>
+          {notifications.map((note, index) => (
+            <div key={index} className="bg-blue-900 border border-blue-700 text-blue-100 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                <span className="block sm:inline">{note}</span>
+            </div>
+          ))}
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-2 bg-white text-slate-800 p-8 rounded-2xl shadow-lg">
+                <h2 className="text-3xl font-bold text-blue-900 mb-4">Calendario Lezioni</h2>
+                <Calendar tileContent={tileContent} />
+            </div>
+            <div className="bg-white text-slate-800 p-8 rounded-2xl shadow-lg">
+                <h2 className="text-3xl font-bold text-blue-900 mb-4">Riepilogo Pacchetti</h2>
+                {(clientData.packages && clientData.packages.length > 0) ? (
+                    clientData.packages.map(pkg => (
+                        <div key={pkg.id} className={`mb-6 pb-6 border-b border-slate-200 ${highlightedLessonId === pkg.id ? 'highlight-lesson' : ''}`}>
+                            <h3 className="text-xl font-bold text-blue-800">{pkg.name}</h3>
+                            <div className="mt-2 space-y-2 text-lg">
+                                <p><strong>Ore Totali:</strong> {pkg.totalHours}h</p>
+                                <p><strong>Ore Svolte:</strong> {totalCompletedHours}h</p>
+                                <p className="font-bold"><strong>Ore Rimanenti:</strong> {totalRemainingHours}h</p>
+                            </div>
+                        </div>
+                    ))
+                ) : <p>Nessun pacchetto attivo.</p>}
+            </div>
+          </div>
+        </main>
+      </div>
+    </>
   );
 }
 

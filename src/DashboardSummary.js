@@ -19,8 +19,10 @@ function DashboardSummary({ clients }) {
     (client.packages || []).forEach(pkg => {
       let completedHours = 0;
       (pkg.bookings || []).forEach(booking => {
-          if (booking.type === 'single' && new Date(booking.dateTime) < new Date()) {
-              completedHours += booking.hoursBooked;
+          if (booking.type === 'single') {
+              if (new Date(booking.dateTime) < new Date()) {
+                  completedHours += booking.hoursBooked;
+              }
           } else if (booking.type === 'recurring') {
               const processedAndNotCancelled = (booking.processedDates || []).filter(d => !(booking.cancelledDates || []).includes(d));
               completedHours += processedAndNotCancelled.length * booking.hoursBooked;
@@ -39,7 +41,7 @@ function DashboardSummary({ clients }) {
       (pkg.bookings || []).forEach(booking => {
         if (booking.type === 'single') {
           const lessonDate = new Date(booking.dateTime);
-          if (lessonDate >= today && lessonDate <= endOfWeek && !booking.isProcessed) {
+          if (lessonDate >= today && lessonDate <= endOfWeek) {
             const endTime = new Date(lessonDate);
             endTime.setMinutes(lessonDate.getMinutes() + booking.hoursBooked * 60);
             upcomingLessons.push({
@@ -62,7 +64,7 @@ function DashboardSummary({ clients }) {
               const isCancelled = (booking.cancelledDates || []).includes(dateString);
               const hasRequest = (booking.requests || {})[dateString];
 
-              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek && !(booking.processedDates || []).includes(dateString)) {
+              if (!isCancelled && !hasRequest && d >= today && d <= endOfWeek) {
                 const endTime = new Date(d);
                 endTime.setMinutes(d.getMinutes() + booking.hoursBooked * 60);
                 upcomingLessons.push({
