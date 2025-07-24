@@ -63,7 +63,7 @@ function ClientPortal({ user }) {
     let changeDetails = { type: requestDetails.type };
 
     if (requestDetails.type === 'cancella') {
-        newStatus = 'Cancellazione Richiesto';
+        newStatus = 'Cancellazione Richiesta';
     } else {
         if (isUrgent) {
             const availableSlots = Object.entries(requestDetails.availability);
@@ -135,6 +135,7 @@ function ClientPortal({ user }) {
   const getAvailableDays = (lessonDate) => {
     const days = [];
     let currentDay = new Date();
+    if(currentDay.getHours() > 0) currentDay.setDate(currentDay.getDate() + 1);
     currentDay.setHours(0,0,0,0);
     
     while (currentDay < lessonDate) {

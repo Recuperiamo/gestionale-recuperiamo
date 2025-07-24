@@ -18,7 +18,7 @@ function AdminDashboard() {
   const [editingClient, setEditingClient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingOccurrence, setEditingOccurrence] = useState(null);
-  const [managingRequest, setManagingRequest] = useState(null); // Stato ripristinato
+  const [managingRequest, setManagingRequest] = useState(null);
 
   const clientsCollectionRef = collection(db, "clients");
   const auth = getAuth();
@@ -113,7 +113,6 @@ function AdminDashboard() {
   const handleAddBooking = async (e, clientId, packageId) => { e.preventDefault(); const clientToUpdate = clients.find(c => c.id === clientId); if (!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if (!pkg) return; let newBooking; const hours = parseFloat(bookingDetails.hours); const startDate = `${bookingDetails.date}T${bookingDetails.time}`; if (bookingType === 'single') { newBooking = { id: Date.now(), type: 'single', dateTime: startDate, hoursBooked: hours, isProcessed: false, requests: {} }; } else { if (bookingDetails.days.length === 0) return alert('Seleziona un giorno.'); newBooking = { id: Date.now(), type: 'recurring', startDate, hoursBooked: hours, recurrence: { weeks: parseInt(bookingDetails.weeks, 10), days: bookingDetails.days }, processedDates: [], cancelledDates: [], requests: {} }; } const totalHoursToBook = bookingType === 'recurring' ? hours * newBooking.recurrence.weeks * newBooking.recurrence.days.length : hours; if (pkg.remainingHours < totalHoursToBook) return alert('Ore insufficienti.'); const newPackages = clientToUpdate.packages.map(p => { if (p.id === packageId) { return { ...p, bookings: [...(p.bookings || []), newBooking] }; } return p; }); await updateDoc(doc(db, "clients", clientId), { packages: newPackages }); setBookingForm(null); };
   const handleDeleteOccurrence = async (clientId, packageId, occurrence) => { if (!window.confirm(`Eliminare la lezione del ${occurrence.effectiveDate.toLocaleDateString()}?`)) return; const clientToUpdate = JSON.parse(JSON.stringify(clients.find(c => c.id === clientId))); if (!clientToUpdate) return; const pkg = clientToUpdate.packages.find(p => p.id === packageId); if (!pkg) return; if (occurrence.type === 'single') { pkg.bookings = pkg.bookings.filter(b => b.id !== occurrence.bookingId); } else { const bookingToUpdate = pkg.bookings.find(b => b.id === occurrence.bookingId); if (bookingToUpdate) { const cancelledDateString = occurrence.effectiveDate.toISOString().split('T')[0]; bookingToUpdate.cancelledDates = [...new Set([...(bookingToUpdate.cancelledDates || []), cancelledDateString])]; } } let newCompletedHours = 0; (pkg.bookings || []).forEach(b => { if (b.type === 'single' && b.isProcessed) { newCompletedHours += b.hoursBooked; } else if (b.type === 'recurring') { const processedAndNotCancelled = (b.processedDates || []).filter(d => !(b.cancelledDates || []).includes(d)); newCompletedHours += processedAndNotCancelled.length * b.hoursBooked; } }); pkg.remainingHours = pkg.totalHours - newCompletedHours; await updateDoc(doc(db, "clients", clientId), { packages: clientToUpdate.packages }); };
   
-  // --- FUNZIONALITÀ DI GESTIONE RICHIESTA RIPRISTINATA ---
   const handleManageReschedule = (client, pkg, booking, dateString, request) => {
     const originalDate = new Date(dateString);
     setManagingRequest({ 
@@ -153,7 +152,7 @@ function AdminDashboard() {
       bookingToUpdate.requests[dateString] = {
         ...bookingToUpdate.requests[dateString],
         resolved: true,
-        status: `Approvata e Spostata`,
+        status: `Approvata e Spostata al ${new Date(newDateTime).toLocaleDateString()}`,
         notified: false,
         notification: { message: notificationMessage }
       };
@@ -171,7 +170,6 @@ function AdminDashboard() {
     const request = (booking.requests || {})[dateString];
     if(!request) return;
 
-    // Logica originale per cancellazione e rifiuto
     if (resolution === 'approved' && request.status.includes('Cancellazione')) {
         if(booking.type === 'single'){
             pkg.bookings = pkg.bookings.filter(b => b.id !== bookingId);
@@ -180,7 +178,6 @@ function AdminDashboard() {
         }
     }
     
-    // Rimuovi la richiesta dopo averla gestita
     delete booking.requests[dateString];
     
     let newCompletedHours = 0;
@@ -202,8 +199,6 @@ function AdminDashboard() {
         <main>
             <DashboardSummary clients={clients} />
             <RequestManager clients={clients} onUpdateRequest={handleUpdateRequest} onManageReschedule={handleManageReschedule} />
-            
-            {/* FORM DI APPROVAZIONE SPOSTAMENTO */}
             {managingRequest && (
                 <div className="edit-client-form">
                     <h3>Approva Spostamento per {managingRequest.client.name}</h3>
@@ -218,7 +213,6 @@ function AdminDashboard() {
                     <button type="button" onClick={() => setManagingRequest(null)}>Annulla</button>
                 </div>
             )}
-
             <form className="add-client-form" onSubmit={handleAddClient}><input type="text" placeholder="Nome nuovo cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} required /><input type="email" placeholder="Email cliente (opzionale)" value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)} /><button type="submit">Aggiungi Cliente</button></form>
             <div className="client-list">
                 <h2>Clienti</h2>
