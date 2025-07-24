@@ -56,19 +56,8 @@ function ClientPortal({ user }) {
   }, [user]);
 
   const handleRequestChangeClick = (occurrence) => {
-    const now = new Date();
-    const lessonDate = occurrence.effectiveDate;
-    const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
-    if (lessonDate - now < threeDaysInMs) {
-      const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
-      if (window.confirm(message)) {
-        setRequestForm(occurrence);
-        setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-      }
-    } else {
-      setRequestForm(occurrence);
-      setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-    }
+    setRequestForm(occurrence);
+    setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
   };
   
   const handleSubmitRequestChange = async (e) => {
@@ -91,7 +80,7 @@ function ClientPortal({ user }) {
             const formattedDates = availableSlots.map(([date, times]) => 
                 `${new Date(date).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
             ).join('; ');
-            newStatus = `Spostamento Richiesto (Disponibile: ${formattedDates})`;
+            newStatus = `Spostamento Urgente Richiesto (Disponibile: ${formattedDates})`;
             changeDetails.availability = requestDetails.availability;
         } else {
             if (!requestDetails.newDate || !requestDetails.newTimeFrom || !requestDetails.newTimeTo) {

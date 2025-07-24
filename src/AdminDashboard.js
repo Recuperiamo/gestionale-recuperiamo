@@ -150,10 +150,7 @@ function AdminDashboard() {
         });
     }
 
-    bookingToUpdate.requests[dateString].resolved = true;
-    bookingToUpdate.requests[dateString].status = `Approvata e Spostata`;
-    bookingToUpdate.requests[dateString].notified = false;
-    bookingToUpdate.requests[dateString].notification = { message: notificationMessage };
+    delete bookingToUpdate.requests[dateString];
 
     await updateDoc(doc(db, "clients", client.id), { packages: clientToUpdate.packages });
     setManagingRequest(null);
