@@ -9,6 +9,7 @@ function ClientPortal({ user }) {
   const [requestForm, setRequestForm] = useState(null);
   const [requestDetails, setRequestDetails] = useState({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
   const [notifications, setNotifications] = useState([]);
+  const [highlightedLessonId, setHighlightedLessonId] = useState(null);
 
   const auth = getAuth();
 
@@ -21,11 +22,16 @@ function ClientPortal({ user }) {
         
         let newNotifications = [];
         let needsUpdate = false;
+        let lessonIdToHighlight = null;
+
         (clientDocData.packages || []).forEach(pkg => {
             (pkg.bookings || []).forEach(booking => {
                 if(booking.requests) {
                     Object.entries(booking.requests).forEach(([dateString, request]) => {
                         if(request.resolved && !request.notified) {
+                            if (request.notification && request.notification.newBookingId) {
+                                lessonIdToHighlight = request.notification.newBookingId;
+                            }
                             newNotifications.push(request.notification?.message || `La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata.`);
                             booking.requests[dateString].notified = true;
                             needsUpdate = true;
@@ -36,7 +42,11 @@ function ClientPortal({ user }) {
         });
 
         if(newNotifications.length > 0) {
+            alert(newNotifications.join('\n\n'));
             setNotifications(newNotifications);
+            if (lessonIdToHighlight) {
+                setHighlightedLessonId(lessonIdToHighlight);
+            }
             if (needsUpdate) {
                 const clientDocRef = doc(db, "clients", clientDocData.id);
                 updateDoc(clientDocRef, { packages: clientDocData.packages });
@@ -87,6 +97,12 @@ function ClientPortal({ user }) {
     let newStatus = '';
     let changeDetails = { type: requestDetails.type };
 
+    // Funzione per creare una data locale ed evitare problemi di fuso orario
+    const parseLocalDate = (dateString) => {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    };
+
     if (requestDetails.type === 'cancella') {
         newStatus = 'Cancellazione Richiesta';
     } else {
@@ -97,7 +113,7 @@ function ClientPortal({ user }) {
                 return;
             }
             const formattedDates = availableSlots.map(([date, times]) => 
-                `${new Date(date.replace(/-/g, '/')).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
+                `${parseLocalDate(date).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
             ).join('; ');
             newStatus = `Spostamento Urgente Richiesto (Disponibile: ${formattedDates})`;
             changeDetails.availability = requestDetails.availability;
@@ -106,7 +122,7 @@ function ClientPortal({ user }) {
                 alert('Per favore, inserisci nuova data e fascia oraria.');
                 return;
             }
-            newStatus = `Spostamento Richiesto a: ${new Date(requestDetails.newDate.replace(/-/g, '/')).toLocaleDateString()} (dalle ${requestDetails.newTimeFrom} alle ${requestDetails.newTimeTo})`;
+            newStatus = `Spostamento Richiesto a: ${parseLocalDate(requestDetails.newDate).toLocaleDateString()} (dalle ${requestDetails.newTimeFrom} alle ${requestDetails.newTimeTo})`;
             changeDetails.newDate = requestDetails.newDate;
             changeDetails.newTimeFrom = requestDetails.newTimeFrom;
             changeDetails.newTimeTo = requestDetails.newTimeTo;
@@ -249,10 +265,13 @@ function ClientPortal({ user }) {
                                 const request = (occurrence.requests || {})[dateString];
                                 const isProcessed = isPast && (!request || request.resolved);
                                 const requestStatus = request && !request.resolved ? request.status : null;
+                                
+                                const isHighlighted = highlightedLessonId === occurrence.uniqueId && !isProcessed;
 
                                 return (
                                 <React.Fragment key={occurrence.uniqueId}>
-                                    <li className="booking-item">
+                                    <li className={`booking-item ${isHighlighted ? 'highlight-lesson' : ''}`}>
+                                        {isHighlighted && <span>⚠️</span>}
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         <span>Stato: {requestStatus || (isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
@@ -322,3 +341,5 @@ function ClientPortal({ user }) {
 }
 
 export default ClientPortal;
+
+
