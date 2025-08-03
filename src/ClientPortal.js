@@ -70,7 +70,7 @@ function ClientPortal({ user }) {
       setRequestDetails({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
     }
   };
-
+  
   const handleSubmitRequestChange = async (e) => {
     e.preventDefault();
     const occurrence = requestForm;
@@ -97,7 +97,7 @@ function ClientPortal({ user }) {
                 return;
             }
             const formattedDates = availableSlots.map(([date, times]) => 
-                `${new Date(date).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
+                `${new Date(date.replace(/-/g, '/')).toLocaleDateString()} (dalle ${times.from} alle ${times.to})`
             ).join('; ');
             newStatus = `Spostamento Urgente Richiesto (Disponibile: ${formattedDates})`;
             changeDetails.availability = requestDetails.availability;
@@ -106,7 +106,7 @@ function ClientPortal({ user }) {
                 alert('Per favore, inserisci nuova data e fascia oraria.');
                 return;
             }
-            newStatus = `Spostamento Richiesto a: ${new Date(requestDetails.newDate).toLocaleDateString()} (dalle ${requestDetails.newTimeFrom} alle ${requestDetails.newTimeTo})`;
+            newStatus = `Spostamento Richiesto a: ${new Date(requestDetails.newDate.replace(/-/g, '/')).toLocaleDateString()} (dalle ${requestDetails.newTimeFrom} alle ${requestDetails.newTimeTo})`;
             changeDetails.newDate = requestDetails.newDate;
             changeDetails.newTimeFrom = requestDetails.newTimeFrom;
             changeDetails.newTimeTo = requestDetails.newTimeTo;
@@ -256,7 +256,7 @@ function ClientPortal({ user }) {
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         <span>Stato: {requestStatus || (isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && (!request || request.resolved) && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
+                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
                                     </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
                                         <li className="booking-form-container">
