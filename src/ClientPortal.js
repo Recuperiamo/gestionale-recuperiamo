@@ -8,7 +8,8 @@ function ClientPortal({ user }) {
   const [loading, setLoading] = useState(true);
   const [requestForm, setRequestForm] = useState(null);
   const [requestDetails, setRequestDetails] = useState({ type: 'sposta', newDate: '', newTimeFrom: '', newTimeTo: '', availability: {} });
-  
+  const [highlightedLessonId, setHighlightedLessonId] = useState(null);
+
   const auth = getAuth();
 
   useEffect(() => {
@@ -17,6 +18,39 @@ function ClientPortal({ user }) {
     const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
       if (!snapshot.empty) {
         const clientDocData = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id };
+        
+        let newNotifications = [];
+        let needsUpdate = false;
+        let lessonIdToHighlight = null;
+
+        (clientDocData.packages || []).forEach(pkg => {
+            (pkg.bookings || []).forEach(booking => {
+                if(booking.requests) {
+                    Object.entries(booking.requests).forEach(([dateString, request]) => {
+                        if(request.resolved && !request.notified) {
+                            if (request.notification && request.notification.newBookingId) {
+                                lessonIdToHighlight = request.notification.newBookingId;
+                            }
+                            newNotifications.push(request.notification?.message || `La tua richiesta per la lezione del ${new Date(dateString.replace(/-/g, '/')).toLocaleDateString()} è stata valutata.`);
+                            booking.requests[dateString].notified = true;
+                            needsUpdate = true;
+                        }
+                    });
+                }
+            });
+        });
+
+        if(newNotifications.length > 0) {
+            alert(newNotifications.join('\n\n'));
+            if (lessonIdToHighlight) {
+                setHighlightedLessonId(lessonIdToHighlight);
+            }
+            if (needsUpdate) {
+                const clientDocRef = doc(db, "clients", clientDocData.id);
+                updateDoc(clientDocRef, { packages: clientDocData.packages });
+            }
+        }
+        
         setClientData(clientDocData);
       }
       setLoading(false);
@@ -222,14 +256,17 @@ function ClientPortal({ user }) {
                                 const request = (occurrence.requests || {})[dateString];
                                 const isProcessed = isPast && (!request || request.resolved);
                                 const requestStatus = request && !request.resolved ? request.status : null;
+                                
+                                const isHighlighted = highlightedLessonId === occurrence.uniqueId && !isProcessed;
 
                                 return (
                                 <React.Fragment key={occurrence.uniqueId}>
-                                    <li className="booking-item">
+                                    <li className={`booking-item ${isHighlighted ? 'highlight-lesson' : ''}`}>
+                                        {isHighlighted && <span>⚠️</span>}
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Orario: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         <span>Stato: {requestStatus || (isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && (!request || request.resolved) && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
+                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
                                     </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
                                         <li className="booking-form-container">
