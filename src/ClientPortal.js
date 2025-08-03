@@ -32,7 +32,7 @@ function ClientPortal({ user }) {
                             if (request.notification && request.notification.newBookingId) {
                                 lessonIdToHighlight = request.notification.newBookingId;
                             }
-                            newNotifications.push(request.notification?.message || `La tua richiesta per la lezione del ${new Date(dateString).toLocaleDateString()} è stata valutata.`);
+                            newNotifications.push(request.notification?.message || `La tua richiesta per la lezione del ${new Date(dateString.replace(/-/g, '/')).toLocaleDateString()} è stata valutata.`);
                             booking.requests[dateString].notified = true;
                             needsUpdate = true;
                         }
@@ -97,11 +97,7 @@ function ClientPortal({ user }) {
     let newStatus = '';
     let changeDetails = { type: requestDetails.type };
 
-    // Funzione per creare una data locale ed evitare problemi di fuso orario
-    const parseLocalDate = (dateString) => {
-        const [year, month, day] = dateString.split('-').map(Number);
-        return new Date(year, month - 1, day);
-    };
+    const parseLocalDate = (dateString) => new Date(dateString.replace(/-/g, '/'));
 
     if (requestDetails.type === 'cancella') {
         newStatus = 'Cancellazione Richiesta';
@@ -341,5 +337,3 @@ function ClientPortal({ user }) {
 }
 
 export default ClientPortal;
-
-
