@@ -18,7 +18,6 @@ function ClientPortal({ user }) {
     const unsubscribe = onSnapshot(clientsQuery, (snapshot) => {
       if (!snapshot.empty) {
         const clientDocData = { ...snapshot.docs[0].data(), id: snapshot.docs[0].id };
-        
         let newNotifications = [];
         let needsUpdate = false;
         (clientDocData.packages || []).forEach(pkg => {
@@ -34,7 +33,6 @@ function ClientPortal({ user }) {
                 }
             });
         });
-
         if(newNotifications.length > 0) {
             setNotifications(newNotifications);
             if (needsUpdate) {
@@ -42,7 +40,6 @@ function ClientPortal({ user }) {
                 updateDoc(clientDocRef, { packages: clientDocData.packages });
             }
         }
-        
         setClientData(clientDocData);
       }
       setLoading(false);
@@ -57,7 +54,6 @@ function ClientPortal({ user }) {
     lessonDate.setHours(0, 0, 0, 0);
     const diffTime = lessonDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
     if (diffDays <= 3) {
       const message = "Oh-oh, sembra che tu sia arrivato/a in ritardo. Lo spostamento della lezione è garantito solo fino a 4 giorni prima. Farò il possibile per soddisfare la tua richiesta ma, nel caso non mi fosse possibile, la lezione sarà considerata svolta come da regola concordata.\n\nSe vuoi comunque proseguire, premi 'OK'.";
       if (window.confirm(message)) {
@@ -73,7 +69,6 @@ function ClientPortal({ user }) {
   const handleSubmitRequestChange = async (e) => {
     e.preventDefault();
     const occurrence = requestForm;
-    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const lessonDateOnly = new Date(occurrence.effectiveDate);
@@ -82,10 +77,8 @@ function ClientPortal({ user }) {
     eightDaysFromNow.setDate(today.getDate() + 8);
     const isCancellable = lessonDateOnly >= eightDaysFromNow;
     const isUrgent = !isCancellable;
-    
     let newStatus = '';
     let changeDetails = { type: requestDetails.type };
-
     if (requestDetails.type === 'cancella') {
         newStatus = 'Cancellazione Richiesta';
     } else {
@@ -111,7 +104,6 @@ function ClientPortal({ user }) {
             changeDetails.newTimeTo = requestDetails.newTimeTo;
         }
     }
-
     const dateString = occurrence.effectiveDate.toISOString().split('T')[0];
     const clientDocRef = doc(db, "clients", clientData.id);
     const newPackages = clientData.packages.map(pkg => {
@@ -160,7 +152,6 @@ function ClientPortal({ user }) {
     const days = [];
     let currentDay = new Date();
     currentDay.setHours(0,0,0,0);
-    
     while (currentDay < lessonDate) {
         const dayOfWeek = currentDay.getDay();
         if (dayOfWeek !== 6 && dayOfWeek !== 0) {
@@ -170,6 +161,8 @@ function ClientPortal({ user }) {
     }
     return days;
   };
+
+  const visibleNotes = (clientData.notes || []).filter(note => note.visible);
 
   return (
     <div className="App">
@@ -183,6 +176,16 @@ function ClientPortal({ user }) {
                 <span className="block sm:inline">{note}</span>
             </div>
         ))}
+
+        {visibleNotes.length > 0 && (
+            <div className="client-notes-portal">
+                <h3>Note per te:</h3>
+                <ul>
+                    {visibleNotes.map(note => <li key={note.id}>{note.text}</li>)}
+                </ul>
+            </div>
+        )}
+
         <h2>I Tuoi Pacchetti Ore</h2>
         <ul className="package-list">
             {(clientData.packages || []).map(pkg => {
@@ -208,12 +211,9 @@ function ClientPortal({ user }) {
                     }
                 });
                 allOccurrences.sort((a, b) => a.effectiveDate - b.effectiveDate);
-                
                 const visibleOccurrences = allOccurrences.filter(occ => !occ.isCancelled);
-                
                 const completedHours = visibleOccurrences.filter(occ => new Date(occ.effectiveDate) < new Date()).reduce((sum, occ) => sum + occ.hoursBooked, 0);
                 const remainingHours = pkg.totalHours - completedHours;
-
                 let pendingRequestsCount = 0;
                 visibleOccurrences.forEach(occ => {
                     const dateString = occ.effectiveDate.toISOString().split('T')[0];
@@ -236,20 +236,17 @@ function ClientPortal({ user }) {
                             {visibleOccurrences.map(occurrence => {
                                 const startTime = occurrence.effectiveDate;
                                 const isPast = startTime < new Date();
-                                
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
                                 const lessonDateOnly = new Date(startTime);
                                 lessonDateOnly.setHours(0, 0, 0, 0);
                                 const eightDaysFromNow = new Date(today);
                                 eightDaysFromNow.setDate(today.getDate() + 8);
-
                                 const isCancellable = lessonDateOnly >= eightDaysFromNow;
                                 const isUrgent = !isCancellable;
-
                                 const dateString = startTime.toISOString().split('T')[0];
                                 const request = (occurrence.requests || {})[dateString];
-                                const isProcessed = startTime < new Date();
+                                const isProcessed = isPast && (!request || request.resolved);
                                 const requestStatus = request && !request.resolved ? request.status : null;
 
                                 return (
@@ -258,7 +255,7 @@ function ClientPortal({ user }) {
                                         <span>Data: {startTime.toLocaleDateString()}</span>
                                         <span>Inizio: {startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         <span>Stato: {requestStatus || (isProcessed ? 'Svolta' : 'Da Svolgere')}</span>
-                                        {!isPast && !requestStatus && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
+                                        {!isPast && (!request || request.resolved) && pendingRequestsCount < 2 && (<button onClick={() => handleRequestChangeClick(occurrence)}>Richiedi Modifica</button>)}
                                     </li>
                                     {requestForm && requestForm.uniqueId === occurrence.uniqueId && (
                                         <li className="booking-form-container">
