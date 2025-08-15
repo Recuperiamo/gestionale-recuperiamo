@@ -16,3 +16,5 @@ Gestionale Next.js con struttura modulare.
 - `/public` — Asset statici
 
 Consulta anche i `context.md` nelle varie cartelle per dettagli di scopo.
+
+> Test workflow GitHub Actions - modifica del 2025-08-15
