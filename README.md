@@ -85,3 +85,48 @@ Applicazione web per la gestione dei pacchetti ore, sviluppata in Next.js 15, Ty
 ## Note
 
 Per qualsiasi modifica alla struttura, seguire quanto definito in STANDARD_OPERATIVO.md.
+
+# Gestionale Pacchetti Ore
+
+## Overview
+
+Repository per la gestione operativa del sistema "Pacchetti Ore" (Next.js, Node, TailwindCSS, ecc).
+
+---
+
+## Struttura della repository
+
+- Tutto il codice e la documentazione si trovano nella cartella `gestionale-recuperiamo`
+- Documentazione operativa principale:
+  - `LOG_OPERATIVO.md` (cronologia attività, sempre aggiornata)
+  - `STANDARD_OPERATIVO.md` (regole operative e di processo)
+- File `.gitignore` in root gestisce l’esclusione di file temporanei e output di build
+
+---
+
+## Policy .gitignore
+
+- Viene sempre utilizzato un file .gitignore aggiornato per stack Next.js/Node.
+- Sono SEMPRE esclusi: node_modules, directory di build (.next, dist, out), file temporanei (*.log, *.tmp, temp/, tmp/), file di ambiente locali (.env, .env.*, tranne .env.example), output test/coverage, file sistema/OS, file temporanei custom (es: elenco_clonata.txt), scarti editor.
+- NON sono mai esclusi: LOG_OPERATIVO.md, STANDARD_OPERATIVO.md, README.md, file di configurazione strategici o deliverable.
+- Dopo ogni aggiornamento del .gitignore viene aggiornata anche questa sezione.
+
+---
+
+## Come contribuire
+
+1. Seguire SEMPRE le regole in `STANDARD_OPERATIVO.md`
+2. Aggiornare `LOG_OPERATIVO.md` dopo ogni modifica strutturale o operativa
+3. Eseguire test manuali ogni volta che viene aggiunta una nuova feature o cambiata la configurazione
+
+---
+
+## Test manuale scenario .gitignore
+
+1. Crea in root i file: test.log, temp.txt, node_modules/fake.js, elenco_clonata.txt.
+2. Esegui `git status`: questi file NON devono apparire tra i non tracciati.
+3. Modifica README.md: deve apparire tra i file modificati.
+4. Elimina i file temporanei di test.
+5. Assicurati che nessun file strategico sia escluso dal versionamento.
+
+---
