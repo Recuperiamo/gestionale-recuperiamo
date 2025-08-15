@@ -1,4 +1,33 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+2025-08-16 01:57:00 (UTC+2)
+- [APERTURA NUOVA MILESTONE] “Implementazione autenticazione e gestione utenti”
+- Obiettivo: progettare e sviluppare la funzionalità di autenticazione utenti e gestione ruoli (amministratore, operatore, visualizzatore) secondo requisiti di sicurezza e usabilità.
+- Task previsti:
+  1. Analisi e scelta della tecnologia di autenticazione (NextAuth.js/Auth0/custom).
+  2. Definizione/aggiornamento modello dati utenti e ruoli.
+  3. Implementazione flusso login/logout, gestione sessione, protezione route e pagine.
+  4. Gestione ruoli e permessi in UI e API.
+  5. Aggiornamento README.md e STANDARD_OPERATIVO.md con policy autenticazione, comandi e scenario test.
+  6. Testing automatico: mock login/logout, test copertura minima.
+  7. Logging dettagliato di ogni step su LOG_OPERATIVO.md.
+- File coinvolti previsti: README.md, LOG_OPERATIVO.md, STANDARD_OPERATIVO.md, src/models/user.ts, src/app/api/auth/[...], eventuali nuovi file di configurazione o librerie.
+- Scenario test manuale milestone:
+  1. Setup ambiente e dipendenze di autenticazione (ad esempio: installazione NextAuth.js/config base).
+  2. Creazione utente di test e verifica login/logout funzionanti via UI.
+  3. Verifica che le pagine protette siano accessibili solo da autenticati, con redirect se non loggati.
+  4. Test modifica ruolo utente → verifica permessi in UI e API.
+  5. Aggiorna README.md con istruzioni e scenario test.
+  6. Tutti i test automatici e manuali devono passare senza errori bloccanti.
+- Note operative: ogni modifica strutturale, di policy o di modello dati va tracciata e documentata; mantenere coerenza tra README.md, LOG_OPERATIVO.md, STANDARD_OPERATIVO.md. Non procedere alle milestone successive senza validazione e chiusura di questa fase.
+
+2025-08-16 01:54:00 (UTC+2)
+- [CHIUSURA FINALE MILESTONE] Inclusi nuovi workflow CI/CD (.github/workflows/build.yml, deploy.yml, dev-check.yml, lint.yml), rimosso il vecchio workflow github_workflows_check-operativo_Version2.yml non più usato. Aggiornato package-lock.json in coerenza con package.json. Riepilogato e verificato scenario test manuale: tutti i workflow attivi e visibili su GitHub Actions, nessun file di workflow residuo o non versionato, milestone effettivamente chiusa.
+- File coinvolti: LOG_OPERATIVO.md, README.md, STANDARD_OPERATIVO.md, babel.config.js, jest.config.js, package.json, package-lock.json, tests/sample.test.js, .github/workflows/build.yml, .github/workflows/deploy.yml, .github/workflows/dev-check.yml, .github/workflows/lint.yml (aggiunti), .github/workflows/github_workflows_check-operativo_Version2.yml (eliminato)
+- Scenario test: 
+  1. Esegui `git status` e verifica che tutti i file sopra siano tra i tracciati/modificati.
+  2. Esegui il push e controlla la tab Actions su GitHub: tutti i nuovi workflow devono risultare caricati e attivi.
+  3. Verifica che il vecchio workflow eliminato non compaia più tra quelli disponibili.
+  4. Clona la repo su ambiente pulito, esegui `npm install`, `npm run dev`, `npm test`: nessun errore bloccante, workflow visibili.
 
 2025-08-16 01:49:00 (UTC+2)
 - [CHIUSURA ISSUE #8] README.md aggiornato e allineato con le istruzioni richieste. LOG_OPERATIVO.md aggiornato con tutti gli step della milestone e timestamp conforme. Scenario test manuale superato. Milestone pronta per chiusura.
