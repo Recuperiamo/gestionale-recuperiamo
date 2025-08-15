@@ -1,3 +1,30 @@
+## [2025-08-15 17:25] - Test workflow: modifica README.md e verifica superamento check operativi
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Test workflow GitHub Actions tramite modifica a README.md  
+**File coinvolti**:
+- README.md
+- LOG_OPERATIVO.md
+
+**Scenario Test**:
+- Modificato README.md per testare il trigger workflow e la validazione automatica.
+- Aggiornato LOG_OPERATIVO.md con una entry conforme che cita tutti i file modificati.
+- Commit e push di entrambi i file.
+- Apertura PR: verifica superamento workflow.
+
+**Esito atteso**:
+- Il check "Verifica presenza LOG_OPERATIVO.md tra i file modificati" deve passare.
+- Il check "Controllo Operativo Bloccante" deve passare se la formattazione è conforme.
+
+**Note**:
+- Entry conforme a STANDARD_OPERATIVO.md.
+
+---
+
+(resto del log invariato)
+
+
 ## [2025-08-15 12:25] - Creazione struttura di progetto iniziale
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
