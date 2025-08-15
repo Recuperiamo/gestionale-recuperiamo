@@ -1,3 +1,54 @@
+## [2025-08-15 17:45] - Fix workflow diagnostica avanzata check-log-operativo.yml
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Sostituzione file check-log-operativo.yml con versione avanzata e diagnostica, aggiunta fetch main branch  
+**File coinvolti**:
+- .github/workflows/check-log-operativo.yml
+- LOG_OPERATIVO.md
+
+**Scenario Test**:
+- Sostituito workflow check-log-operativo.yml con versione aggiornata (fetch + debug).
+- Commit e push.
+- Aggiornamento/apertura PR e verifica che la lista file modificati sia corretta nei log.
+- Se il check passa, procedere. Se fallisce, analizzare output di debug e correggere.
+
+**Esito atteso**:
+- Il check “Verifica presenza LOG_OPERATIVO.md tra i file modificati” deve passare se i file sono corretti e la pipeline aggiornata.
+
+**Note**:
+- Entry conforme a STANDARD_OPERATIVO.md.
+---
+
+(resto del log invariato)
+
+## [2025-08-15 17:40] - Diagnostica avanzata per workflow bloccato su verifica file modificati
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Test e diagnostica per superamento workflow bloccante su modifica README.md e LOG_OPERATIVO.md  
+**File coinvolti**:
+- README.md
+- LOG_OPERATIVO.md
+- .github/workflows/[NOME_WORKFLOW].yml (debug fetch e diff branch)
+
+**Scenario Test**:
+- Modificato README.md e LOG_OPERATIVO.md con entry conforme.
+- Aggiunti step di fetch e debug alla pipeline per mostrare branch remoti e diff reale.
+- Commit e push di tutti i file.
+- Apertura PR con verifica lista file realmente visti dal workflow e superamento check.
+
+**Esito atteso**:
+- La diagnostica mostra la vera lista file modificati.
+- Il check "Verifica presenza LOG_OPERATIVO.md tra i file modificati" passa se la pipeline è corretta e i file sono effettivamente visti.
+- Se il check fallisce ancora, il log di debug mostra il motivo.
+
+**Note**:
+- Entry conforme a STANDARD_OPERATIVO.md.
+- Se la pipeline viene aggiornata, ricordarsi di descrivere la modifica anche in STANDARD_OPERATIVO.md.
+
+---
+
 ## [2025-08-15 17:30] - Test workflow: modifica README.md e verifica superamento check operativi
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
