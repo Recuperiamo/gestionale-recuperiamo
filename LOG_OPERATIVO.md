@@ -1,3 +1,30 @@
+## [2025-08-15 18:50] - Rinominato GIT_COMMANDS_Version7.md in GIT_COMMANDS.md e aggiornati riferimenti
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Rinomina file comandi git per uniformare la nomenclatura ed eliminare la versione dal nome; aggiornati tutti i riferimenti nei documenti di standard e README.  
+**File coinvolti**:
+- GIT_COMMANDS_Version7.md (rinominato)
+- GIT_COMMANDS.md (nuovo nome)
+- LOG_OPERATIVO.md
+- STANDARD_OPERATIVO.md
+- README.md
+
+**Scenario Test**:
+- Verificato che GIT_COMMANDS.md sia presente e accessibile nella repo.
+- Tutti i riferimenti nei documenti puntano al nuovo nome file.
+- Il vecchio file GIT_COMMANDS_Version7.md non risulta più presente nella struttura.
+- Provato a copiare i comandi dal file rinominato, confermata la corretta visualizzazione e utilizzo.
+
+**Esito atteso**:
+- Nome file coerente e riferimenti uniformati in tutta la documentazione.
+- Nessun errore di link o riferimento nei documenti operativi.
+
+**Note**:
+- In caso di riferimenti interni in altri file (es. issue template, CONTRIBUTING.md), aggiornarli contestualmente.
+
+---
+
 ## [2025-08-15 18:40] - Aggiornamento GIT_COMMANDS_Version7.md: snippet comandi git standardizzati
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
