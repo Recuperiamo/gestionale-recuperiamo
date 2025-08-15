@@ -1,4 +1,34 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-15 23:29:14 UTC+2  
+- Integrazione log per inizializzazione progetto e installazione dipendenze chiave (Next.js, React, TypeScript, Tailwind, ESLint) secondo STANDARD_OPERATIVO.md v. aggiornata [2025-08-15 20:08].
+- Comandi eseguiti per setup (CMD e PowerShell):
+
+CMD:
+npx create-next-app@latest temp-nextjs --typescript --eslint --tailwind --app
+cd temp-nextjs
+npm install
+cd ..
+move temp-nextjs\* .
+rmdir /s /q temp-nextjs
+
+PowerShell:
+npx create-next-app@latest temp-nextjs --typescript --eslint --tailwind --app
+cd temp-nextjs
+npm install
+cd ..
+Move-Item temp-nextjs\* .
+Remove-Item temp-nextjs -Recurse -Force
+
+- Scenario test manuale:
+  1. Da un clone pulito, eseguire:
+     - `npm install` (nessun errore atteso)
+     - `npm run dev` (avvio shell Next.js, 404 previsto se nessuna pagina custom presente)
+  2. Verificare presenza di:
+     - package.json, package-lock.json, tsconfig.json, next.config.ts, postcss.config.mjs, tailwind.config.ts, eslint.config.mjs, next-env.d.ts, README.md, /src, /public
+  3. Tutte le dipendenze minime Next.js, React, TS, Tailwind, ESLint devono risultare in package.json
+  4. Struttura root conforme a STANDARD_OPERATIVO.md
+
+- Conformità verificata con STANDARD_OPERATIVO.md, nessuna anomalia rilevata in questa fase.
 
 ## 2025-08-15 20:22:16 UTC  
 - Pronto per aggiornamento log e push.  
