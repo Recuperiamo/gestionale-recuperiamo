@@ -61,3 +61,27 @@ Applicazione web per la gestione dei pacchetti ore, sviluppata in Next.js 15, Ty
 
 - Segui sempre le procedure dettagliate in STANDARD_OPERATIVO.md.
 - Consulta LOG_OPERATIVO.md per la cronologia dettagliata delle operazioni.
+
+# Gestionale Recuperiamo
+
+## Struttura del repository
+
+- Tutto il codice, la documentazione e i file di configurazione si trovano esclusivamente nella cartella `gestionale-recuperiamo`.
+- Nessun file di progetto deve essere presente fuori da questa cartella nella root superiore.
+
+## Modalità operativa
+
+- Tutte le operazioni di sviluppo (git, npm, ecc.) vanno eseguite solo all’interno di `gestionale-recuperiamo`.
+- Dopo ogni modifica strutturale, vanno aggiornati LOG_OPERATIVO.md, STANDARD_OPERATIVO.md e README.md.
+
+## Test manuale consigliato
+
+1. Da dentro la cartella `gestionale-recuperiamo` eseguire:
+   - `npm install`
+   - `npm run dev`
+   - `git status`
+2. Verificare che l’ambiente si avvii senza errori e che non siano presenti warning su lockfile multipli.
+
+## Note
+
+Per qualsiasi modifica alla struttura, seguire quanto definito in STANDARD_OPERATIVO.md.

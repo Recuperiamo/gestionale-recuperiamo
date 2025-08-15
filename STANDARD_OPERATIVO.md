@@ -140,3 +140,23 @@ git push
 
 - Qualsiasi modifica a queste impostazioni tecniche va discussa PRIMA in issue dedicata e approvata via PR, con aggiornamento obbligatorio di questo file e del README.md.
 - Tutte le PR che modificano la struttura o lo stack devono riportare l’estratto aggiornato di questa sezione nello spazio descrizione della PR.
+
+# STANDARD OPERATIVO
+
+## Principi fondamentali
+
+- Tutti i file e le cartelle di progetto DEVONO risiedere esclusivamente all’interno della root della repository gestionale-recuperiamo.
+- NESSUN file o cartella di progetto può essere presente fuori dalla cartella gestionale-recuperiamo.
+- Tutte le operazioni di sviluppo, git, npm, test e gestione CI/CD devono essere eseguite solo dentro gestionale-recuperiamo.
+- La root superiore può contenere solo la cartella gestionale-recuperiamo e (opzionalmente) documenti personali NON collegati al progetto.
+
+## Aggiornamento struttura
+
+- Dopo ogni intervento strutturale, aggiornare sempre LOG_OPERATIVO.md, STANDARD_OPERATIVO.md e README.md.
+- Ogni anomalia o deviazione va documentata tempestivamente nel log operativo.
+
+## Test e validazione
+
+- Ogni modifica strutturale DEVE essere seguita da test manuale: `npm install`, `npm run dev`, `git status` eseguiti da dentro la repo.
+- Nessun warning di lockfile multipli deve essere presente.
+- Il log operativo e la documentazione vanno aggiornati immediatamente dopo i test.
