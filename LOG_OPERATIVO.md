@@ -72,3 +72,19 @@
 - La entry include tutti i file modificati e rispetta il formato richiesto da STANDARD_OPERATIVO.md.
 
 ---
+
+## [2025-08-15 16:45] - Fix contenuto check-operativo.js: rimossi header/commenti non JS
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Correzione file .github/scripts/check-operativo.js, ora contiene solo codice JS valido senza commenti non JS  
+**File coinvolti**:
+- .github/scripts/check-operativo.js
+
+**Scenario Test**:
+- Sostituito il contenuto di .github/scripts/check-operativo.js con la versione fornita.
+- Commit e push della modifica.
+- Aggiornamento PR, verifica che il check bloccante venga eseguito senza errori di sintassi JS.
+- Prossimo step: verifica esito workflow e aggiornamento log operativo con risultato finale.
+
+---

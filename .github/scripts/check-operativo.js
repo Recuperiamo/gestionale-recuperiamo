@@ -1,110 +1,48 @@
-2. **Controlla che il contenuto sia quello fornito (JavaScript, non YAML).**
+const fs = require('fs');
 
----
+function fail(msg) {
+  console.error(`::error::${msg}`);
+  process.exit(1);
+}
 
-### SCENARIO TEST MANUALE
+// 1. Recupera la lista dei file modificati dalla variabile ambiente
+const changed = process.env.CHANGED_FILES ? process.env.CHANGED_FILES.split('\n').filter(Boolean) : [];
+const requiredLog = 'LOG_OPERATIVO.md';
+const requiredStandard = 'STANDARD_OPERATIVO.md';
+const requiredReadme = 'README.md';
+const requiredOnboarding = 'ONBOARDING_SESSION.md';
+const requiredEndSession = 'END_SESSION.md';
 
-1. Rinomina il file come sopra.
-2. Fai commit e push della modifica.
-3. Apri/aggiorna la PR.
-4. Verifica che ora il check “Controllo Operativo Bloccante” parta e non abbia più errori “MODULE_NOT_FOUND”.  
-5. Se il check fallisce, controlla il messaggio: ora il motivo sarà solo se il log operativo non è aggiornato o se la formattazione non è conforme.
+const checklistFiles = [requiredStandard, requiredReadme, requiredOnboarding, requiredEndSession];
 
----
+// 2. Se viene modificato QUALSIASI file tra quelli chiave, LOG_OPERATIVO.md deve essere tra i changed
+const fileChiaveModificato = checklistFiles.some(f => changed.includes(f));
+if (fileChiaveModificato && !changed.includes(requiredLog)) {
+  fail('Se modifichi README.md, STANDARD_OPERATIVO.md, ONBOARDING_SESSION.md o END_SESSION.md, devi aggiornare LOG_OPERATIVO.md nella stessa PR.');
+}
 
-## LOG_OPERATIVO.md aggiornato
+// 3. Se LOG_OPERATIVO.md è tra i file cambiati, controlla l’ultima entry
+if (changed.includes(requiredLog)) {
+  const log = fs.readFileSync(requiredLog, 'utf8');
 
-Ecco il file completo aggiornato con questa operazione e scenario test:
+  // Trova l’ultima entry tra i separatori ---
+  const entries = log.split(/^---$/m).map(e => e.trim()).filter(Boolean);
+  if (entries.length < 1) fail('LOG_OPERATIVO.md sembra vuoto, impossibile verificare ultima entry.');
 
-````markdown name=LOG_OPERATIVO.md
-## [2025-08-15 12:25] - Creazione struttura di progetto iniziale
+  const ultima = entries[0].startsWith('#') ? entries[1] : entries[0]; // ignora titolo eventuale
+  // 3a. Deve esserci la versione dello standard
+  if (!/Versione STANDARD_OPERATIVO\.md/i.test(ultima)) fail('L’ultima entry di LOG_OPERATIVO.md deve riportare la versione di STANDARD_OPERATIVO.md.');
+  // 3b. Deve esserci Scenario Test
+  if (!/Scenario Test/i.test(ultima)) fail('L’ultima entry di LOG_OPERATIVO.md deve contenere "Scenario Test".');
+  // 3c. Deve esserci la sezione "File coinvolti" con almeno una voce
+  if (!/File coinvolti\*?\s*:\s*([^\n]*\n)+/i.test(ultima)) fail('L’ultima entry di LOG_OPERATIVO.md deve contenere la sezione "File coinvolti".');
+  // 3d. Se la PR modifica STANDARD_OPERATIVO.md o README.md, queste voci devono apparire nella lista file coinvolti
+  const filesInUltima = Array.from(ultima.matchAll(/- ([^\s]+)/g)).map(m => m[1]);
+  for (const f of [requiredStandard, requiredReadme]) {
+    if (changed.includes(f) && !filesInUltima.includes(f)) {
+      fail(`Hai modificato ${f} ma non lo hai elencato tra i file coinvolti nell’ultima entry di LOG_OPERATIVO.md.`);
+    }
+  }
+}
 
-**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
-**Autore**: Recuperiamo  
-**Motivo**: Setup base del gestionale, strutturazione iniziale  
-**File coinvolti**:
-- app/
-- src/components/
-- src/fetcher/
-- public/
-- context.md
-- app/context.md
-- src/components/context.md
-- src/fetcher/context.md
-- public/context.md
-
-**Scenario Test**:
-- Verificata la presenza di tutte le cartelle e dei rispettivi file context.md
-
-**Note**:
-- Standard operativo definito in STANDARD_OPERATIVO.md
-
-**TODO**:
-- Inizializzare Next.js
-
----
-
-# Mini-checklist per LOG_OPERATIVO.md
-
-- [ ] Versione STANDARD_OPERATIVO.md aggiornata e riportata
-- [ ] Scenario Test presente e chiaro
-- [ ] Tutti i file coinvolti sono elencati
-- [ ] Note e TODO aggiornati
-
----
-
-## [2025-08-15 15:30] - Test trigger workflow su PR
-
-- Modificato README.md per testare il trigger dei workflow su Pull Request.
-- Eseguito commit e push su branch `test-failure-PR`.
-- Aperta PR verso `main`, verificato che i check GitHub Actions vengano eseguiti.
-- Esito: **I workflow vengono eseguiti regolarmente** su PR non relative a LOG_OPERATIVO.md.
-- I check “Controllo LOG_OPERATIVO.md” e “Controllo Operativo Bloccante” falliscono attivamente come atteso, perché la modifica non aggiorna il LOG_OPERATIVO.md.
-- Scenario test positivo: i workflow bloccano il merge in modo corretto secondo le regole operative.
-- Prossimo step: test su PR con modifica e aggiornamento di LOG_OPERATIVO.md per verifica superamento check.
-
-## [2025-08-15 15:40] - Conferma funzionamento check bloccanti su PR
-
-- Eseguito commit e push: "Test: esito trigger workflow su PR, check bloccanti attivi come atteso".
-- Aperta PR: i workflow vengono eseguiti e i check falliscono come atteso, bloccando il merge.
-- Scenario test conforme a STANDARD_OPERATIVO.md: workflow bloccanti attivi e funzionanti.
-- Prossimo step: modificare LOG_OPERATIVO.md in modo conforme per verificare superamento dei check operativi.
-
-## [2025-08-15 16:10] - Test: superamento workflow bloccante con entry conforme e dettagliata
-
-**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
-**Autore**: Recuperiamo  
-**Motivo**: Test di superamento workflow bloccante su PR che modifica sia README.md sia LOG_OPERATIVO.md  
-**File coinvolti**:
-- README.md
-- LOG_OPERATIVO.md
-
-**Scenario Test**:
-- Modifica di README.md (aggiunta riga di test) e aggiornamento contestuale di LOG_OPERATIVO.md con entry formattata e dettagliata.
-- Commit e push su branch `test-failure-PR`.
-- Apertura PR verso main, verifica passaggio dei workflow bloccanti.
-
-**Esito atteso**:
-- Tutti i workflow (“Controllo LOG_OPERATIVO.md”, “Controllo Operativo Bloccante”) devono passare, consentendo il merge.
-
-**Note**:
-- La entry include tutti i file modificati e rispetta il formato richiesto da STANDARD_OPERATIVO.md.
-
----
-
-## [2025-08-15 16:30] - Ripristino corretto script check-operativo.js e scenario test
-
-**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
-**Autore**: Recuperiamo  
-**Motivo**: Correzione posizione e nome script controllo operativo, da .yml a .js  
-**File coinvolti**:
-- .github/scripts/check-operativo.js
-
-**Scenario Test**:
-- Rinominato file di controllo operativo da .yml a .js.
-- Commit e push della modifica.
-- Apertura/aggiornamento PR, verifica che il check bloccante venga eseguito senza errore “MODULE_NOT_FOUND”.
-- Se LOG_OPERATIVO.md è conforme, il check passa; se non conforme, il motivo sarà esplicitato dal messaggio workflow.
-- Prossimo step: verifica esito e aggiorna log operativo con risultato finale.
-
----
+console.log('Controlli operativi superati.');
