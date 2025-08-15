@@ -1,0 +1,31 @@
+name: Controllo Operativo Bloccante
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-operativo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ottieni lista file modificati nella PR
+        id: files
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          echo "CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...${{ github.head_ref }})" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Esegui controlli operativi
+        run: |
+          cd .github/scripts
+          npm init -y
+          npm install
+          node check-operativo.js
+        env:
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
