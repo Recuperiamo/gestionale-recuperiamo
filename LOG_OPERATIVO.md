@@ -1,4 +1,50 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## LOG OPERATIVO
+# LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## 2025-08-16 00:24 UTC+2 – Riepilogo stato sessione
+
+**DONE:**
+- Bonifica struttura e pulizia root superiore completata.
+- Test manuale eseguito con successo (npm install, npm run dev, git status).
+- Aggiornamento file di processo (STANDARD_OPERATIVO.md, README.md).
+- Entry log aggiornata con orari reali.
+
+**TO DO:**
+- Confermare la gestione di elenco_clonata.txt (da ignorare/eliminare o aggiungere a .gitignore).
+- Confermare se AI_PERSONALIZZAZIO.md va committato così com’è.
+- Eseguire push del LOG_OPERATIVO.md e di tutti i file modificati.
+- Validare che la struttura rimanga conforme allo standard operativo dopo il push.
+
+---
+
+## 2025-08-16 00:16 UTC+2 – Aggiornamento file operativi e processuali
+- Aggiornati STANDARD_OPERATIVO.md e README.md con nota sulla struttura e operatività aggiornata.
+- Preparate entry per LOG_OPERATIVO.md e pronte istruzioni push.
+- Da verificare gestione file non tracciati/residui (elenco_clonata.txt da ignorare o eliminare; AI_PERSONALIZZAZIO.md da committare se ok).
+
+---
+
+## 2025-08-16 00:08 UTC+2 – Test manuale funzionamento repo dopo pulizia
+- Da dentro gestionale-recuperiamo:
+  - Eseguito `npm install`: esito OK, nessun errore o vulnerabilità.
+  - Eseguito `npm run dev`: esito OK, Next.js si avvia regolarmente (Localhost:3000 pronto).
+  - Eseguito `git status`: situazione pulita, a parte file AI_PERSONALIZZAZIO.md modificato e elenco_clonata.txt non tracciato.
+- Nessun warning su lockfile multipli, ambiente in stato pulito.
+- Tutte le operazioni eseguite **esclusivamente dentro la repo**, come da standard.
+
+---
+
+## 2025-08-16 00:01 UTC+2 – Bonifica struttura e pulizia root superiore
+- Analisi e confronto struttura tra root e cartella gestionale-recuperiamo.
+- Verificata presenza di file e cartelle di progetto nella root superiore, non appartenenti alla repo.
+- Avviata procedura di spostamento e cancellazione: ora **tutto il progetto** risiede solo in gestionale-recuperiamo.
+- Eliminati file e cartelle di progetto residui dalla root superiore.
+- La root superiore contiene ora esclusivamente la cartella gestionale-recuperiamo.
+
+---
+
+
 ## 2025-08-15 [UTC+2: 23:59]
 - Aggiornamento e push di package.json e package-lock.json.
 - Motivazione: allineamento repository remoto con ambiente locale dopo inizializzazione, installazione framework e dipendenze base (Next.js, TailwindCSS, ecc).
