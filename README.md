@@ -106,3 +106,28 @@
 - Gli stati (es. stato pacchetto, stato fattura, ruolo utente) vanno mappati su enum/tabella di riferimento.
 - In fase di progettazione dettagliata, le entità potranno essere raffinate/estese (es. aggiunta storicizzazione, gestione allegati, ecc.).
 - Possibili estensioni future: entità PROGETTO, gestione documenti, storico accessi.
+# Gestionale Pacchetti Ore – Documentazione progettuale
+
+...
+
+## Backup integrale documentazione progettuale Fase 2
+
+### Bozza struttura dati (STRUTTURA_DATI_BOZZA.md)
+# Bozza struttura dati – Gestionale Didattica (MVP)
+(entità e relazioni come già fornito...)
+
+---
+
+### Bozza architettura cartelle (ARCHITETTURA_CARTELLE_BOZZA.md)
+# Bozza architettura cartelle e componenti – Gestionale Didattica (MVP)
+
+## Obiettivi di architettura
+- Separazione chiara tra front-end, back-end e documentazione
+- Facilità di estensione futura e mantenimento
+- Rintracciabilità dei deliverable progettuali e degli standard
+
+...
+
+(su modello del file ARCHITETTURA_CARTELLE_BOZZA.md, come sopra)
+
+---

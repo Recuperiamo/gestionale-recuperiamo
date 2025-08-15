@@ -1,3 +1,83 @@
+## [2025-08-15 19:35] - Bozza architettura cartelle e componenti: creato ARCHITETTURA_CARTELLE_BOZZA.md, aggiornato log e README
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Prodotta e versionata la bozza di architettura cartelle/componenti per MVP gestionale didattica, come da checklist progettazione. Creato ARCHITETTURA_CARTELLE_BOZZA.md, incollato integralmente in coda a LOG_OPERATIVO.md e aggiornata la sezione documentazione di README.md.  
+**File coinvolti**:
+- ARCHITETTURA_CARTELLE_BOZZA.md (nuovo)
+- LOG_OPERATIVO.md (aggiornato)
+- README.md (aggiornato)
+
+**Scenario Test**:
+- ARCHITETTURA_CARTELLE_BOZZA.md presente in root e completo.
+- Sezione documentazione progettuale di README.md aggiornata con la nuova bozza architettura.
+- LOG_OPERATIVO.md contiene nuova entry dettagliata e backup integrale della bozza architettura in fondo al file.
+- Tutte le cartelle e i documenti chiave sono tracciati e spiegati.
+- Pronto per revisione e step successivi (milestone/fasi sviluppo).
+
+**Esito atteso**:
+- Struttura di progetto chiara, scalabile e conforme agli standard.
+- Backup garantito anche in caso di perdita file singolo o refactor.
+
+---
+
+(resto del file invariato, inclusi tutte le entry precedenti e i backup INTEGRALI già presenti)
+
+---
+
+# === BACKUP ARCHITETTURA_CARTELLE_BOZZA.md ===
+
+# Bozza architettura cartelle e componenti – Gestionale Didattica (MVP)
+
+## Obiettivi di architettura
+- Separazione chiara tra front-end, back-end e documentazione
+- Facilità di estensione futura e mantenimento
+- Rintracciabilità dei deliverable progettuali e degli standard
+
+---
+
+## Struttura principale (root)
+
+- /app/             → Entry point applicazione, logiche di routing, layout generali
+- /src/             → Tutto il codice sorgente “core” (componenti, logica, fetcher)
+  - /components/    → Componenti UI riusabili (tabelle, form, card, dialog, ecc.)
+  - /fetcher/       → Funzioni di accesso dati/API (client/server)
+  - /utils/         → Funzioni di utilità e helper condivisi
+  - /models/        → Schemi entità dati (tipi, interfacce, validatori)
+- /public/          → Asset statici (immagini, logo, favicon, documenti pubblici)
+- /docs/            → Documentazione tecnica, guide, standard, mappa funzionale, schemi ER
+- /tests/           → Test automatici/unitari (quando previsti)
+- /scripts/         → Script di supporto (migrazioni, seed, automazioni)
+- /.github/         → Workflow, template issue/PR, check-operativo
+- /output.md        → Output generati temporanei/manuali
+- /context.md       → File di contesto per onboarding/recupero stato
+
+---
+
+## Deliverable/documentazione in root
+- LOG_OPERATIVO.md
+- README.md
+- STANDARD_OPERATIVO.md
+- Tutte le mappe/checklist/scenari/strutture dati di fase (versionate)
+
+---
+
+## Note operative
+- Ogni cartella avrà un context.md (o README.md) che ne spiega lo scopo.
+- La struttura è pensata per MVP ma facilmente scalabile.
+- Il dettaglio dei componenti UI e dei models verrà raffinato nella fase di sviluppo.
+- Le modifiche strutturali vanno sempre tracciate in LOG_OPERATIVO.md
+
+---
+
+## Scenario test manuale
+- Tutte le cartelle elencate sono create e referenziate a README.md
+- Ogni cartella/documento ha un context.md o README.md di spiegazione
+- Nessuna componente “core” fuori da src/
+- Aggiornamento log e README.md immediato dopo ogni modifica architetturale
+- Backup integrale architettura incollato in LOG_OPERATIVO.md
+
+---
 ## [2025-08-15 19:25] - Bozza struttura dati MVP: aggiunto STRUTTURA_DATI_BOZZA.md e aggiornati log e README
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
