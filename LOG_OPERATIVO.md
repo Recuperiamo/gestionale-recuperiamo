@@ -1,3 +1,23 @@
+## [2025-08-15 20:10] - Correzione README.md: inserito backup integrale di tutti i deliverable progettuali come da standard
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Correzione formale: README.md ora contiene il testo completo e integrale di tutti i deliverable progettuali fase 2 (nessun rimando/segnaposto). Backup conforme secondo scenario test, log operativo aggiornato e tracciato.  
+**File coinvolti**:
+- README.md (aggiornato)
+- LOG_OPERATIVO.md (aggiornato)
+
+**Scenario Test**:
+- README.md contiene backup integrale di: mappa funzionale, checklist progettazione, scenario test progettazione, struttura dati, architettura cartelle, milestone/fasi di sviluppo, scenario test manuale finale.
+- Nessun segnaposto o rimando, solo testo completo.
+- Entry di correzione presente in LOG_OPERATIVO.md.
+- Pronto per scenario test finale e validazione “GO”.
+
+**Esito atteso**:
+- Conformità piena allo standard operativo e scenario test.
+- Tutti i file strategici sono tracciati, reperibili e versionati.
+
+---
 ## [2025-08-15 19:55] - Scenario test manuale finale progettazione: creato SCENARIO_TEST_MANUALE_PROGETTAZIONE.md, aggiornato log e README
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
