@@ -1,0 +1,31 @@
+# ATTENZIONE: Sostituisci [NOME_WORKFLOW] con il nome reale del file workflow.
+# Esempio: check-operativo.yml
+
+jobs:
+  check-log-operativo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch main branch
+        run: git fetch origin main
+
+      - name: Debug branch info
+        run: |
+          git branch -a
+          echo "HEAD: $(git rev-parse HEAD)"
+          echo "Main: $(git rev-parse origin/main || git rev-parse main)"
+          git log --oneline -n 5
+
+      - name: Lista file modificati PR
+        run: |
+          echo "Files changed:"
+          git diff --name-only origin/main...HEAD
+
+      - name: Calcola file modificati
+        id: files
+        run: |
+          echo "CHANGED=$(git diff --name-only origin/main...HEAD)" >> $GITHUB_OUTPUT
+
+      ... # resto degli step (incluso quello che lancia check-operativo.js)
