@@ -1,3 +1,24 @@
+## [2025-08-15 18:40] - Aggiornamento GIT_COMMANDS_Version7.md: snippet comandi git standardizzati
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Aggiornati gli snippet pronti di comandi git in GIT_COMMANDS_Version7.md per uniformità tra CMD e PowerShell e coerenza con le regole operative.  
+**File coinvolti**:
+- GIT_COMMANDS_Version7.md
+- LOG_OPERATIVO.md
+
+**Scenario Test**:
+- Copiato e incollato i blocchi CMD/PowerShell, verificato che siano corretti e pronti all’uso immediato.
+- Controllato che i comandi siano conformi agli standard operativi, senza commenti all’interno dei blocchi di codice.
+
+**Esito atteso**:
+- Comandi git aggiornati e uniformi, pronti per copia/incolla operativo.
+
+**Note**:
+- Se in futuro cambia lo standard operativo, aggiornare anche STANDARD_OPERATIVO.md e README.md.
+
+---
+
 ## [2025-08-15 18:30] - Chiusura fase requisiti gestionale didattica e promemoria scenario test
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  

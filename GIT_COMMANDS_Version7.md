@@ -1,6 +1,10 @@
 # Comandi Git Standard (snippet pronti)
 
 ## CMD
+
+git add LOG_OPERATIVO.md
+git commit -m "Aggiornamento LOG_OPERATIVO.md: [breve descrizione]"
+git push
 ```
 git add LOG_OPERATIVO.md
 git add <files_da_aggiornare>
