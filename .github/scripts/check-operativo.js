@@ -43,6 +43,10 @@ if (changed.includes(requiredLog)) {
       fail(`Hai modificato ${f} ma non lo hai elencato tra i file coinvolti nell’ultima entry di LOG_OPERATIVO.md.`);
     }
   }
+  // 3e. Deve esserci il timestamp con ora UTC+2
+  if (!/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\+2\]/.test(ultima)) {
+    fail("L’ultima entry di LOG_OPERATIVO.md deve iniziare con il timestamp [YYYY-MM-DD HH:MM UTC+2].");
+  }
 }
 
 console.log('Controlli operativi superati.');
