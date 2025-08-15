@@ -1,4 +1,48 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## [2025-08-16 01:28 UTC+2] Issue #7: aggiunta sezione "Sviluppo locale" a README.md
+
+Versione STANDARD_OPERATIVO.md: 2025-08-15
+
+File coinvolti:
+- README.md
+- LOG_OPERATIVO.md
+
+Scenario Test:
+- Clonare la repository su un ambiente pulito.
+- Seguire i passi della sezione “Sviluppo locale” in README.md: `npm install`, `npm run dev`, `npm run build`, `npm run lint`, `npm test`.
+- Tutti i comandi devono completarsi senza errori o warning bloccanti.
+- L’applicazione parte su http://localhost:3000 e risponde correttamente.
+- I comandi di lint e test restituiscono feedback chiaro.
+## [2025-08-16 01:25 UTC+2] Avvio lavoro Issue #7: setup ambiente di testing locale
+
+Versione STANDARD_OPERATIVO.md: 2025-08-15
+
+File coinvolti:
+- README.md
+- LOG_OPERATIVO.md
+- STANDARD_OPERATIVO.md
+- (eventuali nuovi script di test/lint/build)
+
+Scenario Test:
+- Un nuovo dev può leggere README.md e, seguendo le istruzioni, avviare ambiente locale senza errori.
+- I comandi di test (`npm test`) e lint (`npm run lint`) funzionano e danno feedback chiaro.
+- Dopo ogni modifica a README.md, STANDARD_OPERATIVO.md o agli script di test/build/lint, LOG_OPERATIVO.md viene aggiornato.
+---
+## [2025-08-16 01:22 UTC+2] Chiusura Issue #6: governance workflow, validazione log operativo/file chiave, doc aggiornata
+
+Versione STANDARD_OPERATIVO.md: 2025-08-15
+
+File coinvolti:
+- .github/scripts/check-operativo.js
+- README.md
+- STANDARD_OPERATIVO.md
+- LOG_OPERATIVO.md
+
+Scenario Test:
+- Modifica uno tra README.md, STANDARD_OPERATIVO.md, ONBOARDING_SESSION.md o END_SESSION.md senza aggiornare LOG_OPERATIVO.md → la PR viene bloccata.
+- Aggiorna LOG_OPERATIVO.md senza una delle sezioni richieste (timestamp, versione standard, file coinvolti, scenario test) → la PR viene bloccata.
+- Aggiorna LOG_OPERATIVO.md ma ometti nella lista “File coinvolti” uno dei file effettivamente modificati → la PR viene bloccata.
+- Tutte le sezioni sono presenti e corrette → la PR passa.
 ## [2025-08-16 01:18 UTC+2] Aggiornamento check-operativo.js: validazione avanzata file chiave, log operativo, timestamp, scenario test
 
 Versione STANDARD_OPERATIVO.md: 2025-08-15

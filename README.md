@@ -142,4 +142,88 @@ Repository per la gestione operativa del sistema "Pacchetti Ore" (Next.js, Node,
 4. Elimina i file temporanei di test.
 5. Assicurati che nessun file strategico sia escluso dal versionamento.
 
+
+## Sviluppo locale
+
+### Prerequisiti
+
+- **Node.js** versione 20.x o superiore  
+  Verifica la versione con:  
+  ```
+  node --version
+  ```
+- **npm** versione 9.x o superiore  
+  Verifica la versione con:  
+  ```
+  npm --version
+  ```
+- Sistema operativo: Linux, macOS, Windows (testato su tutte le principali piattaforme)
+- È consigliato usare un terminale moderno (es: VSCode Terminal, iTerm2, Windows Terminal)
+
+---
+
+### Setup e comandi chiave
+
+1. **Clona il repository**
+   ```
+   git clone https://github.com/Recuperiamo/gestionale-recuperiamo.git
+   cd gestionale-recuperiamo
+   ```
+
+2. **Installa le dipendenze**
+   ```
+   npm install
+   ```
+
+3. **Avvia l’ambiente di sviluppo**
+   ```
+   npm run dev
+   ```
+   L’applicazione sarà disponibile su [http://localhost:3000](http://localhost:3000)
+
+4. **Build di produzione**
+   ```
+   npm run build
+   ```
+
+5. **Lint del codice**
+   ```
+   npm run lint
+   ```
+
+6. **Esegui i test**
+   ```
+   npm test
+   ```
+
+---
+
+### Risoluzione problemi frequenti
+
+- Se riscontri errori di permessi su Linux/macOS, prova:
+  ```
+  chmod +x ./node_modules/.bin/*
+  ```
+- Se `npm install` genera warning su versioni, assicurati che Node.js e npm siano aggiornati.
+- Se ricevi errori su file `.env` mancanti, copia eventualmente il file `.env.example` come base:
+  ```
+  cp .env.example .env
+  ```
+
+---
+
+### Scenario test manuale sviluppo locale
+
+1. Clona la repository su una macchina/VM “vergine”.
+2. Segui i passi sopra in ordine.
+3. Verifica che ogni comando (`npm install`, `npm run dev`, `npm run build`, `npm run lint`, `npm test`) dia esito positivo senza errori bloccanti.
+4. Accedi a http://localhost:3000 e verifica che l’app sia funzionante.
+5. Se incontri problemi non documentati, aggiorna questa sezione e segnala l’errore nel LOG_OPERATIVO.md.
+
+---
+
+### Note operative
+
+- Aggiorna LOG_OPERATIVO.md ogni volta che questa sezione viene modificata.
+- Se aggiungi nuovi comandi/script, documentali qui e aggiorna STANDARD_OPERATIVO.md.
 ---
