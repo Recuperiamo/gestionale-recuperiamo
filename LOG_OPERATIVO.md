@@ -374,3 +374,189 @@
 - [ ] Note e TODO aggiornati
 
 ---
+
+## [2025-08-15 19:10] - Backup integrale deliverable progettazione Fase 2 (MAPPA_FUNZIONALE, CHECKLIST, SCENARIO TEST) incollati in LOG_OPERATIVO.md
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Incollati integralmente in coda a LOG_OPERATIVO.md i tre deliverable chiave della fase 2 progettazione: MAPPA_FUNZIONALE_Version13.md, PROGETTAZIONE_CHECKLIST_Version73.md, SCENARIO_TEST_PROGETTAZIONE_Version73.md. Garantito backup storico e recuperabilità anche in caso di perdita dei file singoli.  
+**File coinvolti**:
+- LOG_OPERATIVO.md
+- MAPPA_FUNZIONALE_Version13.md
+- PROGETTAZIONE_CHECKLIST_Version73.md
+- SCENARIO_TEST_PROGETTAZIONE_Version73.md
+- README.md
+
+**Scenario Test**:
+- Dopo questa entry, il contenuto dei tre file risulta incollato integralmente e inalterato in coda a LOG_OPERATIVO.md.
+- In caso di perdita o cancellazione accidentale dei file singoli, il backup rimane recuperabile dal log.
+- In caso di revisione futura, aggiornare contestualmente log, README e i file separati.
+
+**Esito atteso**:
+- Conformità totale allo standard operativo: nessun deliverable di fase 2 risulta disperso.
+- Pronto per revisione e proseguimento con le prossime milestone progettuali.
+
+**Note**:
+- In caso di modifica di uno qualsiasi dei deliverable, aggiornare contestualmente anche il backup nel log.
+
+---
+
+# === BACKUP INTEGRALE DELIVERABLE PROGETTAZIONE FASE 2 ===
+
+## MAPPA_FUNZIONALE_Version13.md
+
+# Mappa funzionale – Gestionale Didattica (MVP)
+
+## Obiettivo gestionale
+Supportare la gestione operativa e amministrativa delle attività didattiche, con particolare attenzione a: pacchetti ore, anagrafica clienti, fatturazione, monitoraggio attività, e reporting.
+
+---
+
+## Funzionalità principali
+
+### 1. Gestione anagrafica clienti
+- Creazione, modifica, eliminazione di clienti (enti, aziende, privati)
+- Gestione dettagli: dati fiscali, contatti, note operative
+
+### 2. Gestione pacchetti ore
+- Creazione/assegnazione di pacchetti ore a clienti
+- Monitoraggio consumo ore per cliente e per progetto
+- Segnalazione automatica esaurimento/soglia ore
+
+### 3. Gestione attività e rendicontazione
+- Registrazione attività svolte (data, ora, descrizione, operatore, cliente associato)
+- Collegamento attività a pacchetti ore
+- Calcolo automatico ore residue
+
+### 4. Fatturazione e amministrazione
+- Generazione documenti di fatturazione (proforma, fattura, ricevuta)
+- Esportazione dati per amministrazione
+- Stato pagamenti e scadenze
+
+### 5. Reportistica e dashboard
+- Visualizzazione riepiloghi per cliente, attività, pacchetti ore, fatturato
+- Esportazione report (PDF, XLS)
+- Indicatori di performance (ore erogate, residuo, valore economico)
+
+---
+
+## Funzionalità secondarie/di supporto
+
+### 6. Gestione utenti e permessi
+- Ruoli: amministratore, operatore, visualizzatore
+- Accesso e gestione differenziata dei dati a seconda del ruolo
+
+### 7. Notifiche e alert
+- Alert automatici su scadenze, esaurimento ore, mancata rendicontazione
+
+### 8. Audit e storico modifiche
+- Log delle modifiche su dati critici (anagrafica, pacchetti, attività)
+
+---
+
+## Funzionalità future (fuori MVP, opzionali)
+- Integrazione con sistemi esterni (es. CRM, contabilità)
+- Accesso clienti (portalino)
+- Integrazione calendario
+- App mobile
+
+---
+
+## Note operative
+- Ogni funzionalità dovrà essere poi mappata su entità dati e componenti UI nelle prossime fasi.
+- La mappa funzionale può essere aggiornata in iterazioni successive prima del “GO”.
+
+---
+
+## PROGETTAZIONE_CHECKLIST_Version73.md
+
+# Checklist Fase 2 – Progettazione Gestionale Didattica
+
+## 1. Raccolta e validazione requisiti
+- [x] Requisiti raccolti e documentati (`GESTIONALE_REQUISITI_BASE.md`)
+- [x] Entry di chiusura fase requisiti su `LOG_OPERATIVO.md`
+- [x] Validazione formale (in chat e nel log) per passaggio a Fase 2
+
+## 2. Progettazione tecnica – Deliverable da produrre e validare
+- [ ] Mappa funzionale (elenco e descrizione funzioni principali/secondarie)
+- [ ] Bozza struttura dati (entità, relazioni, attributi chiave; anche schema ER/tabella)
+- [ ] Bozza architettura cartelle/componenti (con spiegazione suddivisione logica)
+- [ ] Lista milestone/fasi di sviluppo (sequenza, priorità, dipendenze)
+
+## 3. Scenario test manuale per la progettazione
+- [ ] Tutti i deliverable sono presenti e accessibili
+- [ ] Deliverable coerenti coi requisiti raccolti
+- [ ] Nessun file di codice/progetto generato prima della validazione
+- [ ] Validazione formale e “GO” alla progettazione/codifica approvati (in chat e su `LOG_OPERATIVO.md`)
+
+## 4. Aggiornamento documenti di processo
+- [ ] Entry di chiusura fase progettazione su `LOG_OPERATIVO.md` (completa e dettagliata)
+- [ ] Aggiornamento `STANDARD_OPERATIVO.md` se necessario
+- [ ] Aggiornamento `README.md` se necessario
+
+---
+
+## Note operative
+- Usa questa checklist per monitorare lo stato tra una sessione e l’altra.
+- Non passare alla codifica se non hai tutte le spunte nella sezione 3.
+- Ogni step significativo va tracciato sia in chat che su `LOG_OPERATIVO.md`.
+- In caso di revisione, aggiorna questa checklist e il log.
+
+---
+
+## SCENARIO_TEST_PROGETTAZIONE_Version73.md
+
+# Scenario Test Manuale – Progettazione Gestionale Didattica
+
+## Obiettivo
+Validare la fase di progettazione tecnica prima di qualsiasi attività di codifica, assicurando che siano prodotti e approvati tutti i deliverable di progetto secondo requisiti e standard.
+
+---
+
+## Deliverable richiesti
+
+1. **Mappa funzionale**
+   - Elenco delle funzioni principali e secondarie del gestionale, con descrizione sintetica del loro obiettivo.
+2. **Bozza di struttura dati**
+   - Rappresentazione (anche preliminare) delle entità chiave, relazioni tra dati, e principali attributi.
+   - Può essere uno schema ER, una tabella di sintesi, o un diagramma.
+3. **Bozza di architettura delle cartelle e componenti**
+   - Proposta di struttura delle principali cartelle (es. src/, app/, public/, ecc.) e dei macro-componenti, con spiegazione della suddivisione logica.
+4. **Lista delle milestone/fasi di sviluppo**
+   - Sequenza delle macro-fasi (ad es: setup ambiente, implementazione autenticazione, gestione utenti, …), con priorità e dipendenze.
+
+---
+
+## Scenario di validazione manuale
+
+- Tutti i deliverable sopra elencati sono presenti e accessibili nella repository/project documentation.
+- La mappa funzionale è coerente con i requisiti raccolti.
+- La struttura dati è sufficiente per permettere una progettazione tecnica dettagliata nella fase successiva.
+- La proposta di architettura di cartelle e componenti rispetta le linee guida tecniche (STANDARD_OPERATIVO.md, eventuali vincoli tecnologici).
+- La lista delle milestone copre tutte le funzionalità previste, con priorità e dipendenze corrette.
+- **Validazione formale:**  
+  Nessun file di progetto/codice viene generato prima dell’approvazione esplicita (in chat e/o nel log-operativo) di tutti i deliverable di progettazione da parte del responsabile progetto/PO.
+- **Criterio di superamento:**  
+  Il responsabile progetto/PO conferma in chat e con apposita entry in LOG_OPERATIVO.md che la fase di progettazione è “GO”.
+
+---
+
+## Checklist di validazione
+
+- [ ] Tutti i deliverable richiesti sono presenti e accessibili
+- [ ] Coerenza rispetto ai requisiti raccolti (vedi GESTIONALE_REQUISITI_BASE.md)
+- [ ] Struttura dati e architettura cartelle/componenti sufficientemente dettagliate
+- [ ] Milestone/fasi complete e ordinate
+- [ ] Validazione e “GO” alla codifica approvati e loggati
+
+---
+
+## Note
+- In caso di revisione o modifica a uno qualsiasi dei deliverable, aggiornare contestualmente la documentazione e il log operativo.
+- Nessuna codifica o creazione di file tecnici fino a validazione conclusa.
+
+---
+
+# Fine backup integrale deliverable progettazione Fase 2
+
+---
