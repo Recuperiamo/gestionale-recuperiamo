@@ -1,5 +1,19 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## [2025-08-16 01:04 UTC+2] Aggiornamento e deduplicazione workflow CI/CD: check-operativo.yml e check-log-operativo.yml
 
+**File coinvolti**:
+- .github/workflows/check-operativo.yml (definitivo, deduplicato e attivo su push+PR)
+- .github/workflows/check-log-operativo.yml (definitivo, deduplicato e attivo su push+PR)
+- LOG_OPERATIVO.md (questa entry, aggiornata)
+
+**Scenario Test**:
+- Push e PR su qualsiasi branch attivano entrambi i workflow
+- PR senza LOG_OPERATIVO.md aggiornato viene bloccata da check-log-operativo.yml
+- Modifica file chiave (README, STANDARD_OPERATIVO.md, ecc.): check-operativo obbliga update log e coerenza file
+
+**Note**:
+- Eliminati i doppioni, mantenute solo le versioni funzionanti e complete dei workflow.
+- Se introduci nuovi workflow, aggiorna sempre questa sezione e la documentazione.
 ## 2025-08-16 00:32 UTC+2 – Issue #5: Aggiornamento .gitignore, standard operativo e README
 
 - Aggiornato file .gitignore per Next.js/Node: aggiunte regole per esclusione node_modules, output temporanei, dist, .next, .env*, *.log, output.md, elenco_clonata.txt e file di sistema.
