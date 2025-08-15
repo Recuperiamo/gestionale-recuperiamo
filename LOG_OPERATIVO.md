@@ -1,5 +1,8 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+2025-08-16 01:49:00 (UTC+2)
+- [CHIUSURA ISSUE #8] README.md aggiornato e allineato con le istruzioni richieste. LOG_OPERATIVO.md aggiornato con tutti gli step della milestone e timestamp conforme. Scenario test manuale superato. Milestone pronta per chiusura.
+
 2025-08-16 01:48:00 (UTC+2)
 - Aggiornata configurazione testing automatico: risolti conflitti Jest tra package.json e jest.config.js, aggiunto babel.config.js per supporto JSX in Jest, installato jest-environment-jsdom come devDependency, corretto setupFilesAfterEnv in jest.config.js.
 - Verificato funzionamento test automatici con test di esempio basato su React Testing Library: test superato con successo via `npm test`.
