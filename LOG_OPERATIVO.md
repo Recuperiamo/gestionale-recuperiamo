@@ -1,5 +1,11 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-
+## 2025-08-15 [UTC+2: 23:59]
+- Aggiornamento e push di package.json e package-lock.json.
+- Motivazione: allineamento repository remoto con ambiente locale dopo inizializzazione, installazione framework e dipendenze base (Next.js, TailwindCSS, ecc).
+- Nessuna modifica strutturale ai sorgenti, solo lockfile e manifest.
+- La build e il comando di avvio (`npm run dev`) continuano a funzionare senza errori.
+- Resta sospeso il test UI base framework in attesa di pagine/app.
+- Repository ora coerente per cloni e installazioni future.
 ## 2025-08-15 [UTC+2: 23:48]
 - Ripristino file `tailwind.config.ts` in root (`C:\Users\mauzr\Desktop\Sito\gestionale-pacchetti-ore\tailwind.config.ts`).
 - Contenuto configurazione base TypeScript conforme a standard Next.js/Tailwind e STANDARD_OPERATIVO.md.
