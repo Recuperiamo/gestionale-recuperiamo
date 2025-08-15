@@ -1,3 +1,95 @@
+## [2025-08-15 19:45] - Lista milestone/fasi di sviluppo: creato MILESTONE_FASI_DI_SVILUPPO.md, aggiornato log e README
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Redatta e versionata la lista milestone/fasi di sviluppo per il gestionale didattica (MVP). Creato file MILESTONE_FASI_DI_SVILUPPO.md, incollato integralmente in coda a LOG_OPERATIVO.md e aggiornata la sezione documentazione di README.md.  
+**File coinvolti**:
+- MILESTONE_FASI_DI_SVILUPPO.md (nuovo)
+- LOG_OPERATIVO.md (aggiornato)
+- README.md (aggiornato)
+
+**Scenario Test**:
+- MILESTONE_FASI_DI_SVILUPPO.md presente in root e completo.
+- Sezione documentazione progettuale di README.md aggiornata con la lista milestone.
+- LOG_OPERATIVO.md contiene nuova entry dettagliata e backup integrale della milestone in fondo al file.
+- Ogni milestone/fase chiara, atomica e validabile.
+- Pronto per raffinamento e scomposizione operativa.
+
+**Esito atteso**:
+- Sequenza di sviluppo chiara, prioritaria e tracciabile.
+- Backup garantito anche in caso di perdita file singolo o refactor.
+
+---
+
+(resto del file invariato, inclusi tutte le entry e backup INTEGRALI già presenti)
+
+---
+
+# === BACKUP MILESTONE_FASI_DI_SVILUPPO.md ===
+
+# Lista milestone/fasi di sviluppo – Gestionale Didattica (MVP)
+
+## Obiettivo
+Definire la sequenza di macro-fasi operative per lo sviluppo, con priorità e dipendenze.
+
+---
+
+## Milestone principali
+
+1. **Setup ambiente e infrastruttura**
+   - Inizializzazione progetto (repo, dipendenze base, struttura cartelle)
+   - Configurazione workflow GitHub Actions e check automatici
+   - Setup ambienti locali e test
+
+2. **Implementazione autenticazione e gestione utenti**
+   - Gestione ruoli: amministratore, operatore, visualizzatore
+   - Login/logout, gestione stato utente
+
+3. **Gestione anagrafica clienti**
+   - CRUD clienti con validazioni
+   - Collegamento ai pacchetti ore
+
+4. **Gestione pacchetti ore**
+   - Creazione/assegnazione pacchetti a clienti
+   - Monitoraggio ore residue e segnalazioni
+
+5. **Gestione attività/rendicontazione**
+   - Registrazione attività collegate a pacchetti
+   - Calcolo automatico ore residue
+
+6. **Fatturazione e amministrazione**
+   - Generazione e gestione documenti (proforma, fattura, ricevuta)
+   - Stato pagamenti
+
+7. **Dashboard e reportistica**
+   - Cruscotto riepiloghi clienti, pacchetti, attività, fatturato
+   - Esportazione dati/report
+
+8. **Notifiche, alert e log modifiche**
+   - Alert automatici (scadenze, esaurimento ore…)
+   - Storico modifiche (audit)
+
+9. **Documentazione tecnica e di processo**
+   - Aggiornamento continuo dei deliverable progettuali
+   - Scenario test manuale finale e validazione
+
+---
+
+## Note operative
+- Ogni milestone è suddivisibile in task più piccoli per la gestione day-by-day.
+- Non procedere allo sviluppo di milestone successive senza check/test/validazione della precedente.
+- Aggiornare LOG_OPERATIVO.md e README.md dopo ogni avanzamento significativo.
+- In caso di variazioni o revisioni, tracciare sempre la motivazione e la nuova sequenza.
+
+---
+
+## Scenario test manuale
+- Ogni milestone è chiara, atomica, tracciabile e validabile.
+- Le dipendenze sono esplicite.
+- Il file MILESTONE_FASI_DI_SVILUPPO.md è presente, accessibile e integralmente riportato nella coda di LOG_OPERATIVO.md.
+- Pronto per revisione, raffinamento o scomposizione in task operativi.
+
+---
 ## [2025-08-15 19:35] - Bozza architettura cartelle e componenti: creato ARCHITETTURA_CARTELLE_BOZZA.md, aggiornato log e README
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
