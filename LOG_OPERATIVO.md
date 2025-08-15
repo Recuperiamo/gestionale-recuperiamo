@@ -1,7 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
-**Prima versione di log per la sessione del 2025-08-15 20:22:16 UTC**
+## 2025-08-15 20:22:16 UTC  
+- Pronto per aggiornamento log e push.  
+- Nessuna omissione rilevata nel log.  
+- Prossimo step: push del log operativo e di tutti i file modificati/creati in questa sessione.
 
+## 2025-08-15 20:32:00 UTC  
+- Aggiornato README.md a seguito della migrazione strutturale Next.js: nuova struttura root, policy versionamento file chiave (incluso next-env.d.ts), istruzioni avvio rapido e note di conformità a STANDARD_OPERATIVO.md.
 ---
 
 ## 2025-08-15 19:55:00 UTC  

@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gestionale Pacchetti Ore
 
-## Getting Started
+## Descrizione
+Applicazione web per la gestione dei pacchetti ore, sviluppata in Next.js 15, TypeScript e Tailwind CSS.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Struttura del progetto (2025-08-15)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **src/**  
+  Codice applicativo principale (componenti, modelli, fetcher, utils, ecc.).
+- **public/**  
+  File statici e asset pubblici.
+- **package.json / package-lock.json**  
+  Gestione dipendenze e script di progetto.
+- **next.config.ts**  
+  Configurazione Next.js.
+- **eslint.config.mjs**  
+  Configurazione ESLint.
+- **tsconfig.json**  
+  Configurazione TypeScript.
+- **postcss.config.mjs**  
+  Configurazione PostCSS (necessario per Tailwind).
+- **.gitignore**  
+  File e cartelle esclusi dal versionamento.
+- **README.md**  
+  Questo file.
+- **next-env.d.ts**  
+  File di tipo generato da Next.js per TypeScript. **Versionato** per garantire portabilità tra ambienti.
+- **LOG_OPERATIVO.md**  
+  Log operativo delle attività di sviluppo e manutenzione.
+- **STANDARD_OPERATIVO.md**  
+  Linee guida vincolanti per formato, struttura e workflow del progetto.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Policy di versionamento
 
-## Learn More
+- **next-env.d.ts**: viene mantenuto sotto versionamento per assicurare l’avvio senza errori su ogni clone.
+- **node_modules/**: non viene versionata, va sempre ricreata con `npm install`.
+- Ogni modifica strutturale va riportata sia su questo file che su STANDARD_OPERATIVO.md.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Avvio Rapido
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Clonare il repository
+2. Installare le dipendenze:
+   ```
+   npm install
+   ```
+3. Avviare il progetto:
+   ```
+   npm run dev
+   ```
+4. Accedere a [http://localhost:3000](http://localhost:3000)
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Note
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Segui sempre le procedure dettagliate in STANDARD_OPERATIVO.md.
+- Consulta LOG_OPERATIVO.md per la cronologia dettagliata delle operazioni.
