@@ -1,3 +1,53 @@
+# LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+**Prima versione di log per la sessione del 2025-08-15 20:22:16 UTC**
+
+---
+
+## 2025-08-15 19:55:00 UTC  
+- Identificazione dei file e delle cartelle utili generati dal wizard Next.js in temp-nextjs.  
+- Definizione lista file/cartelle standard Next.js+Tailwind+TS+App Router da spostare in root.  
+- Scenario test manuale descritto per verifica struttura e funzionamento.
+
+## 2025-08-15 20:01:00 UTC  
+- Spostamento in root di:  
+  - src/  
+  - public/  
+  - package.json  
+  - package-lock.json  
+  - next.config.ts  
+  - eslint.config.mjs  
+  - tsconfig.json  
+  - postcss.config.mjs  
+  - .gitignore (overwrite)  
+  - README.md  
+  - next-env.d.ts  
+- Comandi forniti sia per CMD sia per PowerShell.
+
+## 2025-08-15 20:06:00 UTC  
+- Eseguito `npm install` dalla root.  
+- Eseguito `npm run dev` dalla root, confermata partenza corretta applicazione Next.js (404 previsto se manca pagina home).  
+- Comandi forniti per verifica post-spostamento.
+
+## 2025-08-15 20:10:00 UTC  
+- Verifica presenza file/cartelle in root, src, public e residui in temp-nextjs.  
+- Identificate sottocartelle ricorsive superflue (src\src, public\public) e avviata procedura di eliminazione.  
+- Residui in temp-nextjs: next-env.d.ts (già migrato), node_modules (da ignorare).
+
+## 2025-08-15 20:13:00 UTC  
+- Eliminazione sottocartelle ricorsive:  
+  - src\src  
+  - public\public  
+- Eliminazione definitiva temp-nextjs (confermata assenza file residui utili).  
+- Verifica finale struttura: root conforme allo standard operativo; nessuna cartella/tempfile superfluo.  
+- Scenario test manuale eseguito: avvio progetto, controllo struttura, nessun errore bloccante.
+
+## 2025-08-15 20:22:16 UTC  
+- Pronto per aggiornamento log e push.  
+- Nessuna omissione rilevata nel log.  
+- Prossimo step: push del log operativo e di tutti i file modificati/creati in questa sessione.
+
+---
 ## [2025-08-15 20:08] Aggiornamento STANDARD_OPERATIVO.md per scelte stack Next.js
 
 - Aggiornata la sezione 11 di STANDARD_OPERATIVO.md per rendere vincolanti:
