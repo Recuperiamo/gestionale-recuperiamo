@@ -152,3 +152,29 @@
 (milestone e note come sopra...)
 
 ---
+# Gestionale Pacchetti Ore – Documentazione progettuale
+
+...
+
+## Backup integrale documentazione progettuale Fase 2
+
+### Bozza struttura dati (STRUTTURA_DATI_BOZZA.md)
+(entità e relazioni già fornite...)
+
+---
+
+### Bozza architettura cartelle (ARCHITETTURA_CARTELLE_BOZZA.md)
+(come fornito sopra...)
+
+---
+
+### Milestone/fasi di sviluppo (MILESTONE_FASI_DI_SVILUPPO.md)
+(milestone e note come sopra...)
+
+---
+
+### Scenario test manuale finale progettazione (SCENARIO_TEST_MANUALE_PROGETTAZIONE.md)
+# Scenario test manuale finale – Fase progettazione gestionale didattica
+(checklist, note e scenario come sopra...)
+
+---
