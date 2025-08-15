@@ -1,3 +1,28 @@
+## [2025-08-15 18:00] - Conclusione ciclo diagnostica workflow: superamento test e ripristino merge
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Conclusione ciclo di test e diagnostica su workflow operativi. Tutti i check superati, merge sbloccato.  
+**File coinvolti**:
+- .github/workflows/check-log-operativo.yml
+- LOG_OPERATIVO.md
+
+**Scenario Test**:
+- Eseguiti test ripetuti con aggiornamento workflow e diagnostica avanzata.
+- Commit, push e PR aggiornata.
+- Tutti i check superati, merge disponibile senza conflitti.
+- Flusso operativo ripristinato e documentato.
+
+**Esito atteso**:
+- I workflow operativi funzionano come da standard.
+- Merge consentito solo se il log operativo è aggiornato.
+
+**Note**:
+- Entry conforme a STANDARD_OPERATIVO.md.
+---
+
+(resto del LOG_OPERATIVO.md invariato)
+
 ## [2025-08-15 17:45] - Fix workflow diagnostica avanzata check-log-operativo.yml
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
