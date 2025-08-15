@@ -112,3 +112,31 @@ git push
 - Ogni sessione, ogni risposta, ogni modifica deve rispettare questo standard.
 - Aggiorna il file se aggiungi nuove regole strutturali.
 - Versiona SEMPRE il file su GitHub!
+
+---
+
+## 11. Stack, struttura e regole tecniche vincolanti
+
+- **Framework:** Next.js (ultima LTS disponibile) con TypeScript.
+- **Styling:** È obbligatorio l’uso di Tailwind CSS.
+- **Root codice:** Tutto il codice sorgente deve essere sotto la cartella `/src`.
+- **Routing:** Usare esclusivamente App Router (`/src/app`). L’uso del pages router legacy NON è consentito.
+- **Dev server:** Usare Webpack (Turbopack disabilitato/stabile non adottato fino a nuovo standard).
+- **Alias import:** Mantenere come unico alias di default `@/*`.
+- **ESLint e Prettier:** DevDependencies obbligatorie, con configurazione condivisa in repo.
+- **Struttura minima progetto:**  
+  - `src/` (contenente tutto il codice applicativo)
+  - `src/app/` (root del routing)
+  - `src/styles/` (stili globali Tailwind, se necessario)
+  - `public/` (asset pubblici)
+  - `README.md`, `STANDARD_OPERATIVO.md`, `LOG_OPERATIVO.md` in root
+  - File di configurazione Next.js e toolchain in root (es: `next.config.js`, `tailwind.config.js`, `tsconfig.json`, ecc.)
+- **Bootstrap progetto:**  
+  Il progetto deve essere inizializzato in modo che rispetti tutte le regole sopra. Qualunque modifica a questi vincoli deve essere discussa, approvata e documentata PRIMA di essere applicata.
+
+---
+
+## Aggiornamento e validazione regole stack
+
+- Qualsiasi modifica a queste impostazioni tecniche va discussa PRIMA in issue dedicata e approvata via PR, con aggiornamento obbligatorio di questo file e del README.md.
+- Tutte le PR che modificano la struttura o lo stack devono riportare l’estratto aggiornato di questa sezione nello spazio descrizione della PR.

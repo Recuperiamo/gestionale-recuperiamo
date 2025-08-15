@@ -1,3 +1,16 @@
+## [2025-08-15 20:08] Aggiornamento STANDARD_OPERATIVO.md per scelte stack Next.js
+
+- Aggiornata la sezione 11 di STANDARD_OPERATIVO.md per rendere vincolanti:
+  - Next.js (ultima LTS) con TypeScript
+  - Tailwind CSS obbligatorio
+  - App Router (`/src/app`), struttura sotto `/src`
+  - Alias import solo `@/*`
+  - ESLint e Prettier come devDependencies obbligatorie
+  - File di configurazione in root, asset pubblici in `public/`
+- Rimossa la parte descrittiva sulle domande interattive del wizard Next.js.
+- Confermata la coerenza con struttura collaborativa e regole di governance preesistenti.
+- Versione STANDARD_OPERATIVO.md applicata: **2025-08-15 20:08**
+
 # LOG OPERATIVO – Gestionale Didattica Recuperiamo
 _Aggiornato al 2025-08-15 19:47:40 UTC_
 
