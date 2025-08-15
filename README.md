@@ -1,6 +1,6 @@
 # Gestionale Pacchetti Ore
 
-Questo progetto segue SEMPRE e SOLO STANDARD_OPERATIVO.md come fonte di verità operativa.
+Questo progetto segue SEMPRE e SOLO STANDARD_OPERATIVO.md come fonte di verità operativa.  
 Gestionale Next.js con struttura modulare.
 
 > **Standard operativo:**  
@@ -17,4 +17,5 @@ Gestionale Next.js con struttura modulare.
 
 Consulta anche i `context.md` nelle varie cartelle per dettagli di scopo.
 
-> Test workflow GitHub Actions - modifica del 2025-08-15
+> Test workflow GitHub Actions - modifica del 2025-08-15  
+> Entry di test aggiornata per superare il check operativo in base a LOG_OPERATIVO.md
