@@ -1,5 +1,3 @@
-(Attenzione: deve essere `.js`, non `.yml`!)
-
 2. **Controlla che il contenuto sia quello fornito (JavaScript, non YAML).**
 
 ---
