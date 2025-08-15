@@ -1,3 +1,27 @@
+## [2025-08-15 19:25] - Bozza struttura dati MVP: aggiunto STRUTTURA_DATI_BOZZA.md e aggiornati log e README
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Prodotta e versionata la bozza struttura dati per il gestionale didattica (MVP) come da checklist progettazione e scenario test. Creato STRUTTURA_DATI_BOZZA.md, incollato integralmente in coda a LOG_OPERATIVO.md e aggiornata la sezione documentazione di README.md per garantire backup e reperibilità.  
+**File coinvolti**:
+- STRUTTURA_DATI_BOZZA.md (nuovo)
+- LOG_OPERATIVO.md (aggiornato)
+- README.md (aggiornato)
+
+**Scenario Test**:
+- STRUTTURA_DATI_BOZZA.md presente in root e completo.
+- Sezione documentazione progettuale di README.md aggiornata con la struttura dati.
+- LOG_OPERATIVO.md contiene nuova entry dettagliata e backup integrale della bozza struttura dati in fondo al file.
+- Nessun campo troncato, tutte le relazioni e le entità principali descritte.
+- Pronto per revisione, discussione o raffinamento.
+
+**Esito atteso**:
+- La struttura dati permette di coprire tutte le necessità della mappa funzionale e delle regole operative.
+- Nessuna entità fondamentale mancante.
+- Backup garantito anche in caso di perdita file singolo.
+
+---
+
 ## [2025-08-15 19:15] - Riepilogo stato sessione e to-do operativo fase progettazione
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
@@ -42,7 +66,6 @@
 - Eseguire periodicamente scenario test manuali per garantire coerenza, backup e reperibilità di ogni deliverable.
 
 ---
-
 
 ## [2025-08-15 18:50] - Rinominato GIT_COMMANDS_Version7.md in GIT_COMMANDS.md e aggiornati riferimenti
 
@@ -604,5 +627,116 @@ Validare la fase di progettazione tecnica prima di qualsiasi attività di codifi
 ---
 
 # Fine backup integrale deliverable progettazione Fase 2
+
+---
+
+# === BACKUP STRUTTURA_DATI_BOZZA.md ===
+
+# Bozza struttura dati – Gestionale Didattica (MVP)
+
+## Entità principali
+
+### CLIENTE
+- id_cliente (PK)
+- ragione_sociale
+- tipo_cliente (azienda, ente, privato)
+- partita_iva/codice_fiscale
+- email
+- telefono
+- indirizzo
+- note
+- data_creazione
+
+---
+
+### PACCHETTO_ORE
+- id_pacchetto (PK)
+- id_cliente (FK → CLIENTE)
+- descrizione
+- ore_acquistate
+- ore_residue
+- data_attivazione
+- data_scadenza
+- stato (attivo, esaurito, scaduto)
+- note
+
+---
+
+### ATTIVITÀ
+- id_attività (PK)
+- id_pacchetto (FK → PACCHETTO_ORE)
+- id_operatore (FK → UTENTE)
+- data
+- ora_inizio
+- ora_fine
+- durata_ore
+- descrizione
+- note
+
+---
+
+### FATTURA
+- id_fattura (PK)
+- id_cliente (FK → CLIENTE)
+- id_pacchetto (FK → PACCHETTO_ORE)
+- numero_fattura
+- data_emissione
+- importo
+- stato_pagamento (da saldare, saldo parziale, saldata)
+- data_scadenza
+- data_pagamento
+- note
+
+---
+
+### UTENTE
+- id_utente (PK)
+- nome
+- cognome
+- email
+- ruolo (amministratore, operatore, visualizzatore)
+- stato (attivo, sospeso)
+- data_creazione
+
+---
+
+### NOTIFICA
+- id_notifica (PK)
+- destinatario (id_utente o id_cliente)
+- tipo_notifica (scadenza, esaurimento ore, amministrazione, ecc.)
+- testo
+- data_creazione
+- letto (boolean)
+
+---
+
+### LOG_MODIFICHE
+- id_log (PK)
+- entità_modificata (CLIENTE, PACCHETTO_ORE, ATTIVITÀ, ecc.)
+- id_record
+- azione (creazione, modifica, cancellazione)
+- autore (id_utente)
+- data_ora
+- dettagli
+
+---
+
+## Relazioni principali
+
+- Un CLIENTE può avere molti PACCHETTO_ORE
+- Un PACCHETTO_ORE può avere molte ATTIVITÀ
+- Un CLIENTE può avere molte FATTURA
+- Un PACCHETTO_ORE può essere associato a 0...n FATTURA (opzionale)
+- Un ATTIVITÀ è svolta da un UTENTE (operatore)
+- Le NOTIFICHE possono essere associate a UTENTE e/o CLIENTE
+
+---
+
+## Note operative
+
+- I campi note sono opzionali e servono per dettagli operativi.
+- Gli stati (es. stato pacchetto, stato fattura, ruolo utente) vanno mappati su enum/tabella di riferimento.
+- In fase di progettazione dettagliata, le entità potranno essere raffinate/estese (es. aggiunta storicizzazione, gestione allegati, ecc.).
+- Possibili estensioni future: entità PROGETTO, gestione documenti, storico accessi.
 
 ---
