@@ -98,4 +98,6 @@
 
 ---
 
+Test superamento check log operativo
+
 > Ricorda: STANDARD_OPERATIVO.md è la fonte di verità e va consultato SEMPRE prima di ogni step importante!
