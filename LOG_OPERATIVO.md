@@ -1,4 +1,15 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## 2025-08-15 [UTC+2: 23:48]
+- Ripristino file `tailwind.config.ts` in root (`C:\Users\mauzr\Desktop\Sito\gestionale-pacchetti-ore\tailwind.config.ts`).
+- Contenuto configurazione base TypeScript conforme a standard Next.js/Tailwind e STANDARD_OPERATIVO.md.
+- Percorso verificato: file presente in root insieme a package.json, tsconfig.json, ecc.
+- Verifica sintattica file: OK.
+- Build (`npm run dev`/`npm run build`) eseguita senza errori di parsing/configurazione.
+- Test diretto sospeso: nessuna pagina/app esistente su cui verificare l'applicazione di classi Tailwind.
+- Scenario test manuale documentato e aggiornato.
+- Aggiornati anche README.md e STANDARD_OPERATIVO.md con nota sul ripristino e percorso corretto.
+
 ## 2025-08-15 23:36:20 UTC+2  
 - Eseguito scenario test manuale bootstrap Next.js:  
   - `npm install` dalla root (esito: nessun errore, 0 vulnerabilità)
