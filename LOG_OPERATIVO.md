@@ -1,4 +1,24 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+2025-08-16 01:48:00 (UTC+2)
+- Aggiornata configurazione testing automatico: risolti conflitti Jest tra package.json e jest.config.js, aggiunto babel.config.js per supporto JSX in Jest, installato jest-environment-jsdom come devDependency, corretto setupFilesAfterEnv in jest.config.js.
+- Verificato funzionamento test automatici con test di esempio basato su React Testing Library: test superato con successo via `npm test`.
+- Aggiornato anche STANDARD_OPERATIVO.md e README.md secondo le nuove procedure di testing automatico.
+## [2025-08-16 01:38 UTC+2] Issue #7: aggiunta testing base (Jest + Testing Library), script test, config, primo test di esempio
+
+Versione STANDARD_OPERATIVO.md: 2025-08-15
+
+File coinvolti:
+- package.json
+- jest.config.js
+- __tests__/sample.test.js
+- LOG_OPERATIVO.md
+
+Scenario Test:
+- Clonare la repo su ambiente pulito.
+- Installare le dipendenze (`npm install`).
+- Eseguire `npm test` ed accertarsi che il test di esempio passi senza errori.
+- Aggiungere eventualmente altri test in __tests__/ e verificare il corretto funzionamento.
 ## [2025-08-16 01:28 UTC+2] Issue #7: aggiunta sezione "Sviluppo locale" a README.md
 
 Versione STANDARD_OPERATIVO.md: 2025-08-15

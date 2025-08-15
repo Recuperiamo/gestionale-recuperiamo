@@ -182,5 +182,20 @@ git push
 - Non devono MAI essere esclusi: LOG_OPERATIVO.md, STANDARD_OPERATIVO.md, README.md, file di configurazione strategici, deliverable di progetto.
 - Aggiornare .gitignore ogni volta che si introducono nuovi file di build/output temporanei.
 - Dopo ogni modifica a .gitignore, aggiornare STANDARD_OPERATIVO.md e README.md.
+# STANDARD_OPERATIVO.md
 
+...
+
+## Testing automatico (Jest + React Testing Library)
+
+- Per ogni modifica strutturale o feature che impatta il frontend, aggiungi o aggiorna i test automatici in `/tests`.
+- La struttura minima di test richiede:
+  - `jest.config.js` con testEnvironment: "jsdom" e preset per Next.js
+  - `babel.config.js` con preset `"next/babel"`
+  - Dipendenze dev: jest, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, babel-jest, jest-environment-jsdom, identity-obj-proxy
+- Ogni test in JSX DEVE funzionare senza errori. Se ricevi errori di parsing JSX, verifica la presenza e correttezza di `babel.config.js`.
+- Esegui i test con `npm test`. Tutti i test devono passare prima di effettuare il push.
+- Aggiorna LOG_OPERATIVO.md, README.md e STANDARD_OPERATIVO.md dopo ogni modifica a questa struttura.
+
+...
 ---

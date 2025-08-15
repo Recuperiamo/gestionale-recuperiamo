@@ -221,6 +221,39 @@ Repository per la gestione operativa del sistema "Pacchetti Ore" (Next.js, Node,
 5. Se incontri problemi non documentati, aggiorna questa sezione e segnala l’errore nel LOG_OPERATIVO.md.
 
 ---
+# gestionale-recuperiamo
+
+...
+
+## Testing automatico (Jest + React Testing Library)
+
+Per eseguire i test automatici:
+
+1. Assicurati che siano presenti i file:
+    - `jest.config.js`
+    - `babel.config.js`
+    - cartella `/tests` con almeno un test di esempio (`sample.test.js`)
+
+2. Installa le dipendenze dev richieste (se non già fatto):
+
+   ```
+   npm install --save-dev jest @testing-library/react @testing-library/jest-dom @testing-library/user-event babel-jest jest-environment-jsdom identity-obj-proxy
+   ```
+
+3. Esegui i test:
+
+   ```
+   npm test
+   ```
+
+### Scenario test manuale
+
+- Modifica/aggiungi un test in `/tests`
+- Lancia `npm test`
+- Tutti i test devono passare senza errori
+- Se modifichi la struttura di test o le dipendenze, aggiorna README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md
+
+...
 
 ### Note operative
 
