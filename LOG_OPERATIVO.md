@@ -1,4 +1,15 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-15 23:36:20 UTC+2  
+- Eseguito scenario test manuale bootstrap Next.js:  
+  - `npm install` dalla root (esito: nessun errore, 0 vulnerabilità)
+  - `npm run dev` dalla root (esito: Next.js 15.4.6 avviato regolarmente, "Ready" in 2.1s, ascolto su http://localhost:3000)
+  - Accesso a http://localhost:3000: server attivo, pagina Next.js standard o 404 previsto
+- Nessun errore/warning bloccante riscontrato.
+- Conformità checklist issue #4, punto 4, verificata.
+- Scenario test manuale aggiunto a log.
+
+---
+
 ## 2025-08-15 23:29:14 UTC+2  
 - Integrazione log per inizializzazione progetto e installazione dipendenze chiave (Next.js, React, TypeScript, Tailwind, ESLint) secondo STANDARD_OPERATIVO.md v. aggiornata [2025-08-15 20:08].
 - Comandi eseguiti per setup (CMD e PowerShell):
