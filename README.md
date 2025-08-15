@@ -57,6 +57,19 @@ Applicazione web per la gestione dei pacchetti ore, sviluppata in Next.js 15, Ty
 
 ---
 
+## Policy di controllo avanzato (CI/CD e log operativo)
+
+- Ogni modifica a README.md, STANDARD_OPERATIVO.md, ONBOARDING_SESSION.md, END_SESSION.md deve essere accompagnata da un aggiornamento contestuale di LOG_OPERATIVO.md nella stessa PR.
+- L’ultima entry di LOG_OPERATIVO.md deve sempre contenere:
+  - Timestamp con data e ora in formato `[YYYY-MM-DD HH:MM UTC+2]`
+  - La versione di STANDARD_OPERATIVO.md applicata (o la data)
+  - Una sezione “File coinvolti” che elenchi tutti i file chiave modificati nella PR
+  - Una sezione “Scenario Test” che descriva come viene validata manualmente la modifica
+- Se una PR modifica README.md o STANDARD_OPERATIVO.md, questi file devono essere presenti anche nella lista “File coinvolti” dell’ultima entry log.
+- In assenza di uno qualsiasi di questi vincoli, il workflow CI/CD blocca la PR.
+
+---
+
 ## Note
 
 - Segui sempre le procedure dettagliate in STANDARD_OPERATIVO.md.

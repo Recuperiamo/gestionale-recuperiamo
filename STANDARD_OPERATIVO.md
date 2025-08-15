@@ -20,6 +20,19 @@
 
 ---
 
+## Policy di controllo avanzato (CI/CD e log operativo)
+
+- Se una PR modifica README.md, STANDARD_OPERATIVO.md, ONBOARDING_SESSION.md o END_SESSION.md, LOG_OPERATIVO.md deve essere aggiornato nella stessa PR.
+- L’ultima entry di LOG_OPERATIVO.md deve contenere obbligatoriamente:
+  - Timestamp con data e ora in formato `[YYYY-MM-DD HH:MM UTC+2]`
+  - La versione di STANDARD_OPERATIVO.md applicata (o la data di ultima modifica)
+  - Una sezione “File coinvolti” che elenchi tutti i file chiave modificati nella PR
+  - Una sezione “Scenario Test” che descriva come validare manualmente la modifica
+- Se la PR modifica README.md o STANDARD_OPERATIVO.md, questi file devono essere obbligatoriamente elencati nella sezione “File coinvolti”.
+- In assenza di uno qualsiasi di questi elementi, il workflow CI/CD blocca la PR.
+
+---
+
 ## 1. Comandi
 
 - Ogni gruppo di comandi va SEMPRE dato in due blocchi distinti:
