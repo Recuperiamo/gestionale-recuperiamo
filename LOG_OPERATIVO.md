@@ -89,4 +89,13 @@
 
 ---
 
+## [2025-08-15 15:15] - Trovata causa blocco credenziali (PAT hardcoded in remote)
+
+- Analisi configurazione: nessun helper attivo, remote.origin.url con PAT hardcoded
+- Problema: Git non chiede mai credenziali perché usa sempre il PAT vecchio nell’URL
+- Soluzione: ripristinato remote senza PAT, cancella tutte le credenziali da Gestore Windows, push forzato con nuovo PAT corretto
+- Prossimo step: test push, verifica richiesta credenziali, uso PAT “Workflow Abilitated”
+
+---
+
 > Ricorda: STANDARD_OPERATIVO.md è la fonte di verità e va consultato SEMPRE prima di ogni step importante!
