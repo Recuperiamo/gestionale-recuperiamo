@@ -98,6 +98,14 @@
 
 ---
 
-Test superamento check log operativo
+## [2025-08-15 15:50] - Test superamento workflow con aggiornamento log operativo
+
+- Modificato solo LOG_OPERATIVO.md per testare il superamento dei check bloccanti.
+- Formattazione conforme a STANDARD_OPERATIVO.md.
+- Eseguito commit e push su branch `test-failure-PR`.
+- Aperta PR, attesa superamento workflow automatici.
+- Prossimo step: verifica merge PR e pulizia branch di test.
+
+---
 
 > Ricorda: STANDARD_OPERATIVO.md è la fonte di verità e va consultato SEMPRE prima di ogni step importante!
