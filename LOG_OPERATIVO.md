@@ -1,4 +1,16 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## [2025-08-16 01:18 UTC+2] Aggiornamento check-operativo.js: validazione avanzata file chiave, log operativo, timestamp, scenario test
+
+Versione STANDARD_OPERATIVO.md: 2025-08-15
+
+File coinvolti:
+- .github/scripts/check-operativo.js
+
+Scenario Test:
+- Modifica uno tra README.md, STANDARD_OPERATIVO.md, ONBOARDING_SESSION.md o END_SESSION.md senza aggiornare LOG_OPERATIVO.md → la PR viene bloccata.
+- Aggiorna LOG_OPERATIVO.md senza “Scenario Test”, senza “File coinvolti”, senza versione standard o senza timestamp → la PR viene bloccata.
+- Aggiorna LOG_OPERATIVO.md ma ometti nella lista “File coinvolti” uno dei file effettivamente modificati → la PR viene bloccata.
+- Correggi tutto e ripeti: la PR passa.
 ## [2025-08-16 01:15 UTC+2] Push completato: workflow CI/CD deduplicati e attivi, repo allineata con remoto
 
 **File coinvolti**:
