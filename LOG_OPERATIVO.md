@@ -1,4 +1,20 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## [2025-08-16 01:15 UTC+2] Push completato: workflow CI/CD deduplicati e attivi, repo allineata con remoto
+
+**File coinvolti**:
+- .github/workflows/check-operativo.yml
+- .github/workflows/check-log-operativo.yml
+- LOG_OPERATIVO.md (questa entry)
+
+**Scenario Test**:
+- PR e push su qualsiasi branch attivano i workflow
+- PR senza LOG_OPERATIVO.md aggiornato viene bloccata
+- Test manuale in corso di validazione
+
+**Note**:
+- Merge effettuato senza conflitti, repo ora aggiornata sia locale che remoto.
+---
+
 ## [2025-08-16 01:04 UTC+2] Aggiornamento e deduplicazione workflow CI/CD: check-operativo.yml e check-log-operativo.yml
 
 **File coinvolti**:
