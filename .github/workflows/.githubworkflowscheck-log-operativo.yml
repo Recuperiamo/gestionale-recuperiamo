@@ -1,0 +1,26 @@
+name: Controllo LOG_OPERATIVO.md
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-log-operativo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recupera lista file modificati nella PR
+        id: files
+        run: |
+          echo "CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...${{ github.head_ref }})" >> $GITHUB_OUTPUT
+      - name: Verifica presenza LOG_OPERATIVO.md tra i file modificati
+        run: |
+          echo "File modificati:"
+          echo "${{ steps.files.outputs.CHANGED }}"
+          # Se c'è almeno un file diverso da LOG_OPERATIVO.md, controlla che LOG_OPERATIVO.md sia tra i modificati
+          if echo "${{ steps.files.outputs.CHANGED }}" | grep -qv "^LOG_OPERATIVO.md$"; then
+            if ! echo "${{ steps.files.outputs.CHANGED }}" | grep -q "^LOG_OPERATIVO.md$"; then
+              echo "::error::Devi aggiornare LOG_OPERATIVO.md se modifichi altri file!"
+              exit 1
+            fi
+          fi
