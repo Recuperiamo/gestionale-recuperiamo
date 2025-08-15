@@ -1,3 +1,62 @@
+## [2025-08-15 18:30] - Chiusura fase requisiti gestionale didattica e promemoria scenario test
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Conclusa la raccolta e validazione dei requisiti base per il gestionale didattica (MVP).  
+**File coinvolti**:
+- GESTIONALE_REQUISITI_BASE.md (nuovo)
+- LOG_OPERATIVO.md
+
+**Scenario Test**:
+- Riepilogati, validati e confermati tutti i requisiti e dati minimi necessari.
+- Prodotto file di checklist GESTIONALE_REQUISITI_BASE.md con tutte le specifiche approvate.
+- Confermato che non si procede con progettazione tecnica/codifica finché non viene completata e validata la fase 2. Scenario Test - Progettazione.
+
+**Esito atteso**:
+- Tutti i requisiti sono raccolti, discussi e documentati.
+- Il file GESTIONALE_REQUISITI_BASE.md funge da riferimento e checklist.
+- Il log operativo fotografa la chiusura della fase di analisi e blocca la progettazione sullo scenario test.
+
+**Note**:
+- Ricordarsi di aggiornare sempre LOG_OPERATIVO.md dopo ogni decisione strutturale.
+- Prima di codificare, validare la fase 2. Scenario Test - Progettazione.
+
+---
+
+## [2025-08-15 18:20] - Sincronizzazione struttura progetto e push file/cartelle mancanti
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-15  
+**Autore**: Recuperiamo  
+**Motivo**: Push di tutti i file e cartelle presenti localmente ma assenti dal repository remoto. Allineamento completo tra struttura locale e GitHub.  
+**File coinvolti**:
+- STANDARD_OPERATIVO.md
+- context.md
+- END_SESSION.md
+- ONBOARDING_SESSION.md
+- output.md
+- GIT_COMMANDS_Version7.md
+- .gitignore (rimosso gitignore senza punto)
+- app/
+- public/
+- src/
+
+**Scenario Test**:
+- Controllo visivo delle differenze tra repository GitHub e struttura locale tramite screenshot.
+- Eseguite operazioni di add/rm/commit/push per sincronizzare tutti i file e cartelle mancanti.
+- Verificato su GitHub che tutti i file e le cartelle siano presenti e corrispondano a quelle locali.
+- Confermato che la struttura rispetti lo STANDARD_OPERATIVO.md.
+
+**Esito atteso**:
+- Nessun file/cartella presente in locale risulta mancante su GitHub.
+- Struttura perfettamente allineata.
+- Repository pronto a ricevere ulteriori modifiche secondo procedure standard.
+
+**Note**:
+- In caso di file temporanei, valutare se inserirli in .gitignore.
+- Se la struttura cambia, aggiornare anche README.md e STANDARD_OPERATIVO.md.
+
+---
+
 ## [2025-08-15 18:15] - Pulizia branch test-failure-PR completata dopo merge e verifica
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
