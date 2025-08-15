@@ -1,3 +1,51 @@
+# LOG OPERATIVO – Gestionale Didattica Recuperiamo
+_Aggiornato al 2025-08-15 19:47:40 UTC_
+
+---
+
+## [2025-08-15 19:47:40 UTC] – Creazione struttura cartelle e context.md (issue #3)
+
+**Autore:** Recuperiamo  
+**Task:**  
+- Creazione/validazione di tutte le cartelle principali secondo ARCHITETTURA_CARTELLE_BOZZA.md:
+    - /app/
+    - /src/components/
+    - /src/fetcher/
+    - /src/utils/
+    - /src/models/
+    - /public/
+    - /docs/
+    - /tests/
+    - /scripts/
+    - /.github/
+    - /context.md (root)
+- Creazione e popolamento file context.md in ciascuna cartella, inclusa la root.
+- Verifica automatica della presenza di tutti i context.md richiesti tramite comando `dir /s /b context.md`.
+- Scenario test manuale eseguito: confermata la presenza di tutti i file context.md nelle cartelle previste dalla bozza architetturale.
+
+**File coinvolti:**  
+- Tutte le cartelle sopra elencate  
+- app/context.md  
+- src/components/context.md  
+- src/fetcher/context.md  
+- src/utils/context.md  
+- src/models/context.md  
+- public/context.md  
+- docs/context.md  
+- tests/context.md  
+- scripts/context.md  
+- .github/context.md  
+- context.md (root)  
+- LOG_OPERATIVO.md
+
+**Scenario test manuale:**  
+- Eseguito comando `dir /s /b context.md` in root del progetto.
+- L’output corrisponde esattamente alla lista di file context.md richiesta dalla struttura di ARCHITETTURA_CARTELLE_BOZZA.md.
+- Confermato che nessuna cartella prevista è priva del proprio context.md.
+
+**Riferimento issue:**  
+- Issue #3 [Creazione repository e struttura cartelle base](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/3)
+
 ## [2025-08-15 20:15] - Validazione finale progettazione: GO ufficiale alla fase di codifica
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-15  
