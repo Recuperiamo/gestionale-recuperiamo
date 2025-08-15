@@ -1,41 +1,46 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Output di build e dipendenze
+node_modules/
+.next/
+dist/
+out/
+coverage/
+tmp/
+temp/
+*.log
+*.tmp
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Configurazioni ambiente locali
+.env
+.env.*
+!.env.example
 
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# File di sistema/OS
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
+# Output e dump temporanei
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# File temporanei custom progetto
+elenco_clonata.txt
 
-# vercel
-.vercel
+# Scarti editor e backup temporanei
+*.swp
+*.swo
+*.bak
+*.old
+.idea/
+.vscode/
+*.code-workspace
 
-# typescript
-*.tsbuildinfo 
-!next-env.d.ts
+# Output personalizzati
+output.md
+*.local
+
+# Escludi file AI personali non strategici (aggiungi qui eventuali nuovi)
+# (Lascia AI_PERSONALIZZAZIO.md SOLO se confermato da te)
+
+# Fine .gitignore

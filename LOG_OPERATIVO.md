@@ -1,6 +1,21 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-## LOG OPERATIVO
-# LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-16 00:28 UTC+2 – Issue #5: Aggiornamento .gitignore e standard operativo
+
+- Aggiornato file .gitignore per Next.js/Node: aggiunte regole per esclusione node_modules, output temporanei, dist, .next, .env*, *.log, output.md, elenco_clonata.txt e file di sistema.
+- Aggiornata sezione dedicata in STANDARD_OPERATIVO.md sulle regole di .gitignore (pattern obbligatori, cosa mai escludere).
+- Validato che nessun file strategico venga escluso erroneamente.
+- Eseguito scenario test manuale: creati file temporanei e verificato che git status non li mostri tra i file tracciati; modificato file README.md e verificato che venga tracciato.
+- Pronti al push di .gitignore, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
+
+---
+
+### Scenario test manuale
+
+1. Dalla root della repo, crea i file: test.log, temp.txt, node_modules/fake.js, elenco_clonata.txt.
+2. Esegui git status: questi file NON devono apparire tra i non tracciati.
+3. Modifica README.md: deve apparire tra i file modificati.
+4. Elimina i file temporanei di test.
+5. Conferma che nessun file strategico (README.md, LOG_OPERATIVO.md, STANDARD_OPERATIVO.md, ecc.) sia escluso dal versionamento.
 
 ## 2025-08-16 00:24 UTC+2 – Riepilogo stato sessione
 

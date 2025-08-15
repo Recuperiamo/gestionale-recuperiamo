@@ -160,3 +160,14 @@ git push
 - Ogni modifica strutturale DEVE essere seguita da test manuale: `npm install`, `npm run dev`, `git status` eseguiti da dentro la repo.
 - Nessun warning di lockfile multipli deve essere presente.
 - Il log operativo e la documentazione vanno aggiornati immediatamente dopo i test.
+
+## Regole per .gitignore
+
+- Utilizzare un file .gitignore in root aggiornato secondo stack Next.js/Node.
+- Escludere SEMPRE: node_modules, output di build (.next, dist, out), file temporanei (*.log, *.tmp, temp/, tmp/), configurazioni locali (.env, .env.*, tranne .env.example), output di test/coverage e file di sistema/OS.
+- Escludere anche tutti i file temporanei custom (es: elenco_clonata.txt) e output.md.
+- Non devono MAI essere esclusi: LOG_OPERATIVO.md, STANDARD_OPERATIVO.md, README.md, file di configurazione strategici, deliverable di progetto.
+- Aggiornare .gitignore ogni volta che si introducono nuovi file di build/output temporanei.
+- Dopo ogni modifica a .gitignore, aggiornare STANDARD_OPERATIVO.md e README.md.
+
+---
