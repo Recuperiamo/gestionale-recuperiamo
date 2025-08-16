@@ -1,4 +1,17 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+
+### 2025-08-16 14:13:20 (UTC+2)
+- [MILESTONE #9 - STEP a] Analisi e scelta tecnologia autenticazione utenti/gestione ruoli
+- SCELTA: Implementazione autenticazione con NextAuth.js + Prisma + PostgreSQL
+- MOTIVAZIONE: Stack open source, integrazione perfetta con Next.js/TypeScript, massima sicurezza e scalabilità, gestione ruoli custom, pieno controllo su schema utenti, ottimo supporto community.
+- IMPATTO: Utilizzeremo NextAuth.js come provider auth, Prisma come ORM e PostgreSQL come database utenti/ruoli.
+- POLICY: Aggiornare README.md (stack, policy auth, sezione test) e STANDARD_OPERATIVO.md (flusso auth, comandi, scenario test).
+- SCENARIO TEST MANUALE: 
+    1. Decisione e motivazione documentate su LOG_OPERATIVO.md e README.md.
+    2. Dipendenze next-auth, @prisma/client, prisma installate in ambiente di sviluppo.
+    3. Adapter PostgreSQL configurato e verificato.
+    4. Commit e log aggiornati, pushati e reperibili.
 2025-08-16 01:59:00 (UTC+2)
 - [CHIUSURA SESSIONE]  
 - Tutte le modifiche della sessione sono state registrate e documentate.  
