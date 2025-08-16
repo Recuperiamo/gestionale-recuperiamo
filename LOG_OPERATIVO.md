@@ -1,5 +1,60 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+Debug issue #14 e ristrutturazione Next.js (UTC+2)
+
+### 2025-08-16 01:00:00
+- Apertura sessione di debug su segnalazione errore 404 e conflitto tra `src/app` e `app/`.
+- Verifica struttura con comandi CMD/PowerShell: solo `app/` esistente, nessun `src/app`.
+- Conferma assenza conflitti, situazione idonea per Next.js app router.
+
+### 2025-08-16 01:10:00
+- Pulizia cache Next.js, riavvio server dev.
+- Test: la home page (`/`) funziona senza errori.
+
+### 2025-08-16 01:20:00
+- Eseguiti comandi per individuare tutte le pagine disponibili (`page.js`, `page.tsx`, ecc.).
+- Esito: solo `app/page.js` presente, nessuna altra pagina custom.
+
+### 2025-08-16 01:30:00
+- Ricerca approfondita di file persi/nascosti (“signin”, “dashboard”, ecc.): esito negativo.
+- Conferma: nessuna traccia di altre pagine custom esistenti.
+
+### 2025-08-16 01:40:00
+- Proposta e conferma creazione pagine base (`signin`, `dashboard`, `profile`, `settings`, `not-found`).
+- Fornitura comandi CMD e PowerShell per creazione cartelle e file `page.js` vuoti.
+
+### 2025-08-16 01:45:00
+- Test di tutte le nuove route: tutte funzionano (pagine vuote, nessun 404).
+- Aggiornamento README.md e STANDARD_OPERATIVO.md per riflettere la nuova struttura con `app/` in root.
+
+---
+
+## Riepilogo sessione (UTC+2)
+
+**Contesto**:  
+- Debug issue #14: risoluzione errori 404, conflitti tra `src/app` e `app/`, standardizzazione struttura Next.js.
+
+**Azioni svolte**:  
+- Analisi e pulizia struttura, verifica assenza doppioni.
+- Pulizia cache e verifica funzionamento home.
+- Individuazione pagine disponibili: solo home.
+- Ricerca file persi: nulla trovato.
+- Proposta e creazione pagine base (`signin`, `dashboard`, `profile`, `settings`, `not-found`).
+- Test OK di tutte le nuove route.
+- Aggiornamento README e STANDARD_OPERATIVO secondo nuova policy.
+
+**Situazione attuale**:  
+- Struttura: solo `app/` (root) per tutte le pagine, nessuna `src/app`.
+- Pagine base tutte create e funzionanti.
+- Documentazione e standard aggiornati.
+
+**Prossimi passi**:  
+- Riempire i file `page.js` con contenuti concreti.
+- Continuare sviluppo e tracciamento secondo STANDARD_OPERATIVO.md.
+- Verificare sempre coerenza timestamp e milestone su chiusura sessione.
+
+---
+
 
 ## Presentazione milestone 2 (2025-08-16 23:06:24 UTC+2)
 
