@@ -1,5 +1,15 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### [2025-08-16 22:51] - Chiusura issue #12 (Documentazione architetturale e scenario test)
 
+- Verificata e confermata la presenza di documentazione architetturale aggiornata e coerente su README.md, LOG_OPERATIVO.md e STANDARD_OPERATIVO.md.
+- Scenario test manuale architetturale presente, chiaro e riproducibile sia in README.md che in LOG_OPERATIVO.md.
+- Tutte le regole di aggiornamento, policy di tracciamento e timestamp sono rispettate.
+- Issue #12 chiusa alle 22:51 (UTC+2). Pronto per avanzamento milestone successiva.
+
+**File coinvolti:**  
+- README.md  
+- LOG_OPERATIVO.md  
+- STANDARD_OPERATIVO.md  
 ### [2025-08-16 22:48] - Chiusura issue #11 (Configurazione workflow CI/CD base e .gitignore)
 
 - Verificati tutti i deliverable della issue #11:
