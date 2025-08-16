@@ -432,5 +432,40 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - **Aggiornamento file:**  
   Ogni modifica va riportata per intero o con stringhe di riferimento, mai solo parziale senza contesto.
 
+---# STANDARD_OPERATIVO.md
+
+## Regole vincolanti di gestione e contribuzione
+
+- **Routing:**  
+  Tutte le pagine Next.js vanno create come sottocartelle di `app/` in root.  
+  Non è più consentito l’uso di `src/app` né come cartella legacy né per nuove pagine.
+- **Struttura:**  
+  La root contiene:
+  - `app/` — tutte le pagine e i layout Next.js
+  - `src/` — componenti, utilità, moduli non di routing
+  - Altri file di configurazione e documentazione
+- **Navbar:**  
+  Ogni pagina principale deve includere la Navbar comune da `app/components/Navbar.js` (esclusa la pagina 404 custom).
+- **Pagine principali:**  
+  `/`, `/signin`, `/profile`, `/settings`, `/not-found` (404 custom, non elencata in navbar).
+- **Log operativo:**  
+  Ogni operazione strutturale e ogni evento importante deve essere registrato in `LOG_OPERATIVO.md` con data e orario UTC+2.
+- **README:**  
+  Deve sempre rispecchiare la struttura attuale del progetto e le policy di routing.
+- **Milestone e commit:**  
+  Alla chiusura di ogni milestone va controllata la coerenza e la progressività dei timestamp nel log.
+- **Debug:**  
+  In caso di conflitti o errori, seguire la procedura:  
+  1. Verifica struttura con comandi CMD/PowerShell  
+  2. Pulizia cache Next.js  
+  3. Test server dev  
+  4. Aggiornamento log e README
+- **Scenario test manuale:**  
+  Per ogni nuova pagina/feature, descrivere sempre uno scenario test manuale a supporto della verifica.
+- **Push:**  
+  Dopo ogni gruppo di modifiche, pushare sia i file modificati/creati sia log, README, STANDARD_OPERATIVO.
+- **Aggiornamento file:**  
+  Ogni modifica va riportata per intero o con stringhe di riferimento, mai solo parziale senza contesto.
+
 ---
 ---

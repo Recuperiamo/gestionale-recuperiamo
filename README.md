@@ -523,3 +523,53 @@ npm run dev
 - Non creare mai una nuova `src/app`.
 
 ---
+
+# gestionale-recuperiamo
+
+## Struttura progetto (2025-08-16)
+
+- Il progetto utilizza Next.js con architettura “app router”.
+- **Tutte le pagine** si trovano nella cartella `app/` direttamente in root.
+- Non esiste più alcuna cartella `src/app`: tutte le route devono essere create come sottocartelle di `app/`.
+- Esempio struttura aggiornata:
+  ```
+  app/
+    page.js              // Dashboard/Home
+    signin/
+      page.js
+    dashboard/           // (alias: home)
+    profile/
+      page.js
+    settings/
+      page.js
+    not-found/
+      page.js
+    components/
+      Navbar.js
+  src/
+    components/
+    utils/
+    ... (altri moduli non di routing)
+  ```
+- Ogni sottocartella di `app/` con un file `page.js` corrisponde ad una route.
+- Navbar comune su tutte le pagine principali (tranne 404), colori coerenti con brand.
+
+## Policy operative
+
+- Ogni modifica strutturale va tracciata in LOG_OPERATIVO.md (con UTC+2).
+- STANDARD_OPERATIVO.md indica le regole vincolanti di contributo e gestione.
+- Per ogni nuovo gruppo di pagine, creare prima la struttura e solo poi inserire i contenuti.
+
+## Avvio sviluppo
+
+```bash
+npm install
+npm run dev
+```
+
+## Debug e manutenzione
+
+- In caso di problemi di routing, verificare sempre che tutte le pagine siano in `app/` root.
+- Non creare mai una nuova `src/app`.
+
+---
