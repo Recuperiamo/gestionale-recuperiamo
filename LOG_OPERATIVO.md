@@ -1,6 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### [2025-08-16 22:43] - Configurazione ESLint flat compatibile Next.js/React
 
+- Aggiornata la configurazione ESLint flat per piena compatibilità con ESLint 9.x e Next.js 13+.
+- Rimosse tutte le configurazioni extends legacy e la compatibilità con eslint-flat-config (non necessaria e incompatibile con ESLint 9).
+- Inserite le principali regole Next.js manualmente tra le rules della flat config.
+- Test manuale superato: `npx eslint .` eseguito senza errori di plugin/config, tutti gli errori sono ora reali errori di lint codice (2503 errori rilevati).
+- Prossimi step: clean-up del codice per ridurre/fixare i problemi di lint, eventuali automatismi di correzione (`eslint --fix`), aggiornamento continuo del log e delle milestone.
 ## Versione: 2025-08-16 22:35 (UTC+2)
 
 ### [2025-08-16 22:35] - Aggiornamento dipendenze e pulizia file superflui
