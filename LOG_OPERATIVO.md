@@ -1,6 +1,29 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+
+2025-08-16 16:10 UTC+2]  
+STANDARD_OPERATIVO.md applicato: ultima modifica 2025-08-16
+
+**Descrizione attività:**  
+- Verifica funzionamento login admin via NextAuth.js + Prisma
+- Fix export route.js (GET/POST)
+- Corretto provider NextAuth (aggiunta credentials)
+- Gestione hash bcrypt su password utente via Prisma Studio
+- Test manuale login/signin, confermato accesso, redirect su / con 404 (root page non ancora creata)
+
+**File coinvolti:**  
+- app/api/auth/[...nextauth]/route.js  
+- LOG_OPERATIVO.md
+
+**Scenario Test:**  
+1. Avvia il server: `npm run dev`
+2. Accedi a `/api/auth/signin`
+3. Login con utente admin (password hashata correttamente)
+4. Accesso riuscito → redirect su `/` con errore 404 (nessuna home page)
+5. Conferma sessione attiva tramite `/api/auth/session`
+6. Logout e riprova  
+7. Nessun errore/avviso su Next.js/Prisma/NextAuth
 ### 2025-08-16 12:54:47 (UTC+2)
 - Creata pagina di login personalizzata NextAuth.js in /app/auth/signin/page.js (form email/password, gestione errori base).
 - Collega automaticamente il flusso di autenticazione NextAuth grazie alla proprietà pages.signIn.
