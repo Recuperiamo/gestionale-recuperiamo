@@ -1,5 +1,18 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+
+## Presentazione milestone 2 (2025-08-16 23:06:24 UTC+2)
+
+- Collegate 5 issue alla milestone "Implementazione autenticazione, gestione utenti e permessi":
+    - [#14 Implementazione login/logout NextAuth](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/14)
+    - [#15 Gestione ruoli e propagazione permessi in sessione](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/15)
+    - [#16 Test manuale login/logout e permessi](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/16)
+    - [#17 Aggiornamento documentazione e standard operativo per autenticazione](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/17)
+    - [#18 Review e chiusura milestone autenticazione](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/18)
+- Tutte le issue sono state create e assegnate correttamente alla milestone.
+- Pronta per avvio lavori e tracciamento avanzamento secondo standard operativo.
+
+---
 ### [2025-08-16 22:54 UTC+2] – Chiusura milestone 1: review setup architetturale e validazione finale
 
 - Organizzata review finale (simulata) tra membri del team: rivista l’intera struttura di progetto, la documentazione in README.md, LOG_OPERATIVO.md e STANDARD_OPERATIVO.md.
