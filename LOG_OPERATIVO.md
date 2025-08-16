@@ -1,9 +1,29 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+## Versione: 2025-08-16 21:40 (UTC+2)
+
+### [2025-08-16 21:40] - Integrazione ESLint base (wizard)
+
+- Avviata configurazione guidata ESLint da terminale root progetto.
+- Selezionate opzioni: JS modules (import/export), React, TypeScript: Yes, Code runs in: Browser+Node, config in JavaScript.
+- Accettata installazione automatica dipendenze: eslint, @eslint/js, globals, typescript-eslint, eslint-plugin-react (package manager: npm).
+- Completata installazione dipendenze senza errori.
+- Creato file: `eslint.config.mjs`
+- Nessun errore riscontrato durante la generazione e l’installazione.
+- Pronto per commit/push e aggiornamento documentazione (README.md, STANDARD_OPERATIVO.md).
+
+---
+
+**Prossimi step:**  
+- Commit e push file `eslint.config.mjs`
+- Aggiornamento STANDARD_OPERATIVO.md (sezione linting)
+- Aggiornamento README.md (istruzioni lint base)
+- Commit e push di log operativo aggiornato
+
 Modifica dummy per test workflow CI/CD
 
 **Versione STANDARD_OPERATIVO.md**: 2025-08-16 20:45 UTC+2 
- 
+
 **File coinvolti**:  
 - README.md  
 - LOG_OPERATIVO.md  
