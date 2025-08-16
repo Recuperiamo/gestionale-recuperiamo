@@ -198,4 +198,35 @@ git push
 - Aggiorna LOG_OPERATIVO.md, README.md e STANDARD_OPERATIVO.md dopo ogni modifica a questa struttura.
 
 ...
+
+# STANDARD OPERATIVO - Recuperiamo Gestionale
+
+...
+
+## Flusso autenticazione e gestione utenti/ruoli (milestone 9)
+
+- Stack: NextAuth.js (auth), Prisma ORM, PostgreSQL.
+- Installazione obbligatoria (dev):  
+  - `npm install next-auth @prisma/client prisma`
+- Lo schema utenti/ruoli è centralizzato in Prisma.
+- Adapter NextAuth.js configurato per PostgreSQL.
+- Policy di commit/log: ogni variazione di stack auth, modello utenti, policy ruoli deve essere registrata in LOG_OPERATIVO.md e aggiornata su README.md.
+
+### Scenario test/manuale autenticazione
+
+1. Decisione stack e motivazione documentate su LOG_OPERATIVO.md e README.md.
+2. Dipendenze installate e visibili in package.json.
+3. Adapter configurato (vedi esempio in README.md).
+4. Tutte le modifiche pushate, log aggiornato.
+
+...
+
+## Comandi obbligatori installazione stack auth
+
+- `npm install next-auth @prisma/client prisma`
+- `npx prisma init`
+- Aggiungere/aggiornare schema Prisma per User e Role
+- `npx prisma migrate dev --name init_auth`
+
+...
 ---

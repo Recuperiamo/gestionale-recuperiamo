@@ -255,6 +255,32 @@ Per eseguire i test automatici:
 
 ...
 
+# Recuperiamo - Gestionale
+
+...
+
+## Stack tecnico autenticazione
+
+Per la milestone 9 è stato adottato il seguente stack per autenticazione e gestione utenti/ruoli:
+- **NextAuth.js**: provider autenticazione integrato in Next.js, gestisce sessioni e provider OAuth/credenziali.
+- **Prisma ORM**: mapping e gestione schema utenti/ruoli su database.
+- **PostgreSQL**: database relazionale per persistenza sicura degli utenti e ruoli.
+
+### Policy autenticazione/ruoli
+
+- Ogni utente ha un ruolo associato (admin, operatore, visualizzatore).
+- Le route protette sono accessibili solo in base al ruolo.
+- Lo schema utenti/ruoli è definito via Prisma e può essere esteso.
+- Tutti i dettagli operativi sono documentati in STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
+
+### Scenario test manuale milestone 9
+
+1. Verificare la presenza delle dipendenze next-auth, @prisma/client, prisma in package.json.
+2. Confermare la documentazione della scelta su README.md e LOG_OPERATIVO.md.
+3. Eseguire la procedura di setup descritta in STANDARD_OPERATIVO.md.
+
+...
+
 ### Note operative
 
 - Aggiorna LOG_OPERATIVO.md ogni volta che questa sezione viene modificata.

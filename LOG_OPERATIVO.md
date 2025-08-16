@@ -1,5 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+
+### 2025-08-16 14:20:10 (UTC+2)
+- [MILESTONE #9 - STEP a] Aggiornamento README.md e STANDARD_OPERATIVO.md per recepire scelta stack autenticazione
+- README.md: aggiunta sezione "Stack tecnico autenticazione" e aggiornamento policy autenticazione/ruoli
+- STANDARD_OPERATIVO.md: inserita sezione "Flusso autenticazione e gestione utenti/ruoli" e scenario test/manuali associati; aggiornata lista comandi obbligatori installazione stack auth
+- Tutti i file referenziati sono aggiornati, coerenti e versionati
 
 ### 2025-08-16 14:13:20 (UTC+2)
 - [MILESTONE #9 - STEP a] Analisi e scelta tecnologia autenticazione utenti/gestione ruoli
