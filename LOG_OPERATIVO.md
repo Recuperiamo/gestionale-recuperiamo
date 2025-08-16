@@ -1,7 +1,24 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
-## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+2025-08-16 18:38 UTC+2
 
+  Inserita ROADMAP_MILESTONE_ISSUE_BOZZA.md in repo per organizzazione avanzata issues/milestone.  
+  Pronto per generazione batch delle issue milestone 1.
+
+---
+
+### Prossimi step (To Do)
+- Generazione e review issue dettagliate milestone 1 (Setup ambiente/architettura).
+- Validazione log-operativo e push file ROADMAP.
+- Aggiornamento README.md e STANDARD_OPERATIVO.md se necessario.
+- Avvio milestone 2 dopo chiusura milestone 1.
+
+---
+
+## Riferimenti sessione:
+- ROADMAP_MILESTONE_ISSUE_BOZZA.md (roadmap dettagliata milestone/issue)
+- README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md aggiornati
+- Scenario test manuale sempre incluso dopo ogni rilascio/feature
 2025-08-16 18:08 UTC+2
 
 ---
