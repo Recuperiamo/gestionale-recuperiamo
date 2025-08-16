@@ -1,7 +1,64 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+### 2025-08-16 12:54:47 (UTC+2)
+- Creata pagina di login personalizzata NextAuth.js in /app/auth/signin/page.js (form email/password, gestione errori base).
+- Collega automaticamente il flusso di autenticazione NextAuth grazie alla proprietà pages.signIn.
+- Pronto per test manuale: login con credenziali corrette/errate, verifica redirect e messaggio di errore.
 
+### 2025-08-16 12:52:33 (UTC+2)
+- [MILESTONE #9 - STEP e/f] Implementazione autenticazione NextAuth.js su architettura Next.js 13+ (directory /app/)
+- Creato file /app/api/auth/[...nextauth]/route.js per endpoint NextAuth.js (PrismaAdapter, provider Credentials, gestione ruoli custom)
+- Allineata struttura alla bozza architetturale (ARCHITETTURA_CARTELLE_BOZZA.md): nessuna directory /pages/ utilizzata, tutto in /app/
+- Aggiornati README.md e STANDARD_OPERATIVO.md per riflettere la posizione e la logica della route API NextAuth.js
+- Scenario test manuale:
+    1. Creare un utente con ruolo in DB.
+    2. Effettuare login via /api/auth/signin (o chiamata POST di test).
+    3. Verificare che la sessione NextAuth includa user.role corrispondente.
+    4. Effettuare login con utente senza ruolo o password errata: accesso negato.
+- Pronto per step successivo: implementazione view di login, policy FE protette per ruolo e test end-to-end.
+
+---
+
+## Comandi push LOG_OPERATIVO.md
+
+CMD
+```
+git add LOG_OPERATIVO.md
+git commit -m "Log operativo: milestone 9 NextAuth.js su /app/api/auth, log, scenario test, doc aggiornata (2025-08-16 12:52:33 UTC+2)"
+git push
+```
+
+PowerShell
+```
+git add LOG_OPERATIVO.md
+git commit -m "Log operativo: milestone 9 NextAuth.js su /app/api/auth, log, scenario test, doc aggiornata (2025-08-16 12:52:33 UTC+2)"
+git push
+```
+
+---
+
+## Comandi push TUTTI I FILE modificati
+
+CMD
+```
+git add app/api/auth/[...nextauth]/route.js
+git add LOG_OPERATIVO.md
+git add README.md
+git add STANDARD_OPERATIVO.md
+git commit -m "Milestone 9: NextAuth.js su /app/api/auth, PrismaAdapter, gestione ruoli, log, doc aggiornata (2025-08-16 12:52:33 UTC+2)"
+git push
+```
+
+PowerShell
+```
+git add app/api/auth/[...nextauth]/route.js
+git add LOG_OPERATIVO.md
+git add README.md
+git add STANDARD_OPERATIVO.md
+git commit -m "Milestone 9: NextAuth.js su /app/api/auth, PrismaAdapter, gestione ruoli, log, doc aggiornata (2025-08-16 12:52:33 UTC+2)"
+git push
+```
 ### 2025-08-16 14:36:50 (UTC+2)
 - [MILESTONE #9 - STEP b] Verifica e conferma installazione dipendenze autenticazione: next-auth, prisma, @prisma/client
 - Dipendenze presenti in package.json: next-auth, @prisma/client, prisma

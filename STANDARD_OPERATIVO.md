@@ -312,4 +312,27 @@ git push
 - `npx prisma studio` (popolamento ruoli)
 
 ...
+
+## Flusso configurazione NextAuth.js + Prisma (su /app/)
+
+- File obbligatorio: `/app/api/auth/[...nextauth]/route.js`
+- Provider richiesto: Credentials (email/password)
+- Adapter: Prisma
+- Ogni utente deve avere ruolo associato
+- Callback NextAuth session/jwt arricchisce la sessione con `user.role`
+- Ogni modifica va riportata su LOG_OPERATIVO.md e README.md
+
+### Scenario test/manuale
+
+1. Login con utente dotato di ruolo in DB → sessione con ruolo
+2. Login negato se manca ruolo o password errata
+3. Modifiche documentate e pushate
+
+---
+### Login custom NextAuth.js
+
+- La pagina /app/auth/signin/page.js deve essere presente per l’autenticazione customizzata.
+- Il form deve gestire errori e redirect.
+- Ogni modifica va riportata su LOG_OPERATIVO.md e README.md.
+
 ---

@@ -373,6 +373,28 @@ npx prisma studio
 
 ...
 
+## Gestione autenticazione e ruoli (NextAuth.js + Prisma – milestone 9)
+
+- Endpoint NextAuth.js: `/app/api/auth/[...nextauth]/route.js` (conforme architettura Next.js 13+)
+- Provider: Credentials (login email/password)
+- Adapter: Prisma collegato a User/Role
+- La sessione NextAuth include il ruolo (`session.user.role`)
+- Policy: solo utenti con ruolo associato possono autenticarsi
+
+### Scenario test/manuale
+
+1. Crea utente nel DB con ruolo associato (admin, operatore, visualizzatore)
+2. Login via `/api/auth/signin`
+3. Verifica sessione NextAuth con campo ruolo
+4. Login negato se manca ruolo o password errata
+
+---
+### Pagina di login personalizzata
+
+- /app/auth/signin/page.js: form custom per login email/password, integrato con NextAuth.
+- Gestione errori lato client e redirect post-login.
+- Lo scenario test prevede login con credenziali valide e non, verifica errori e redirect.
+
 ### Note operative
 
 - Aggiorna LOG_OPERATIVO.md ogni volta che questa sezione viene modificata.
