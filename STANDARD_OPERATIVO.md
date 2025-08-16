@@ -262,5 +262,28 @@ git push
 - `npx prisma migrate dev --name init_auth`
 
 ...
+# STANDARD OPERATIVO - Recuperiamo Gestionale
 
+...
+
+## Flusso autenticazione e gestione utenti/ruoli (milestone 9)
+
+- Schema Prisma utenti/ruoli: modelli User, Role, Account, Session, VerificationToken.
+- User obbligatoriamente associato a un Role.
+- Ruoli predefiniti: admin, operatore, visualizzatore.
+- Policy: ogni modifica a schema utenti/ruoli richiede aggiornamento log e README.md.
+
+### Scenario test/manuale schema utenti/ruoli
+
+1. schema.prisma contiene i modelli User, Role, Account, Session, VerificationToken come descritto.
+2. Migrazione effettuata senza errori.
+3. Tabella Role popolata con almeno i tre ruoli predefiniti.
+4. Tutte le modifiche documentate e pushate.
+
+## Comandi obbligatori migrazione iniziale schema auth
+
+- `npx prisma migrate dev --name init_auth`
+- (opzionale) Popolamento ruoli via script seed/prisma studio/manuale
+
+...
 ---

@@ -317,6 +317,28 @@ npx prisma init
 
 ...
 
+# Recuperiamo - Gestionale
+
+...
+
+## Schema autenticazione e gestione ruoli (Prisma, milestone 9)
+
+Lo schema Prisma include i seguenti modelli:
+- **User**: utente applicativo, con relazione obbligatoria a Role, campi NextAuth.js, email unica.
+- **Role**: ruoli custom (admin, operatore, visualizzatore), relazione 1:N verso User.
+- **Account, Session, VerificationToken**: compatibili NextAuth.js adapter Prisma.
+
+Esempio di relazione: ogni User è associato a un solo Role, ogni Role può avere più User.
+
+### Scenario test/manuale schema utenti/ruoli
+
+1. schema.prisma contiene i modelli User, Role, Account, Session, VerificationToken come sopra.
+2. Migrazione completata senza errori con `npx prisma migrate dev --name init_auth`.
+3. Tabella Role popolata manualmente o via seed con admin, operatore, visualizzatore.
+4. Documentazione aggiornata.
+
+...
+
 ### Note operative
 
 - Aggiorna LOG_OPERATIVO.md ogni volta che questa sezione viene modificata.
