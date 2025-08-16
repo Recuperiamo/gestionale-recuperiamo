@@ -1,5 +1,38 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+2025-08-16 20:45 UTC+2
+
+## Verifica presenza file context.md in tutte le cartelle (Issue #10)
+
+- 2025-08-16 20:44 UTC+2 – Eseguito controllo completo presenza file context.md in tutte le cartelle e sottocartelle strutturali.
+- 2025-08-16 20:44 UTC+2 – Riscontrata piena conformità rispetto allo standard: tutti i context.md sono presenti in root, nelle cartelle principali e nelle sottocartelle core di /src.
+- 2025-08-16 20:44 UTC+2 – Sono presenti anche dei context.md extra (in root e in _app): non creano problemi, vengono mantenuti e documentati come fuori standard ma utili per completezza o future esigenze.
+- 2025-08-16 20:45 UTC+2 – Aggiornati README.md e STANDARD_OPERATIVO.md per riflettere la gestione dei context.md extra.
+
+## Scenario test manuale
+1. Lancia il comando `dir /s /b context.md` (o equivalente PowerShell) dalla root.
+2. Controlla che ogni cartella principale e sottocartella core abbia un context.md.
+3. I context.md extra (root, _app, ecc.) sono ammessi se non interferiscono con la logica di build/esecuzione.
+4. Tutta la struttura è documentata e coerente con ARCHITETTURA_CARTELLE_BOZZA.md e lo standard.
+5. Log-operativo, README.md e STANDARD_OPERATIVO.md sono aggiornati per riflettere la situazione reale.
+
+2025-08-16 20:35 UTC+2
+
+## Creazione struttura cartelle e file di contesto (Issue #10)
+
+- 2025-08-16 20:34 UTC+2 – Avvio generazione struttura cartelle come da ARCHITETTURA_CARTELLE_BOZZA.md.
+- 2025-08-16 20:34 UTC+2 – Creazione delle cartelle: /app, /src, /src/components, /src/fetcher, /src/utils, /src/models, /public, /docs, /tests, /scripts, /.github.
+- 2025-08-16 20:34 UTC+2 – Inserimento file context.md in ciascuna cartella principale e in tutte le sottocartelle significative di /src. Ogni file spiega scopo e regole della cartella.
+- 2025-08-16 20:35 UTC+2 – Aggiornamento di README.md e STANDARD_OPERATIVO.md per documentare la presenza dei nuovi context.md e le regole operative.
+- 2025-08-16 20:35 UTC+2 – Log operazione in LOG_OPERATIVO.md, con scenario test e orario reali.
+
+## Scenario test manuale
+1. Clona la repo da zero.
+2. Verifica la presenza di tutte le cartelle elencate in ARCHITETTURA_CARTELLE_BOZZA.md.
+3. Controlla che ogni cartella principale e ogni sottocartella di /src contenga un context.md, leggibile e chiaro.
+4. Assicurati che README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md siano aggiornati e descrivano la struttura.
+5. Nessun file di codice core si trova fuori da /src.
+6. Controlla che i timestamp del log siano coerenti e progressivi.
 2025-08-16 18:38 UTC+2
 
   Inserita ROADMAP_MILESTONE_ISSUE_BOZZA.md in repo per organizzazione avanzata issues/milestone.  

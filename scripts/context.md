@@ -1,7 +1,1 @@
-# scripts 
-
-**Scopo:**  
-Script di supporto (migrazioni, seed, automazioni). 
-
-**Regole d'uso:**  
-- Nessuna regola specifica per ora. 
+Script di supporto: migrazioni, seed, automazioni, strumenti di sviluppo. 

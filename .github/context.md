@@ -1,7 +1,1 @@
-# .github 
-
-**Scopo:**  
-Workflow, template issue/PR, check-operativo. 
-
-**Regole d'uso:**  
-- Nessuna regola specifica per ora. 
+Workflow CI/CD, template issue/PR, check operativi e automazioni GitHub. 

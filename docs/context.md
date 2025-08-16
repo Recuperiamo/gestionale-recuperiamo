@@ -1,7 +1,1 @@
-# docs 
-
-**Scopo:**  
-Documentazione tecnica, guide, standard, mappa funzionale, schemi ER. 
-
-**Regole d'uso:**  
-- Nessuna regola specifica per ora. 
+Documentazione tecnica, guide di progetto, standard operativi, checklist, mappa funzionale, schemi ER. 

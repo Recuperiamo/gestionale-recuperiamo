@@ -1,7 +1,1 @@
-# fetcher 
-
-**Scopo:**  
-Funzioni di accesso dati/API (client/server). 
-
-**Regole d'uso:**  
-- Nessuna regola specifica per ora. 
+Funzioni per l'accesso e la gestione di dati/API, sia lato client che server. 

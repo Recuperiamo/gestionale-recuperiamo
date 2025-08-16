@@ -410,6 +410,63 @@ npx prisma studio
 4. Prova login con utente senza ruolo: la dashboard mostra “N/D”.
 5. Logout e ripeti con altro utente.
 
+# Gestionale Recuperiamo – Architettura e Primi Passi
+
+Questo progetto adotta una struttura modulare e scalabile.  
+Ogni cartella principale (e ogni sottocartella di /src) contiene un file `context.md` che ne spiega scopo, regole operative e best practice.
+
+## Struttura principale
+
+- `/app` – Entry point applicazione, logiche di routing, layout generali.
+- `/src` – Codice sorgente core, diviso in:
+    - `/components` – Componenti UI riusabili.
+    - `/fetcher` – Accesso dati/API.
+    - `/utils` – Helper e funzioni condivise.
+    - `/models` – Schemi entità e validatori.
+- `/public` – Asset statici e documenti pubblici.
+- `/docs` – Documentazione tecnica e guide.
+- `/tests` – Test automatici/unitari.
+- `/scripts` – Script di supporto e automazioni.
+- `/.github` – Workflow, template, check operativi.
+
+Consulta ogni `context.md` per dettagli di utilizzo delle singole aree.
+
+## Regole operative
+
+- Aggiorna sempre il `LOG_OPERATIVO.md` e il presente file dopo ogni cambio strutturale.
+- Non lasciare codice core al di fuori di `/src`.
+- Ogni cartella nuova deve includere un proprio `context.md`.
+
+# Gestionale Recuperiamo – Architettura e Primi Passi
+
+Questo progetto adotta una struttura modulare e scalabile.  
+Ogni cartella principale (e ogni sottocartella di /src) contiene un file `context.md` che ne spiega scopo, regole operative e best practice.
+
+Sono presenti anche alcuni `context.md` extra (ad esempio in root o in cartelle non standard come `_app`): sono ammessi finché non interferiscono con la logica del progetto e possono servire come documentazione supplementare.
+
+## Struttura principale
+
+- `/app` – Entry point applicazione, logiche di routing, layout generali.
+- `/src` – Codice sorgente core, diviso in:
+    - `/components` – Componenti UI riusabili.
+    - `/fetcher` – Accesso dati/API.
+    - `/utils` – Helper e funzioni condivise.
+    - `/models` – Schemi entità e validatori.
+- `/public` – Asset statici e documenti pubblici.
+- `/docs` – Documentazione tecnica e guide.
+- `/tests` – Test automatici/unitari.
+- `/scripts` – Script di supporto e automazioni.
+- `/.github` – Workflow, template, check operativi.
+
+Consulta ogni `context.md` per dettagli di utilizzo delle singole aree.
+
+## Regole operative
+
+- Aggiorna sempre il `LOG_OPERATIVO.md` e il presente file dopo ogni cambio strutturale.
+- Non lasciare codice core al di fuori di `/src`.
+- Ogni cartella nuova deve includere un proprio `context.md`.
+- I file `context.md` extra sono ammessi se non creano conflitti e vengono documentati in README.md e STANDARD_OPERATIVO.md.
+
 
 ### Note operative
 

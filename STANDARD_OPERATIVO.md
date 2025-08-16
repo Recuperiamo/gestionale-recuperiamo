@@ -357,4 +357,48 @@ git push
   - esistenza della pagina di destinazione
 
 ---
+# STANDARD OPERATIVO – Gestionale Recuperiamo
+
+## Regole vincolanti per la struttura delle cartelle
+
+- Segui la struttura definita in ARCHITETTURA_CARTELLE_BOZZA.md.
+- Ogni cartella principale e ogni sottocartella di `/src` deve contenere un file `context.md` che ne spiega scopo e regole d’uso.
+- Non usare mai file denominati README.md all’interno delle cartelle di progetto: la descrizione va sempre in `context.md`, conforme agli standard di progetto.
+- Ogni aggiornamento strutturale va tracciato in LOG_OPERATIVO.md e nel presente file.
+- Non collocare codice core al di fuori di `/src`.
+
+## Procedura per l’aggiunta/modifica di cartelle
+
+1. Crea la nuova cartella seguendo lo standard.
+2. Inserisci un file `context.md` descrittivo con scopo, regole e best practice.
+3. Aggiorna LOG_OPERATIVO.md e README.md.
+4. Se la modifica è strutturale, aggiorna anche questo STANDARD_OPERATIVO.md.
+
+---
+
+Ultimo aggiornamento: 2025-08-16 19:05 UTC+2
+
+# STANDARD OPERATIVO – Gestionale Recuperiamo
+
+## Regole vincolanti per la struttura delle cartelle
+
+- Segui la struttura definita in ARCHITETTURA_CARTELLE_BOZZA.md.
+- Ogni cartella principale e ogni sottocartella di `/src` deve contenere un file `context.md` che ne spiega scopo e regole d’uso.
+- Non usare mai file denominati README.md all’interno delle cartelle di progetto: la descrizione va sempre in `context.md`, conforme agli standard di progetto.
+- Ogni aggiornamento strutturale va tracciato in LOG_OPERATIVO.md e nel presente file.
+- Non collocare codice core al di fuori di `/src`.
+- La presenza di file `context.md` extra (ad es. in root, _app, src/generated, ecc.) è ammessa se non interferisce con la gestione del codice, la build o i workflow: tali file devono essere documentati in README.md e qui, e servono per eventuali necessità di onboarding, documentazione supplementare o future evoluzioni.
+
+## Procedura per l’aggiunta/modifica di cartelle
+
+1. Crea la nuova cartella seguendo lo standard.
+2. Inserisci un file `context.md` descrittivo con scopo, regole e best practice.
+3. Aggiorna LOG_OPERATIVO.md e README.md.
+4. Se la modifica è strutturale, aggiorna anche questo STANDARD_OPERATIVO.md.
+5. Se aggiungi un context.md extra (fuori dallo standard), documentalo in README.md e qui.
+
+---
+
+Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
+
 ---

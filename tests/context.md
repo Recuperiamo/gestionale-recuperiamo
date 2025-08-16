@@ -1,7 +1,1 @@
-# tests 
-
-**Scopo:**  
-Test automatici/unitari (quando previsti). 
-
-**Regole d'uso:**  
-- Nessuna regola specifica per ora. 
+Test automatici e unitari \(Jest, Vitest, ecc.\). 
