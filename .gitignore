@@ -44,3 +44,4 @@ output.md
 # (Lascia AI_PERSONALIZZAZIO.md SOLO se confermato da te)
 
 # Fine .gitignore
+/src/generated/prisma

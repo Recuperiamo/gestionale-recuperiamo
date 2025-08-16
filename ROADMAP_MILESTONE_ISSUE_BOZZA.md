@@ -1,6 +1,23 @@
 # Roadmap dettagliata – Gestionale Didattica (MVP)
 
 ---
+Versione 2025-08-16 18:51 UTC+2
+
+## Collegamento Issues a Milestone 1
+
+- 2025-08-16 18:48 UTC+2 – Verifica collegamento manuale delle issue alla milestone.
+- 2025-08-16 18:49 UTC+2 – Confermato collegamento delle seguenti issue a “Milestone 1 – Setup ambiente e architettura di progetto”:
+    - #10 Creazione struttura cartelle e file di contesto
+    - #11 Configurazione workflow CI/CD base e .gitignore
+    - #12 Documentazione architetturale e scenario test
+    - #13 Review setup architetturale e chiusura milestone
+- 2025-08-16 18:50 UTC+2 – Richiesta log-operativo e comandi di push da parte dell’utente.
+
+## Scenario test manuale
+1. Accedi alla milestone su GitHub.
+2. Verifica che tutte le issue #10, #11, #12, #13 risultino effettivamente collegate e visibili nella milestone.
+3. Apri ciascuna issue e controlla che il campo “Milestone” sia settato correttamente.
+4. Nessuna delle issue deve risultare “unassigned” rispetto alle milestone.
 
 ## Milestone 1 – Setup ambiente e architettura di progetto
 
