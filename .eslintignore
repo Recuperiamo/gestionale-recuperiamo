@@ -1,1 +1,10 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.env*
+*.config.js
+*.config.cjs
 *.config.mjs
