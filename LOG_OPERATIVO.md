@@ -2,18 +2,17 @@
 
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
 
-## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
-
-### 2025-08-16 14:56:00 (UTC+2)
-- [MILESTONE #9 - STEP c] Definizione schema Prisma utenti/ruoli per NextAuth.js + gestione ruoli custom
-- Aggiornato schema.prisma: modelli User, Role, Account, Session, VerificationToken
-- Relazione 1:N Role-User, ruoli predefiniti: admin, operatore, visualizzatore
+### 2025-08-16 14:36:50 (UTC+2)
+- [MILESTONE #9 - STEP b] Verifica e conferma installazione dipendenze autenticazione: next-auth, prisma, @prisma/client
+- Dipendenze presenti in package.json: next-auth, @prisma/client, prisma
+- Cartella /prisma e file schema.prisma presenti e validi
+- File .env presente e correttamente configurato con DATABASE_URL postgres
 - Scenario test manuale:
-    1. schema.prisma contiene i modelli e relazioni come da milestone
-    2. Migrazione iniziale completata senza errori (`npx prisma migrate dev --name init_auth`)
-    3. Tabella Role popolata con valori admin, operatore, visualizzatore
-    4. LOG_OPERATIVO.md, README.md e STANDARD_OPERATIVO.md aggiornati e pushati
-- Pronto per test di NextAuth.js adapter Prisma e seed ruoli
+    1. In package.json sono presenti next-auth, @prisma/client, prisma.
+    2. Esiste la cartella /prisma e contiene schema.prisma.
+    3. In root è presente .env.
+    4. LOG_OPERATIVO.md, README.md e STANDARD_OPERATIVO.md sono aggiornati e pushati dopo queste operazioni.
+- Pronto per passaggio a definizione schema Prisma utenti/ruoli (milestone 9 - step c)
 
 ### 2025-08-16 14:35:10 (UTC+2)
 - [MILESTONE #9 - STEP b] Verifica e conferma installazione dipendenze autenticazione: next-auth, prisma, @prisma/client
