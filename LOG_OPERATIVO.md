@@ -1,5 +1,15 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### [2025-08-16 22:48] - Chiusura issue #11 (Configurazione workflow CI/CD base e .gitignore)
+
+- Verificati tutti i deliverable della issue #11:
+  - Workflow CI/CD GitHub Actions attivo e funzionante su push/PR.
+  - File .gitignore completo per Next.js, Node.js e ambienti CI.
+  - Scenario test manuale superato: push o PR attiva workflow, build/lint eseguiti senza errori di configurazione.
+- Issue #11 chiusa alle 22:48 (UTC+2).
+- Orari milestone e log coerenti con timestamp commit/push.
+- Nuova milestone aperta: "Clean-up manuale e strategia refactoring errori ESLint" (dalle 22:44 UTC+2).
+
 ### [2025-08-16 22:43] - Configurazione ESLint flat compatibile Next.js/React
 
 - Aggiornata la configurazione ESLint flat per piena compatibilità con ESLint 9.x e Next.js 13+.
