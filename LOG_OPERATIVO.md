@@ -1,5 +1,38 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+Modifica dummy per test workflow CI/CD
+
+**Versione STANDARD_OPERATIVO.md**: 2025-08-16 20:45 UTC+2 
+ 
+**File coinvolti**:  
+- README.md  
+- LOG_OPERATIVO.md  
+
+**Scenario Test**:  
+- Modifica aggiunta dummy in fondo a README.md  
+- Commit e push della modifica  
+- Verifica che TUTTI i workflow GitHub Actions si attivino  
+- Controllo che nessun errore bloccante venga restituito (tranne eventuali errori previsti, es: mancanza log se omesso di proposito)  
+- In caso di errore, correggi e ripeti test
+2025-08-16 20:55 UTC+2
+
+## Chiusura Issue #10 – Creazione struttura cartelle e file di contesto
+
+- Tutte le cartelle principali e core sono presenti come da ARCHITETTURA_CARTELLE_BOZZA.md.
+- In ogni cartella principale e sottocartella core è presente un file context.md, come richiesto dal deliverable.
+- Sono documentati e mantenuti context.md extra in root e _app, in quanto non interferiscono con la build o la logica operativa.
+- README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md aggiornati e coerenti, inclusa descrizione scenario test manuale e policy per file fuori standard.
+- Scenario test manuale eseguito: la struttura è conforme, i file di contesto sono tutti presenti, nessun componente core è fuori da /src.
+- Issue #10 pronta per chiusura: deliverable pienamente soddisfatti e tracciati.
+
+## Scenario test manuale – Issue #10
+1. Esegui `dir /s /b context.md` dalla root: ogni cartella principale e ogni sottocartella core ha il suo context.md.
+2. Verifica che README.md e STANDARD_OPERATIVO.md riportino la gestione dei context.md extra.
+3. Nessun file di codice core si trova fuori da /src.
+4. Tutti i file chiave sono aggiornati, versionati e pushati.
+5. I timestamp del log sono coerenti, progressivi e rispecchiano i commit eseguiti.
+
+
 2025-08-16 20:45 UTC+2
 
 ## Verifica presenza file context.md in tutte le cartelle (Issue #10)

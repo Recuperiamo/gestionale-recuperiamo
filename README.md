@@ -473,3 +473,5 @@ Consulta ogni `context.md` per dettagli di utilizzo delle singole aree.
 - Aggiorna LOG_OPERATIVO.md ogni volta che questa sezione viene modificata.
 - Se aggiungi nuovi comandi/script, documentali qui e aggiorna STANDARD_OPERATIVO.md.
 ---
+
+# Dummy commit per test workflow CI/CD - 2025-08-16
