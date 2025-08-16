@@ -1,4 +1,17 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+
+## Versione: 2025-08-16 22:35 (UTC+2)
+
+### [2025-08-16 22:35] - Aggiornamento dipendenze e pulizia file superflui
+
+- Installate le dipendenze mancanti (`eslint` come devDependency e `tailwindcss`) per consentire il corretto funzionamento della build CI/CD e la risoluzione dei relativi errori.
+- Aggiornati i file `package.json` e `package-lock.json` in seguito all’installazione delle nuove dipendenze.
+- Rimossa la vecchia configurazione `.eslintignore` (non più supportata con flat config).
+- File `primi-errori-eslint.txt` non integrato nel versionamento: si suggerisce l’eliminazione o l’aggiunta a `.gitignore` in quanto file temporaneo e non funzionale alla milestone.
+- Scenario test manuale: Push delle modifiche, verifica build su GitHub Actions → nessun errore di dipendenze mancanti, build che prosegue almeno fino a eventuali errori di lint o test.
+- Prossimi step: validazione della build CI/CD su GitHub Actions, aggiornamento workflow se necessario, pulizia e verifica finale `.gitignore`.
+
 ## Versione: 2025-08-16 22:22 (UTC+2)
 
 ### [2025-08-16 22:22] - Aggiornamento flat config ESLint, esclusione directory e verifica output
