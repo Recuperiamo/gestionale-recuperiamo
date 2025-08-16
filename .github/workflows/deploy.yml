@@ -1,0 +1,15 @@
+name: Deploy (placeholder)
+
+on:
+  push:
+    branches: [ "release", "main" ]
+  pull_request:
+    branches: [ "release", "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Deploy non ancora implementato."
+          exit 1
