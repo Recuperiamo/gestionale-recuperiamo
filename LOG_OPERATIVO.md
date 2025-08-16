@@ -2,6 +2,28 @@
 
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
 
+### 2025-08-16 14:35:10 (UTC+2)
+- [MILESTONE #9 - STEP b] Verifica e conferma installazione dipendenze autenticazione: next-auth, prisma, @prisma/client
+- Verificata presenza dipendenze richieste in package.json
+- Cartella /prisma e file schema.prisma presenti e validi
+- File .env presente e correttamente configurato con DATABASE_URL postgres
+- Scenario test manuale:
+    1. In package.json sono presenti next-auth, @prisma/client, prisma.
+    2. Esiste la cartella /prisma e contiene schema.prisma.
+    3. In root è presente .env.
+    4. LOG_OPERATIVO.md, README.md e STANDARD_OPERATIVO.md sono aggiornati e pushati dopo queste operazioni.
+- Pronto per passaggio a definizione schema Prisma utenti/ruoli (milestone 9 - step c)
+    
+### 2025-08-16 14:25:30 (UTC+2)
+- [MILESTONE #9 - STEP b] Installazione dipendenze autenticazione: next-auth, prisma, @prisma/client
+- Inizializzazione Prisma con `npx prisma init` (creata cartella /prisma e file schema.prisma)
+- Aggiornata documentazione: README.md (sezione dipendenze, step installazione), STANDARD_OPERATIVO.md (comandi installazione e scenario test)
+- SCENARIO TEST MANUALE:
+    1. Dipendenze presenti in package.json
+    2. Cartella /prisma e file schema.prisma creati
+    3. Log e documentazione aggiornati e pushati
+    4. Pronto per definizione schema utenti/ruoli e migrazione
+
 ### 2025-08-16 14:20:10 (UTC+2)
 - [MILESTONE #9 - STEP a] Aggiornamento README.md e STANDARD_OPERATIVO.md per recepire scelta stack autenticazione
 - README.md: aggiunta sezione "Stack tecnico autenticazione" e aggiornamento policy autenticazione/ruoli
