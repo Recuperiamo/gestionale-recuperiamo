@@ -1,5 +1,20 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+---
+
+### 2025-08-17 01:55:38 (UTC+2)
+- Installazione pacchetto next-auth.
+- Creazione API route `/app/api/auth/[...nextauth]/route.js` con provider credenziali e utente mock (mario.rossi@email.it / test1234).
+- Integrazione NextAuth.js in tutte le pagine:
+  - Login via NextAuth.js in `/signin` (form, errori, redirect automatico se autenticato).
+  - Logout e login dinamici nella Navbar.
+  - Dati utente dinamici in `/profile`.
+  - Protezione pagine `/`, `/profile`, `/settings`: redirect a `/signin` se non autenticato.
+- Aggiornamento README.md, LOG_OPERATIVO.md, STANDARD_OPERATIVO.md con scenario test manuale e policy autenticazione.
+- Test manuale completato: login/logout funzionanti con sessione persistente, dati utente mostrati, accesso protetto alle pagine.
+- Pronto per review, milestone chiudibile.
+
+---
 Debug issue #14 e ristrutturazione Next.js (UTC+2)
 
 ### 2025-08-16 01:00:00

@@ -1,6 +1,19 @@
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 
 export default function ProfilePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  if (status === "loading") return null;
+  if (!session) {
+    router.replace("/signin");
+    return null;
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#20489a" }}>
       <Navbar />
@@ -19,13 +32,13 @@ export default function ProfilePage() {
           Profilo Utente
         </h2>
         <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>
-          Nome: <span style={{ fontWeight: 400 }}>Mario Rossi</span>
+          Nome: <span style={{ fontWeight: 400 }}>{session.user.name}</span>
         </div>
         <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>
-          Email: <span style={{ fontWeight: 400 }}>mario.rossi@email.it</span>
+          Email: <span style={{ fontWeight: 400 }}>{session.user.email}</span>
         </div>
         <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 28 }}>
-          Ruolo: <span style={{ fontWeight: 400 }}>Tutor</span>
+          Ruolo: <span style={{ fontWeight: 400 }}>{session.user.role}</span>
         </div>
         <div
           style={{

@@ -468,4 +468,39 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
   Ogni modifica va riportata per intero o con stringhe di riferimento, mai solo parziale senza contesto.
 
 ---
+# STANDARD_OPERATIVO.md
+
+## Regole vincolanti di gestione e contribuzione
+
+- **Routing:**  
+  Tutte le pagine Next.js vanno create come sottocartelle di `app/` in root.  
+  Non è più consentito l’uso di `src/app`.
+- **Autenticazione:**  
+  Il sistema di autenticazione utilizza NextAuth.js con credenziali (mock utente).  
+  La route API NextAuth è: `/app/api/auth/[...nextauth]/route.js`.
+  Pagine protette da autenticazione: `/`, `/profile`, `/settings`.
+  Accesso libero a `/signin` e `/not-found`.
+- **Navbar:**  
+  Ogni pagina principale deve includere la Navbar comune da `app/components/Navbar.js` (esclusa la pagina 404 custom).
+  Navbar mostra login/logout in base alla sessione.
+- **Log operativo:**  
+  Ogni operazione strutturale, evento importante o modifica all’autenticazione deve essere registrata in LOG_OPERATIVO.md (UTC+2).
+- **README:**  
+  Deve sempre rispecchiare la struttura attuale e includere scenario test manuale aggiornato.
+- **Milestone e commit:**  
+  Alla chiusura di ogni milestone va controllata la coerenza e progressività dei timestamp nel log.
+- **Debug:**  
+  In caso di conflitti o errori, seguire la procedura:  
+  1. Verifica struttura  
+  2. Pulizia cache  
+  3. Test server dev  
+  4. Aggiornamento log e README
+- **Scenario test manuale:**  
+  Aggiornare sempre per ogni feature/bugfix.
+- **Push:**  
+  Dopo ogni gruppo di modifiche, pushare file modificati/creati più log, README, STANDARD_OPERATIVO.
+- **Aggiornamento file:**  
+  Ogni modifica va riportata per intero o con stringhe di riferimento.
+
+---
 ---

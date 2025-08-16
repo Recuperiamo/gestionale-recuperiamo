@@ -1,6 +1,19 @@
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Navbar from "./components/Navbar";
 
 export default function DashboardPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  if (status === "loading") return null;
+  if (!session) {
+    router.replace("/signin");
+    return null;
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#20489a" }}>
       <Navbar />

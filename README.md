@@ -572,4 +572,49 @@ npm run dev
 - In caso di problemi di routing, verificare sempre che tutte le pagine siano in `app/` root.
 - Non creare mai una nuova `src/app`.
 
+---# gestionale-recuperiamo
+
+## Struttura progetto (2025-08-16)
+
+- Il progetto utilizza Next.js con architettura “app router” e autenticazione via NextAuth.js (provider credenziali).
+- Tutte le pagine si trovano nella cartella `app/` direttamente in root.
+- **API route** per autenticazione: `/app/api/auth/[...nextauth]/route.js`
+- Pagine principali:
+  - `/` (Dashboard/Home) → protetta, visibile solo se autenticati
+  - `/signin` → login NextAuth.js (mock utente: mario.rossi@email.it / test1234)
+  - `/profile` → visibile solo se autenticati, mostra dati utente dalla sessione
+  - `/settings` → visibile solo se autenticati
+  - `/not-found` → pagina 404 custom (accesso libero)
+- Navbar comune su tutte le pagine principali (tranne 404), con login/logout dinamico.
+- Sessione persistente e callback JWT/session attive.
+
+## Policy operative
+
+- Ogni modifica strutturale o di autenticazione va tracciata in LOG_OPERATIVO.md (con UTC+2).
+- STANDARD_OPERATIVO.md indica le regole vincolanti di contribuzione.
+- Per ogni nuova feature, vanno aggiornati i test manuali in README e log.
+
+## Avvio sviluppo
+
+```bash
+npm install
+npm run dev
+```
+
+## Debug e manutenzione
+
+- Verifica sempre che API route NextAuth (`app/api/auth/[...nextauth]/route.js`) sia correttamente configurata.
+- In caso di problemi di routing/autenticazione, controlla che tutte le pagine siano in `app/` root e la sessione NextAuth sia attiva.
+- Non creare mai una nuova `src/app`.
+
+## Scenario test manuale (autenticazione)
+
+1. Avvia il server Next.js (`npm run dev`).
+2. Accedi a `/signin`, esegui login con:
+   - Email: mario.rossi@email.it
+   - Password: test1234
+3. Verifica che la sessione sia stabile e le pagine protette siano accessibili.
+4. Esegui logout dalla navbar, verifica che torni a `/signin` e la sessione sia terminata.
+5. Consulta LOG_OPERATIVO.md per data e orario degli step.
+
 ---
