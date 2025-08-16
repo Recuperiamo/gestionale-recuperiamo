@@ -1,60 +1,117 @@
-import NextAuth from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+"use client";
 
-const users = [
-  {
-    id: "1",
-    name: "Mario Rossi",
-    email: "mario.rossi@email.it",
-    password: "test1234",
-    role: "Tutor"
+import { signIn, useSession } from "next-auth/react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Navbar from "../components/Navbar";
+
+export default function SignInPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+
+  if (session) {
+    router.replace("/");
+    return null;
   }
-];
 
-export const authOptions = {
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email", placeholder: "tuo@email.it" },
-        password: { label: "Password", type: "password" }
-      },
-      async authorize(credentials) {
-        const user = users.find(
-          (u) =>
-            u.email === credentials.email &&
-            u.password === credentials.password
-        );
-        if (user) {
-          return { id: user.id, name: user.name, email: user.email, role: user.role };
-        }
-        return null;
-      }
-    })
-  ],
-  session: {
-    strategy: "jwt"
-  },
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = user.role;
-        token.name = user.name;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user.role = token.role;
-        session.user.name = token.name;
-      }
-      return session;
-    }
-  },
-  pages: {
-    signIn: "/signin"
-  }
-};
-
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+  return (
+    <div style={{ minHeight: "100vh", background: "#20489a" }}>
+      <Navbar />
+      <main
+        style={{
+          maxWidth: 420,
+          margin: "70px auto 0 auto",
+          background: "#fff",
+          borderRadius: 18,
+          padding: "40px 34px 34px 34px",
+          boxShadow: "0 4px 20px 0 rgba(32,72,154,0.07)",
+          color: "#20489a",
+        }}
+      >
+        <h2 style={{ fontWeight: 700, fontSize: 27, marginBottom: 16, textAlign: "center" }}>
+          Accedi al tuo account
+        </h2>
+        <form
+          autoComplete="off"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setErr("");
+            const res = await signIn("credentials", {
+              email,
+              password,
+              redirect: false
+            });
+            if (res?.error) setErr("Credenziali non valide");
+          }}
+        >
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ fontWeight: 600, fontSize: 16, marginBottom: 6, display: "block" }}>
+              Email
+            </label>
+            <input
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                fontSize: 16,
+                borderRadius: 7,
+                border: "1.5px solid #dbe4f1",
+                outline: "none",
+              }}
+              placeholder="tuo@email.it"
+              type="email"
+              name="email"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </div>
+          <div style={{ marginBottom: 28 }}>
+            <label style={{ fontWeight: 600, fontSize: 16, marginBottom: 6, display: "block" }}>
+              Password
+            </label>
+            <input
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                fontSize: 16,
+                borderRadius: 7,
+                border: "1.5px solid #dbe4f1",
+                outline: "none",
+              }}
+              placeholder="••••••••"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+          </div>
+          <button
+            type="submit"
+            style={{
+              background: "#1cb0f6",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 16,
+              padding: "12px 0",
+              border: "none",
+              borderRadius: 7,
+              width: "100%",
+            }}
+          >
+            Accedi
+          </button>
+          {err && <div style={{ color: "#D32F2F", margin: "18px 0 0 0", fontWeight: 600, textAlign: "center" }}>{err}</div>}
+        </form>
+        <div style={{ marginTop: 18, fontSize: 14, color: "#4268b3", textAlign: "center" }}>
+          Non hai un account? <span style={{ color: "#1cb0f6", fontWeight: 600 }}>Contatta l'amministratore</span>
+        </div>
+      </main>
+    </div>
+  );
+}
