@@ -1,7 +1,27 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+[2025-08-16 16:22 UTC+2]  
+STANDARD_OPERATIVO.md applicato: ultima modifica 2025-08-16
 
+**Descrizione attività:**  
+- Creata dashboard protetta come home page (`/src/app/page.js`)
+- La home è accessibile solo ad utenti autenticati (controllo sessione NextAuth)
+- Visualizzazione di email e ruolo utente in dashboard
+- Test manuale: login, redirect, visualizzazione dati, logout
+
+**File coinvolti:**  
+- src/app/page.js  
+- LOG_OPERATIVO.md
+
+**Scenario Test:**  
+1. Avvia il server con `npm run dev`
+2. Vai su [http://localhost:3000/](http://localhost:3000/)
+3. Se non autenticato: redirect automatico a `/api/auth/signin`
+4. Effettua login: dopo il login, visualizzi dashboard con email e ruolo utente
+5. Prova logout (se presente): dopo il logout, la home non è più accessibile senza login
+
+---
 2025-08-16 16:10 UTC+2]  
 STANDARD_OPERATIVO.md applicato: ultima modifica 2025-08-16
 
