@@ -28,9 +28,7 @@ export default defineConfig([
       "@next/next": pluginNext
     },
     extends: [
-      "js/recommended",
-      "plugin:react/recommended",
-      "plugin:@next/next/recommended"
+      "js/recommended"
     ],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
@@ -41,8 +39,16 @@ export default defineConfig([
       }
     },
     rules: {
+      // React
       "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off" // Disattiva se usi TS o non usi prop-types
+      "react/prop-types": "off",
+
+      // Next.js rules (aggiungi quelle che vuoi, le principali sono queste)
+      "@next/next/no-html-link-for-pages": "error",
+      "@next/next/no-head-element": "warn",
+      "@next/next/no-sync-scripts": "warn",
+      "@next/next/no-css-tags": "warn"
+      // puoi aggiungerne altre dalla lista qui: https://github.com/vercel/next.js/tree/canary/packages/eslint-plugin-next/docs/rules
     }
   },
   tseslint.configs.recommended,
