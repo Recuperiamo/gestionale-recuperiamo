@@ -1,5 +1,13 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## Versione: 2025-08-16 22:22 (UTC+2)
 
+### [2025-08-16 22:22] - Aggiornamento flat config ESLint, esclusione directory e verifica output
+
+- Corretto `eslint.config.mjs` secondo flat config ESLint 9+, integrando la sezione `ignores` per escludere directory di build/output (*.next, node_modules, ecc.).
+- Eliminata doppia export e errori di sintassi nella configurazione.
+- Verificato funzionamento: ora il lint ignora correttamente le directory di output.
+- Dopo rilancio `npx eslint .`, il numero di errori è sceso da 4388 a 2503, confermando l'esclusione delle directory generate.
+- Prossimi step: analisi tipologia errori rimasti, eventuale uso di `--fix`, aggiornamento documentazione e commit/push file modificati.
 ## Versione: 2025-08-16 21:40 (UTC+2)
 
 ### [2025-08-16 21:40] - Integrazione ESLint base (wizard)
