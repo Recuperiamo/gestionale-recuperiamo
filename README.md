@@ -395,6 +395,22 @@ npx prisma studio
 - Gestione errori lato client e redirect post-login.
 - Lo scenario test prevede login con credenziali valide e non, verifica errori e redirect.
 
+## Login, redirect e gestione ruolo
+
+- Il login via NextAuth ora forza sempre il redirect sulla home `/` dopo l’autenticazione, indipendentemente dal callbackUrl.
+- Il ruolo utente (`admin`, `operatore`, ecc.) viene ora letto dalla relazione Prisma e propagato nella sessione JWT NextAuth.
+- La dashboard legge `session.user.role` e mostra il ruolo corretto.
+- Qualsiasi modifica ai ruoli deve essere fatta da Prisma Studio (tabella `Role` e relazione in `User`).
+
+### Scenario test manuale
+
+1. Avvia Next.js, accedi a `/api/auth/signin`.
+2. Effettua login con utente avente ruolo valorizzato su Prisma Studio.
+3. Dopo login, verifica che la dashboard mostri il ruolo esatto.
+4. Prova login con utente senza ruolo: la dashboard mostra “N/D”.
+5. Logout e ripeti con altro utente.
+
+
 ### Note operative
 
 - Aggiorna LOG_OPERATIVO.md ogni volta che questa sezione viene modificata.

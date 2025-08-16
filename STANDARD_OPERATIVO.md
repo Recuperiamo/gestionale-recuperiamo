@@ -335,4 +335,26 @@ git push
 - Il form deve gestire errori e redirect.
 - Ogni modifica va riportata su LOG_OPERATIVO.md e README.md.
 
+### Login e propagazione ruolo NextAuth
+
+- La configurazione NextAuth deve usare la callback `redirect` per forzare il redirect post-login su `/`.
+- La callback `authorize` in CredentialsProvider deve includere la relazione `role` nella query Prisma:
+  ```js
+  include: { role: true }
+  ```
+- L’oggetto user restituito da authorize deve avere `role: user.role?.name`.
+- Le callback `jwt` e `session` propagano `role` nel token e nella sessione.
+- Scenario test manuale obbligatorio dopo modifiche: login con utenti dei vari ruoli, verifica visibilità ruolo in dashboard.
+
+---
+
+### Debug loop login
+
+- Se compare loop login NextAuth, controllare:
+  - callbackUrl in query string
+  - pages.signIn custom in config NextAuth
+  - callback `redirect` configurata correttamente
+  - esistenza della pagina di destinazione
+
+---
 ---

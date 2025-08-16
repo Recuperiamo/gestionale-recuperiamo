@@ -1,6 +1,35 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
 ## LOG OPERATIVO - Sessione 2025-08-16 (UTC+2)
+
+2025-08-16 18:08 UTC+2
+
+---
+
+### Issue #9: Fix loop login NextAuth + propagazione ruolo
+
+- 2025-08-16 14:10 UTC+2  
+  Avvio troubleshooting: identificato ciclo di redirect su NextAuth dovuto a callbackUrl errato e pagina dashboard non esistente.
+- 2025-08-16 14:35 UTC+2  
+  Rimosso pages.signIn custom da config NextAuth, primo fix loop: ora login page appare, ma redirect su /dashboard (404).
+- 2025-08-16 15:00 UTC+2  
+  Patch callback `redirect` per forzare redirect su `/` dopo login. Test superato: login ritorna su home.
+- 2025-08-16 15:30 UTC+2  
+  Fix propagazione ruolo utente: corretta query Prisma in authorize per includere la relazione `role` e passare il nome ruolo nella sessione.
+- 2025-08-16 16:08 UTC+2  
+  Verifica finale: login avviene, ruolo correttamente mostrato in dashboard.  
+  Aggiornati anche i log di debug in tutte le callback NextAuth.
+- 2025-08-16 18:08 UTC+2  
+  Aggiornamento log-operativo, README e STANDARD_OPERATIVO per chiusura issue #9.  
+  Milestone chiusa, nuova milestone da avviare per eventuali refactor UI e miglioramento experience.
+
+---
+
+**Prossimi step**:  
+- Eventuale refactor UI login/dashboard.
+- Test manuali su altri ruoli.
+- Refactor middleware se necessario.
+
 [2025-08-16 16:22 UTC+2]  
 STANDARD_OPERATIVO.md applicato: ultima modifica 2025-08-16
 
