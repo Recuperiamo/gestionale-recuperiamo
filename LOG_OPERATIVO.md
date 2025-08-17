@@ -1,5 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+## 2025-08-17 14:23 UTC+2
+- Fix: la tabella clienti mostra solo note se compilate, rimosse colonne CF/PIVA, aumentata spaziatura verticale righe.
+- Fix: il form modifica ora preserva nome_referente.
+- Fix: Dettagli cliente chiudibile anche ricliccando su "Dettagli" stesso cliente.
+- Fix: Dettagli mostra solo campi compilati.
+- Test manuale eseguito: OK su tutti i punti.
+
 ## Stato al 2025-08-17 13:11 UTC+2
 
 ### Modifiche e attività svolte nella sessione

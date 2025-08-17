@@ -39,13 +39,25 @@ export default function ClientiPage() {
     }
   };
 
+  // PATCH: mapping campi frontend → backend
+  const mapFormToApi = (formData) => ({
+    nomeReferente: formData.nome,
+    email: formData.email,
+    telefono: formData.telefono,
+    indirizzo: formData.indirizzo,
+    codiceFiscale: formData.cf,
+    partitaIva: formData.piva,
+    note: formData.note
+  });
+
   const handleAdd = async (formData) => {
     setAlert({ message: '', type: 'error' });
     setLoading(true);
     try {
+      const apiData = mapFormToApi(formData);
       const res = await fetch('/api/clienti', {
         method: 'POST',
-        body: JSON.stringify(formData),
+        body: JSON.stringify(apiData),
         headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json();
@@ -64,12 +76,12 @@ export default function ClientiPage() {
 
   const handleEdit = (cliente) => {
     setForm({
-      nome: cliente.nome || '',
+      nome: cliente.nomeReferente || cliente.nome || "",
       email: cliente.email || '',
       telefono: cliente.telefono || '',
       indirizzo: cliente.indirizzo || '',
-      cf: cliente.cf || '',
-      piva: cliente.piva || '',
+      cf: cliente.codiceFiscale || cliente.cf || '',
+      piva: cliente.partitaIva || cliente.piva || '',
       note: cliente.note || '',
     });
     setEditId(cliente.id);
@@ -81,9 +93,10 @@ export default function ClientiPage() {
     setAlert({ message: '', type: 'error' });
     setLoading(true);
     try {
+      const apiData = { ...mapFormToApi(formData), id: editId };
       const res = await fetch('/api/clienti', {
         method: 'PUT',
-        body: JSON.stringify({ ...formData, id: editId }),
+        body: JSON.stringify(apiData),
         headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json();
@@ -141,8 +154,13 @@ export default function ClientiPage() {
     }
   };
 
+  // --- PATCH: chiudi dettagli se ri-clicchi Dettagli sullo stesso cliente ---
   const handleViewDetails = (cliente) => {
-    setDettaglioCliente(cliente);
+    if (dettaglioCliente && dettaglioCliente.id === cliente.id) {
+      setDettaglioCliente(null); // se già aperto su questo cliente, chiudi
+    } else {
+      setDettaglioCliente(cliente);
+    }
   };
 
   const handleCloseDetails = () => {
@@ -167,12 +185,12 @@ export default function ClientiPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onViewDetails={handleViewDetails}
+          dettaglioCliente={dettaglioCliente}
         />
       </div>
       <ClienteDettaglioModal
         cliente={dettaglioCliente}
         onClose={handleCloseDetails}
-        onEdit={handleEdit}
       />
     </>
   );

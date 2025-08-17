@@ -1,42 +1,40 @@
-console.log("RENDER ClientiTable (o ClientiForm, o ClienteDettaglioModal)");
-
-/**
- * Modale dettaglio cliente.
- * Visualizza solo i campi effettivamente valorizzati.
- */
 import React from "react";
 
 export default function ClienteDettaglioModal({ cliente, onClose }) {
   if (!cliente) return null;
 
-  // Campi da mostrare solo se valorizzati
-  const campiOpzionali = [
-    { label: "Telefono", key: "telefono" },
-    { label: "Indirizzo", key: "indirizzo" },
-    { label: "Codice Fiscale", key: "cf" },
-    { label: "Partita IVA", key: "piva" },
-    { label: "Note", key: "note" }
-  ];
+  // Helper: mostra solo i campi valorizzati
+  const dettagli = [
+    { label: "ID", value: cliente.id },
+    { label: "Nome referente", value: cliente.nomeReferente || cliente.nome },
+    { label: "Email", value: cliente.email },
+    { label: "Telefono", value: cliente.telefono },
+    { label: "Indirizzo", value: cliente.indirizzo },
+    { label: "Codice Fiscale", value: cliente.codiceFiscale || cliente.cf },
+    { label: "Partita IVA", value: cliente.partitaIva || cliente.piva },
+    { label: "Note", value: cliente.note }
+  ].filter(d => d.value && d.value !== "");
 
   return (
-    <div className="modal" style={{ border: "1px solid #333", background: "#fff", padding: "16px", margin: "16px auto", maxWidth: 500 }}>
-      <h2>Dettaglio Cliente</h2>
-      <p><b>Nome:</b> {cliente.nome}</p>
-      <p><b>Email:</b> {cliente.email}</p>
-      {campiOpzionali.map(
-        campo =>
-          cliente[campo.key] &&
-          String(cliente[campo.key]).trim() !== "" && (
-            <p key={campo.key}>
-              <b>{campo.label}:</b> {cliente[campo.key]}
-            </p>
-          )
-      )}
-      <button
-        className="bg-gray-400 text-white px-2 py-1 rounded hover:bg-gray-600 ml-2"
-        onClick={onClose}>
-        Chiudi
-      </button>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
+        <h3 className="text-xl font-bold mb-4">Dettagli Cliente</h3>
+        <ul>
+          {dettagli.map(({ label, value }) => (
+            <li key={label} className="mb-3">
+              <span className="font-bold">{label}:</span> <span>{value}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
+            onClick={onClose}
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
