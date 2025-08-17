@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
@@ -9,11 +9,15 @@ export default function ProfiloPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  if (status === "loading") return null;
-  if (!session) {
-    router.replace("/signin");
-    return null;
-  }
+  // Redirect se non autenticato
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session) {
+      router.replace("/signin");
+    }
+  }, [session, status, router]);
+
+  if (status === "loading" || !session) return null;
 
   // Tutti gli utenti autenticati possono vedere questa pagina
   return (

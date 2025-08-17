@@ -1,5 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-17 17:06:00
 
+- Avviata procedura di chiusura sessione come da checklist END_SESSION.md.
+- Verificato stato delle pagine 404/notfound e suggerito fix strutturale (app/404.js).
+- Forniti diversi scenari test manuali per la gestione pagina 404 custom.
+- Nessuna modifica a README.md o STANDARD_OPERATIVO.md necessaria in questa sessione.
+- Nessun nuovo file aggiunto oltre a proposte di fix su 404.js.
+- Nessun file da pushare (nessuna modifica effettiva ai file del repository in questa sessione).
 ## 2025-08-17 16:44 UTC+2
 
 - Fix sistematici "React is not defined" aggiungendo l'import React in testa ai seguenti file:
