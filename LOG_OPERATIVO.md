@@ -1,4 +1,20 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+### 2025-08-17 02:44:00 (UTC+2)
+- NOTA OPERATIVA PRISMA:
+    - Ogni volta che si modifica lo schema Prisma o si sposta/ricrea la cartella node_modules, è OBBLIGATORIO eseguire:
+      ```
+      npx prisma generate
+      ```
+    - Questo comando aggiorna il client Prisma ed evita errori di inizializzazione.
+- Verificato login/logout funzionanti per tutti e tre gli account creati (admin, operatore, visualizzatore): autentica, propaga ruolo corretto, sessione coerente.
+---
+### 2025-08-17 02:40:00 (UTC+2)
+- Sostituito mock user in NextAuth.js con query Prisma: ora authorize carica utente e ruolo reale da DB, verifica password (bcrypt) e propaga ruolo in sessione.
+- Solo utenti con ruolo valorizzato possono loggarsi.
+- Pronto per step successivo: visualizzazione ruolo in dashboard e progettazione middleware.
+- Scenario test manuale: login solo con utente avente ruolo, verifica campo role in sessione NextAuth.
+---
 ### 2025-08-17 02:33:00 (UTC+2)
 - Ricognizione stato attuale gestione ruoli/permessi (issue #15): schema Prisma pronto, ma login NextAuth.js ancora su mock user e senza join su Role.
 - Nessun middleware presente per controllo permessi/ruoli.

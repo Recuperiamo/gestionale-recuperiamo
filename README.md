@@ -616,5 +616,27 @@ npm run dev
 3. Verifica che la sessione sia stabile e le pagine protette siano accessibili.
 4. Esegui logout dalla navbar, verifica che torni a `/signin` e la sessione sia terminata.
 5. Consulta LOG_OPERATIVO.md per data e orario degli step.
+# Gestionale Pacchetti Ore – Recuperiamo
 
+...
+
+## Sviluppo e gestione database (Prisma)
+
+1. Modifica lo schema in `prisma/schema.prisma`
+2. Ogni volta che modifichi lo schema, esegui:
+
+    ```
+    npx prisma generate
+    ```
+
+    **Nota:**  
+    Questo comando va eseguito ogni volta che cambi lo schema Prisma, o se sposti/ricrei la cartella `node_modules`.
+
+3. Poi crea/aggiorna il DB con:
+
+    ```
+    npx prisma migrate dev
+    ```
+
+...
 ---

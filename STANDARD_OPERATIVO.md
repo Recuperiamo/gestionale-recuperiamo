@@ -503,4 +503,27 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
   Ogni modifica va riportata per intero o con stringhe di riferimento.
 
 ---
+# STANDARD OPERATIVO – GESTIONALE PACCHETTI ORE
+
+...
+
+## Gestione Prisma e Database
+
+- Per ogni modifica a `schema.prisma` (aggiunta/variazione modelli, relazioni, proprietà) è necessario eseguire:
+
+  ```
+  npx prisma generate
+  ```
+
+- **Nota:**  
+  Questo comando va eseguito ogni volta che cambi lo schema Prisma, o se sposti/ricrei la cartella `node_modules`.
+
+- Ricordati di eseguire anche le migration:
+
+  ```
+  npx prisma migrate dev
+  ```
+
+...
+
 ---
