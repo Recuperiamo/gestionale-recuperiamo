@@ -1,5 +1,9 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+## 2025-08-17 14:53 UTC+2
+- Fix: Corretto warning ESLint in not-found/page.js (uso di <Link> Next.js invece di <a>).
+- Fix: Corretto errore di sintassi nella pagina not-found causato da sostituzione errata <a>/<Link>.
+- Test manuale: build OK senza warning/errori ESLint, navigazione a /not-found porta a link "Dashboard" funzionante, nessun errore di compilazione.
 ## 2025-08-17 14:23 UTC+2
 - Fix: la tabella clienti mostra solo note se compilate, rimosse colonne CF/PIVA, aumentata spaziatura verticale righe.
 - Fix: il form modifica ora preserva nome_referente.
