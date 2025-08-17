@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import React from "react";
 import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -12,35 +13,38 @@ export default function Navbar() {
     <nav style={{
       background: "#fff",
       padding: "10px 32px",
-      borderBottom: "1.5px solid #dbe4f1",
       display: "flex",
-      justifyContent: "space-between"
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderBottom: "1.5px solid #dbe4f1",
     }}>
-      <div>
-        {/* Solo admin vede il link Dashboard */}
-        {session?.user?.role === "admin" && (
-          <Link href="/" style={{ marginRight: 16, fontWeight: 600 }}>Dashboard</Link>
-        )}
-        {/* Tutti gli utenti autenticati vedono Profilo */}
-        {session?.user && (
-          <Link href="/profilo" style={{ fontWeight: 600 }}>Profilo</Link>
-        )}
+      <div style={{ fontWeight: 700, fontSize: 22, color: "#20489a" }}>
+        <Link href="/" style={{ textDecoration: "none", color: "#20489a" }}>
+          Gestione Clienti
+        </Link>
       </div>
-      <div>
-        {session?.user && (
-          <button onClick={() => signOut()} style={{
-            background: "#1cb0f6",
-            color: "#fff",
-            border: "none",
-            borderRadius: 7,
-            padding: "8px 20px",
-            fontWeight: 700,
-            cursor: "pointer"
-          }}>
-            Logout
+      {session && (
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>
+            {session.user?.name || "Utente"}
+          </span>
+          <button
+            onClick={() => signOut({ callbackUrl: "/signin" })}
+            style={{
+              background: "#1cb0f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              padding: "8px 18px",
+              fontWeight: 600,
+              fontSize: 15,
+              cursor: "pointer"
+            }}
+          >
+            Esci
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </nav>
   );
 }

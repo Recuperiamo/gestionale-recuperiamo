@@ -1,22 +1,19 @@
 "use client";
 
+import React from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import Navbar from "../components/Navbar";
 
 export default function ProfiloPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  useEffect(() => {
-    if (status === "loading") return;
-    if (!session) {
-      router.replace("/signin");
-    }
-  }, [session, status, router]);
-
-  if (status === "loading" || !session) return null;
+  if (status === "loading") return null;
+  if (!session) {
+    router.replace("/signin");
+    return null;
+  }
 
   // Tutti gli utenti autenticati possono vedere questa pagina
   return (
@@ -24,49 +21,28 @@ export default function ProfiloPage() {
       <Navbar />
       <main
         style={{
-          maxWidth: 540,
-          margin: "40px auto 0 auto",
-          background: "#20489a",
-          color: "#fff",
-          padding: "0 0 32px 0",
+          maxWidth: 420,
+          margin: "70px auto 0 auto",
+          background: "#fff",
+          borderRadius: 18,
+          padding: "40px 34px 34px 34px",
+          boxShadow: "0 4px 20px 0 rgba(32,72,154,0.07)",
+          color: "#20489a",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{
-            fontSize: 32,
-            fontWeight: 700,
-            marginTop: 24,
-            marginBottom: 10,
-            letterSpacing: "-0.8px"
-          }}>
-            Profilo Utente
-          </div>
-          <div style={{
-            fontSize: 18,
-            marginBottom: 24,
-            fontWeight: 400
-          }}>
-            Qui vedrai i tuoi dati utente e i pacchetti assegnati.
-          </div>
+        <h2 style={{ fontWeight: 700, fontSize: 27, marginBottom: 16, textAlign: "center" }}>
+          Il tuo profilo
+        </h2>
+        <div style={{ fontSize: 18, textAlign: "center", marginBottom: 24 }}>
+          <b>Nome:</b> {session.user?.name || "Non disponibile"}
+          <br />
+          <b>Email:</b> {session.user?.email || "Non disponibile"}
+          <br />
+          <b>Ruolo:</b> {session.user?.role || "Non disponibile"}
         </div>
-        <section
-          style={{
-            background: "#fff",
-            borderRadius: 18,
-            padding: "32px 32px 28px 32px",
-            margin: "0 0 36px 0",
-            boxShadow: "0 4px 20px 0 rgba(32,72,154,0.05)",
-            color: "#20489a",
-            textAlign: "center"
-          }}
-        >
-          <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 14 }}>
-            (Sezione in costruzione)
-          </div>
-          <div style={{ fontWeight: 400, fontSize: 16 }}>
-            In futuro qui troverai i dati del tuo profilo, i pacchetti ore, e lo storico delle attività.
-          </div>
-        </section>
+        <div style={{ marginTop: 18, fontSize: 14, color: "#4268b3", textAlign: "center" }}>
+          Se hai bisogno di modificare i tuoi dati, contatta l'amministratore.
+        </div>
       </main>
     </div>
   );

@@ -778,5 +778,11 @@ Per dettagli e scenari di test manuale vedi `STANDARD_OPERATIVO.md`.
 - Dopo il login come admin, si accede alla Dashboard Admin (`/` - file: `app/page.js`).
 - In alto a destra compaiono i bottoni “Profilo” e “Gestione clienti” (quest’ultimo solo per admin).
 - “Gestione clienti” porta a `/clienti`.
+# README
 
+## Note importanti (ultimo aggiornamento: 2025-08-17 16:44 UTC+2)
+
+- In tutte le componenti React/JSX (in particolare nelle directory app/, app/components/ e simili) è necessario aggiungere sempre `import React from "react";` in testa ai file `.js` e `.jsx` per evitare errori "React is not defined", anche se usi Next.js 13+.
+- Nelle API route Next.js (cartella app/api/...), evitare tipizzazione TypeScript inline nei parametri delle funzioni callback. Se necessario, usare `// @ts-nocheck` in testa al file per evitare warning/errori TS non risolvibili.
+- Consultare LOG_OPERATIVO.md per la cronologia dettagliata delle modifiche strutturali.
 ...
