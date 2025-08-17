@@ -1,4 +1,8 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### [2025-08-17 22:20 UTC+2]
+- Debug PATCH/DELETE clienti: confermata soluzione parsing JSON robusto per compatibilità Next.js/Windows; CRUD clienti operativo e testato via API con curl (POST, GET, PATCH, DELETE).
+### [2025-08-17 21:55 UTC+2]
+- Ripristinata cartella prisma e schema.prisma; generato con successo Prisma Client; creata struttura src/lib/prisma.ts e src/app/api/clienti/route.ts per CRUD reale clienti.
 ### [2025-08-17 21:32 UTC+2]
 - Documentata fase scenario test manuale milestone “Collegamento clienti-pacchetti ore” (stato: placeholder).
 - Tutti gli step previsti sono stati eseguiti; le API e la UI restituiscono correttamente messaggi placeholder.

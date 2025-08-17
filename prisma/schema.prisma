@@ -1,4 +1,4 @@
-// schema.prisma aggiornato – milestone 3 (Clienti)
+// schema.prisma milestone CRUD reale Clienti & Pacchetti
 
 generator client {
   provider = "prisma-client-js"
@@ -12,37 +12,36 @@ datasource db {
 // === Modelli NextAuth + Ruoli già presenti ===
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  password  String
-  roleId    Int
-  role      Role     @relation(fields: [roleId], references: [id])
-  // ...altri campi NextAuth
-  accounts  Account[]
-  sessions  Session[]
+  id       Int       @id @default(autoincrement())
+  email    String    @unique
+  name     String?
+  password String
+  roleId   Int
+  role     Role      @relation(fields: [roleId], references: [id])
+  accounts Account[]
+  sessions Session[]
 }
 
 model Role {
-  id    Int     @id @default(autoincrement())
-  name  String  @unique
+  id    Int    @id @default(autoincrement())
+  name  String @unique
   users User[]
 }
 
 model Account {
-  id                 Int       @id @default(autoincrement())
-  userId             Int
-  user               User      @relation(fields: [userId], references: [id])
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                Int     @id @default(autoincrement())
+  userId            Int
+  user              User    @relation(fields: [userId], references: [id])
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   @@unique([provider, providerAccountId])
 }
@@ -66,45 +65,30 @@ model VerificationToken {
 // === CLIENT: modello cliente milestone 3 ===
 
 model Client {
-  id             Int     @id @default(autoincrement())
-  nomeReferente  String
-  email          String
-  telefono       String? 
-  indirizzo      String? 
-  codiceFiscale  String? @unique
-  partitaIva     String? @unique
-  note           String? 
-
-  @@index([email])
-
-  // ... [modelli già presenti sopra] ...
-
-model Client {
-  id             Int             @id @default(autoincrement())
-  nomeReferente  String
-  email          String
-  telefono       String?
-  indirizzo      String?
-  codiceFiscale  String?         @unique
-  partitaIva     String?         @unique
-  note           String?
-  pacchetti      PacchettoOre[]  // <--- Relazione 1:N
+  id            Int            @id @default(autoincrement())
+  nomeReferente String
+  email         String
+  telefono      String?
+  indirizzo     String?
+  codiceFiscale String?        @unique
+  partitaIva    String?        @unique
+  note          String?
+  pacchetti     PacchettoOre[] // Relazione 1:N
 
   @@index([email])
 }
 
 model PacchettoOre {
-  id            Int      @id @default(autoincrement())
-  clienteId     Int
-  cliente       Client   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  descrizione   String
-  oreAcquistate Int
-  oreResidue    Int
+  id              Int       @id @default(autoincrement())
+  clienteId       Int
+  cliente         Client    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  descrizione     String
+  oreAcquistate   Int
+  oreResidue      Int
   dataAttivazione DateTime
   dataScadenza    DateTime?
-  stato         String   // es: 'attivo', 'esaurito', 'scaduto'
-  note          String?
+  stato           String // es: 'attivo', 'esaurito', 'scaduto'
+  note            String?
 
   @@index([clienteId])
-}
 }
