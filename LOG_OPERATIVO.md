@@ -1,5 +1,10 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-17 11:08 UTC+2
 
+- Aggiornata la policy di confronto struttura reale vs architettura ideale: ora è obbligatorio verificare l’esistenza di file già presenti (anche con estensioni diverse, esempio .js/.jsx) prima di proporre o creare nuovi file, per evitare duplicati o conflitti.  
+- Segnalazione obbligatoria in LOG_OPERATIVO.md di ogni anomalia, rischio di duplicato o esigenza di refactor.  
+- Scenario test manuale integrato: va verificata anche l’assenza di duplicati di file/componenti chiave prima del rilascio di nuove funzionalità.
+- File coinvolti: README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md
 ## 2025-08-17 10:54 UTC+2
 
 - Inserita e resa vincolante la policy di confronto tra struttura reale e architettura ideale (vedi README.md e STANDARD_OPERATIVO.md): ogni modifica a cartelle/componenti deve essere confrontata con ARCHITETTURA_CARTELLE_BOZZA.md e ogni scostamento va motivato nel log. Aggiornata la documentazione per facilitare onboarding e coerenza progettuale di lungo periodo.

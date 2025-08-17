@@ -606,3 +606,12 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Questo processo va seguito e documentato per garantire coerenza, scalabilità e onboarding efficace.
 
 ...
+
+## Policy verifica file esistenti prima di nuove creazioni
+
+**OBBLIGATORIO – Evitare duplicati e conflitti:**
+- Prima di proporre o creare un nuovo file (soprattutto componenti, pagine, utility):
+  - Verifica sempre se esiste già un file con lo stesso nome (anche con estensione diversa come .js/.jsx/.ts/.tsx) nella stessa directory o in directory affini.
+  - In caso di dubbio, chiedi sempre conferma all’autore o esegui una ricerca nell’intera repository.
+  - Segnala e documenta nel LOG_OPERATIVO.md qualsiasi anomalia, rischio di duplicazione o necessità di refactor.
+  - Integra sempre la verifica di eventuali file duplicati negli scenari di test manuale.
