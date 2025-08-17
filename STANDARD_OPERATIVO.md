@@ -615,3 +615,55 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
   - In caso di dubbio, chiedi sempre conferma all’autore o esegui una ricerca nell’intera repository.
   - Segnala e documenta nel LOG_OPERATIVO.md qualsiasi anomalia, rischio di duplicazione o necessità di refactor.
   - Integra sempre la verifica di eventuali file duplicati negli scenari di test manuale.
+
+  # STANDARD OPERATIVO
+
+## Regole vincolanti
+
+1. **Controllo file duplicati/cloni**
+   - Prima di proporre o creare nuovi file/componenti, controlla SEMPRE se esiste già un file con nome simile (anche con estensione diversa) nella repo o nei path coinvolti.
+   - Prima di ogni chiusura milestone, esegui il seguente comando PowerShell dalla root del progetto per individuare file duplicati (stesso nome, qualsiasi estensione/directory):
+
+     ```powershell
+     Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+     ```
+
+   - Se il risultato è vuoto, annota nel LOG_OPERATIVO.md che la repo è pulita.
+   - Se vengono elencati file, individua le posizioni con:
+     ```powershell
+     Get-ChildItem -Recurse -File | Where-Object { $_.Name -eq "NOME_FILE_DUPLICATO" }
+     ```
+     Valuta se sono realmente cloni/doppioni da eliminare/merge/refactor. Documenta SEMPRE nel LOG_OPERATIVO.md e risolvi prima di chiudere la milestone.
+
+2. **Aggiornamento file strutturali**
+   - Dopo ogni modifica strutturale (nuove policy, nuova milestone, refactor fondamentali, ecc.), aggiorna sempre sia STANDARD_OPERATIVO.md che README.md e segnala in LOG_OPERATIVO.md.
+
+3. **Scenario test manuale controllo duplicati**
+   - Esegui il comando PowerShell sopra riportato.
+   - Se non esistono duplicati, annota il controllo in LOG_OPERATIVO.md.
+   - Se esistono, documenta ogni caso (nome file, percorso, motivo della duplicazione), valuta e risolvi prima di chiudere la milestone.
+
+4. **Gestione orari log**
+   - Tutte le voci del LOG_OPERATIVO.md devono riportare data e ora (UTC+2), essere coerenti e progressivi.
+   - Alla chiusura milestone, controllare la coerenza dei timestamp e creare subito una nuova milestone.
+
+5. **Push file**
+   - Dopo ogni aggiornamento ai file strutturali o log, eseguire sempre il push completo (vedi scenari test/manuali).
+
+---
+
+## Esempio di annotazione LOG_OPERATIVO.md
+
+```
+## 2025-08-17 11:20 UTC+2
+- Eseguito controllo duplicati file con PowerShell: Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+- Nessun file duplicato trovato nell’intero progetto. Struttura pulita.
+```
+
+---
+
+## Altri scenari test/manuali
+
+- Dopo ogni modifica strutturale, verifica che nessun file chiave sia stato duplicato/spostato senza aggiornare le importazioni.
+- Aggiorna sempre README.md e LOG_OPERATIVO.md in caso di variazioni alle policy o alla struttura.
+

@@ -740,3 +740,25 @@ npm run dev
   - In caso di dubbio, chiedi sempre conferma all’autore o esegui una ricerca nell’intera repository.
   - Segnala e documenta nel LOG_OPERATIVO.md qualsiasi anomalia, rischio di duplicazione o necessità di refactor.
   - Integra sempre la verifica di eventuali file duplicati negli scenari di test manuale.
+
+  # gestionale-recuperiamo
+
+Gestionale per la gestione pacchetti ore clienti.
+
+## Regole operative fondamentali
+
+- Segui SEMPRE le regole vincolanti e gli scenari test manuali definiti in `STANDARD_OPERATIVO.md`.
+- Prima di proporre o aggiungere nuovi file/componenti, esegui SEMPRE una ricerca di possibili file già esistenti con nome simile (anche con estensione diversa) su tutta la repo.
+- **Prima di ogni chiusura milestone è OBBLIGATORIO eseguire il controllo file duplicati via PowerShell:**
+
+  ```powershell
+  Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+  ```
+  Se vengono rilevati file doppi, segnalarlo subito nel LOG_OPERATIVO.md e risolvere prima della chiusura milestone.
+
+- Annotare ogni controllo nel LOG_OPERATIVO.md con data, ora (UTC+2), comando usato ed esito.
+
+---
+
+Per dettagli e scenari di test manuale vedi `STANDARD_OPERATIVO.md`.
+

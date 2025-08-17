@@ -1,4 +1,14 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## 2025-08-17 11:18 UTC+2
+
+- Eseguito controllo file duplicati su tutta la repository tramite PowerShell:
+  `Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name`
+  Esito: nessun file con nome identico rilevato nell’albero del progetto.
+
+- Aggiornati README.md e STANDARD_OPERATIVO.md con la regola vincolante di controllo duplicati prima di ogni milestone e scenario test manuale associato.
+
+
 ## 2025-08-17 11:08 UTC+2
 
 - Aggiornata la policy di confronto struttura reale vs architettura ideale: ora è obbligatorio verificare l’esistenza di file già presenti (anche con estensioni diverse, esempio .js/.jsx) prima di proporre o creare nuovi file, per evitare duplicati o conflitti.  
