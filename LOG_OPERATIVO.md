@@ -1,5 +1,13 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-
+## 2025-08-17 15:47:00 UTC+2
+- Creata struttura cartelle e file per test ClientiForm:
+  - src/components/clienti/__tests__/ClientiForm.integration.test.jsx
+  - src/components/clienti/__tests__/validateClientiForm.test.js
+- Scritto dummy test in entrambi i file.
+- Creato/aggiornato babel.config.json per supporto JSX con @babel/preset-env e @babel/preset-react.
+- Installate dipendenze: @babel/preset-env, @babel/preset-react, @babel/core, babel-jest.
+- Sistemato errore React non definito in sample.test.js con import React.
+- Verificato successo di tutte le suite di test (`npm test`): 3 passed, 0 failed.
 ### 2025-08-17 15:21 UTC+2
 - Implementato ordinamento client-side sulla colonna “Nome referente” della tabella clienti (case-insensitive, con toggle A→Z, Z→A e reset).
 - Aggiornato il file `src/components/clienti/ClientiTable.jsx` per la gestione locale dello stato di ordinamento e l’UI.
