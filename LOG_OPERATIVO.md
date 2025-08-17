@@ -1,4 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## [2025-08-17 19:00:42 UTC+2]
+
+- Chiusura e verifica finale issue #20 (Implementazione CRUD clienti frontend):
+    - Completato e verificato: form clienti (validazione aggiornata), tabella CRUD, feedback utente, dettagli cliente.
+    - Eseguiti tutti gli scenari di test manuale previsti dalla issue, tutto OK.
+    - Pronto per merge/fase successiva.
+- Nessuna modifica strutturale richiesta in README.md e STANDARD_OPERATIVO.md in quanto la logica implementata è conforme agli standard già descritti.
 ## 2025-08-17 17:06:00
 
 - Avviata procedura di chiusura sessione come da checklist END_SESSION.md.
