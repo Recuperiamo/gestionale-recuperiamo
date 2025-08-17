@@ -883,3 +883,27 @@ Tutti i metodi restituiscono oggetti JSON.
 ## Aggiornamento scenario test/manuale/log
 
 Vedi anche `LOG_OPERATIVO.md` per storico operazioni, timestamp UTC+2 e dettagli evolutivi.
+
+## Gestione Pacchetti associati al Cliente
+
+- La vista dettaglio cliente (`ClienteDettaglioModal.jsx`) ora integra la sezione "Pacchetti associati" tramite il componente `PacchettiClienteList.jsx`.
+- La componente consente la visualizzazione, aggiunta, modifica e rimozione dei pacchetti collegati al cliente selezionato, interfacciandosi con le API già presenti.
+- Per modifiche future, estendere solo il nuovo componente o passare props aggiuntive tramite la modale.
+
+# Gestionale Pacchetti Ore
+
+...
+
+## Funzionalità principali
+
+- Gestione anagrafica clienti (crea, modifica, elimina)
+- Visualizzazione dettagli cliente in modale:
+  - La modale si apre solo quando un cliente è selezionato.
+  - La modale non mostra più schermate di caricamento inattese quando nessun cliente è selezionato.
+  - Chiusura modale tramite bottone o click sull’overlay.
+
+...
+
+## Standard operativo
+
+Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e log.

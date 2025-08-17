@@ -742,3 +742,23 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Se ci sono rischi di duplicati (es. file simili in JS/TS), segnalare.
 - Aggiornare README.md e questo file a ogni cambiamento strutturale o di scenario test.
 - Per la chiusura milestone, controllare coerenza e progressività dei timestamp nel log-operativo.
+
+## [2025-08-17 23:20 UTC+2] - Integrazione gestione pacchetti in dettaglio cliente
+
+- Creato componente `PacchettiClienteList.jsx` in `src/components/clienti/` per visualizzare e gestire i pacchetti associati ad un cliente, con funzioni CRUD e collegamento alle API esistenti.
+- Integrato il nuovo componente come sezione aggiuntiva all’interno di `ClienteDettaglioModal.jsx`.
+- Aggiornata la struttura della vista dettaglio cliente secondo le regole di separazione e riusabilità.
+- Effettuata verifica assenza di duplicati prima della creazione del nuovo file.
+- Aggiornata STANDARD_OPERATIVO.md e README.md dopo la modifica strutturale.
+
+# STANDARD OPERATIVO
+
+...
+
+## Regole vincolanti per le modali
+
+- **Rendering condizionale modali**: Ogni componente modale deve essere renderizzato solo se la variabile di stato che ne controlla i dati (`dettaglioCliente`, ecc.) è valorizzata (non null/undefined).  
+  Questo previene la comparsa di overlay/modal vuoti o in stato di caricamento quando nessun dato è selezionato dall’utente.
+- Ad ogni modifica strutturale che coinvolge la UI o la logica di apertura/chiusura modali, aggiornare il presente file e il log-operativo.
+
+...

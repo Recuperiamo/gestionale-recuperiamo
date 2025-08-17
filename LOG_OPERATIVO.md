@@ -1,4 +1,24 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## LOG OPERATIVO (UTC+2)
+
+### 2025-08-17 23:45 UTC+2
+- Corretto il rendering condizionale della modale dettaglio cliente in `app/clienti/page.js`: ora viene renderizzata solo se dettaglioCliente è valorizzato, evitando overlay/modal "Caricamento dati cliente..." quando nessun cliente è selezionato.
+- Test manuale eseguito: confermata l’apertura della modale solo su selezione cliente e la sua chiusura senza effetti collaterali.
+- Screenshot di conferma allegato dall’utente.
+- Pronto per aggiornamento file strutturali e push.
+
+### 2025-08-17 21:30 UTC+2
+- Inserito componente Modal generico in `src/components/Modal.jsx`, integrato con ClienteDettaglioModal e funzionante per overlay modale centrata e chiusura sia da bottone che da overlay.
+
+### 2025-08-17 18:05 UTC+2
+- Debug ciclo apertura/chiusura modale dettaglio cliente: identificato e risolto ReferenceError per componente Modal non definito.
+
+## [2025-08-17 23:20 UTC+2] - Integrazione gestione pacchetti nel dettaglio cliente
+- Creato: src/components/clienti/PacchettiClienteList.jsx (CRUD pacchetti associati a cliente)
+- Modificato: src/components/clienti/ClienteDettaglioModal.jsx (aggiunta sezione pacchetti)
+- Aggiornato: STANDARD_OPERATIVO.md e README.md (documentazione nuove regole e struttura UI)
+
 ### [UTC+2 2025-08-17 23:00]
 - Completato test manuale CRUD API pacchetti (GET, POST, PATCH, DELETE) con dati validi e invalidi
 - Verifica e correzione struttura: solo JS puro in path API/lib, nessun errore di build, risposta conforme a schema Prisma
