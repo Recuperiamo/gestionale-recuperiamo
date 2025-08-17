@@ -1,5 +1,28 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## Milestone 3 – Gestione anagrafica clienti
 
+---
+
+**2025-08-17 03:22:33 UTC+2** – Avvio milestone 3  
+- Creata e documentata la milestone “Gestione anagrafica clienti” su GitHub.
+- Collegate le seguenti issue operative:
+    - [#19 Implementazione CRUD clienti backend (API/handler)](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/19)
+    - [#21 Collegamento clienti-pacchetti ore (relazione)](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/21)
+    - [#22 Test manuale CRUD clienti e relazioni](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/22)
+    - [#23 Aggiornamento doc e standard operativo](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/23)
+    - [#24 Review e chiusura milestone](https://github.com/Recuperiamo/gestionale-recuperiamo/issues/24)
+- Issue frontend CRUD clienti in attesa di creazione (da confermare/assegnare).
+
+**Scenario test manuale milestone 3:**  
+1. Testare operatività API CRUD clienti: inserimento, modifica, eliminazione, validazioni, errori.
+2. Eseguire test UI e collegamento relazionale clienti-pacchetti.
+3. Validare edge case e casi limite su CRUD e relazioni.
+4. Aggiornare e verificare coerenza documentazione (README, LOG_OPERATIVO, STANDARD_OPERATIVO).
+5. Validare chiusura milestone e log finale con timestamp coerenti.
+
+---
+
+> Prossimo step: apertura issue frontend CRUD clienti, avvio sviluppo backend, aggiornamento doc contestuale.
 ## 2025-08-17 03:21:00 (UTC+2)
 
 - Review e chiusura milestone 2 (autenticazione) completata.
