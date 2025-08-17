@@ -639,4 +639,27 @@ npm run dev
     ```
 
 ...
+# Funzionalità Ruoli e Protezione Accessi (2025-08-17)
+
+## Protezione dashboard
+- Solo utenti con ruolo `admin` possono accedere a `/` (dashboard).
+- Utenti autenticati ma non admin vengono reindirizzati su `/profilo` sia lato server (middleware.js) che lato client (React).
+
+## Pagina profilo
+- Pagina `/profilo` accessibile a tutti gli utenti autenticati.
+- Serve come landing page post-login per operatori/visualizzatori.
+
+## Navbar
+- Link “Dashboard” visibile solo ad admin.
+- Link “Profilo” visibile a tutti gli utenti autenticati.
+
+## Redirect post-login
+- Admin → `/`
+- Altri ruoli → `/profilo`
+
+## Scenario test manuale
+1. Login admin: atterra su `/`, vede link “Dashboard” e “Profilo”.
+2. Login operatore/visualizzatore: atterra su `/profilo`, NON vede “Dashboard”, vede solo “Profilo”.
+3. Forzare `/` con ruolo non admin: redirect su `/profilo`.
+4. Logout/login con ruolo diverso: comportamento coerente.
 ---

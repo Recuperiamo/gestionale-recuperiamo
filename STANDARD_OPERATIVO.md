@@ -525,5 +525,21 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
   ```
 
 ...
+# STANDARD_OPERATIVO.md (estratto aggiornato 2025-08-17)
 
+## Regole protezione accessi e ruoli
+
+- Tutti i controlli di accesso alle pagine sensibili (es: dashboard) devono essere implementati sia lato server (`middleware.js`) che lato client (nei componenti React).
+- Solo utenti con ruolo `admin` possono accedere a `/` (dashboard). Gli altri vengono reindirizzati a `/profilo`.
+- La pagina `/profilo` è accessibile a tutti gli utenti autenticati e rappresenta la landing page di default per operatori e visualizzatori.
+- Navbar: mostrare link “Dashboard” solo ad admin, “Profilo” a tutti.
+- Dopo login, admin viene reindirizzato a `/`, altri ruoli a `/profilo` (gestito nella callback redirect di NextAuth).
+- Ogni modifica strutturale deve essere riflessa in questo file, in README.md e nel log operativo.
+
+## Scenario test manuale (obbligatorio per ogni release)
+
+1. Login come admin → accesso a `/`, link “Dashboard” e “Profilo” visibili.
+2. Login come operatore/visualizzatore → redirect e accesso solo a `/profilo`, nessun link dashboard.
+3. Forzare `/` da browser con ruolo non admin → redirect su `/profilo`.
+4. Logout/login con altro ruolo → comportamento coerente e link corretti.
 ---
