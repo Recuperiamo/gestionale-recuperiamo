@@ -1,4 +1,28 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### [UTC+2 2025-08-17 23:00]
+- Completato test manuale CRUD API pacchetti (GET, POST, PATCH, DELETE) con dati validi e invalidi
+- Verifica e correzione struttura: solo JS puro in path API/lib, nessun errore di build, risposta conforme a schema Prisma
+- Scenario test manuale CRUD aggiunto per README.md e STANDARD_OPERATIVO.md
+- Da aggiornare: README.md (endpoint API e scenario CRUD), STANDARD_OPERATIVO.md (struttura file e test)
+- Pronto per push di tutti i file coinvolti
+
+---
+
+#### SCENARIO TEST MANUALE CRUD PACCHETTI
+
+GET
+curl http://localhost:3000/api/pacchetti
+
+POST
+curl -X POST http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"clienteId\":35,\"descrizione\":\"Pacchetto prova\",\"oreAcquistate\":10,\"oreResidue\":10,\"dataAttivazione\":\"2025-08-17T21:00:00.000Z\",\"stato\":\"attivo\"}"
+
+PATCH
+curl -X PATCH http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"id\":1,\"descrizione\":\"Pacchetto modificato\",\"oreResidue\":5}"
+
+DELETE
+curl -X DELETE http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"id\":1}"
+### [2025-08-17 22:25 UTC+2]
+- Implementata CRUD reale pacchetti: creata API RESTful src/app/api/pacchetti/route.ts con parsing JSON robusto, testabile via curl su Windows (GET, POST, PATCH, DELETE).
 ### [2025-08-17 22:20 UTC+2]
 - Debug PATCH/DELETE clienti: confermata soluzione parsing JSON robusto per compatibilità Next.js/Windows; CRUD clienti operativo e testato via API con curl (POST, GET, PATCH, DELETE).
 ### [2025-08-17 21:55 UTC+2]
