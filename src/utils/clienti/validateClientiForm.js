@@ -8,9 +8,9 @@ export function validateClientiForm(form) {
   if (
     !form.email ||
     !form.email.trim() ||
-    !/^[\w-.]+@[\w-]+\.[a-z]{2,7}$/i.test(form.email)
+    !/^[\w-.]+@[\w-]+\.(it|com|net)$/i.test(form.email)
   )
-    errs.push("Formato email non valido.");
+    errs.push("Formato email non valido (sono ammessi solo domini .it, .com, .net).");
   if (
     form.telefono &&
     (!/^\d+$/.test(form.telefono) || /\D/.test(form.telefono))

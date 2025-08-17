@@ -76,4 +76,35 @@ model Client {
   note           String? 
 
   @@index([email])
+
+  // ... [modelli già presenti sopra] ...
+
+model Client {
+  id             Int             @id @default(autoincrement())
+  nomeReferente  String
+  email          String
+  telefono       String?
+  indirizzo      String?
+  codiceFiscale  String?         @unique
+  partitaIva     String?         @unique
+  note           String?
+  pacchetti      PacchettoOre[]  // <--- Relazione 1:N
+
+  @@index([email])
+}
+
+model PacchettoOre {
+  id            Int      @id @default(autoincrement())
+  clienteId     Int
+  cliente       Client   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  descrizione   String
+  oreAcquistate Int
+  oreResidue    Int
+  dataAttivazione DateTime
+  dataScadenza    DateTime?
+  stato         String   // es: 'attivo', 'esaurito', 'scaduto'
+  note          String?
+
+  @@index([clienteId])
+}
 }

@@ -48,7 +48,7 @@ export default function Alert({ message, type = "error", onClose }) {
           <path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
-      <style jsx>{`
+      <style>{`
         .animate-alert-slide {
           animation: alert-slide-in 0.22s cubic-bezier(0.4,0,0.2,1);
         }
