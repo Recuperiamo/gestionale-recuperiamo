@@ -718,3 +718,16 @@ npm run dev
 3. Recupera dettaglio (GET /:id).
 4. Modifica cliente (PUT) e verifica dettaglio.
 5. Elimina cliente (DELETE) e verifica dettaglio (404).
+
+## Policy confronto struttura reale vs. architettura ideale
+
+**IMPORTANTE – Ogni volta che si creano/modificano cartelle e componenti:**
+
+- Confronta SEMPRE la struttura reale della repository con il file `ARCHITETTURA_CARTELLE_BOZZA.md` (che rappresenta la visione architetturale ideale del progetto).
+- Ogni differenza, miglioramento, refactor o scostamento rispetto al modello ideale deve essere documentato in `LOG_OPERATIVO.md`, spiegando motivazione e impatto.
+- Se la modifica è strutturale, aggiorna anche `README.md` e `STANDARD_OPERATIVO.md`.
+- In caso di dubbio, fornisci a Copilot il file architetturale, oppure Copilot confronterà autonomamente la repo con la bozza.
+- **Non aggiornare la bozza architetturale per micro-evoluzioni:** aggiornarla solo in caso di revisione strategica o cambi di roadmap.
+- Questo confronto facilita la coerenza di lungo periodo e l’onboarding di nuovi sviluppatori.
+
+...

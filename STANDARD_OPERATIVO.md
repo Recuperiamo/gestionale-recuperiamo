@@ -592,3 +592,17 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 ## Endpoints attuali (ver. 2025-08-17 05:10 UTC+2)
 - app/api/clienti/route.js (CRUD lista)
 - app/api/clienti/[id]/route.js (dettaglio singolo cliente)
+
+
+## Policy confronto struttura reale vs. architettura ideale
+
+**OBBLIGATORIO – Ad ogni modifica strutturale:**
+
+- Confronta sempre la struttura attuale del repository con il file `ARCHITETTURA_CARTELLE_BOZZA.md` (modello architetturale ideale).
+- Qualsiasi variazione, refactor, nuova cartella o file che si discosti dal modello ideale va spiegata in `LOG_OPERATIVO.md` (motivazione e impatto).
+- Se la variazione è strutturale, aggiorna anche `README.md` e il presente file.
+- In caso di dubbio, passa sempre il file architetturale a Copilot per un confronto, oppure Copilot confronterà autonomamente la repo.
+- **La bozza architetturale NON va aggiornata per ogni micro-evoluzione:** solo in caso di cambi di roadmap o revisione strategica, aggiornala e incolla la versione precedente in fondo a `LOG_OPERATIVO.md` per storico.
+- Questo processo va seguito e documentato per garantire coerenza, scalabilità e onboarding efficace.
+
+...

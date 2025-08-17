@@ -1,4 +1,24 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## 2025-08-17 10:54 UTC+2
+
+- Inserita e resa vincolante la policy di confronto tra struttura reale e architettura ideale (vedi README.md e STANDARD_OPERATIVO.md): ogni modifica a cartelle/componenti deve essere confrontata con ARCHITETTURA_CARTELLE_BOZZA.md e ogni scostamento va motivato nel log. Aggiornata la documentazione per facilitare onboarding e coerenza progettuale di lungo periodo.
+- File coinvolti: README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md
+- Scenario Test:
+    1. Crea/muovi/aggiorna cartelle o componenti.
+    2. Confronta la struttura reale con ARCHITETTURA_CARTELLE_BOZZA.md.
+    3. Se c’è una differenza, documentala in LOG_OPERATIVO.md (e aggiorna README/standard se impatta la struttura).
+    4. Verifica che la nuova sezione sia visibile ed evidenziata sia in README.md che in STANDARD_OPERATIVO.md.
+
+2025-08-17 05:19 (UTC+2)
+
+- 2025-08-17 05:19 (UTC+2) Verifica finale scenario test manuale e deliverable issue #19: tutti i punti (CRUD, validazioni, errori, documentazione, coerenza dati) risultano completati e testati. Preparato messaggio di chiusura e pronta la milestone per essere archiviata.
+- 2025-08-17 05:17 (UTC+2) Ricevuta conferma test manuale: endpoint dettaglio GET /api/clienti/:id funzionante secondo scenario proposto. Pronto per chiusura milestone e controllo finale coerenza log/timestamp.
+- 2025-08-17 05:15 (UTC+2) Revisione orari log-operativo su richiesta, allineamento orario presentazione log; conferma milestone dalle 04:56, verifica contenuti e formato.
+- 2025-08-17 05:11 (UTC+2) Aggiornamento file strutturali (README.md, STANDARD_OPERATIVO.md), log-operativo e [id]/route.js con nuova implementazione endpoint dettaglio clienti. Forniti comandi git per commit/push selettivo e totale.
+- 2025-08-17 04:58 (UTC+2) Analisi file route.js principale di lista clienti, identificata logica corretta con PrismaClient, proposta versione endpoint dettaglio coerente, scenario test manuale dettagliato.
+- 2025-08-17 04:56 (UTC+2) Discussione su errore "Can't resolve '../_lib/data'": evidenziata necessità di allineare logica dati al backend reale (Prisma), richiesta conferma struttura dati, impostazione soluzione definitiva.
+
 2025-08-17 05:15 (UTC+2)
 
 - 2025-08-17 05:15 (UTC+2) Revisione orari log-operativo su richiesta, allineamento orario presentazione log; conferma milestone dalle 04:56, verifica contenuti e formato.
