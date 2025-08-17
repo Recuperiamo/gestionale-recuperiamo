@@ -1,4 +1,11 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+
+## 2025-08-17 16:09:00 UTC+2
+- Aggiunto bottone “Gestione clienti” accanto a “Profilo” nella Dashboard Admin (file: `app/page.js`), visibile solo per admin.
+- Aggiornata nomenclatura a “Dashboard Admin” in titoli e documentazione.
+- Aggiornati STANDARD_OPERATIVO.md e README.md per riflettere la modifica e la posizione dei bottoni.
+
 ## 2025-08-17 15:47:00 UTC+2
 - Creata struttura cartelle e file per test ClientiForm:
   - src/components/clienti/__tests__/ClientiForm.integration.test.jsx

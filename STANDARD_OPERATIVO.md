@@ -667,3 +667,12 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Dopo ogni modifica strutturale, verifica che nessun file chiave sia stato duplicato/spostato senza aggiornare le importazioni.
 - Aggiorna sempre README.md e LOG_OPERATIVO.md in caso di variazioni alle policy o alla struttura.
 
+...
+### Accesso alla gestione clienti dalla Dashboard Admin
+
+- La **Dashboard Admin** è la home privata dopo il login admin (file: `app/page.js`).
+- Accanto al pulsante “Profilo” in alto a destra è presente il bottone “Gestione clienti”, visibile solo per utenti con ruolo `admin`.
+- Il bottone porta a `/clienti`.
+- La protezione della rotta `/clienti` è già garantita lato backend.
+
+...

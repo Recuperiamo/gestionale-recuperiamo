@@ -771,3 +771,12 @@ Per dettagli e scenari di test manuale vedi `STANDARD_OPERATIVO.md`.
 - **Tabella clienti ora ordinabile per “Nome referente”** (clic sull’intestazione: A→Z, Z→A, reset).
 - Ruoli utenti e permessi.
 - Dashboard e reportistica.
+
+...
+### Dashboard Admin
+
+- Dopo il login come admin, si accede alla Dashboard Admin (`/` - file: `app/page.js`).
+- In alto a destra compaiono i bottoni “Profilo” e “Gestione clienti” (quest’ultimo solo per admin).
+- “Gestione clienti” porta a `/clienti`.
+
+...

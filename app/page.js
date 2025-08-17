@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "./components/Navbar";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -25,6 +26,53 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#20489a" }}>
       <Navbar />
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: "12px",
+          maxWidth: 540,
+          margin: "0 auto",
+          padding: "24px 0 0 0"
+        }}
+      >
+        {/* Bottone gestione clienti visibile solo per admin */}
+        {session.user?.role === "admin" && (
+          <Link
+            href="/clienti"
+            style={{
+              background: "#1cb0f6",
+              color: "#fff",
+              padding: "9px 22px",
+              borderRadius: "6px",
+              fontWeight: 600,
+              fontSize: 16,
+              textDecoration: "none",
+              transition: "background 0.2s"
+            }}
+            onMouseOver={e => (e.currentTarget.style.background = "#197dbb")}
+            onMouseOut={e => (e.currentTarget.style.background = "#1cb0f6")}
+          >
+            Gestione clienti
+          </Link>
+        )}
+        <Link
+          href="/profilo"
+          style={{
+            background: "#fff",
+            color: "#20489a",
+            padding: "9px 22px",
+            borderRadius: "6px",
+            fontWeight: 600,
+            fontSize: 16,
+            textDecoration: "none",
+            border: "1.5px solid #20489a"
+          }}
+        >
+          Profilo
+        </Link>
+      </div>
       <main
         style={{
           maxWidth: 540,
@@ -42,7 +90,7 @@ export default function DashboardPage() {
             marginBottom: 10,
             letterSpacing: "-0.8px"
           }}>
-            Pannello Gestione Ore
+            Dashboard Admin
           </div>
           <div style={{
             fontSize: 18,
@@ -99,43 +147,31 @@ export default function DashboardPage() {
                 borderRadius: 7,
                 border: "1.5px solid #dbe4f1",
                 outline: "none",
-                marginRight: 4,
               }}
-              placeholder="Es. 50"
-              type="number"
-              name="ore"
+              placeholder="Email"
+              type="email"
+              name="email"
               autoComplete="off"
               disabled
             />
             <button
-              type="button"
+              type="submit"
               style={{
-                background: "#1cb0f6",
+                background: "#20489a",
                 color: "#fff",
-                fontWeight: 700,
-                fontSize: 16,
-                padding: "10px 22px",
                 border: "none",
                 borderRadius: 7,
-                cursor: "not-allowed",
-                opacity: 0.7
+                padding: "10px 18px",
+                fontWeight: 600,
+                fontSize: 15,
+                cursor: "not-allowed"
               }}
               disabled
             >
-              Crea Cliente
+              Aggiungi
             </button>
           </form>
         </section>
-        <div style={{ textAlign: "center", marginTop: 52 }}>
-          <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 8 }}>
-            Diagnosi in corso...
-          </div>
-          <div style={{ fontWeight: 400, fontSize: 16 }}>
-            Se vedi questo messaggio, la pagina base si è caricata correttamente.
-            <br />
-            Numero di clienti caricati in memoria: 0
-          </div>
-        </div>
       </main>
     </div>
   );
