@@ -762,3 +762,12 @@ Gestionale per la gestione pacchetti ore clienti.
 
 Per dettagli e scenari di test manuale vedi `STANDARD_OPERATIVO.md`.
 
+# Gestionale Recuperiamo
+
+## Funzionalità principali
+
+- Gestione anagrafica clienti: creazione, modifica, eliminazione, dettagli.
+- Gestione pacchetti ore, attività, fatturazione.
+- **Tabella clienti ora ordinabile per “Nome referente”** (clic sull’intestazione: A→Z, Z→A, reset).
+- Ruoli utenti e permessi.
+- Dashboard e reportistica.

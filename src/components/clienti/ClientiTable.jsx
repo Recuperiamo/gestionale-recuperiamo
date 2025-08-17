@@ -1,33 +1,74 @@
-import React from "react";
+import React, { useState } from "react";
 
 // Rileva se almeno una nota è compilata
 function hasAtLeastOneNote(clienti) {
   return clienti.some(c => c.note && c.note.trim() !== "");
 }
 
+function sortByNome(clienti, direction) {
+  // Ordinamento case-insensitive, fallback se vuoto
+  return [...clienti].sort((a, b) => {
+    const nomeA = (a.nomeReferente || a.nome || "").toLowerCase();
+    const nomeB = (b.nomeReferente || b.nome || "").toLowerCase();
+    if (nomeA < nomeB) return direction === "asc" ? -1 : 1;
+    if (nomeA > nomeB) return direction === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
 export default function ClientiTable({ clienti, onEdit, onDelete, onViewDetails, dettaglioCliente }) {
   const showNote = hasAtLeastOneNote(clienti);
+
+  // Stato ordinamento: null = nessun ordinamento, altrimenti {direction: "asc"|"desc"}
+  const [nomeSort, setNomeSort] = useState(null);
+
+  // Applica ordinamento se attivo
+  const clientiOrdinati = nomeSort
+    ? sortByNome(clienti, nomeSort)
+    : clienti;
+
+  // Gestione click su intestazione
+  const handleSortClick = () => {
+    if (!nomeSort) setNomeSort("asc");
+    else if (nomeSort === "asc") setNomeSort("desc");
+    else setNomeSort(null);
+  };
+
+  // Icona ordinamento
+  const renderSortIcon = () => {
+    if (nomeSort === "asc") return <span> ▲</span>;
+    if (nomeSort === "desc") return <span> ▼</span>;
+    return null;
+  };
 
   return (
     <table className="w-full border mt-4">
       <thead>
         <tr className="bg-gray-100">
           <th className="px-2 py-2 border">ID</th>
-          <th className="px-2 py-2 border">Nome referente</th>
+          <th
+            className="px-2 py-2 border cursor-pointer select-none"
+            onClick={handleSortClick}
+            title="Ordina per Nome referente"
+            style={{ userSelect: "none" }}
+          >
+            Nome referente
+            {renderSortIcon()}
+          </th>
           <th className="px-2 py-2 border">Email</th>
           {showNote && <th className="px-2 py-2 border">Note</th>}
           <th className="px-2 py-2 border">Azioni</th>
         </tr>
       </thead>
       <tbody>
-        {clienti.length === 0 ? (
+        {clientiOrdinati.length === 0 ? (
           <tr>
             <td colSpan={showNote ? 5 : 4} className="text-center py-4">
               Nessun cliente presente
             </td>
           </tr>
         ) : (
-          clienti.map((c) => (
+          clientiOrdinati.map((c) => (
             <tr key={c.id} className="align-top">
               <td className="border px-2 py-3">{c.id}</td>
               <td className="border px-2 py-3">{c.nomeReferente || c.nome || ""}</td>

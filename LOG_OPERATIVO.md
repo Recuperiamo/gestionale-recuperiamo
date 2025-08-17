@@ -1,5 +1,10 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### 2025-08-17 15:21 UTC+2
+- Implementato ordinamento client-side sulla colonna “Nome referente” della tabella clienti (case-insensitive, con toggle A→Z, Z→A e reset).
+- Aggiornato il file `src/components/clienti/ClientiTable.jsx` per la gestione locale dello stato di ordinamento e l’UI.
+- Aggiornato README.md per segnalare la funzione di ordinamento nella tabella clienti.
+- Scenario test manuale documentato in chat.
 ## 2025-08-17 14:53 UTC+2
 - Fix: Corretto warning ESLint in not-found/page.js (uso di <Link> Next.js invece di <a>).
 - Fix: Corretto errore di sintassi nella pagina not-found causato da sostituzione errata <a>/<Link>.
