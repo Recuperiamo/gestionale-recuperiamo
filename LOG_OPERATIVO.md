@@ -1,5 +1,23 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### 2025-08-17 02:22:00 (UTC+2)
+- **Apertura lavorazione issue #15 – Gestione ruoli e propagazione permessi in sessione (https://github.com/Recuperiamo/gestionale-recuperiamo/issues/15)**
+- Obiettivi:
+    - Ruoli utente gestiti in schema Prisma (admin, operatore, visualizzatore) e propagati in sessione NextAuth.
+    - Middleware/guardie di accesso per limitare le route secondo ruolo.
+    - Visualizzazione ruolo in dashboard.
+    - Aggiornamento README.md e LOG_OPERATIVO.md.
+- Scenario test manuale (inizio lavorazione):
+    1. Login con utente admin: accesso pieno a tutte le aree riservate.
+    2. Login con operatore/visualizzatore: verifica limiti di accesso e visibilità.
+    3. Dashboard mostra ruolo corretto.
+    4. Aggiorna doc e log con timestamp.
+- Prossimi step: analisi stato attuale propagazione ruoli, verifica schema Prisma, pianificazione implementazione middleware.
+### 2025-08-17 02:10:00 (UTC+2)
+- Review finale milestone NextAuth.js (issue #14): confermati login/logout funzionanti, sessione persistente, callback JWT/session attive e redirect post-login.
+- Controllo coerenza e progressività dei timestamp su LOG_OPERATIVO.md: tutti OK.
+- Documentazione e log allineati.
+- Pronto per chiusura milestone NextAuth.js e apertura milestone successiva.
 ---
 
 ### 2025-08-17 02:05:15 (UTC+2)
