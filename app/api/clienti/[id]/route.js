@@ -1,5 +1,4 @@
-// API dettaglio cliente: GET, PUT, DELETE (da popolare con logica reale)
-// Puoi includere l'array pacchetti associati in GET con Prisma include: { pacchetti: true }
+// API dettaglio cliente: GET, PUT, DELETE placeholder
 export async function GET(req) {
   return new Response(JSON.stringify({ message: "GET dettaglio cliente - da implementare" }), { status: 200 });
 }

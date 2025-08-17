@@ -786,3 +786,22 @@ Per dettagli e scenari di test manuale vedi `STANDARD_OPERATIVO.md`.
 - Nelle API route Next.js (cartella app/api/...), evitare tipizzazione TypeScript inline nei parametri delle funzioni callback. Se necessario, usare `// @ts-nocheck` in testa al file per evitare warning/errori TS non risolvibili.
 - Consultare LOG_OPERATIVO.md per la cronologia dettagliata delle modifiche strutturali.
 ...
+# ... [contenuto precedente] ...
+
+## Struttura milestone “Collegamento clienti-pacchetti ore” (2025-08-17)
+
+- Nuovi modelli:
+  - `PacchettoOre` (relazione 1:N verso `Client`, onDelete: Cascade)
+- Nuove API:
+  - CRUD Pacchetti Ore: `app/api/pacchetti/route.js`, `app/api/pacchetti/[id]/route.js`
+  - Dettaglio cliente (inclusione pacchetti): `app/api/clienti/[id]/route.js`
+- Nuovi componenti React:
+  - `src/components/pacchetti/PacchettiList.jsx`
+  - `src/components/pacchetti/PacchettoForm.jsx`
+- Scenario test manuale:
+  1. Creazione cliente
+  2. Creazione pacchetto ore associato (API)
+  3. Recupero pacchetti per cliente
+  4. Visualizzazione in UI
+  5. Eliminazione cliente e verifica cascade delete pacchetti
+  6. Casi limite (cliente senza pacchetti, dati non validi, update)

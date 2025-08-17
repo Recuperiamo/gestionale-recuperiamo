@@ -1,4 +1,4 @@
-// API route per operazioni su singolo pacchetto ore (dettaglio, update, delete)
+// API per dettaglio, update, delete singolo pacchetto ore - placeholder
 export async function GET(req) {
   return new Response(JSON.stringify({ message: "GET dettaglio pacchetto ore - da implementare" }), { status: 200 });
 }

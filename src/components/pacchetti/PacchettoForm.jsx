@@ -1,13 +1,9 @@
-// API dettaglio cliente: GET, PUT, DELETE (da popolare con logica reale)
-// Puoi includere l'array pacchetti associati in GET con Prisma include: { pacchetti: true }
-export async function GET(req) {
-  return new Response(JSON.stringify({ message: "GET dettaglio cliente - da implementare" }), { status: 200 });
-}
-
-export async function PUT(req) {
-  return new Response(JSON.stringify({ message: "PUT dettaglio cliente - da implementare" }), { status: 200 });
-}
-
-export async function DELETE(req) {
-  return new Response(JSON.stringify({ message: "DELETE dettaglio cliente - da implementare" }), { status: 200 });
-}
+import React from "react";
+const PacchettoForm = () => {
+  return (
+    <div>
+      <h4>Form Pacchetto Ore - da implementare</h4>
+    </div>
+  );
+};
+export default PacchettoForm;

@@ -685,3 +685,13 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - La protezione della rotta `/clienti` è già garantita lato backend.
 
 ...
+
+# ... [contenuto precedente] ...
+
+## Regole milestone “Collegamento clienti-pacchetti ore” (2025-08-17)
+
+- Ogni pacchetto ore è associato a UN solo cliente (`clienteId`), ogni cliente può avere N pacchetti.
+- Eliminazione di un cliente comporta eliminazione automatica dei pacchetti associati (cascade).
+- Tutti i nuovi file/feature devono essere tracciati nel LOG_OPERATIVO.md con orario UTC+2 e scenario test.
+- Ogni modifica strutturale prevede aggiornamento contestuale di README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
+- Non sono ammessi duplicati di componenti, API o modelli: verifica preventiva obbligatoria.

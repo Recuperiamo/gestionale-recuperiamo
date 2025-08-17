@@ -1,5 +1,16 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+[2025-08-17 21:13 UTC+2]
+- Creata struttura e file placeholder per milestone “Collegamento clienti-pacchetti ore”:
+  - Cartelle e file: app/api/pacchetti/route.js, app/api/pacchetti/[id]/route.js, src/components/pacchetti/PacchettiList.jsx, src/components/pacchetti/PacchettoForm.jsx, app/api/clienti/[id]/route.js
+- Aggiornato schema.prisma con modello PacchettoOre e relazione 1:N verso Client (onDelete: Cascade).
+- Completato scenario test manuale per placeholder e struttura (con verifica presenza file, risposta API, rendering componenti).
+- Aggiornato README.md e STANDARD_OPERATIVO.md con nuova struttura, scenario test, regole relazione/cascade.
+- Pronti per implementazione logica CRUD reale.
+- Tutti i file nuovi e modificati sono tracciati e pronti per il commit/push.
 
+### [2025-08-17 20:45 UTC+2]
+- Proposta tecnica accettata e pianificazione milestone: aggiunta modello PacchettoOre, API CRUD, integrazione UI, aggiornamento documentazione.
+- Forniti comandi per creazione cartelle/file vuoti con placeholder secondo struttura milestone.
 ## [2025-08-17 19:00:42 UTC+2]
 
 - Chiusura e verifica finale issue #20 (Implementazione CRUD clienti frontend):

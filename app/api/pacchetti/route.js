@@ -1,5 +1,4 @@
-// API route principale per CRUD pacchetti ore (bozza vuota)
-// Da completare con logica POST, GET, PUT, DELETE
+// API principale per pacchetti ore - CRUD placeholder
 export async function GET(req) {
   return new Response(JSON.stringify({ message: "GET pacchetti ore - da implementare" }), { status: 200 });
 }
