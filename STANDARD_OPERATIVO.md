@@ -543,3 +543,37 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 3. Forzare `/` da browser con ruolo non admin → redirect su `/profilo`.
 4. Logout/login con altro ruolo → comportamento coerente e link corretti.
 ---
+
+# STANDARD OPERATIVO – Milestone 3 (Clienti)
+
+## Modello dati clienti – Regole obbligatorie
+
+### Campi obbligatori
+- `nome_referente`: obbligatorio, non vuoto
+- `email`: obbligatorio, non vuoto, formato valido
+
+### Campi opzionali
+- `telefono`: opzionale, formato base se presente
+- `indirizzo`: opzionale
+- `codice_fiscale`: opzionale, se presente dev'essere unico e valido (formato CF IT)
+- `partita_iva`: opzionale, se presente dev'essere unica e valida (formato PIVA IT)
+- `note`: opzionale, campo libero
+
+### Validazioni chiave
+- `nome_referente` e `email` devono essere sempre presenti e non vuoti.
+- Se forniti, `codice_fiscale` e/o `partita_iva` devono essere unici e rispettare il formato previsto.
+- Email deve rispettare il formato previsto.
+- Telefono, se presente, deve rispettare il formato base.
+
+### Edge-case da testare
+- Cliente solo con nome ed email (senza altri dati): deve funzionare.
+- Cliente con uno o entrambi tra CF e PIVA, formati validi e non duplicati.
+- Tentato inserimento con CF/PIVA già presenti (duplicati).
+- Inserimento con nome/email vuoti: errore.
+- Aggiornamento con tentativo di duplicare CF/PIVA.
+- Inserimento con tutti i campi opzionali riempiti.
+
+---
+
+## Scenario test manuale – CRUD clienti
+(Vedi README.md per dettagli e casi)

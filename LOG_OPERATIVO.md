@@ -1,4 +1,14 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+**2025-08-17 03:44:00 UTC+2** – Definizione schema dati clienti aggiornata (issue #19)
+- Aggiornata la struttura dati clienti:
+    - Campi obbligatori: solo `nome_referente` ed `email`
+    - Tutti gli altri campi opzionali, con validazione e unicità solo se forniti
+- Aggiornati README.md e STANDARD_OPERATIVO.md con la nuova struttura dati, regole di validazione e scenario test manuale aggiornato
+
+---
+
+> Prossimo step: implementazione modello dati nel backend e prime migration/schema.
 ## Milestone 3 – Gestione anagrafica clienti
 
 ---

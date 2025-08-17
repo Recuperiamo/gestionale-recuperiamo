@@ -663,3 +663,36 @@ npm run dev
 3. Forzare `/` con ruolo non admin: redirect su `/profilo`.
 4. Logout/login con ruolo diverso: comportamento coerente.
 ---
+# Gestionale Recuperiamo
+
+## Modello dati Clienti
+
+| Campo           | Tipo     | Obbligatorio | Validazione                | Note                                    |
+|-----------------|----------|--------------|----------------------------|-----------------------------------------|
+| id              | int/uuid | Sì (auto)    | Unico, autoincrement/uuid  | Gestito dal sistema                     |
+| nome_referente  | string   | Sì           | Non vuoto                  |                                         |
+| email           | string   | Sì           | Formato email, non vuoto   |                                         |
+| telefono        | string   | No           | Formato base               |                                         |
+| codice_fiscale  | string   | No           | Formato CF IT se presente  | Unicità se presente                     |
+| partita_iva     | string   | No           | Formato PIVA IT se presente| Unicità se presente                     |
+| indirizzo       | string   | No           |                            |                                         |
+| note            | string   | No           |                            | Campo libero, opzionale                 |
+
+### Validazioni e regole
+- `nome_referente` e `email` sono SEMPRE obbligatori e non possono essere vuoti.
+- Se forniti, `codice_fiscale` e/o `partita_iva` devono essere unici e validi nel formato.
+- Email: formato valido (es. regex).
+- Telefono: controllo base se fornito (es. solo cifre, lunghezza minima).
+
+---
+
+## Scenario test manuale CRUD clienti
+
+1. Inserire cliente con nome ed email validi: successo e presenza in lista.
+2. Inserire cliente senza nome o senza email: errore obbligatorietà.
+3. Inserire cliente con CF o PIVA già esistenti (se presenti): errore di duplicato.
+4. Inserire cliente con CF e/o PIVA non validi: errore di validazione formato.
+5. Aggiornare cliente modificando nome/email: successo.
+6. Eliminare cliente: non più presente in lista.
+7. Richiedere lista/dettaglio: dati sempre coerenti.
+8. Inserire cliente con tutti i campi opzionali riempiti: successo.
