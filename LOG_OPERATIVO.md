@@ -1,4 +1,40 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## Stato al 2025-08-17 13:11 UTC+2
+
+### Modifiche e attività svolte nella sessione
+
+- Refactor sicurezza NextAuth: separazione `authOptions.ts` e `route.ts` in `app/api/auth/[...nextauth]/`.
+- Correzione tipizzazione TypeScript per callback JWT/session NextAuth.
+- Build di produzione Next.js superata senza errori bloccanti.
+- Confermato funzionamento completo di login, sessione, redirect, gestione clienti (tabella, form, modali, alert).
+- Aggiornati tutti i file secondo le best practice Next.js 15+.
+- Commit e push di tutti i file modificati/aggiunti per confermare build stabile e chiusura milestone.
+- Test manuale completato con successo.
+
+### Pending/To Do
+
+- **Errore validazione “nome referente”**: persiste warning o errore su campo obbligatorio, come da screenshot utente (vedi ![image1](image1)). Da risolvere in prossima sessione.
+- **Pending patch ESLint**: warning Next.js su uso `<a>` invece di `<Link />` in `/app/not-found/page.js`. Patch pronta su richiesta.
+
+---
+
+## Scenario test manuale svolto
+
+1. Build (`npm run build`) completata senza errori bloccanti.
+2. Testate tutte le funzionalità: login/logout, operazioni clienti (CRUD), alert, redirect, gestione sessione e ruoli.
+3. Nessun errore di import, undefined o crash lato UI.
+4. Warning ESLint e validazione nome referente come unici pending.
+
+---
+
+## Prossimi step suggeriti
+
+- Correggere validazione “nome referente” nella form clienti.
+- Applicare patch ESLint sostituendo `<a>` con `<Link />` in `/app/not-found/page.js` per piena compliance Next.js.
+- Avviare nuova milestone per fase successiva dopo verifica log e timestamp.
+
+---
 Ultimo aggiornamento: 2025-08-17 12:54 UTC+2
 
 ---
