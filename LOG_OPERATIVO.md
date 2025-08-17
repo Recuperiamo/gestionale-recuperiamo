@@ -1,4 +1,15 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+## 2025-08-17 03:11:00 (UTC+2)
+
+- Completata implementazione issue #15: gestione ruoli con propagazione in sessione NextAuth, middleware di protezione, visualizzazione ruolo utente in dashboard.
+- Aggiornati README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md con nuove regole di accesso, scenario test manuale e timestamp.
+- Scenario test manuale eseguito:
+    1. Login admin: accesso a tutte le aree riservate, ruolo visibile in dashboard.
+    2. Login operatore/visualizzatore: accesso solo a /profilo, dashboard inaccessibile, ruolo correttamente visualizzato.
+    3. Forzatura dashboard con ruolo non admin: redirect su /profilo.
+    4. Documentazione e log aggiornati con timestamp coerenti.
+- Issue #15 chiusa dopo verifica dei deliverable e della documentazione.
 ## 2025-08-17 03:05:00 (UTC+2)
 
 - Implementata protezione dashboard (/) solo per admin tramite middleware.js e controllo lato client in app/page.js.
