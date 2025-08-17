@@ -32,6 +32,15 @@
 - In assenza di uno qualsiasi di questi elementi, il workflow CI/CD blocca la PR.
 
 ---
+# STANDARD_OPERATIVO
+
+## Regole vincolanti (aggiornamento: 2025-08-17 16:45 UTC+2)
+
+- Ogni file React/JSX in app/, app/components/ e percorsi analoghi DEVE avere `import React from "react";` in testa, anche se Next.js 13+ e anche se non esplicitamente richiesto.
+- Nelle API route Next.js (.ts/.js in app/api/...), NON usare tipizzazione TypeScript inline nei parametri delle callback. Se necessario, aggiungere `// @ts-nocheck` in testa al file per evitare warning/errori TS non risolvibili.
+- Dopo ogni modifica strutturale, aggiornare sempre sia LOG_OPERATIVO.md che README.md e STANDARD_OPERATIVO.md, segnalando in chat l'avvenuto aggiornamento.
+- [Altre regole preesistenti qui...]
+
 
 ## 1. Comandi
 
