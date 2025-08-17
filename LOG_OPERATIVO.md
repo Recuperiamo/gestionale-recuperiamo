@@ -1,6 +1,23 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
-## LOG OPERATIVO (UTC+2)
+
+### 2025-08-17 23:58 UTC+2
+- Verificata e chiusa milestone issue 22 (“Test manuale CRUD clienti e relazioni”): scenario test eseguito per tutte le operazioni CRUD clienti (dati validi/invalidi), gestione relazioni clienti-pacchetti, edge case (duplicati, eliminazione con relazioni attive, campi minimi), documentazione puntuale di ogni step con esito e timestamp in LOG_OPERATIVO.md e README.md. Tutte le tasks risultano completate e conformi a quanto richiesto in issue e standard operativo. Milestone archiviata.
+
+### 2025-08-17 23:55 UTC+2
+- Verificata e chiusa milestone issue 21 (“Collegamento clienti-pacchetti ore (relazione)”): relazione clienti ↔ pacchetti ore completata lato backend, API e frontend secondo specifiche issue e standard operativo. Test manuale superato, relazione persistente e visualizzazione pacchetti associati da UI; eliminazione cliente gestita correttamente. Checklist di verifica eseguita e milestone archiviata.
+
+### 2025-08-17 23:45 UTC+2
+- Corretto il rendering condizionale della modale dettaglio cliente in `app/clienti/page.js`: ora viene renderizzata solo se dettaglioCliente è valorizzato, evitando overlay/modal "Caricamento dati cliente..." quando nessun cliente è selezionato.
+- Test manuale eseguito: confermata l’apertura della modale solo su selezione cliente e la sua chiusura senza effetti collaterali.
+- Screenshot di conferma allegato dall’utente.
+- Pronto per aggiornamento file strutturali e push.
+
+### 2025-08-17 21:30 UTC+2
+- Inserito componente Modal generico in `src/components/Modal.jsx`, integrato con ClienteDettaglioModal e funzionante per overlay modale centrata e chiusura sia da bottone che da overlay.
+
+### 2025-08-17 18:05 UTC+2
+- Debug ciclo apertura/chiusura modale dettaglio cliente: identificato e risolto ReferenceError per componente Modal non definito.
 
 ### 2025-08-17 23:45 UTC+2
 - Corretto il rendering condizionale della modale dettaglio cliente in `app/clienti/page.js`: ora viene renderizzata solo se dettaglioCliente è valorizzato, evitando overlay/modal "Caricamento dati cliente..." quando nessun cliente è selezionato.
