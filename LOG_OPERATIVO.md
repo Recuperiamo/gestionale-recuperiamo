@@ -2,6 +2,12 @@
 
 ---
 
+### 2025-08-17 02:05:15 (UTC+2)
+- Fix redirect dopo login in `/signin`: spostato `router.replace("/")` in `useEffect` per evitare warning React ("Cannot update a component while rendering a different component").
+- Test manuale: login utente test, redirect a home senza errori console, sessione gestita correttamente.
+- Aggiornamento log-operativo e push della fix.
+- Pronto per chiusura milestone test pagine protette.
+
 ### 2025-08-17 01:55:38 (UTC+2)
 - Installazione pacchetto next-auth.
 - Creazione API route `/app/api/auth/[...nextauth]/route.js` con provider credenziali e utente mock (mario.rossi@email.it / test1234).
