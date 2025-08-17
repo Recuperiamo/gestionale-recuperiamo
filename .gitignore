@@ -40,6 +40,11 @@ elenco_clonata.txt
 output.md
 *.local
 
+allfiles.txt
+duplicates.txt
+justnames.txt
+sortednames.txt
+
 # Escludi file AI personali non strategici (aggiungi qui eventuali nuovi)
 # (Lascia AI_PERSONALIZZAZIO.md SOLO se confermato da te)
 
