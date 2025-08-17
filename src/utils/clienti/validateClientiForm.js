@@ -2,7 +2,6 @@
  * Validazione form cliente.
  * Restituisce array di stringhe di errore.
  */
-
 export function validateClientiForm(form) {
   const errs = [];
   if (!form.nome || !form.nome.trim()) errs.push("Nome obbligatorio.");

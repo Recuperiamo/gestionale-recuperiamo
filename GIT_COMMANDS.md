@@ -20,6 +20,23 @@ git commit -m "Aggiorna LOG_OPERATIVO.md e <breve_descrizione>"
 git push
 ```
 
+## Comandi Prisma & Build (CMD)
+
+npx prisma generate
+npx prisma migrate dev
+npx prisma db push
+npm run build
+npm run start
+
+## Comandi Prisma & Build (PowerShell)
+
+npx prisma generate
+npx prisma migrate dev
+npx prisma db push
+npm run build
+npm run start
+
+
 > Sostituisci `<files_da_aggiornare>` con i file reali modificati.
 > Copia e incolla questi blocchi ogni volta che devi salvare su GitHub, come da standard.
 > NON serve allegare questo file a ogni sessione: tienilo nella repo come reference.

@@ -1,7 +1,5 @@
-console.log("RENDER ClientiTable (o ClientiForm, o ClienteDettaglioModal)");
-
 import React, { useEffect, useState } from "react";
-
+import { validateClientiForm } from "../../utils/clienti/validateClientiForm";
 export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, loading }) {
   const [errors, setErrors] = useState([]);
 
@@ -9,33 +7,13 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
     setErrors([]);
   }, [form, editId]);
 
-  const validate = () => {
-    const errs = [];
-    if (!form.nome.trim()) errs.push("Nome obbligatorio.");
-    if (
-      !form.email.trim() ||
-      !/^[\w-.]+@[\w-]+\.[a-z]{2,7}$/i.test(form.email)
-    )
-      errs.push("Formato email non valido.");
-    if (
-      form.telefono &&
-      (!/^\d+$/.test(form.telefono) || /\D/.test(form.telefono))
-    )
-      errs.push("Il telefono può contenere solo cifre.");
-    if (form.cf && (!/^[a-zA-Z0-9]{16}$/.test(form.cf)))
-      errs.push("Codice fiscale non valido (deve essere di 16 caratteri alfanumerici).");
-    if (form.piva && !/^\d{11}$/.test(form.piva))
-      errs.push("Partita IVA non valida (11 cifre).");
-    return errs;
-  };
-
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = e => {
     e.preventDefault();
-    const validationErrors = validate();
+    const validationErrors = validateClientiForm(form);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
       return;
