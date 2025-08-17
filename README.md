@@ -696,3 +696,25 @@ npm run dev
 6. Eliminare cliente: non più presente in lista.
 7. Richiedere lista/dettaglio: dati sempre coerenti.
 8. Inserire cliente con tutti i campi opzionali riempiti: successo.
+
+# Gestionale Recuperiamo – Backend API
+
+## Endpoints attivi (Next.js App Router + Prisma)
+
+- `POST   /api/clienti` – Crea cliente
+- `GET    /api/clienti` – Lista clienti
+- `PUT    /api/clienti` – Modifica cliente
+- `DELETE /api/clienti` – Elimina cliente
+- `GET    /api/clienti/:id` – **Dettaglio singolo cliente** (NEW, vedi `/app/api/clienti/[id]/route.js`)
+
+## Note strutturali
+- Tutti gli endpoint sono in `app/api/clienti/` (e sottocartelle).
+- L’endpoint di dettaglio è implementato in `/app/api/clienti/[id]/route.js` e utilizza Prisma per il recupero puntuale tramite chiave primaria numerica.
+- Vedere `STANDARD_OPERATIVO.md` per policy di log, timestamp e milestone.
+
+## Scenario test manuale consigliato
+1. Crea cliente (POST).
+2. Ottieni lista (GET).
+3. Recupera dettaglio (GET /:id).
+4. Modifica cliente (PUT) e verifica dettaglio.
+5. Elimina cliente (DELETE) e verifica dettaglio (404).

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Alert from '@/src/components/Alert';
+import Alert from '@/components/Alert';
 
 export default function ClientiPage() {
   const [form, setForm] = useState({

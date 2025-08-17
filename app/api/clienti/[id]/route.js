@@ -1,13 +1,26 @@
-
 import { NextResponse } from "next/server";
-import { getClientiData } from "../_lib/data"; // Adatta il path se necessario
+import { PrismaClient } from "@prisma/client";
 
+const prisma = new PrismaClient();
+
+// Endpoint dettaglio cliente: GET /api/clienti/:id
 export async function GET(request, { params }) {
   const { id } = params;
-  const clienti = await getClientiData();
-  const cliente = clienti.find(c => String(c.id) === String(id));
-  if (!cliente) {
-    return NextResponse.json({ error: "Cliente non trovato" }, { status: 404 });
+  if (!id) {
+    return NextResponse.json({ error: "ID cliente mancante" }, { status: 400 });
   }
-  return NextResponse.json(cliente);
+  try {
+    const cliente = await prisma.client.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!cliente) {
+      return NextResponse.json({ error: "Cliente non trovato" }, { status: 404 });
+    }
+    return NextResponse.json(cliente, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Errore durante la lettura del dettaglio cliente: " + error.message },
+      { status: 500 }
+    );
+  }
 }

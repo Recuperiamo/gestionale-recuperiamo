@@ -1,4 +1,31 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+2025-08-17 05:15 (UTC+2)
+
+- 2025-08-17 05:15 (UTC+2) Revisione orari log-operativo su richiesta, allineamento orario presentazione log; conferma milestone dalle 04:56, verifica contenuti e formato.
+- 2025-08-17 05:11 (UTC+2) Aggiornamento file strutturali (README.md, STANDARD_OPERATIVO.md), log-operativo e [id]/route.js con nuova implementazione endpoint dettaglio clienti. Forniti comandi git per commit/push selettivo e totale.
+- 2025-08-17 04:58 (UTC+2) Analisi file route.js principale di lista clienti, identificata logica corretta con PrismaClient, proposta versione endpoint dettaglio coerente, scenario test manuale dettagliato.
+- 2025-08-17 04:56 (UTC+2) Discussione su errore "Can't resolve '../_lib/data'": evidenziata necessità di allineare logica dati al backend reale (Prisma), richiesta conferma struttura dati, impostazione soluzione definitiva.
+
+---
+
+#### Scenario test manuale endpoint dettaglio /api/clienti/:id
+
+1. Crea un cliente tramite POST /api/clienti o UI.
+2. Recupera l’ID del cliente dalla risposta o dalla lista.
+3. Fai una richiesta GET /api/clienti/{id} (Postman, browser, curl…):
+    - Dovresti ricevere tutti i dati del cliente se esiste.
+    - Dovresti ricevere errore 404 e messaggio "Cliente non trovato" se l’ID non esiste.
+4. Modifica il cliente con PUT, poi ripeti GET /api/clienti/{id} per vedere i dati aggiornati.
+5. Elimina il cliente, poi verifica che GET /api/clienti/{id} restituisca 404.
+
+ 2025-08-17 04:56 (UTC+2)
+
+- 2025-08-17 04:10 (UTC+2) Inizio sessione di verifica avanzamento issue #19 (CRUD clienti backend).
+- 2025-08-17 04:15 (UTC+2) Confermata integrazione e funzionamento alert su pagina clienti; problema colori lasciato in coda.
+- 2025-08-17 04:22 (UTC+2) Analisi scenario test manuale issue #19, confermati punti 1-4 già svolti, punto 5 ancora da verificare.
+- 2025-08-17 04:49 (UTC+2) Verificata coerenza dati in tabella clienti dopo sequenza operazioni CRUD e refresh; confermato punto 5 (lista aggiornata e coerente).
+- 2025-08-17 04:56 (UTC+2) Richiesta chiarimento su presenza/struttura endpoint di dettaglio (`/api/clienti/:id`); fornita guida su verifica struttura file API e test endpoint dettagli cliente.
+
 
 **2025-08-17 03:44:00 UTC+2** – Definizione schema dati clienti aggiornata (issue #19)
 - Aggiornata la struttura dati clienti:

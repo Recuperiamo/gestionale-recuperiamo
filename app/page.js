@@ -14,7 +14,12 @@ export default function DashboardPage() {
     return null;
   }
 
-  // Nuova variabile per il ruolo utente
+  // Solo admin può restare su dashboard, gli altri redirect a /profilo
+  if (session.user?.role !== "admin") {
+    router.replace("/profilo");
+    return null;
+  }
+
   const userRole = session.user?.role || "Ruolo non definito";
 
   return (
@@ -46,7 +51,6 @@ export default function DashboardPage() {
           }}>
             Traccia le ore dei tuoi clienti, gestisci gli appuntamenti e condividi i riepiloghi.
           </div>
-          {/* Visualizzazione esplicita ruolo */}
           <div style={{
             fontSize: 15,
             fontWeight: 600,

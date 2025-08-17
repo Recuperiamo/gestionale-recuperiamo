@@ -577,3 +577,18 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 
 ## Scenario test manuale – CRUD clienti
 (Vedi README.md per dettagli e casi)
+
+# STANDARD_OPERATIVO
+
+## Policy vincolanti di formato, log, milestone
+- Ogni operazione strutturale deve essere riportata in LOG_OPERATIVO.md con data+ora (UTC+2), in ordine progressivo.
+- Aggiornare sempre README.md e STANDARD_OPERATIVO.md dopo modifiche strutturali (endpoint, policy, directory).
+- Dopo ogni commit/push significativo, verificare la coerenza e progressività dei timestamp.
+- Alla chiusura milestone: controllare coerenza orari nel log, chiudere milestone, crearne una nuova ancorata all’ultimo orario del log.
+- Ogni cambiamento strutturale (nuovi endpoint, refactor directory) va descritto in README.md e loggato.
+- Scenario test manuale obbligatorio per ogni feature.
+- In fase di debug, fornire sempre file completi.
+
+## Endpoints attuali (ver. 2025-08-17 05:10 UTC+2)
+- app/api/clienti/route.js (CRUD lista)
+- app/api/clienti/[id]/route.js (dettaglio singolo cliente)

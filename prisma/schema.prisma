@@ -1,6 +1,7 @@
+// schema.prisma aggiornato – milestone 3 (Clienti)
+
 generator client {
   provider = "prisma-client-js"
-  // output   = "./src/generated/prisma"
 }
 
 datasource db {
@@ -8,55 +9,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id             String   @id @default(uuid())
-  name           String?
-  email          String   @unique
-  emailVerified  DateTime?
-  password       String?  // opzionale, per login con credenziali
-  image          String?
-  role           Role     @relation(fields: [roleId], references: [id])
-  roleId         Int
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+// === Modelli NextAuth + Ruoli già presenti ===
 
-  // NextAuth.js adapters fields
-  accounts       Account[]
-  sessions       Session[]
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  roleId    Int
+  role      Role     @relation(fields: [roleId], references: [id])
+  // ...altri campi NextAuth
+  accounts  Account[]
+  sessions  Session[]
 }
 
 model Role {
-  id             Int      @id @default(autoincrement())
-  name           String   @unique // admin, operatore, visualizzatore
-  users          User[]
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  users User[]
 }
 
 model Account {
-  id                String   @id @default(uuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user              User     @relation(fields: [userId], references: [id])
+  id                 Int       @id @default(autoincrement())
+  userId             Int
+  user               User      @relation(fields: [userId], references: [id])
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
 
   @@unique([provider, providerAccountId])
 }
 
 model Session {
-  id           String   @id @default(uuid())
+  id           Int      @id @default(autoincrement())
   sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
+  userId       Int
   user         User     @relation(fields: [userId], references: [id])
+  expires      DateTime
 }
 
 model VerificationToken {
@@ -65,4 +61,19 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// === CLIENT: modello cliente milestone 3 ===
+
+model Client {
+  id             Int     @id @default(autoincrement())
+  nomeReferente  String
+  email          String
+  telefono       String? 
+  indirizzo      String? 
+  codiceFiscale  String? @unique
+  partitaIva     String? @unique
+  note           String? 
+
+  @@index([email])
 }

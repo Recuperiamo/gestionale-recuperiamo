@@ -19,7 +19,7 @@ function isValidPIVA(piva) {
 export async function POST(req) {
   try {
     const body = await req.json();
-
+    console.log('BODY RICEVUTO', body);
     // Validazione obbligatorietà e formato
     if (!body.nomeReferente || !body.nomeReferente.trim()) {
       return new Response(
