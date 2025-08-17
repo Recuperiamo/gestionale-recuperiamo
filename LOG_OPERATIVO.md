@@ -1,5 +1,13 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+## 2025-08-17 03:14:00 (UTC+2)
+
+- Validato e documentato scenario test manuale login/logout e permessi (issue #16).
+- Eseguito test su tutti i ruoli previsti: admin, operatore, visualizzatore.
+- Verificati: accesso dashboard, redirect, visibilità aree, logout e protezione route.
+- Scenario e risultati riportati in README.md e LOG_OPERATIVO.md secondo standard operativo, con timestamp.
+- Issue #16 chiusa dopo verifica e documentazione completa.
+
 ## 2025-08-17 03:11:00 (UTC+2)
 
 - Completata implementazione issue #15: gestione ruoli con propagazione in sessione NextAuth, middleware di protezione, visualizzazione ruolo utente in dashboard.
