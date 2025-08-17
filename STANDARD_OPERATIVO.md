@@ -695,3 +695,50 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Tutti i nuovi file/feature devono essere tracciati nel LOG_OPERATIVO.md con orario UTC+2 e scenario test.
 - Ogni modifica strutturale prevede aggiornamento contestuale di README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
 - Non sono ammessi duplicati di componenti, API o modelli: verifica preventiva obbligatoria.
+
+# STANDARD_OPERATIVO
+
+## Regole vincolanti
+
+- Ogni modifica strutturale richiede aggiornamento di questo file e di README.md.
+- Dopo ogni operazione, aggiorna LOG_OPERATIVO.md con timestamp UTC+2 e scenario test.
+- Comandi push sempre forniti in doppio formato (CMD e PowerShell).
+- File API e lib condivise in JS puro per compatibilità Next+Babel.
+- Se esistono file `.ts` ridondanti, eliminarli o convertirli.
+- Nessuna modifica o commit senza aggiornamento di log e scenario test.
+- Aggiornamento orari nel log-operativo in fase di chiusura milestone: devono essere coerenti, progressivi, e corrispondere ai commit.
+- Dopo la chiusura di una milestone, crea subito la milestone successiva.
+
+## Struttura file attuale
+
+- `/app/api/pacchetti/route.js` — CRUD pacchetti ore (JS puro)
+- `/src/lib/prisma.js` — Prisma client singleton (JS puro)
+- `/LOG_OPERATIVO.md` — log operativo con timestamp, scenario test
+- `/README.md` — scenario test CRUD e descrizione endpoints
+- `/STANDARD_OPERATIVO.md` — regole vincolanti aggiornate
+
+## Scenario test manuale CRUD aggiornato
+
+1. **GET:**  
+    ```sh
+    curl http://localhost:3000/api/pacchetti
+    ```
+2. **POST:**  
+    ```sh
+    curl -X POST http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"clienteId\":35,\"descrizione\":\"Pacchetto prova\",\"oreAcquistate\":10,\"oreResidue\":10,\"dataAttivazione\":\"2025-08-17T21:00:00.000Z\",\"stato\":\"attivo\"}"
+    ```
+3. **PATCH:**  
+    ```sh
+    curl -X PATCH http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"id\":1,\"descrizione\":\"Pacchetto modificato\",\"oreResidue\":5}"
+    ```
+4. **DELETE:**  
+    ```sh
+    curl -X DELETE http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"id\":1}"
+    ```
+
+## Note operative
+
+- In debug, fornire sempre file completi.
+- Se ci sono rischi di duplicati (es. file simili in JS/TS), segnalare.
+- Aggiornare README.md e questo file a ogni cambiamento strutturale o di scenario test.
+- Per la chiusura milestone, controllare coerenza e progressività dei timestamp nel log-operativo.

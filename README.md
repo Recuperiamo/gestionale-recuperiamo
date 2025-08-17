@@ -805,3 +805,81 @@ Per dettagli e scenari di test manuale vedi `STANDARD_OPERATIVO.md`.
   4. Visualizzazione in UI
   5. Eliminazione cliente e verifica cascade delete pacchetti
   6. Casi limite (cliente senza pacchetti, dati non validi, update)
+
+  # Gestionale Pacchetti Ore
+
+## Struttura attuale
+
+- API: `/app/api/pacchetti/route.js` — CRUD pacchetti ore (JS puro, compatibile Next.js+Babel)
+- Prisma singleton: `/src/lib/prisma.js` — gestione client Prisma senza typecast TS
+- Log operativo e standard: `LOG_OPERATIVO.md`, `STANDARD_OPERATIVO.md`
+
+## Endpoints API pacchetti
+
+Tutti i metodi restituiscono oggetti JSON.
+
+- **GET `/api/pacchetti`**  
+  Restituisce lista di tutti i pacchetti ore.
+- **POST `/api/pacchetti`**  
+  Crea un nuovo pacchetto.  
+  Richiede payload:
+  ```json
+  {
+    "clienteId": 1,
+    "descrizione": "Pacchetto di esempio",
+    "oreAcquistate": 10,
+    "oreResidue": 10,
+    "dataAttivazione": "2025-08-17T21:00:00.000Z",
+    "stato": "attivo"
+  }
+  ```
+  Campi opzionali: `note` (String), `dataScadenza` (DateTime ISO).
+
+- **PATCH `/api/pacchetti`**  
+  Modifica un pacchetto esistente.  
+  Richiede payload:
+  ```json
+  {
+    "id": 1,
+    "descrizione": "Nuova descrizione"
+  }
+  ```
+  Puoi aggiornare uno o più campi tra quelli previsti dal modello.
+
+- **DELETE `/api/pacchetti`**  
+  Elimina un pacchetto.  
+  Richiede payload:
+  ```json
+  {
+    "id": 1
+  }
+  ```
+
+## Scenario test manuale CRUD
+
+1. **GET**
+    ```sh
+    curl http://localhost:3000/api/pacchetti
+    ```
+2. **POST**
+    ```sh
+    curl -X POST http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"clienteId\":35,\"descrizione\":\"Pacchetto prova\",\"oreAcquistate\":10,\"oreResidue\":10,\"dataAttivazione\":\"2025-08-17T21:00:00.000Z\",\"stato\":\"attivo\"}"
+    ```
+3. **PATCH**
+    ```sh
+    curl -X PATCH http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"id\":1,\"descrizione\":\"Pacchetto modificato\",\"oreResidue\":5}"
+    ```
+4. **DELETE**
+    ```sh
+    curl -X DELETE http://localhost:3000/api/pacchetti -H "Content-Type: application/json" -d "{\"id\":1}"
+    ```
+
+## Note tecniche
+
+- Solo JS puro per massima compatibilità con Next.js/Babel (SWC disabilitato).
+- Tutti i path API devono essere `.js`.
+- Il singleton Prisma in `/src/lib/prisma.js` non usa typecast TS.
+
+## Aggiornamento scenario test/manuale/log
+
+Vedi anche `LOG_OPERATIVO.md` per storico operazioni, timestamp UTC+2 e dettagli evolutivi.
