@@ -1,5 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-17 03:18:00 (UTC+2)
 
+- Aggiornata e validata la documentazione per autenticazione e permessi (issue #17).
+- README.md aggiornato: flusso login/logout, gestione permessi, ruoli, scenario test manuale.
+- STANDARD_OPERATIVO.md aggiornato: policy autenticazione, commit/log, scenario test manuale.
+- LOG_OPERATIVO.md aggiornato: tutte le modifiche documentate con timestamp coerente.
+- Verificata la coerenza e l’allineamento tra i file.
+- Issue #17 chiusa dopo verifica finale.
 ## 2025-08-17 03:14:00 (UTC+2)
 
 - Validato e documentato scenario test manuale login/logout e permessi (issue #16).
