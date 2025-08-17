@@ -1,5 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## 2025-08-17 03:05:00 (UTC+2)
 
+- Implementata protezione dashboard (/) solo per admin tramite middleware.js e controllo lato client in app/page.js.
+- Creata pagina /profilo (accessibile a tutti gli utenti autenticati) come placeholder per dati profilo/ore.
+- Aggiunta/aggiornata Navbar per mostrare link “Dashboard” solo ad admin, e “Profilo” a tutti.
+- Modificata callback redirect di NextAuth in app/api/auth/[...nextauth]/route.js: dopo il login, admin va su /, altri ruoli su /profilo.
+- Aggiornati README.md e STANDARD_OPERATIVO.md con nuova logica di accesso, redirect post-login e scenario test manuale.
+- Scenario test manuale inserito in README.md e STANDARD_OPERATIVO.md.
 ### 2025-08-17 02:47:00 (UTC+2)
 - Implementata visualizzazione esplicita del ruolo utente autenticato nella dashboard (app/page.js), in posizione visibile e con stile coerente con la UI.
 - Scenario test manuale: login con tutti i ruoli, verifica presenza e correttezza visualizzazione ruolo nella dashboard.

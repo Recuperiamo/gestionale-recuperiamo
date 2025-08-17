@@ -1,15 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-
-const users = [
-  {
-    id: "1",
-    name: "Mario Rossi",
-    email: "mario.rossi@email.it",
-    password: "test1234",
-    role: "Tutor"
-  }
-];
+import prisma from "@/utils/prisma";
+import bcrypt from "bcryptjs";
 
 export const authOptions = {
   providers: [
@@ -20,15 +12,25 @@ export const authOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const user = users.find(
-          (u) =>
-            u.email === credentials.email &&
-            u.password === credentials.password
-        );
-        if (user) {
-          return { id: user.id, name: user.name, email: user.email, role: user.role };
-        }
-        return null;
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+          include: { role: true }
+        });
+
+        if (!user || !user.password) return null;
+        const passwordValid = await bcrypt.compare(credentials.password, user.password);
+
+        if (!passwordValid || !user.role) return null;
+
+        // Propaga solo i dati necessari
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role.name
+        };
       }
     })
   ],
@@ -49,6 +51,12 @@ export const authOptions = {
         session.user.name = token.name;
       }
       return session;
+    },
+    async redirect({ url, baseUrl, token }) {
+      if (token?.role === "admin") {
+        return baseUrl + "/";
+      }
+      return baseUrl + "/profilo";
     }
   },
   pages: {
