@@ -1,5 +1,10 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-
+### 2025-08-17 02:33:00 (UTC+2)
+- Ricognizione stato attuale gestione ruoli/permessi (issue #15): schema Prisma pronto, ma login NextAuth.js ancora su mock user e senza join su Role.
+- Nessun middleware presente per controllo permessi/ruoli.
+- Navbar e dashboard non mostrano né utilizzano il ruolo; nessun controllo accesso su route.
+- Prossimi step: integrare Prisma in authorize, propagare ruolo reale, mostrare ruolo in dashboard, pianificare middleware controllo accessi.
+- Scenario test manuale aggiornato: login con utenti reali, propagazione ruolo, dashboard che mostra ruolo, pianificazione test middleware
 ### 2025-08-17 02:22:00 (UTC+2)
 - **Apertura lavorazione issue #15 – Gestione ruoli e propagazione permessi in sessione (https://github.com/Recuperiamo/gestionale-recuperiamo/issues/15)**
 - Obiettivi:

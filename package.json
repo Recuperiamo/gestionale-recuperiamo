@@ -22,6 +22,9 @@
     "tailwindcss": "^4.1.12"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/eslint-parser": "^7.28.0",
+    "@babel/preset-react": "^7.27.1",
     "@eslint/js": "^9.33.0",
     "@next/eslint-plugin-next": "^15.4.6",
     "@testing-library/jest-dom": "^6.1.5",
@@ -29,8 +32,9 @@
     "@testing-library/user-event": "^14.5.2",
     "@types/react": "19.1.10",
     "@types/tailwindcss": "^3.0.11",
+    "@typescript-eslint/parser": "^8.39.1",
     "babel-jest": "^29.7.0",
-    "eslint": "^9.33.0",
+    "eslint": "^8.57.1",
     "eslint-formatter-unix": "^8.40.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.3.0",
