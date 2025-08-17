@@ -1,4 +1,9 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### [2025-08-17 21:32 UTC+2]
+- Documentata fase scenario test manuale milestone “Collegamento clienti-pacchetti ore” (stato: placeholder).
+- Tutti gli step previsti sono stati eseguiti; le API e la UI restituiscono correttamente messaggi placeholder.
+- Aggiornati README.md e STANDARD_OPERATIVO.md con descrizione scenario test e regola milestone.
+
 [2025-08-17 21:13 UTC+2]
 - Creata struttura e file placeholder per milestone “Collegamento clienti-pacchetti ore”:
   - Cartelle e file: app/api/pacchetti/route.js, app/api/pacchetti/[id]/route.js, src/components/pacchetti/PacchettiList.jsx, src/components/pacchetti/PacchettoForm.jsx, app/api/clienti/[id]/route.js
