@@ -14,6 +14,9 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Nuova variabile per il ruolo utente
+  const userRole = session.user?.role || "Ruolo non definito";
+
   return (
     <div style={{ minHeight: "100vh", background: "#20489a" }}>
       <Navbar />
@@ -42,6 +45,16 @@ export default function DashboardPage() {
             fontWeight: 400
           }}>
             Traccia le ore dei tuoi clienti, gestisci gli appuntamenti e condividi i riepiloghi.
+          </div>
+          {/* Visualizzazione esplicita ruolo */}
+          <div style={{
+            fontSize: 15,
+            fontWeight: 600,
+            marginBottom: 6,
+            letterSpacing: "0.3px",
+            color: "#1cb0f6",
+          }}>
+            Ruolo attuale: <span style={{ color: "#fff", background: "#1cb0f6", borderRadius: "5px", padding: "2px 10px", marginLeft: "4px" }}>{userRole}</span>
           </div>
         </div>
         <section

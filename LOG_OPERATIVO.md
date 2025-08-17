@@ -1,5 +1,10 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### 2025-08-17 02:47:00 (UTC+2)
+- Implementata visualizzazione esplicita del ruolo utente autenticato nella dashboard (app/page.js), in posizione visibile e con stile coerente con la UI.
+- Scenario test manuale: login con tutti i ruoli, verifica presenza e correttezza visualizzazione ruolo nella dashboard.
+---
+
 ### 2025-08-17 02:44:00 (UTC+2)
 - NOTA OPERATIVA PRISMA:
     - Ogni volta che si modifica lo schema Prisma o si sposta/ricrea la cartella node_modules, è OBBLIGATORIO eseguire:
