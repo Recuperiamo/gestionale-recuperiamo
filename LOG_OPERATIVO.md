@@ -1,5 +1,6 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-
+### 2025-08-17 23:59 UTC+2
+- Verificata e chiusa issue #23 “Aggiornamento doc e standard operativo”: README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md aggiornati con flusso clienti, relazioni, policy commit/log, scenario test manuale e milestone. Tutti i documenti risultano coerenti, ogni entry contiene timestamp e scenario test/manuale. Progressione oraria confermata e milestone aggiornata.
 
 ### 2025-08-17 23:58 UTC+2
 - Verificata e chiusa milestone issue 22 (“Test manuale CRUD clienti e relazioni”): scenario test eseguito per tutte le operazioni CRUD clienti (dati validi/invalidi), gestione relazioni clienti-pacchetti, edge case (duplicati, eliminazione con relazioni attive, campi minimi), documentazione puntuale di ogni step con esito e timestamp in LOG_OPERATIVO.md e README.md. Tutte le tasks risultano completate e conformi a quanto richiesto in issue e standard operativo. Milestone archiviata.
