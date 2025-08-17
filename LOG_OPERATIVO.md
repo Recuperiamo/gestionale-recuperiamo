@@ -1,5 +1,81 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+Ultimo aggiornamento: 2025-08-17 12:54 UTC+2
 
+---
+
+## 2025-08-17 12:54 UTC+2 - Chiusura sessione
+
+### Done
+- **Debug e refactor funzionale UI clienti**
+  - Identificazione entry point reale Next.js (`app/clienti/page.js`)
+  - Modularizzazione: estratti e integrati i componenti `ClientiForm.jsx`, `ClientiTable.jsx`, `ClienteDettaglioModal.jsx` con props e log di render.
+  - Uniformati i nomi dei campi tra front-end e API: `nome`, `cf`, `piva` (risolto mismatch tra `nome` e `nomeReferente`).
+  - Fix gestione modifica: ora il form si popola da tabella e, se richiesto, da modale dettagli.
+  - Eliminato il tasto "Modifica" dalla modale dettaglio su richiesta utente.
+  - Verificata e ripristinata la possibilità di aggiungere nuovi clienti (validazione e payload coerenti).
+  - Tutti i log figli e padre visibili su console, validazione campi e UX testate.
+  - Aggiornata la documentazione operativa (README, STANDARD_OPERATIVO) per riflettere la nuova struttura e le regole di naming.
+  - Scenario test manuale fornito per ogni feature/fix.
+
+### To do (prossima sessione)
+- Eventuale refactor backend/API per gestione errori più chiara lato client.
+- UI/UX review: miglioramenti accessibilità panel modale e feedback visivi.
+- Allineamento finale milestone, verifica timestamp e archiviazione milestone corrente, apertura nuova milestone.
+- Aggiornamento periodico log-operativo, push e controllo coerenza timeline.
+- Test cross-browser e responsive su dispositivi mobili.
+- (Se richiesto) logging avanzato e telemetria di uso funzionalità.
+
+---
+
+## Scenario test manuale finale
+
+1. Aggiungi nuovo cliente con tutti i campi validi → il cliente compare nella lista, log figli visibili.
+2. Prova a inserire dati non validi → compare errore, nessun invio.
+3. Clicca "Modifica" su un cliente in lista → il form si popola, puoi salvare la modifica.
+4. Clicca "Dettagli": si apre la modale con i dati, puoi solo chiudere (nessun tasto Modifica).
+5. Elimina un cliente → la lista si aggiorna.
+6. Usa "Annulla Modifica" per tornare in modalità inserimento nuovo cliente.
+7. Tutte le operazioni DEVONO lasciare traccia nei log di console (entry point e figli).
+
+---
+
+## File modificati/creati in questa sessione
+- `app/clienti/page.js`
+- `src/components/clienti/ClientiForm.jsx`
+- `src/components/clienti/ClientiTable.jsx`
+- `src/components/clienti/ClienteDettaglioModal.jsx`
+- `README.md` (aggiornamento struttura e nomenclatura)
+- `STANDARD_OPERATIVO.md` (regole modularizzazione, naming, log)
+- `LOG_OPERATIVO.md` (questo file)
+
+---
+
+## Comandi push (da usare in sequenza)
+
+### CMD
+```
+git add app/clienti/page.js
+git add src/components/clienti/ClientiForm.jsx
+git add src/components/clienti/ClientiTable.jsx
+git add src/components/clienti/ClienteDettaglioModal.jsx
+git add README.md
+git add STANDARD_OPERATIVO.md
+git add LOG_OPERATIVO.md
+git commit -m "Chiusura sessione 2025-08-17 12:54 UTC+2: modularizzazione, fix modifica, validazione clienti, log e doc"
+git push
+```
+
+### PowerShell
+```
+git add app/clienti/page.js
+git add src/components/clienti/ClientiForm.jsx
+git add src/components/clienti/ClientiTable.jsx
+git add src/components/clienti/ClienteDettaglioModal.jsx
+git add README.md
+git add STANDARD_OPERATIVO.md
+git add LOG_OPERATIVO.md
+git commit -m "Chiusura sessione 2025-08-17 12:54 UTC+2: modularizzazione, fix modifica, validazione clienti, log e doc"
+git push
 ## 2025-08-17 11:18 UTC+2
 
 - Eseguito controllo file duplicati su tutta la repository tramite PowerShell:
