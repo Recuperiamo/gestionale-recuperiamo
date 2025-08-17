@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn, useSession } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 
@@ -12,10 +12,13 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
 
-  if (session) {
-    router.replace("/");
-    return null;
-  }
+  useEffect(() => {
+    if (session) {
+      router.replace("/");
+    }
+  }, [session, router]);
+
+  if (session) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: "#20489a" }}>
