@@ -1,5 +1,113 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### [2025-08-19 01:25 UTC+2] CREAZIONE AUDIT RETROATTIVO (ISSUE #32)
+- Creata issue #32 "AUDIT RETROATTIVO: verifica di tutte le issue chiuse precedenti" per lanciare audit sistematico di tutte le issue chiuse.
+- Inserito riferimento all’issue come commento e stabilito che tutte le sub-issue di audit dovranno essere collegate come sub-task.
+- Scenario test manuale: selezionare issue chiusa, verificare presenza di codice/commit, doc, scenario test, checklist, log. Classificare eventuali discrepanze, correggere/riaprire se necessario, aggiornare log e checklist solo dopo verifica effettiva. Ripetere per tutte le issue chiuse.
+
+# LOG OPERATIVO – Debug pacchetti/clienti – 2025-08-19 00:55 (UTC+2)
+
+## [2025-08-19 00:55 UTC+2]
+- Confermata risoluzione problemi API e context: tutto funziona come atteso.
+- Inviato log completo su richiesta, pronto per push finale.
+
+## [2025-08-19 00:41 UTC+2]
+- Forniti file completi aggiornati per le API pacchetti:
+  - app/api/pacchetti/[id]/route.js
+  - app/api/pacchetti/route.js
+- Corretti: gestione params Next.js 13+, errori 400/500, validazione, progressivo automatico.
+- Fornito scenario test e comandi per push.
+
+## [2025-08-19 00:14 UTC+2]
+- Analisi errori log build:
+  - “params should be awaited before using its properties”: spiegato bug Next.js e soluzione.
+  - Segnalati anche errori 400/500 su progressivo e POST.
+  - Forniti comandi di ricerca per individuare errori e validazione.
+
+## [2025-08-19 00:06 UTC+2]
+- Debug “Module not found: Can't resolve '../context/ClientiContext'”:
+  - Verificato che il file esiste in src/context/ClientiContext.jsx.
+  - Proposto fix con import `@/context/ClientiContext` in app/layout.js.
+  - Forniti comandi di ricerca path e alias.
+
+## [2025-08-18 23:51 UTC+2]
+- Pulizia PacchettoForm.jsx e integrazione context centralizzato:
+  - Rimossa logica fetchClienti, useState/useEffect locali.
+  - Integrato useClienti in select, mantenendo solo logica business del form.
+- Pulizia e fix layout.js:
+  - Integrato ClientiProvider con SessionProvider.
+- Forniti scenario test, comandi di ricerca per pulizia fetch/clienti.
+
+## [2025-08-18 23:33 UTC+2]
+- Proposta e implementazione context centralizzato:
+  - Creato src/context/ClientiContext.jsx con Provider e hook.
+  - Fornito esempio di utilizzo e scenario test.
+  - Forniti comandi di ricerca per individuare duplicati e vecchie fetch.
+
+## [2025-08-18 23:15 UTC+2]
+- Analisi e risposta su: cosa viene buttato/riusato con context centralizzato.
+  - Dettagliata lista di codice da eliminare e da riusare.
+  - Scenario test semplificato.
+
+## [2025-08-18 23:00 UTC+2]
+- Forniti tutti i comandi di ricerca (CMD/PowerShell) per verificare fetch, context, props, useEffect, path clienti/pacchetti.
+- Spiegato pro/contro del pattern context centralizzato.
+
+## [2025-08-18 22:55 UTC+2]
+- Prima versione log-operativo della sessione (inizio debug desincronizzazione clienti/pacchetti).
+- Avviato debug con comandi di ricerca su fetch, mapping nomeReferente, path API, struttura project.
+
+---
+#### [2025-08-18 21:42 UTC+2] VERIFICA POST-MIGRATION CAMPO SOGLIA PACCHETTOORE (ISSUE #28, MILESTONE 4)
+
+- **Verifica completata:** il campo sogliaOreResidue appare regolarmente nei pacchetti (Prisma Studio), configurabile e persistente.
+- **Evidenza:** screenshot ![image2](image2) allegato a conferma presenza e valore del campo (oreAcquistate, oreResidue, soglia visibile).
+- **Nessun errore** in migration o gestione del campo, pronto per step successivo: aggiornamento API pacchetti e logica alert.
+- **Scenario test manuale svolto:**  
+    1. Modificato schema.prisma e migrato DB.
+    2. Aperto Prisma Studio, verificato campo sogliaOreResidue su tutti i pacchetti (default null).
+    3. Impostato valore su pacchetto esistente, confermata persistenza.
+    4. Allegato screenshot di conferma.
+- **Prossimo step:** CRUD API e alert UI.
+- **Versione STANDARD_OPERATIVO.md applicata:** 2025-08-17 16:45 UTC+2
+
+#### [2025-08-18 19:30 UTC+2] APERTURA SESSIONE – MILESTONE 4: IMPLEMENTAZIONE ALERT SOGLIA/ESAURIMENTO PACCHETTI ORE (ISSUE #28)
+
+- **Sessione avviata** per sviluppo milestone 4: Implementazione alert soglia/esaurimento pacchetti ore, issue #28.
+- Obiettivo: implementare alert (UI e/o email) quando le ore residue di un pacchetto scendono sotto una soglia configurabile o arrivano a zero.
+- Tutte le regole di formato, log e scenario test si applicano come da STANDARD_OPERATIVO.md (ver. 2025-08-17 16:45 UTC+2).
+- Prima versione log-operativo di questa sessione.
+
+---
+
+**Istruzioni operative avvio milestone 4 (issue #28):**
+- Leggere e spuntare la checklist ONBOARDING_SESSION.md.
+- Ogni modifica a file chiave (README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md, ONBOARDING_SESSION.md, END_SESSION.md) deve essere accompagnata da update contestuale del log.
+- Dopo ogni step, push obbligatorio di file modificati.
+- Aggiornare subito README.md e STANDARD_OPERATIVO.md dopo ogni modifica strutturale/policy.
+- Seguire scenario test manuale per ogni feature/step sviluppato.
+
+---
+
+## Checklist avvio milestone 4 (alert soglia/esaurimento pacchetti ore)
+
+- [x] Ho letto STANDARD_OPERATIVO.md e le regole di formato/collaborazione.
+- [x] Ho tracciato questa entry in LOG_OPERATIVO.md con orario reale (UTC+2).
+- [x] Ho aperto la issue #28 su GitHub come riferimento milestone.
+- [x] Ho letto e spuntato la checklist ONBOARDING_SESSION.md.
+- [x] Ho verificato la presenza di tutte le milestone e della documentazione aggiornata.
+- [x] Sono prontə a sviluppare secondo le policy di log, push e scenario test.
+
+---
+
+## Scenario test manuale milestone 4 (alert soglia/esaurimento)
+
+1. Imposta la soglia alert su un pacchetto (via UI/API/DB).
+2. Esegui un’attività che porta le ore residue sotto la soglia o a zero.
+3. Verifica che venga generato e visualizzato l’alert (in UI e/o via email).
+4. Documenta nel LOG_OPERATIVO.md il test con esiti, timestamp e screenshot se necessario.
+5. Esegui test di edge case: modifica soglia, reset ore, gestione alert multipli, coerenza dopo refresh.
+
 #### [2025-08-18 19:28 UTC+2] CHIUSURA SESSIONE – REVISIONE FINALE LOG, ORARI, FILE STRUTTURALI
 
 - **Chiusura sessione:**  
