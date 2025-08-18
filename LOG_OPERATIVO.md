@@ -1,6 +1,29 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### [2025-08-18 02:12 UTC+2] Chiusura milestone 3: bugfix palette Alert, validazione avanzata email, aggiornamento file strutturali e regole anti-doppioni
 
+- Chiusura milestone 3: completate tutte le attività previste (CRUD clienti, validazione form, UI Alert palette).
+- Bug palette Alert (issue #25) risolto: ora alert di successo ed errore rispettano pienamente il brand.
+- Scenario test manuale milestone 3 superato:
+    1. CRUD clienti: creazione, modifica, cancellazione → alert visualizzati correttamente (verde/rosso)
+    2. Validazione email/telefono: respinte email di test, placeholder, troppo semplici; accettate solo email realistiche
+    3. Nessun file duplicato in repo (controllo .js/.tsx, src/ vs app/)
+    4. Verifica UI su tutte le pagine clienti
+- Aggiornati: src/components/Alert.js, LOG_OPERATIVO.md, README.md (sezione milestone 3), STANDARD_OPERATIVO.md (rafforzate regole anti-doppioni, note errori passati).
+- Tutti gli orari del log sono coerenti e progressivi rispetto ai commit effettuati.
+- Pronti per apertura nuova milestone (fase 4).
+
+#### Issue chiuse:
+- #25 Bug UI: colori non applicati su componente Alert
+- #24 Review e chiusura milestone (chiusura milestone 3)
+
+#### File coinvolti:
+- src/components/Alert.js
+- LOG_OPERATIVO.md
+- README.md
+- STANDARD_OPERATIVO.md
+
+---
 ### 2025-08-17 00:00 UTC+2
 - Review finale milestone: verificate chiusura di tutte le issue collegate (#21, #22, #23), coerenza log, documentazione e progressione oraria. Scenario test/manuale milestone completato: tutte le checklist rispettate, nessun file duplicato, milestone chiusa su GitHub e archiviata secondo standard operativo.
 

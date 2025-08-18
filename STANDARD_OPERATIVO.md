@@ -762,3 +762,20 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Ad ogni modifica strutturale che coinvolge la UI o la logica di apertura/chiusura modali, aggiornare il presente file e il log-operativo.
 
 ...
+
+# STANDARD OPERATIVO
+
+...
+
+## Regole anti-doppioni e milestone
+
+- Prima di creare/modificare qualsiasi file o componente, verificare SEMPRE l’assenza di doppioni (.js/.tsx, src/ vs app/).
+- Non devono mai coesistere file simili in percorsi diversi (layout.tsx/js, Alert.js/tsx, ecc).
+- Directory di riferimento per l’applicativo: root principale (app/) e NON src/.
+- Ogni attività che modifica/aggiunge file va tracciata in LOG_OPERATIVO.md con orario UTC+2.
+- Gli errori di duplicazione e percorso rilevati (es. layout.tsx/js, uso improprio src/) sono bloccanti e devono essere evitati.
+- Dopo ogni milestone, controllare coerenza timestamp log e archiviare milestone solo dopo verifica.
+- Scenario test/manuale obbligatorio per ogni feature/bugfix.
+- Dopo chiusura milestone, creare subito nuova milestone per la fase successiva (fase 4).
+
+...

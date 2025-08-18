@@ -904,6 +904,31 @@ Vedi anche `LOG_OPERATIVO.md` per storico operazioni, timestamp UTC+2 e dettagli
 
 ...
 
+# Gestionale Recuperiamo
+
+...
+
+## Stato milestone
+
+### Milestone 3 (chiusa il 2025-08-18 02:12 UTC+2)
+
+- Funzionalità: CRUD clienti, validazione form, palette Alert UI conforme a brand.
+- Bugfix principali: palette colori Alert (issue #25)
+- Scenario test superato (CRUD alert, validazione email/telefono, nessun duplicato file, coerenza struttura).
+- Tutti i dettagli e timestamp in LOG_OPERATIVO.md
+
+...
+
+## UI Components
+
+### Alert
+
+- Gli alert rispettano ora la palette brand: verde per successo, rosso per errore (come da design system).
+- Testati su tutte le pagine clienti e form.
+- Scenario test milestone 3: vedere LOG_OPERATIVO.md.
+
+...
+
 ## Standard operativo
 
 Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e log.
