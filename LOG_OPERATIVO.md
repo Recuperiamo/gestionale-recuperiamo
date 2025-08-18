@@ -1,5 +1,55 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+#### [2025-08-18 17:42 UTC+2] RISOLUZIONE CRUD PACCHETTI ORE (PRISMA, APP ROUTER NEXT 15)
+
+- Integrato `export const runtime = "nodejs";` in `app/api/pacchetti/route.js` e `app/api/pacchetti/[id]/route.js` (verificato in entrambi i file).
+- Collection (`route.js`) già migrata a Prisma, ora anche la route `[id]` aggiornata per usare Prisma e non più funzioni mock/in memoria/file.
+- Eliminata ogni dipendenza da mock persistente (`tmp_pacchetti.json`) e da `src/lib/pacchetti.js` per le route API effettivamente usate dalla UI.
+- Testato CRUD completo da UI: creazione, modifica, eliminazione pacchetto OK, nessun errore 404/500, nessun errore "params should be awaited".
+- Verificato che la UI si aggiorna in tempo reale, i dati sono coerenti in DB e non vi sono più warning o errori strutturali.
+- File e path coinvolti:  
+  - `app/api/pacchetti/route.js`
+  - `app/api/pacchetti/[id]/route.js`
+  - [verifica assenza utilizzo effettivo di `src/lib/pacchetti.js` lato API]
+- Scenario test manuale aggiornato e svolto con successo.
+
+#### [2025-08-18 17:15 UTC+2] DEBUG AVANZATO CRUD PACCHETTI ORE
+
+- Analisi persistenza mock: riscontrato che tutte le API route usate dalla UI devono essere su Prisma/nodejs, non edge/serverless/mock.
+- Proposto e fornito file completi per route `[id]` su Prisma (`findUnique`, `update`, `delete`), con gestione errori coerente.
+- Forniti comandi diagnostici per ricerca duplicati, check runtime, check presenza file `tmp_pacchetti.json`.
+- Verificato che la UI chiamava ancora funzioni mock per il dettaglio pacchetto.
+- Forniti scenario test manuale, comandi ricerca, e controllo coerenza file/branch.
+
+#### [2025-08-18 16:20 UTC+2] DEBUG ROUTE EDGE/NODEJS - MOCK NON PERSISTENTE
+
+- Analisi cause edge/serverless (Next 15 App Router): fs non supportato, mock persistente in file non funzionante.
+- Proposto passaggio a `export const runtime = "nodejs";` per tutte le API route.
+- Forniti comandi ricerca/verifica e scenario test manuale aggiornato.
+- Inviati file con direttiva runtime e logica mock persistente.
+
+#### [2025-08-18 15:55 UTC+2] DEBUG MEMORIA VOLATILE/MOCK
+
+- Identificata perdita mock tra chiamate CRUD (memoria non condivisa in dev/serverless).
+- Forniti file con log di debug e proposta file persistente temporaneo.
+- Avviato scenario test manuale e raccolta log errori.
+
+#### [2025-08-18 15:42 UTC+2] AVVIO SESSIONE
+
+- Prima versione log-operativo di questa sessione.
+- Riepilogo situazione: Next.js 15.4.6, CRUD pacchetti ore con problemi di persistenza e gestione mock.
+## [2025-08-18 15:00:42 UTC+2] - Inizio milestone 4 - UI pacchetti ore
+
+- Analisi struttura componenti in src/components/pacchetti e src/components/clienti.
+- Verificato che PacchettiList.jsx e PacchettoForm.jsx sono placeholder, unico componente reale: PacchettiClienteList.jsx.
+- Proposta implementazione reale PacchettiList.jsx e PacchettoForm.jsx con gestione props e integrazione CRUD.
+- Scenario test manuale definito.
+- File coinvolti: 
+  - src/components/pacchetti/PacchettiList.jsx (implementazione)
+  - src/components/pacchetti/PacchettoForm.jsx (implementazione)
+  - LOG_OPERATIVO.md (update)
+- Prossimo step: implementazione e test, aggiornamento README.md e STANDARD_OPERATIVO.md se necessario.
+
 ### [2025-08-18 14:45 UTC+2] Apertura milestone 4 – Gestione pacchetti ore: avvio sessione, verifica implementazioni e pianificazione task/issues
 
 - Inizio sessione milestone 4 (“Gestione pacchetti ore”), riferimento ROADMAP_MILESTONE_ISSUE_BOZZA.md.
