@@ -1,4 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+#### [2025-08-18 18:13 UTC+2] CHIUSURA MILESTONE MOCK: POLICY ELIMINAZIONE E PREVENZIONE ERRORI
+
+- Eseguita ricerca globale: nessun mock, fs, tmp_pacchetti.json, né import legacy nelle route API.
+- Confermata assenza (o eliminazione) di `src/lib/pacchetti.mock.js` e di altri mock ancora attivi.
+- Aggiornati README.md e STANDARD_OPERATIVO.md con:
+    - Regola vincolante: eliminazione/spostamento file mock subito dopo fase di test/migrazione.
+    - Policy su check pre-commit/CI.
+    - Scenario test manuale aggiornato.
 
 #### [2025-08-18 18:10 UTC+2] DEBUG E PREVENZIONE USO MOCK/LEGACY PROVIDER DATI
 

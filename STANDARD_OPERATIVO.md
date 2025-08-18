@@ -799,3 +799,27 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 
 ## Policy CI e pre-commit
 - Integrare i comandi di check come pre-commit hook (es: Husky) e/o step di CI per bloccare merge accidentali di mock.
+# STANDARD OPERATIVO - Provider dati, mock e prevenzione errori
+
+## Policy su file mock e provider dati
+- Qualsiasi file mock (es: `src/lib/pacchetti.mock.js`) va marcato chiaramente come deprecato.
+- Non deve MAI essere importato da nessuna route API reale in `app/api/pacchetti/*`.
+- Ogni nuova route deve essere implementata direttamente su Prisma.
+- Prima del commit, lancia SEMPRE i comandi ricerca "from @/lib/pacchetti" e "mock" sulle route API.
+- **Regola aggiuntiva:**  
+  - Al termine di ogni milestone di migrazione/test, i file mock vanno eliminati o spostati in `__deprecated__` fuori dal path di produzione.
+  - Ogni eliminazione va tracciata nel LOG_OPERATIVO.md.
+
+## Naming e cartelle
+- I file mock deprecati vanno spostati in `src/lib/legacy/` oppure rinominati con `.mock.js`.
+- Nessun file in `/legacy/` o con `.mock.js` va mai usato in produzione.
+
+## Scenario test manuale
+1. CRUD completo da UI e Postman.
+2. Check logs: assenza di warning/errore "mock", "params", "tmp_pacchetti.json".
+3. Ricerca pattern mock in tutte le route API.
+4. **Verifica assenza di file mock fuori da cartelle legacy/deprecated.**
+
+## Policy CI e pre-commit
+- Integrare i comandi di check come pre-commit hook (es: Husky) e/o step di CI per bloccare merge accidentali di mock.
+- Al termine fase migrazione/test, controllare e confermare rimozione file mock.
