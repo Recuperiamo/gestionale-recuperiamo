@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "./components/Navbar";
 import Link from "next/link";
+import '../styles/globals.css';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();

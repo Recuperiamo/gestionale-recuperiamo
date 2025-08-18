@@ -1,9 +1,8 @@
-
-export const runtime = "nodejs";
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-async function parseJsonBody(req) {
+// Helper per parsing body robusto
+async function parseJsonBody(req: NextRequest) {
   try {
     return await req.json();
   } catch {
@@ -11,6 +10,7 @@ async function parseJsonBody(req) {
   }
 }
 
+// GET: lista pacchetti
 export async function GET() {
   console.log("SONO NELLA GET DEL CRUD REALE PACCHETTI");
   try {
@@ -24,7 +24,8 @@ export async function GET() {
   }
 }
 
-export async function POST(req) {
+// POST: crea pacchetto
+export async function POST(req: NextRequest) {
   try {
     const data = await parseJsonBody(req);
     if (!data) return NextResponse.json({ error: "JSON non valido" }, { status: 400 });
@@ -35,7 +36,8 @@ export async function POST(req) {
   }
 }
 
-export async function PATCH(req) {
+// PATCH: aggiorna pacchetto
+export async function PATCH(req: NextRequest) {
   try {
     const data = await parseJsonBody(req);
     if (!data) return NextResponse.json({ error: "JSON non valido" }, { status: 400 });
@@ -48,7 +50,8 @@ export async function PATCH(req) {
   }
 }
 
-export async function DELETE(req) {
+// DELETE: elimina pacchetto
+export async function DELETE(req: NextRequest) {
   try {
     const data = await parseJsonBody(req);
     if (!data) return NextResponse.json({ error: "JSON non valido" }, { status: 400 });

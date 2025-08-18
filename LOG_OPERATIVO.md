@@ -1,4 +1,17 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+#### [2025-08-18 18:25 UTC+2] CHIUSURA ISSUE #26 UI PACCHETTI ORE E ASSEGNAZIONE A CLIENTE
+
+- Completato sviluppo e test di tutte le funzionalità richieste:
+    - Form reale creazione/modifica pacchetti ore con selezione cliente.
+    - Tabella pacchetti ore filtrabile per cliente, visualizzazione dettagli dettagliata e stato.
+    - Validazione lato client e feedback coerenti con design system.
+    - Test CRUD completo da UI: crea, modifica, elimina, aggiorna lista in tempo reale.
+    - Assegnazione pacchetto a cliente e controllo visualizzazione in tabella e dettagli cliente.
+- Aggiornato LOG_OPERATIVO.md con orario, file coinvolti, scenario test manuale svolto.
+- Policy su eliminazione file mock post-migrazione verificata e attuata.
+- Scenario test manuale eseguito e superato.
+
 #### [2025-08-18 18:13 UTC+2] CHIUSURA MILESTONE MOCK: POLICY ELIMINAZIONE E PREVENZIONE ERRORI
 
 - Eseguita ricerca globale: nessun mock, fs, tmp_pacchetti.json, né import legacy nelle route API.

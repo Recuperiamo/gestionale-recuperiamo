@@ -177,6 +177,7 @@ export default function ClientiPage() {
         editId={editId}
         setEditId={setEditId}
         loading={loading}
+        setAlert={setAlert}
       />
       <div className="max-w-3xl mx-auto my-8">
         <h2 className="text-xl font-bold mb-2">Lista Clienti</h2>
@@ -188,10 +189,12 @@ export default function ClientiPage() {
           dettaglioCliente={dettaglioCliente}
         />
       </div>
-      <ClienteDettaglioModal
-        cliente={dettaglioCliente}
-        onClose={handleCloseDetails}
-      />
+      {dettaglioCliente && (
+        <ClienteDettaglioModal
+          cliente={dettaglioCliente}
+          onClose={handleCloseDetails}
+        />
+      )}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { validateClientiForm } from "../../utils/clienti/validateClientiForm";
-export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, loading }) {
+
+export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, loading, setAlert }) {
   const [errors, setErrors] = useState([]);
 
   useEffect(() => {
@@ -16,9 +17,12 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
     const validationErrors = validateClientiForm(form);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
+      // MOSTRA ALERT ROSSO CON IL PRIMO ERRORE (o tutti aggregati se preferisci)
+      setAlert && setAlert({ type: "error", message: validationErrors.join(" ") });
       return;
     }
     setErrors([]);
+    if (setAlert) setAlert({ type: "", message: "" }); // chiudi eventuale alert errore precedente
     onAdd(form);
     if (!editId) {
       setForm({
@@ -45,6 +49,7 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
       note: ""
     });
     setErrors([]);
+    if (setAlert) setAlert({ type: "", message: "" });
   };
 
   return (
