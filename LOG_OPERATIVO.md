@@ -1,5 +1,37 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### [2025-08-18 14:45 UTC+2] Apertura milestone 4 – Gestione pacchetti ore: avvio sessione, verifica implementazioni e pianificazione task/issues
+
+- Inizio sessione milestone 4 (“Gestione pacchetti ore”), riferimento ROADMAP_MILESTONE_ISSUE_BOZZA.md.
+- Prima versione log-operativo della sessione: [2025-08-18 02:12 UTC+2] Chiusura milestone 3 (bugfix palette Alert, validazione email, aggiornamento regole anti-doppioni).
+- Verificata implementazione effettiva rispetto a roadmap:
+    - CRUD API pacchetti ore: GIÀ IMPLEMENTATO (app/api/pacchetti/route.js, test manuale documentato).
+    - UI pacchetti ore: solo componenti placeholder, da implementare.
+    - Decremento ore automatico su attività: NON IMPLEMENTATO.
+    - Alert soglia/esaurimento pacchetti: NON IMPLEMENTATO (solo Alert UI generale disponibile, nessuna logica soglia).
+    - Scenario test/manuale milestone, aggiornamento doc/standard e review milestone: DA ESEGUIRE.
+- Nessun conflitto/doppione rilevato.
+- Pronta la checklist completa milestone 4 (tasks/issues in formato markdown da draftare).
+- Avvio sessione formalizzato secondo ONBOARDING_SESSION.md e STANDARD_OPERATIVO.md (checklist spuntata).
+- Prossimi step:
+    1. Draft issue milestone 4 (tutte tranne CRUD API pacchetti).
+    2. Implementazione UI reale pacchetti ore e logiche mancanti.
+    3. Documentazione scenario test/manuale milestone e aggiornamento doc/standard operativo.
+    4. Push su branch di feature o main secondo policy.
+
+---
+**Versione STANDARD_OPERATIVO.md applicata**: 2025-08-17 16:45 UTC+2
+
+**File coinvolti:**
+- LOG_OPERATIVO.md
+
+**Scenario Test:**
+1. Verifica che la milestone 4 sia aperta con orario e descrizione nel log-operativo.
+2. Conferma checklist ONBOARDING_SESSION.md a inizio sessione.
+3. Controllo stato implementazioni effettive rispetto a roadmap e milestone.
+4. Nessun conflitto/doppione tra task/issues.
+5. Tasks/issues milestone 4 pronte per draft su GitHub.
+
 ### [2025-08-18 02:12 UTC+2] Chiusura milestone 3: bugfix palette Alert, validazione avanzata email, aggiornamento file strutturali e regole anti-doppioni
 
 - Chiusura milestone 3: completate tutte le attività previste (CRUD clienti, validazione form, UI Alert palette).
