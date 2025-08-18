@@ -1,5 +1,14 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+#### [2025-08-18 19:28 UTC+2] CHIUSURA SESSIONE – REVISIONE FINALE LOG, ORARI, FILE STRUTTURALI
+
+- **Chiusura sessione:**  
+  - Verificato e corretto orario checkpoint bandierina ([2025-08-18 18:11 UTC+2]).
+  - Eseguito test completo milestone #27 (monitoraggio e decremento automatico ore pacchetti): esito positivo, log coerente e progressivo.
+  - Aggiornati README.md e STANDARD_OPERATIVO.md con note su gestione orari e revisioni log.
+  - Pronto per nuova milestone/fase successiva.
+
+
 #### [2025-08-18 19:23 UTC+2] CHIUSURA ISSUE #27 – MONITORAGGIO E DECREMENTO AUTOMATICO ORE PACCHETTI
 
 - **Test eseguiti su API `/api/attivita` completati su branch principale.**
