@@ -750,7 +750,62 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Aggiornata la struttura della vista dettaglio cliente secondo le regole di separazione e riusabilità.
 - Effettuata verifica assenza di duplicati prima della creazione del nuovo file.
 - Aggiornata STANDARD_OPERATIVO.md e README.md dopo la modifica strutturale.
+# STANDARD OPERATIVO E FORMATTAZIONE (VINCOLANTE)
 
+...
+
+## Policy VINCOLANTE – Checklist di chiusura issue/milestone (2025-08-19 01:30 UTC+2)
+
+- **Compilazione checklist:**  
+  Le checklist di chiusura delle issue e delle milestone DEVONO essere compilate solo dopo aver verificato:
+  1. Che tutte le task siano effettivamente implementate nel codice e/o nella documentazione.
+  2. Che ci sia riscontro nei commit, nel LOG_OPERATIVO.md (con scenario test e orario), nei file README.md e in ogni file coinvolto.
+  3. Che sia presente uno scenario test manuale, superato e riportato nel log.
+
+- **Divieto di checklist “simulate” o “presunte”:**  
+  NON è consentito spuntare task come completate senza verifica oggettiva di codice, log, file e scenario test.
+
+- **Segnalazione e sospensione in caso di dubbio:**  
+  In caso di dubbio sull’effettivo completamento di una task, la checklist va sospesa e va segnalato il dubbio in chat/documentazione.  
+  La chiusura della issue/milestone va rimandata finché non c’è riscontro oggettivo.
+
+- **Audit periodico e controllo retroattivo:**  
+  Almeno una volta a milestone (o su richiesta), eseguire un audit delle checklist chiuse:
+    - Verificare presenza di commit, log, scenario test e documentazione per ogni task segnata come completata.
+    - In caso di discrepanze, correggere log e checklist e segnalare l’errore nei file di progetto.
+
+- **Comandi di ricerca consigliati per audit:**
+
+  CMD:
+  ```
+  findstr /spin "chiusa closed checklist" LOG_OPERATIVO.md
+  findstr /spin "alert notification email soglia" src\* app\* README.md 
+  
+  # STANDARD_OPERATIVO.md
+  ```
+
+  PowerShell:
+  ```
+  Select-String -Path LOG_OPERATIVO.md -Pattern "chiusa|closed|checklist"
+  Select-String -Path src\* -Pattern "alert|notification|email|soglia"
+  Select-String -Path app\* -Pattern "alert|notification|email|soglia"
+  Select-String -Path README.md -Pattern "alert|notification|email|soglia"
+  Select-String -Path STANDARD_OPERATIVO.md -Pattern "alert|notification|email|soglia"
+  ```
+
+- **Documentazione e aggiornamento:**  
+  Dopo ogni audit, riportare nel LOG_OPERATIVO.md:
+    - Orario e outcome dell’audit
+    - Eventuali discrepanze trovate e azioni correttive
+    - Riferimento agli orari e ai commit delle checklist revisionate
+
+...
+
+## [2025-08-19] – Policy milestone alert soglia/esaurimento pacchetti
+
+(Questa sezione è stata aggiornata e integrata con la nuova policy checklist)
+
+...
 # STANDARD OPERATIVO
 
 ...
