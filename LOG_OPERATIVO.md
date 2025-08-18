@@ -1,5 +1,13 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+
+#### [2025-08-18 18:36 UTC+2] ANALISI BASE REPO PER ISSUE #27 MONITORAGGIO E DECREMENTO AUTOMATICO ORE PACCHETTI
+
+- Ricevuti risultati ricerca file/cartelle: nessun file o modulo “attivit*” presente; directory e file “pacchetti” esistenti in .next, app/api, src/components, src/lib.
+- In `prisma/schema.prisma` presente solo il modello `PacchettoOre` con relazioni e campi `oreAcquistate`, `oreResidue`.
+- Nessun modello/route/endpoint/dir per “attività” o per decremento ore attualmente esistente.
+- Conclusione: necessario progettare da zero modello attività, API/route e logica decremento ore.
+- Aggiornato scenario test manuale e checklist, pronto per fase di progettazione e confronto struttura.
 #### [2025-08-18 18:32 UTC+2] APERTURA ISSUE #27 MONITORAGGIO E DECREMENTO AUTOMATICO ORE PACCHETTI
 
 - Inizializzata la gestione per l’implementazione di monitoraggio e decremento automatico delle ore residue sui pacchetti (issue #27).
