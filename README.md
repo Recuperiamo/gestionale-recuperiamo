@@ -929,6 +929,31 @@ Vedi anche `LOG_OPERATIVO.md` per storico operazioni, timestamp UTC+2 e dettagli
 
 ...
 
+# Gestionale Pacchetti Ore - Standard e Regole Provider Dati
+
+## Regole vincolanti
+- Tutte le API route in `app/api/pacchetti/*` DEVONO usare Prisma come unico provider dati.
+- È VIETATO importare o usare moduli mock (es. `src/lib/pacchetti.mock.js`) nelle route API reali.
+- Il file mock è mantenuto solo come esempio o per test manuali, ma va marcato come deprecato e protetto da uso accidentale.
+
+## Check obbligatori prima di ogni commit/push
+1. Lancia i seguenti comandi di ricerca per assicurarti che nessuna route API usi il mock:
+    - CMD:
+        ```
+        findstr /s /n /i "from \"@/lib/pacchetti" app\api\pacchetti\*.js
+        findstr /s /n /i "mock" app\api\pacchetti\*.js
+        ```
+    - PowerShell:
+        ```
+        Select-String -Path app/api/pacchetti/*.js -Pattern "from \"@/lib/pacchetti"
+        Select-String -Path app/api/pacchetti/*.js -Pattern "mock"
+        ```
+2. Ogni importazione dal mock va rimossa o bloccata.
+3. Tutte le operazioni CRUD vanno testate da UI e API per garantirne la coerenza.
+
+## Standard Operativo
+- Vedi anche `STANDARD_OPERATIVO.md` per dettagli su milestone, log operativo, policy di merge e naming file deprecati/mock.
+
 ## Standard operativo
 
 Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e log.

@@ -1,5 +1,18 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+#### [2025-08-18 18:10 UTC+2] DEBUG E PREVENZIONE USO MOCK/LEGACY PROVIDER DATI
+
+- Eseguita la ricerca globale sulle route API per pattern di import legacy/mock: "from \"@/lib/pacchetti", "mock", "fs.", "tmp_pacchetti.json".
+- Confermato che nessuna route API (`app/api/pacchetti/route.js`, `app/api/pacchetti/[id]/route.js`) importa più moduli mock o utilizza pattern deprecati.
+- Creato e spostato `src/lib/pacchetti.mock.js` con warning anti-uso e funzioni che lanciano errore se invocate.
+- Aggiornati README.md e STANDARD_OPERATIVO.md con:
+  - Regole vincolanti su provider dati
+  - Policy naming, deprecazione, controllo pre-commit/CI
+  - Scenario test manuale
+  - Comandi di ricerca obbligatori
+- Documentata la distinzione tra file mock e provider dati reale, inclusa motivazione su mantenimento del mock come esempio e fallback per test/manuali, ma con protezioni anti-uso.
+- Scenario test manuale svolto: ricerca provider dati, CRUD da UI e API, verifica assenza warning/errore, log aggiornato.
+
 #### [2025-08-18 17:42 UTC+2] RISOLUZIONE CRUD PACCHETTI ORE (PRISMA, APP ROUTER NEXT 15)
 
 - Integrato `export const runtime = "nodejs";` in `app/api/pacchetti/route.js` e `app/api/pacchetti/[id]/route.js` (verificato in entrambi i file).
