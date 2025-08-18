@@ -79,9 +79,9 @@ model Client {
 }
 
 model PacchettoOre {
-  id              Int       @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   clienteId       Int
-  cliente         Client    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente         Client      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   descrizione     String
   oreAcquistate   Int
   oreResidue      Int
@@ -89,6 +89,20 @@ model PacchettoOre {
   dataScadenza    DateTime?
   stato           String // es: 'attivo', 'esaurito', 'scaduto'
   note            String?
+  attivita        Attivita[]  // Relazione 1:N con Attivita (nuovo modello)
 
   @@index([clienteId])
+}
+
+// === ATTIVITA: monitoraggio e consumo ore pacchetti (issue #27) ===
+
+model Attivita {
+  id           Int           @id @default(autoincrement())
+  createdAt    DateTime      @default(now())
+  descrizione  String?
+  oreConsumate Int
+  pacchetto    PacchettoOre  @relation(fields: [pacchettoId], references: [id])
+  pacchettoId  Int
+
+  // Futuri: userId, tipoAttivita, stato, ...
 }

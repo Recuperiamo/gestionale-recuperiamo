@@ -1,6 +1,53 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+#### [2025-08-18 19:23 UTC+2] CHIUSURA ISSUE #27 – MONITORAGGIO E DECREMENTO AUTOMATICO ORE PACCHETTI
 
+- **Test eseguiti su API `/api/attivita` completati su branch principale.**
+    - POST crea attività e scala correttamente le ore residue nel pacchetto associato.
+    - Overbooking (oreConsumate > oreResidue) bloccato con risposta `"error":"Ore residue insufficienti"`.
+    - Stato pacchetto aggiornato in tempo reale (`attivo`/`esaurito`).
+    - I dati rimangono coerenti dopo refresh/API/DB.
+- **Scenario test manuale**:
+    1. Recuperato `pacchettoId` valido da API/Prisma Studio.
+    2. Testato inserimento attività regolare e overbooking.
+    3. Verificata consistenza ore residue e stato pacchetto.
+    4. Nessuna anomalia riscontrata.
+- **PowerShell:** curl non compatibile per POST JSON, test eseguiti da CMD.
+- **LOG_OPERATIVO.md** aggiornato con timestamp e scenario eseguito.
+- **Pronto per nuova milestone/fase successiva.**
+
+#### [2025-08-18 18:11 UTC+2] CHECKPOINT "BANDIERINA" POST-RESET PRISMA E FIX SESSIONPROVIDER
+
+- **Reset database** eseguito con successo tramite `npx prisma migrate dev --name init`.
+- **Tutte le tabelle** generate secondo schema Prisma, ambiente pronto per inserimento dati da UI/API/Prisma Studio.
+- **Problema NextAuth:** errore `"useSession must be wrapped in a <SessionProvider />"` su `/signin`.
+- **Diagnosi:** nessun `<SessionProvider />` in layout globale, né provider custom trovati.
+- **Fix:** aggiornato `app/layout.js` per includere `<SessionProvider />` come wrapper globale, dichiarazione `"use client";` aggiunta secondo standard Next.js 13+ e policy progetto.
+- **Test login:** eseguito login con successo, sessione funzionante, errori NextAuth risolti.
+- **Procedura batch password:** fornito comando PowerShell/Node per generazione hash bcrypt e inserimento sicuro password in Prisma Studio.
+- **Scenario test manuale post-fix:** login/logout/gestione sessione NextAuth, accesso a tutte le pagine protette, verifica utenti in DB dopo migration/reset.
+- **Repo pronta** per test su API Attività e logica decremento ore pacchetti.
+
+---
+
+**Scenario test manuale checkpoint:**
+1. Esegui reset/migrazione DB (`npx prisma migrate dev --name init`).
+2. Verifica che tutte le tabelle siano presenti via Prisma Studio.
+3. Aggiorna `app/layout.js` con `<SessionProvider />` e `"use client";`.
+4. Riavvia (`npm run dev`), accedi a `/signin`, esegui login/logout.
+5. Se necessario, batcha e inserisci password hashata in Prisma Studio.
+6. Verifica accesso alle pagine che usano `useSession`.
+7. Conferma assenza errori NextAuth/session provider in console.
+8. DB pronto per inserimento dati di test e test API attività.
+
+---
+
+
+
+**Pronto per procedere a:**
+- Test API attività (`/api/attivita`)
+- Test decremento ore pacchetti
+- Scenario test manuale completo su attività e logica business
 #### [2025-08-18 18:36 UTC+2] ANALISI BASE REPO PER ISSUE #27 MONITORAGGIO E DECREMENTO AUTOMATICO ORE PACCHETTI
 
 - Ricevuti risultati ricerca file/cartelle: nessun file o modulo “attivit*” presente; directory e file “pacchetti” esistenti in .next, app/api, src/components, src/lib.
