@@ -1,5 +1,11 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+#### [2025-08-18 18:32 UTC+2] APERTURA ISSUE #27 MONITORAGGIO E DECREMENTO AUTOMATICO ORE PACCHETTI
+
+- Inizializzata la gestione per l’implementazione di monitoraggio e decremento automatico delle ore residue sui pacchetti (issue #27).
+- Raccolte istruzioni operative, proposte, checklist e scenario test manuale per sviluppo e verifica.
+- Nessun file modificato nella fase di inizializzazione issue.
+
 #### [2025-08-18 18:25 UTC+2] CHIUSURA ISSUE #26 UI PACCHETTI ORE E ASSEGNAZIONE A CLIENTE
 
 - Completato sviluppo e test di tutte le funzionalità richieste:
