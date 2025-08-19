@@ -1,5 +1,3 @@
-// schema.prisma milestone CRUD reale Clienti & Pacchetti
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,17 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// === Modelli NextAuth + Ruoli già presenti ===
-
 model User {
   id       Int       @id @default(autoincrement())
   email    String    @unique
   name     String?
   password String
   roleId   Int
-  role     Role      @relation(fields: [roleId], references: [id])
   accounts Account[]
   sessions Session[]
+  role     Role      @relation(fields: [roleId], references: [id])
 }
 
 model Role {
@@ -31,7 +27,6 @@ model Role {
 model Account {
   id                Int     @id @default(autoincrement())
   userId            Int
-  user              User    @relation(fields: [userId], references: [id])
   type              String
   provider          String
   providerAccountId String
@@ -42,6 +37,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
+  user              User    @relation(fields: [userId], references: [id])
 
   @@unique([provider, providerAccountId])
 }
@@ -50,8 +46,8 @@ model Session {
   id           Int      @id @default(autoincrement())
   sessionToken String   @unique
   userId       Int
-  user         User     @relation(fields: [userId], references: [id])
   expires      DateTime
+  user         User     @relation(fields: [userId], references: [id])
 }
 
 model VerificationToken {
@@ -62,8 +58,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// === CLIENT: modello cliente milestone 3 ===
-
 model Client {
   id            Int            @id @default(autoincrement())
   nomeReferente String
@@ -73,36 +67,33 @@ model Client {
   codiceFiscale String?        @unique
   partitaIva    String?        @unique
   note          String?
-  pacchetti     PacchettoOre[] // Relazione 1:N
+  pacchetti     PacchettoOre[]
 
   @@index([email])
 }
 
 model PacchettoOre {
-  id              Int         @id @default(autoincrement())
-  clienteId       Int
-  cliente         Client      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  descrizione     String
-  oreAcquistate   Int
-  oreResidue      Int
-  dataAttivazione DateTime
-  dataScadenza    DateTime?
-  stato           String // es: 'attivo', 'esaurito', 'scaduto'
-  note            String?
-  attivita        Attivita[]  // Relazione 1:N con Attivita (nuovo modello)
+  id               Int        @id @default(autoincrement())
+  clienteId        Int
+  descrizione      String
+  oreAcquistate    Int
+  oreResidue       Int
+  dataAttivazione  DateTime
+  dataScadenza     DateTime?
+  stato            String
+  note             String?
+  sogliaOreResidue Int?
+  attivita         Attivita[]
+  cliente          Client     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
   @@index([clienteId])
 }
 
-// === ATTIVITA: monitoraggio e consumo ore pacchetti (issue #27) ===
-
 model Attivita {
-  id           Int           @id @default(autoincrement())
-  createdAt    DateTime      @default(now())
+  id           Int          @id @default(autoincrement())
+  createdAt    DateTime     @default(now())
   descrizione  String?
   oreConsumate Int
-  pacchetto    PacchettoOre  @relation(fields: [pacchettoId], references: [id])
   pacchettoId  Int
-
-  // Futuri: userId, tipoAttivita, stato, ...
+  pacchetto    PacchettoOre @relation(fields: [pacchettoId], references: [id])
 }

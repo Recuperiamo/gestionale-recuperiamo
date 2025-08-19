@@ -1,62 +1,117 @@
+import { PrismaClient } from "@prisma/client";
 
-export const runtime = "nodejs";
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+const prisma = new PrismaClient();
 
-async function parseJsonBody(req) {
-  try {
-    return await req.json();
-  } catch {
-    return null;
-  }
+// Calcola il prossimo progressivo
+async function getNextProgressivo(clienteId, dataAttivazione) {
+  const count = await prisma.pacchettoOre.count({
+    where: {
+      clienteId: Number(clienteId),
+      dataAttivazione: {
+        lte: new Date(dataAttivazione),
+      },
+    },
+  });
+  return `${clienteId}-${count + 1}`;
 }
 
-export async function GET() {
-  console.log("SONO NELLA GET DEL CRUD REALE PACCHETTI");
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+
+  if (request.nextUrl.pathname.endsWith("/progressivo")) {
+    const clienteId = searchParams.get("clienteId");
+    const dataAttivazione = searchParams.get("dataAttivazione");
+    if (!clienteId || !dataAttivazione) {
+      return Response.json(
+        { error: "clienteId e dataAttivazione obbligatori" },
+        { status: 400 }
+      );
+    }
+    const progressivo = await getNextProgressivo(clienteId, dataAttivazione);
+    return Response.json({ progressivo });
+  }
+
+  const clienteId = searchParams.get("clienteId");
   try {
     const pacchetti = await prisma.pacchettoOre.findMany({
-      include: { cliente: true },
-      orderBy: { id: 'asc' },
+      where: clienteId ? { clienteId: Number(clienteId) } : undefined,
+      orderBy: { id: "desc" },
+      include: {
+        cliente: { select: { id: true, nomeReferente: true } },
+        attivita: true,
+      },
     });
-    return NextResponse.json(pacchetti);
+    console.log("GET /api/pacchetti, pacchetti:", pacchetti); // DEBUG
+    return Response.json(pacchetti);
   } catch (error) {
-    return NextResponse.json({ error: 'Errore nel recupero pacchetti' }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const data = await parseJsonBody(req);
-    if (!data) return NextResponse.json({ error: "JSON non valido" }, { status: 400 });
-    const nuovoPacchetto = await prisma.pacchettoOre.create({ data });
-    return NextResponse.json(nuovoPacchetto, { status: 201 });
+    const body = await request.json();
+    console.log("BACKEND RICEVE BODY:", body); // DEBUG
+    const { clienteId, descrizione, oreAcquistate, dataAttivazione, stato } = body;
+    if (!clienteId || !oreAcquistate || !dataAttivazione || !stato) {
+      return Response.json(
+        { error: "Dati obbligatori mancanti" },
+        { status: 400 }
+      );
+    }
+
+    let finalDescrizione = descrizione;
+    if (!finalDescrizione || finalDescrizione.trim() === "") {
+      finalDescrizione = await getNextProgressivo(
+        clienteId,
+        dataAttivazione || new Date()
+      );
+    }
+
+    const pacchetto = await prisma.pacchettoOre.create({
+      data: {
+        clienteId: Number(clienteId),
+        descrizione: finalDescrizione,
+        oreAcquistate: Number(oreAcquistate),
+        oreResidue: Number(oreAcquistate),
+        dataAttivazione: new Date(dataAttivazione),
+        stato,
+        sogliaOreResidue: body.sogliaOreResidue !== undefined ? body.sogliaOreResidue : null,
+      },
+    });
+    console.log("PACCHETTO CREATO:", pacchetto); // DEBUG
+    return Response.json(pacchetto, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: 'Errore nella creazione pacchetto' }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }
 
-export async function PATCH(req) {
+export async function PUT(request) {
   try {
-    const data = await parseJsonBody(req);
-    if (!data) return NextResponse.json({ error: "JSON non valido" }, { status: 400 });
-    const { id, ...updateData } = data;
-    if (!id) return NextResponse.json({ error: 'ID pacchetto mancante' }, { status: 400 });
-    const updated = await prisma.pacchettoOre.update({ where: { id }, data: updateData });
-    return NextResponse.json(updated);
+    const body = await request.json();
+    const { id, ...updateData } = body;
+    if (!id) {
+      return Response.json({ error: "ID mancante" }, { status: 400 });
+    }
+    const pacchetto = await prisma.pacchettoOre.update({
+      where: { id: Number(id) },
+      data: updateData,
+    });
+    return Response.json(pacchetto);
   } catch (error) {
-    return NextResponse.json({ error: 'Errore aggiornamento pacchetto' }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }
 
-export async function DELETE(req) {
+export async function DELETE(request) {
   try {
-    const data = await parseJsonBody(req);
-    if (!data) return NextResponse.json({ error: "JSON non valido" }, { status: 400 });
-    const { id } = data;
-    if (!id) return NextResponse.json({ error: 'ID pacchetto mancante' }, { status: 400 });
-    await prisma.pacchettoOre.delete({ where: { id } });
-    return NextResponse.json({ result: 'Pacchetto eliminato' });
+    const { id } = await request.json();
+    if (!id) {
+      return Response.json({ error: "ID mancante" }, { status: 400 });
+    }
+    await prisma.pacchettoOre.delete({ where: { id: Number(id) } });
+    return Response.json({ result: "Pacchetto eliminato" });
   } catch (error) {
-    return NextResponse.json({ error: 'Impossibile eliminare il pacchetto' }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }

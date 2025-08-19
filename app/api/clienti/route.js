@@ -87,13 +87,24 @@ export async function POST(req) {
 
 export async function GET() {
   try {
+    // Restituisci tutti i campi necessari per la tabella clienti (UI) e per la select (PacchettoForm)
     const clienti = await prisma.client.findMany({
-      orderBy: { id: 'desc' }
+      orderBy: { id: 'desc' },
+      select: {
+        id: true,
+        nomeReferente: true,  // campo per la tabella clienti
+        email: true,          // campo per la tabella clienti
+        telefono: true,
+        indirizzo: true,
+        codiceFiscale: true,
+        partitaIva: true,
+        note: true,
+      }
     });
     return new Response(JSON.stringify(clienti), { status: 200 });
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: 'Errore durante la lettura della lista clienti' }),
+      JSON.stringify({ error: 'Errore durante la lettura della lista clienti: ' + error.message }),
       { status: 500 }
     );
   }

@@ -1,47 +1,59 @@
-export const runtime = "nodejs";
-console.log("==> CARICATO route.js CORRETTO IN app/api/pacchetti/[id]/route.js");
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
 
-export async function GET(request, contextPromise) {
-  const { params } = await contextPromise;
-  const id = Number(params.id);
+const prisma = new PrismaClient();
+
+// Next.js 13+: bisogna usare { params } come secondo argomento
+
+export async function GET(request, { params }) {
+  const { id } = params || {};
+  if (!id) {
+    return Response.json({ error: "Parametro id mancante" }, { status: 400 });
+  }
   try {
     const pacchetto = await prisma.pacchettoOre.findUnique({
-      where: { id },
-      include: { cliente: true }
+      where: { id: Number(id) },
+      include: {
+        cliente: { select: { id: true, nomeReferente: true } },
+        attivita: true,
+      },
     });
     if (!pacchetto) {
-      return NextResponse.json({ error: "Pacchetto non trovato" }, { status: 404 });
+      return Response.json({ error: "Pacchetto non trovato" }, { status: 404 });
     }
-    return NextResponse.json(pacchetto);
+    return Response.json(pacchetto);
   } catch (error) {
-    return NextResponse.json({ error: "Errore nel recupero pacchetto" }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }
 
-export async function PUT(request, contextPromise) {
-  const { params } = await contextPromise;
-  const id = Number(params.id);
-  const data = await request.json();
+export async function PATCH(request, { params }) {
+  const { id } = params || {};
+  if (!id) {
+    return Response.json({ error: "Parametro id mancante" }, { status: 400 });
+  }
   try {
-    const pacchettoAggiornato = await prisma.pacchettoOre.update({
-      where: { id },
-      data,
+    const body = await request.json();
+    const pacchetto = await prisma.pacchettoOre.update({
+      where: { id: Number(id) },
+      data: body,
     });
-    return NextResponse.json(pacchettoAggiornato);
+    return Response.json(pacchetto);
   } catch (error) {
-    return NextResponse.json({ error: "Pacchetto non trovato o update fallito" }, { status: 404 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }
 
-export async function DELETE(request, contextPromise) {
-  const { params } = await contextPromise;
-  const id = Number(params.id);
+export async function DELETE(request, { params }) {
+  const { id } = params || {};
+  if (!id) {
+    return Response.json({ error: "Parametro id mancante" }, { status: 400 });
+  }
   try {
-    await prisma.pacchettoOre.delete({ where: { id } });
-    return NextResponse.json({ success: true });
+    await prisma.pacchettoOre.delete({
+      where: { id: Number(id) },
+    });
+    return Response.json({ result: "Pacchetto eliminato" });
   } catch (error) {
-    return NextResponse.json({ error: "Pacchetto non trovato o delete fallita" }, { status: 404 });
+    return Response.json({ error: error.message }, { status: 400 });
   }
 }

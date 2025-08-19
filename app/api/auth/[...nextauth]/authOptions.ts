@@ -1,7 +1,6 @@
 // @ts-nocheck
-
+import { prisma } from '@/lib/prisma';
 import CredentialsProvider from "next-auth/providers/credentials";
-import prisma from "@/utils/prisma";
 import bcrypt from "bcryptjs";
 
 export const authOptions = {
