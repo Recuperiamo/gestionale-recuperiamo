@@ -984,3 +984,11 @@ Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e 
 
 ## Standard Operativo
 - Vedi anche `STANDARD_OPERATIVO.md` per dettagli su milestone, log operativo, policy di merge, naming file deprecati/mock.
+
+### Alert soglia/esaurimento pacchetti ore
+
+- Alert UI automatico in alto quando le ore residue di un pacchetto scendono sotto la soglia configurata (per-pacchetto).
+- La soglia può essere impostata o lasciata vuota/nulla (nessun alert).
+- L’alert è chiudibile per pacchetto e si applica solo se la condizione persiste.
+- Non è presente alert email né soglia globale (opzionali).
+- Scenario test manuale e dettagli nel LOG_OPERATIVO.md.

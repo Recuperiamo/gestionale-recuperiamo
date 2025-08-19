@@ -878,3 +878,14 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 ## Policy CI e pre-commit
 - Integrare i comandi di check come pre-commit hook (es: Husky) e/o step di CI per bloccare merge accidentali di mock.
 - Al termine fase migrazione/test, controllare e confermare rimozione file mock.
+
+## STANDARD OPERATIVO - Aggiornamento 2025-08-19 03:00 (UTC+2)
+
+### Funzionalità: Alert soglia/esaurimento pacchetti ore
+
+- Ogni pacchetto può avere una soglia (campo sogliaOreResidue): se le ore residue scendono al di sotto, compare un alert UI in alto, ben visibile.
+- L’alert è chiudibile per singolo pacchetto; la logica impedisce duplicazioni simultanee.
+- La soglia può essere lasciata vuota/nulla per disattivare l’alert su un pacchetto.
+- È possibile estendere la logica per una soglia globale (al momento non implementata).
+- L’invio email è opzionale e non implementato.
+- Tutti i test manuali richiesti sono descritti nel LOG_OPERATIVO.md.

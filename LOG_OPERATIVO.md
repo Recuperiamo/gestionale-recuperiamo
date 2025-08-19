@@ -1,5 +1,23 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+
+### [2025-08-19 02:55] Verifica reale e chiusura issue #28 ("Implementazione alert soglia/esaurimento pacchetti ore")
+- Test manuale eseguito:
+    1. Creato pacchetto con sogliaOreResidue=5 e oreResidue=4.
+    2. Confermata apparizione alert UI in alto (“Ore residue sotto soglia (5)!”).
+    3. Chiusura alert funzionante, alert rimane nascosto per quel pacchetto.
+    4. Portato oreResidue sopra soglia, alert non appare più.
+    5. Testato pacchetto senza soglia o con soglia nulla: nessun alert compare.
+    6. La notifica email è opzionale e non implementata, come da scelta progettuale.
+    7. Nessuna soglia globale implementata, ma la logica è pronta per futura estensione.
+    8. Aggiornata la UI secondo le ultime specifiche (alert in alto, ben visibile).
+- Esito: Tutti i punti richiesti dalla issue risultano coperti e funzionanti.
+- Nessun bug rilevato nell’attuale implementazione.
+- Comandi di verifica e ricerca utilizzati:
+    - Ricerca occorrenze alert/soglia nei componenti e nelle funzioni core.
+    - Verifica presenza/assenza logica email e soglia globale.
+- Pronto per chiusura issue #28.
+
 ### [2025-08-19 01:25 UTC+2] CREAZIONE AUDIT RETROATTIVO (ISSUE #32)
 - Creata issue #32 "AUDIT RETROATTIVO: verifica di tutte le issue chiuse precedenti" per lanciare audit sistematico di tutte le issue chiuse.
 - Inserito riferimento all’issue come commento e stabilito che tutte le sub-issue di audit dovranno essere collegate come sub-task.
