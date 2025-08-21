@@ -992,3 +992,28 @@ Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e 
 - L’alert è chiudibile per pacchetto e si applica solo se la condizione persiste.
 - Non è presente alert email né soglia globale (opzionali).
 - Scenario test manuale e dettagli nel LOG_OPERATIVO.md.
+
+# gestionale-recuperiamo
+
+## Funzionalità principali
+
+- CRUD pacchetti ore tramite API RESTful.
+- Gestione clienti e pacchetti associati.
+- Alert automatico per soglia ore residue.
+- **Nuovo:** nella tabella pacchetti sono presenti i bottoni “Modifica” ed “Elimina” che permettono azioni dirette sulla riga selezionata.
+
+## Avvio progetto e test
+
+1. Avviare backend e frontend come da istruzioni precedenti.
+2. Accedere alla sezione “Pacchetti”.
+3. Per ogni riga della tabella sono disponibili:
+   - **Modifica:** apre una modale precompilata, consente di aggiornare descrizione, ore residue, soglia.
+   - **Elimina:** chiede conferma, elimina il pacchetto e aggiorna la lista.
+4. Scenario test/manuale aggiornato:
+   - Modificare un pacchetto, salvare, verificare aggiornamento in tabella e via GET.
+   - Eliminare un pacchetto, confermare, verificare rimozione in tabella e via GET.
+   - Verificare la gestione degli annullamenti e degli errori di rete/API.
+
+## Documentazione tecnica
+
+- Vedi STANDARD_OPERATIVO.md per dettagli su workflow, formato log e regole commit/push.

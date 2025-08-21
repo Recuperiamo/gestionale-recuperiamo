@@ -889,3 +889,33 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - È possibile estendere la logica per una soglia globale (al momento non implementata).
 - L’invio email è opzionale e non implementato.
 - Tutti i test manuali richiesti sono descritti nel LOG_OPERATIVO.md.
+
+# STANDARD OPERATIVO
+
+## Regole vincolanti
+
+- Ogni modifica strutturale va documentata in questo file e in README.md.
+- Dopo ogni aggiunta di feature nella UI, aggiornare lo scenario test/manuale e le istruzioni operative.
+- I log operativi DEVONO riportare orario UTC+2 e seguire l’ordine richiesto (dal più recente al più vecchio).
+
+## Scenario test/manuale aggiornato
+
+### Modifica/Elimina pacchetto da UI
+
+1. Accedere alla sezione pacchetti.
+2. Per ogni riga, cliccare “Modifica”:
+   - Si apre una modale con i dati precompilati.
+   - Modificare almeno un campo e salvare.
+   - Verificare che la tabella si aggiorni e che la modifica sia persistente via GET API.
+   - Testare annullamento della modale (nessuna modifica deve essere applicata).
+3. Per ogni riga, cliccare “Elimina”:
+   - Si apre la modale di conferma.
+   - Confermare eliminazione.
+   - Verificare che la riga scompaia e che la cancellazione sia persistente via GET API.
+   - Testare annullamento della conferma (nessuna cancellazione deve avvenire).
+4. Simulare errori di rete/API e verificare la gestione degli errori nella UI.
+
+## Istruzioni operative aggiornate
+
+- Dopo ogni patch UI che modifica la struttura dei componenti o la UX, aggiornare README.md e LOG_OPERATIVO.md.
+- Segnalare sempre in chat eventuali omissioni o rischi di duplicato.

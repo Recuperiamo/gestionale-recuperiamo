@@ -1,6 +1,20 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
 
+- Data/Ora: 2025-08-21 23:22:00 (UTC+2)
+- Descrizione: 
+  - Integrati nella tabella pacchetti della UI (PacchettiList.jsx) due nuovi bottoni per ogni riga (“Modifica” ed “Elimina”).
+  - Creati i componenti PacchettoEditForm.jsx e ConfirmDeleteModal.jsx.
+  - Aggiornato scenario test/manuale, README.md e STANDARD_OPERATIVO.md.
+  - Verificato che la feature rispetti le milestone e i requisiti di test.
+  - Test manuale eseguito: modifica e cancellazione funzionanti, aggiornamento live della tabella, gestione annullamento ok.
+
+---
+
+**Step precedenti:**
+- Vedi entry precedente (ore 21:20-21:50): integrazione CRUD PATCH/DELETE e test API.
+- Vedi entry precedente (ore 19:10): verifica e test chiamate PATCH/DELETE da curl, debug permessi cartelle, nessuna modale pacchetti preesistente trovata.
+- Vedi entry precedente (ore 18:30): fix bug minori e review milestone 4.
 ### [2025-08-19 02:55] Verifica reale e chiusura issue #28 ("Implementazione alert soglia/esaurimento pacchetti ore")
 - Test manuale eseguito:
     1. Creato pacchetto con sogliaOreResidue=5 e oreResidue=4.
