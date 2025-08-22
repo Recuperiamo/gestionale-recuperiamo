@@ -1,4 +1,17 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+- 2025-08-23 01:53 UTC+2: **Aggiornamento MAPPA_STRUTTURA_PROGETTO.md**
+    - Allineata la mappa a struttura attuale: eliminati tutti i riferimenti a `/src`, aggiornata legenda e descrizione per `/app` root logica e `/tests` sede esclusiva dei test.
+    - Scenario test/manuale e note operative aggiornate.
+    - File coinvolti: MAPPA_STRUTTURA_PROGETTO.md, LOG_OPERATIVO.md
+    - Scenario test: vedi "Note operative e scenario test/manuale" in MAPPA_STRUTTURA_PROGETTO.md
+    
+    # LOG OPERATIVO - Aggiornato al 2025-08-23 01:40 UTC+2
+
+- 2025-08-23 01:40 UTC+2: Eliminazione completa della cartella `src` dopo verifica e migrazione totale di tutti i file utili. Confermata assenza di residui fuori da node_modules, test eseguiti e funzionanti dalla nuova struttura, nessun conflitto di path o duplicato.
+- 2025-08-23 01:33 UTC+2: Spostati i test di clienti da `src/components/clienti/__tests__` a `tests/components/clienti/` e confermato funzionamento test runner.
+- 2025-08-23 01:29 UTC+2: Creata la struttura definitiva `tests/components/clienti/` per i test dei clienti.
+- 2025-08-23 01:09 UTC+2: Aggiornati i file `README.md` e `STANDARD_OPERATIVO.md` per riflettere la nuova struttura senza `src` e con i test in `tests/components/clienti/`.
 ## LOG OPERATIVO - Ultimo aggiornamento: 2025-08-23 01:12:00 (UTC+2)
 
 - Aggiornamento struttura progetto: mantenuto solo context.md in root ed eliminato src/context.md. Aggiornata la descrizione struttura in context.md, README.md e STANDARD_OPERATIVO.md.

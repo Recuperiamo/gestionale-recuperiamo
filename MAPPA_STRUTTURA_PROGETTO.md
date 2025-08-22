@@ -1,9 +1,9 @@
-# Mappa Struttura Progetto – Ultimo aggiornamento: 2025-08-22 22:15 (UTC+2)
+# Mappa Struttura Progetto – Ultimo aggiornamento: 2025-08-23 02:05 (UTC+2)
 
 ```plaintext
 gestionale-recuperiamo/
 │
-├── app/                       # Cartella principale Next.js (tutte le route e la logica frontend/backend)
+├── app/                       # Cartella principale Next.js (route, logica frontend/backend, componenti, API, layout)
 │   ├── api/                   # Route API (Next.js Route Handlers)
 │   │   ├── attivita/
 │   │   │   └── route.js       # API: CRUD attività (usa Prisma)
@@ -12,12 +12,19 @@ gestionale-recuperiamo/
 │   │   └── ...                # Altre route API
 │   │
 │   ├── lib/                   # Librerie interne (shared code)
-│   │   └── prisma.js          # Inizializzazione e export client Prisma (DA NON RIMUOVERE)
+│   │   └── prisma.js          # Inizializzazione ed export client Prisma (DA NON RIMUOVERE)
 │   │
 │   ├── layout.js              # RootLayout globale, include <SessionProvider>
 │   ├── page.js                # Pagina principale (landing/homepage)
 │   ├── not-found.js           # Pagina 404 custom
-│   ├── ...                    # Altre pagine o layout di sezione
+│   ├── ...                    # Altre pagine, layout, componenti
+│
+├── tests/                     # Test automatici/unitari (Jest, Testing Library, ecc.)
+│   ├── components/
+│   │   └── clienti/
+│   │       ├── ClientiForm.integration.test.jsx
+│   │       └── validateClientiForm.test.js
+│   └── ...                    # Altri test organizzati per area/funzionalità
 │
 ├── prisma/                    # Schema e migrazioni Prisma
 │   ├── schema.prisma          # Definizione modello database
@@ -33,7 +40,7 @@ gestionale-recuperiamo/
 ├── README.md                  # Documentazione principale, include questa mappa
 ├── STANDARD_OPERATIVO.md      # Regole operative, convenzioni, checklist QA
 ├── LOG_OPERATIVO.md           # Log operativo sempre aggiornato (reverse chronological, UTC+2)
-├── MAPPA_STRUTTURA_PROGETTO.md # File mappa struttura (questo file)
+├── MAPPA_STRUTTURA_PROGETTO.md # Questo file, sempre aggiornato
 └── ...
 ```
 
@@ -41,11 +48,13 @@ gestionale-recuperiamo/
 
 ## Legenda Directory e File Chiave
 
-- **app/**: Tutto il codice dell’applicazione Next.js (route, pagine, layout, API, provider, shared code).
+- **app/**: Tutto il codice dell’applicazione Next.js (route, pagine, layout, API, provider, shared code, componenti).
     - **api/**: Endpoint backend, handler REST/POST/GET per ogni risorsa (CRUD attività, utenti, ecc).
     - **lib/prisma.js**: Client Prisma singleton, usato da tutte le route API per comunicare col database.
     - **layout.js**: Layout radice, include solo <SessionProvider> (non più provider custom).
     - **not-found.js**: Pagina custom 404.
+- **tests/**: Test automatici (Jest, React Testing Library, ecc.), organizzati per area funzionale.  
+  Esempio: `tests/components/clienti/ClientiForm.integration.test.jsx`
 - **prisma/**: Tutto ciò che riguarda Prisma e il database.
     - **schema.prisma**: Definizione DB, modelli, relazioni.
     - **migrations/**: Migrazioni generate da Prisma migrate.
@@ -59,29 +68,25 @@ gestionale-recuperiamo/
 
 ---
 
-## Note e punti di attenzione
+## Note operative e scenario test/manuale
 
-- **Provider React**: Usare SOLO quelli indicati in layout.js (es: <SessionProvider>); evitare provider custom non documentati.
-- **Import Prisma**: Usare sempre `import prisma from '../lib/prisma'` (path relativo corretto).
-- **Aggiornamento struttura**: Dopo ogni modifica strutturale, aggiornare MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
-- **Non duplicare file di provider, prisma, ecc.**: Prima di creare nuovi file, cerca sempre duplicati o file simili.
-- **Route API**: Ogni cartella sotto `app/api` rappresenta una risorsa REST, con un file `route.js` per gestirne i metodi.
-
----
-
-## Scenario test integrità struttura
-
-1. Da root, eseguire ricerca file chiave:
-    - Verificare presenza e unicità di `app/lib/prisma.js`, `app/layout.js`, `prisma/schema.prisma`.
-    - Cercare duplicati o file non documentati.
-2. Da fresh clone, lanciare:
-    - `npm install`
-    - `npx prisma generate`
-    - `npm run build` e `npm run dev`
-    - Navigare tra tutte le route e testare API CRUD.
-3. Dopo ogni modifica strutturale, confrontare la repo con questa mappa (tramite script o manualmente).
+**Dopo ogni modifica strutturale:**
+1. Aggiorna MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md.
+2. Esegui controllo duplicati file:
+   ```powershell
+   Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+   ```
+   Se lista vuota: repo pulita. Se presenti file, risolvere e loggare.
+3. Esegui:
+   - `npm install`
+   - `npx prisma generate`
+   - `npm run build`
+   - `npm run dev`
+   - `npm test`
+4. Naviga tra tutte le route e verifica funzionamento app, API, test.
+5. Conferma che la struttura reale coincida con questa mappa.
 
 ---
 
-**Ultimo aggiornamento mappa:** 2025-08-22 22:15 (UTC+2)  
+**Ultimo aggiornamento mappa:** 2025-08-23 01:52 (UTC+2)  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**
