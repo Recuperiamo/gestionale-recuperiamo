@@ -1029,3 +1029,45 @@ Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e 
 - `app/api/auth/[...nextauth]/authOptions.ts` – Configurazione NextAuth centralizzata.
 - `app/api/auth/[...nextauth]/route.js` – Handler NextAuth App Router.
 - `app/api/pacchetti/alert-letto/route.js` – API gestione alert pacchetti.
+
+```diff
+## 2025-08-22 21:50 UTC+2 — Aggiornamento struttura protezione accessi
+
+- Le pagine admin protette ora usano il componente centralizzato `AuthGuard` (`app/components/AuthGuard.js`).
+- Navbar presente solo sulle pagine admin.
+- Per aggiungere una nuova pagina protetta: wrappare il contenuto in `<AuthGuard>` e inserire `<Navbar />` come primo componente figlio.
+- Vedi STANDARD_OPERATIVO.md per scenario test e struttura aggiornata.
+```
+
+# Gestionale Pacchetti Ore – README
+
+## Migrazione componenti (update 2025-08-22)
+
+**ATTENZIONE:**  
+Dal 22-08-2025 tutti i componenti e moduli relativi a "clienti" e "pacchetti" (ed eventuali utils connessi) sono stati migrati definitivamente in `app/components/` e `app/utils/`.  
+Non utilizzare più le cartelle `src/components/clienti`, `src/components/pacchetti`, `src/utils/clienti` per sviluppo o fix: tali path sono ora dismessi e mantenuti solo per storico.
+
+Tutte le nuove feature, fix, refactor su questi componenti dovranno avvenire su `app/`.
+
+## Struttura cartelle aggiornata
+
+- `app/components/clienti/`  
+- `app/components/pacchetti/`  
+- `app/utils/clienti/`  
+- etc.
+
+## Build/test
+Procedere sempre con:
+```
+npm install
+npm run build
+npm run dev
+```
+e test manuale delle funzioni migrate.
+
+## Scenario test dopo refactor
+- Build e avvio senza errori
+- Navigazione completa clienti/pacchetti/dashboard
+- Funzionamento alert, modali, interazioni principali
+
+---

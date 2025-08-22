@@ -1,12 +1,17 @@
-"use client";
+'use client';
+
 import React from "react";
-import PacchettiList from "@/components/pacchetti/PacchettiList.jsx";
+import AuthGuard from '../components/AuthGuard';
+import Navbar from '../components/Navbar';
+import PacchettiList from '../components/pacchetti/PacchettiList';
 
 export default function PacchettiPage() {
   return (
-    <div>
-      <h1>Gestione Pacchetti Ore</h1>
-      <PacchettiList />
-    </div>
+    <AuthGuard>
+      <Navbar />
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
+        <PacchettiList />
+      </main>
+    </AuthGuard>
   );
 }

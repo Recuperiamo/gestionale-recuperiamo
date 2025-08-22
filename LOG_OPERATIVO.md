@@ -1,4 +1,56 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+# LOG OPERATIVO – Aggiornamento 2025-08-22 22:59 (UTC+2)
+
+## 2025-08-22 22:59 (UTC+2)
+- Ripristinata la pagina /pacchetti: reinserito il rendering del componente PacchettiList in app/pacchetti/page.js dopo la migrazione definitiva.
+- Ora la pagina mostra correttamente la lista, le modali, gli alert e tutte le funzionalità relative ai pacchetti.
+- Verificata la piena operatività di /pacchetti, /clienti, /dashboard, /signin.
+- Aggiornamento documentazione e scenario test OK.
+- Pronto per ulteriori refactor o test di stabilità.
+
+## 2025-08-22 22:55 (UTC+2)
+- Completata la migrazione definitiva dei componenti "clienti", "pacchetti" e relativi utils da src/components e src/utils a app/components e app/utils.
+- Eseguita la rimozione fisica dei vecchi file duplicati presenti in src/components/clienti, src/components/pacchetti e src/utils/clienti.
+- Aggiornati README.md e STANDARD_OPERATIVO.md per indicare che tutti i componenti e i moduli migrati devono essere gestiti solo da app/.
+- Verificato che nessun import nei file JS/JSX fa più riferimento ai vecchi path in src/.
+- Build eseguita con successo dopo la pulizia.
+- Setup scenario test manuale: build e navigazione completa delle pagine, verifica alert, modali e funzioni clienti/pacchetti/dashboard.
+- Prossimo step: debug pagina pacchetti.
+
+## 2025-08-22 21:50 (UTC+2)
+- Build Next.js fallita per assenza file migrati da src a app/components e app/utils.
+- Copiati tutti i file necessari da src/components/clienti, src/components/pacchetti, src/utils/clienti nelle relative cartelle app/.
+- Sistemati tutti gli import relativi nelle view e componenti.
+- Build tornata funzionante, confermata migrazione a struttura ibrida.
+
+## 2025-08-22 20:55 (UTC+2)
+- Inizio sessione: situazione pre-migrazione, struttura ancora duplicata su src e app.
+
+# LOG OPERATIVO – Aggiornamento 2025-08-22 22:55 (UTC+2)
+
+## 2025-08-22 22:55 (UTC+2)
+- Completata la migrazione definitiva dei componenti "clienti", "pacchetti" e relativi utils da `src/components` e `src/utils` a `app/components` e `app/utils`.
+- Eseguita la rimozione fisica dei vecchi file duplicati presenti in `src/components/clienti`, `src/components/pacchetti` e `src/utils/clienti`.
+- Aggiornati README.md e STANDARD_OPERATIVO.md per indicare che **tutti i componenti e i moduli migrati devono essere gestiti solo da `app/`**.
+- Verificato che nessun import nei file JS/JSX fa più riferimento ai vecchi path in `src/`.
+- Build eseguita con successo dopo la pulizia.
+- Setup scenario test manuale: build e navigazione completa delle pagine, verifica alert, modali e funzioni clienti/pacchetti/dashboard.
+- Prossimo step: debug pagina pacchetti.
+
+---
+
+## 2025-08-22 21:50 (UTC+2)
+- Build Next.js fallita per assenza file migrati da src a app/components e app/utils.
+- Copiati tutti i file necessari da src/components/clienti, src/components/pacchetti, src/utils/clienti nelle relative cartelle app/.
+- Sistemati tutti gli import relativi nelle view e componenti.
+- Build tornata funzionante, confermata migrazione a struttura ibrida.
+
+---
+
+## 2025-08-22 20:55 (UTC+2)
+- Inizio sessione: situazione pre-migrazione, struttura ancora duplicata su src e app.
+
 ### LOG OPERATIVO - Ultimo update: 2025-08-22 03:07 (UTC+2)
 
 - [2025-08-22 03:07 UTC+2] Fix propagazione id utente in sessione NextAuth:

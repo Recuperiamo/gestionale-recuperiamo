@@ -923,3 +923,32 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - `app/api/auth/[...nextauth]/authOptions.ts` – configurazione NextAuth centralizzata
 - `app/api/auth/[...nextauth]/route.js` – handler NextAuth
 - `app/api/pacchetti/alert-letto/route.js` – API alert pacchetti
+
+```diff
+## 2025-08-22 21:50 UTC+2 — Integrazione AuthGuard per tutte le pagine admin protette
+
+- Creato nuovo componente `app/components/AuthGuard.js`, DRY e centralizzato.
+- Aggiornate tutte le pagine admin (`/clienti/page.js`, `/pacchetti/page.js`, `/dashboard/page.js`, `/page.js`) con wrapper `<AuthGuard>` e `<Navbar>`.
+- Nessuna modifica a backend o logica NextAuth; nessun impatto su pagine pubbliche o signin.
+- Scenario test manuale e comandi push sempre aggiornati in README.md.
+```
+
+# STANDARD OPERATIVO – Aggiornamento 2025-08-22
+
+## Regole fondamentali
+
+- Non creare più file o fix in `src/components/clienti`, `src/components/pacchetti`, `src/utils/clienti`.
+- Tutti i componenti e moduli migrati vanno gestiti **esclusivamente** in `app/components` e `app/utils`.
+- Dopo ogni refactor strutturale, eliminare i doppioni da `src/` e aggiornare README/log.
+- Ad ogni modifica strutturale, aggiornare questo file e README.md segnalando la struttura corrente e regole di lavoro.
+- In caso di rischio duplicati o confusione per path legacy, segnalare subito in chat e NON procedere fino a chiarimento.
+- Ogni build/test dopo refactor deve essere seguito da scenario test manuale come descritto in README.
+- Alla chiusura milestone, verificare che nessun file migrato sia rimasto in src/components o src/utils.
+
+## Struttura corrente (post-migrazione 2025-08-22)
+
+- Tutti i componenti clienti e pacchetti sono in `app/components/`
+- Tutti gli utils migrati sono in `app/utils/`
+- Le cartelle `src/components/clienti`, `src/components/pacchetti`, `src/utils/clienti` sono da considerarsi obsolete e non vanno più toccate.
+
+---
