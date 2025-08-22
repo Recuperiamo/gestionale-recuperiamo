@@ -1,4 +1,11 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+### 2025-08-23 00:28 (UTC+2)
+- **Eliminato ARCHITETTURA_CARTELLE_BOZZA.md**: rimossa la vecchia "vision" architetturale per evitare ambiguità tra `app/` e `src/`.
+- **Confermata come unica fonte la mappa reale**: ora in MAPPA_STRUTTURA_PROGETTO.md, referenziata in README.md e STANDARD_OPERATIVO.md.
+- **Aggiornato README.md e STANDARD_OPERATIVO.md**: ora indicano esplicitamente che la root applicativa è `app/` (Next.js 13+); vietata la presenza di `src/` o altre strutture miste.
+- **Scenario test**: ricerca presenza `/src/`, verifica presenza/aggiornamento MAPPA_STRUTTURA_PROGETTO.md, controllo referenze errate in tutta la doc.
+
 ### 2025-08-22 23:57 (UTC+2)
 - **Aggiunto app/lib/prisma.js al repository**: file fondamentale per Prisma, ora versionato e pushato.
 - **Riepilogo stato**: build OK, tutte le dipendenze e path import sistemati, provider React superflui rimossi, log e file di standard aggiornati e pushati (vedi commit 75595e1 main).

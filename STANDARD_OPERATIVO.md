@@ -952,3 +952,47 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 - Le cartelle `src/components/clienti`, `src/components/pacchetti`, `src/utils/clienti` sono da considerarsi obsolete e non vanno più toccate.
 
 ---
+# STANDARD OPERATIVO – Gestionale Recuperiamo
+
+---
+
+## Principi vincolanti
+
+- **Struttura di riferimento:**  
+  L’unica fonte valida per la struttura della repo è **MAPPA_STRUTTURA_PROGETTO.md**.  
+  Ogni modifica strutturale (aggiunta, eliminazione, spostamento di cartelle/file chiave) impone l’aggiornamento di questo file, oltre che di README.md e LOG_OPERATIVO.md.
+- **Root logica:**  
+  Tutta la logica (UI, API, layout, shared code) è in `/app/`.  
+  È vietato creare o usare `/src/` o altre strutture “legacy”.
+- **Documentazione**  
+  - **MAPPA_STRUTTURA_PROGETTO.md** — unica mappa aggiornata e con legenda della struttura.
+  - **LOG_OPERATIVO.md** — log reverse order, con timestamp UTC+2.
+  - **README.md** — solo riferimenti a file reali; non includere più visioni teoriche o bozze disallineate.
+
+---
+
+## Regole di processo
+
+- Dopo ogni modifica strutturale, aggiorna SEMPRE:
+    - MAPPA_STRUTTURA_PROGETTO.md
+    - README.md
+    - STANDARD_OPERATIVO.md
+    - LOG_OPERATIVO.md
+- Elimina ogni riferimento a `/src/` e a documenti di vision/bozza non più allineati.
+- Ogni modifica che introduce/rimuove directory “core” va discussa e concordata in chat.
+- **Verifiche periodiche:**
+    - Cerca file duplicati/simili prima di proporre nuovi componenti o path.
+    - Dopo ogni push, verifica che la struttura reale coincida con la mappa riportata.
+
+---
+
+## Debug e test
+
+- **Scenario test integrità struttura:**  
+  Vedi README.md per lo scenario manuale aggiornato.
+- **Comandi di ricerca**:  
+  Consulta sempre la sezione “comandi di debug” in chat per trovare file, directory o duplicati.
+
+---
+
+Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)

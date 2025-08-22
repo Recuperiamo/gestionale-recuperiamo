@@ -1071,3 +1071,60 @@ e test manuale delle funzioni migrate.
 - Funzionamento alert, modali, interazioni principali
 
 ---
+
+# Gestionale Recuperiamo
+
+Gestionale per la gestione dei pacchetti ore e attività per didattica.
+
+---
+
+## Struttura e architettura del progetto
+
+**Riferimento unico e sempre aggiornato:**  
+Consulta il file  
+**MAPPA_STRUTTURA_PROGETTO.md**  
+per conoscere la struttura reale e aggiornata della repository, con legenda e descrizione di tutte le directory e dei file chiave.
+
+- **Root logica e tecnica:**  
+  Tutto il codice applicativo (UI, API, layout, shared code) è nella cartella **/app/**, secondo la convenzione Next.js 13+.  
+  Non esiste e non deve esistere alcuna cartella `/src/` o strutture “miste”.
+- **Database e Prisma:**  
+  Tutto il codice e le migrazioni relative a Prisma sono in `/prisma/`.
+- **Non usare documenti di “vision” disallineati**:  
+  Non sono più presenti file di architettura teorica o bozza; ogni modifica strutturale va riportata nella mappa reale e nel log operativo.
+
+---
+
+## Documentazione e file di processo
+
+- **MAPPA_STRUTTURA_PROGETTO.md**  
+  — Unica fonte per la struttura aggiornata del progetto. Da aggiornare dopo ogni modifica architetturale.
+- **LOG_OPERATIVO.md**  
+  — Log operativo di tutte le modifiche rilevanti, in reverse order, con orario UTC+2.
+- **STANDARD_OPERATIVO.md**  
+  — Regole vincolanti di formato, processo, aggiornamento documentazione, gestione debug e push.
+
+---
+
+## Regole di aggiornamento
+
+- Dopo ogni modifica strutturale, aggiorna **MAPPA_STRUTTURA_PROGETTO.md**, **README.md**, **STANDARD_OPERATIVO.md** e **LOG_OPERATIVO.md**.
+- Ogni file eliminato/aggiunto/trasformato deve essere riflesso nella mappa e nel log.
+- Non introdurre nuove directory “core” senza aggiornarle nella mappa e senza consultare il responsabile del progetto.
+
+---
+
+## Scenario test manuale (integrità struttura)
+
+1. Clona la repo, installa le dipendenze (`npm install`).
+2. Esegui:
+    - `npx prisma generate`
+    - `npm run build`
+    - `npm run dev`
+3. Naviga tra tutte le route.  
+4. Verifica che la struttura reale corrisponda a quanto riportato in **MAPPA_STRUTTURA_PROGETTO.md**.
+5. Accertati che non esistano riferimenti o directory `/src/` o simili.
+
+---
+
+Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)
