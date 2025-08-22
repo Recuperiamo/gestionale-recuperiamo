@@ -1128,3 +1128,15 @@ per conoscere la struttura reale e aggiornata della repository, con legenda e de
 ---
 
 Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)
+
+## Struttura delle cartelle
+
+- `app/`: pagine dell’applicazione, API localizzate e layout principali (Next.js "app router").
+- `components/`: componenti React riusabili (UI, CRUD, ecc.).
+- `fetcher/`: funzioni per la gestione delle chiamate API lato frontend.
+- `lib/`: librerie, helpers e codice condiviso.
+- `models/`: modelli dati e logica di dominio.
+- `utils/`: utilities generiche e helpers.
+- `public/`: risorse statiche (immagini, icone, ecc.).
+
+Consulta il file `context.md` in ogni cartella per una descrizione dettagliata del suo scopo.

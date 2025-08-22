@@ -5,8 +5,11 @@ Questa repository segue una struttura modulare e ordinata per facilitare la manu
 ## Cartelle principali
 
 - `app/`: contiene le pagine dell’applicazione, le API localizzate e i layout principali (Next.js "app router").
-- `src/components/`: componenti React riusabili (UI, CRUD, ecc.).
-- `src/fetcher/`: funzioni che gestiscono le chiamate alle API lato frontend.
+- `components/`: componenti React riusabili (UI, CRUD, ecc.).
+- `fetcher/`: funzioni che gestiscono le chiamate alle API lato frontend.
+- `lib/`: librerie, helpers e codice condiviso.
+- `models/`: modelli dati e logica di dominio.
+- `utils/`: utilities generiche e helpers.
 - `public/`: risorse statiche (immagini, icone, ecc.).
 
 Consulta il file `context.md` in ogni cartella per una descrizione dettagliata del suo scopo.

@@ -1,5 +1,9 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+## LOG OPERATIVO - Ultimo aggiornamento: 2025-08-23 01:12:00 (UTC+2)
 
+- Aggiornamento struttura progetto: mantenuto solo context.md in root ed eliminato src/context.md. Aggiornata la descrizione struttura in context.md, README.md e STANDARD_OPERATIVO.md.
+- Eliminati tutti i riferimenti a /src/ nella documentazione.
+- Aggiornato il log operativo e forniti comandi per il push di tutti i file modificati.
 ### 2025-08-23 00:28 (UTC+2)
 - **Eliminato ARCHITETTURA_CARTELLE_BOZZA.md**: rimossa la vecchia "vision" architetturale per evitare ambiguità tra `app/` e `src/`.
 - **Confermata come unica fonte la mappa reale**: ora in MAPPA_STRUTTURA_PROGETTO.md, referenziata in README.md e STANDARD_OPERATIVO.md.

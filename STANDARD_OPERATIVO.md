@@ -996,3 +996,41 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 ---
 
 Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)
+
+## Struttura progetto
+
+- `app/`: pagine, API locali, layout principali (Next.js app router).
+- `components/`: componenti React riusabili.
+- `fetcher/`: funzioni per chiamate API lato frontend.
+- `lib/`: helpers, utility e codice condiviso.
+- `models/`: modelli dati e logica di dominio.
+- `utils/`: utilities e helpers generici.
+- `public/`: risorse statiche condivise.
+
+## Regole base
+
+- Aggiorna SEMPRE README.md e LOG_OPERATIVO.md dopo ogni modifica strutturale.
+- Dopo ogni modifica alla struttura aggiorna anche questo file, indicando la sezione aggiornata.
+- Tutte le operazioni, revisioni e fix devono essere tracciate nel LOG_OPERATIVO.md con data/ora UTC+2.
+- Fornisci sempre scenario test/manuale per ogni milestone o modifica strutturale.
+
+## Workflow commit & branch
+
+- Lavora su branch feature o fix quando possibile.
+- Descrivi ogni commit in modo chiaro, indicando se si tratta di refactor, fix, feature, docs, test.
+- Dopo ogni milestone chiusa, verifica la coerenza e progressività degli orari nel log operativo.
+- Crea subito una nuova milestone per la fase successiva dopo la chiusura di quella attuale.
+
+## Naming & convenzioni
+
+- Cartelle e file in lower-case separati da trattino (`-`) o camelCase.
+- Componenti React: PascalCase.
+- Funzioni e variabili: camelCase.
+- Modelli dati: PascalCase.
+
+## Scenario test/manuale
+
+1. Verifica che la struttura delle cartelle sia conforme a quanto sopra.
+2. Controlla che README.md, LOG_OPERATIVO.md e questo file siano coerenti tra loro.
+3. Effettua una ricerca di eventuali riferimenti obsoleti a `/src/`.
+4. Valida la build e il funzionamento del gestionale.
