@@ -1140,3 +1140,83 @@ Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)
 - `public/`: risorse statiche (immagini, icone, ecc.).
 
 Consulta il file `context.md` in ogni cartella per una descrizione dettagliata del suo scopo.
+
+# Gestionale Pacchetti Ore – Recuperiamo
+
+## Descrizione
+Applicazione Next.js 15, TypeScript, Tailwind CSS per la gestione dei pacchetti ore, clienti e attività.
+
+---
+
+## Struttura attuale della repository (2025-08-23)
+
+- **/app/**  
+  Unico entrypoint applicativo (route, API, layout, componenti, shared code).
+- **/tests/**  
+  Test automatici (es: `/tests/components/clienti/`).
+- **/public/**  
+  Asset statici.
+- **/prisma/**  
+  Schema e migrazioni Prisma.
+- **/node_modules/**  
+  Dipendenze (NON versionate).
+- **File root:**  
+  - `README.md`, `STANDARD_OPERATIVO.md`, `LOG_OPERATIVO.md`, `MAPPA_STRUTTURA_PROGETTO.md`
+  - Configurazione Next.js, Tailwind, Prisma, ESLint, ecc.
+
+---
+
+## Policy fondamentali (post-migrazione 2025-08-23)
+
+- Tutto il codice, componenti e moduli sono in `/app` (NON usare più `/src`).
+- I test sono in `/tests` (NON più in `src/components/__tests__` o simili).
+- Aggiorna SEMPRE README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md dopo ogni modifica strutturale.
+- Prima di proporre file/componenti, esegui il controllo file duplicati:
+  ```powershell
+  Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+  ```
+  Se la lista è vuota, annota nel log che la repo è pulita. Se ci sono doppioni, risolvi PRIMA di proseguire.
+
+---
+
+## Avvio rapido
+
+```bash
+npm install
+npm run dev
+```
+Applicazione su [http://localhost:3000](http://localhost:3000)
+
+---
+
+## Test automatici
+
+1. I test sono in `/tests` (es: `/tests/components/clienti/ClientiForm.integration.test.jsx`)
+2. Per eseguire:
+   ```bash
+   npm test
+   ```
+3. Tutti i test devono passare senza errori.
+4. Dopo ogni modifica a test, aggiorna README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md.
+
+---
+
+## Scenario test/manuale struttura
+
+1. Clona la repo, esegui `npm install`, `npx prisma generate`, `npm run build`, `npm run dev`
+2. Naviga tra tutte le route e verifica funzionamento app
+3. Esegui controllo duplicati (vedi comando sopra)
+4. Verifica che la struttura reale coincida con MAPPA_STRUTTURA_PROGETTO.md
+5. Accertati che non esistano directory o riferimenti a `/src/`
+
+---
+
+## Note operative
+
+- Segui sempre STANDARD_OPERATIVO.md per policy, format, commit, log, milestones.
+- Ogni modifica strutturale va riflessa in README, STANDARD_OPERATIVO, LOG_OPERATIVO, MAPPA_STRUTTURA_PROGETTO.
+- Consulta MAPPA_STRUTTURA_PROGETTO.md per la mappa aggiornata.
+
+---
+
+Ultimo aggiornamento: 2025-08-23 01:41 UTC+2

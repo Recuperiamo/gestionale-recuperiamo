@@ -1034,3 +1034,83 @@ Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)
 2. Controlla che README.md, LOG_OPERATIVO.md e questo file siano coerenti tra loro.
 3. Effettua una ricerca di eventuali riferimenti obsoleti a `/src/`.
 4. Valida la build e il funzionamento del gestionale.
+
+# STANDARD OPERATIVO E FORMATTAZIONE (VINCOLANTE)
+
+...
+
+## Regole vincolanti (aggiornamento: 2025-08-23 01:41 UTC+2)
+
+- Tutto il codice applicativo (UI, API, componenti, moduli) deve essere sotto la cartella `/app` (root logica e tecnica).
+- Non è più consentito l’uso di `/src` per codice, componenti, moduli o utilità. Qualsiasi file residuo in `/src` va eliminato.
+- I test automatici sono gestiti nella cartella `/tests`, con struttura libera e scalabile (es: `/tests/components/clienti/`).
+- File di configurazione (Next.js, Tailwind, Prisma, ecc.) e documentazione (README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md) risiedono in root.
+- Segui sempre la struttura e la legenda di MAPPA_STRUTTURA_PROGETTO.md. Aggiorna questo file e la mappa dopo ogni modifica strutturale.
+- Policy anti-doppioni: prima di ogni chiusura milestone ed ogni nuova feature, esegui SEMPRE il controllo file duplicati (vedi comandi in README.md e sotto).
+- Qualsiasi anomalia, variazione o rischio di duplicato va documentato in LOG_OPERATIVO.md e risolto prima della milestone successiva.
+- Ogni modifica a README.md, STANDARD_OPERATIVO.md, o file strutturali, DEVE essere riportata nel log con timestamp UTC+2, scenario test e lista file coinvolti.
+- Dopo ogni modifica strutturale: aggiorna README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md.
+
+...
+
+## Policy struttura e aggiornamento directory
+
+- Root codice: `/app/`
+- Test automatici: `/tests/` (con struttura libera, es: `/tests/components/clienti/`)
+- Configurazione e documentazione: solo in root
+- Cartella `/src`: **VIETATA** per qualsiasi nuovo codice, componente, modulo, utilità.
+- Dopo ogni refactor eliminare eventuali residui in `/src` e aggiorna la documentazione.
+- Dopo ogni modifica, controlla che la struttura reale coincida con la mappa e aggiorna tutti i file di processo.
+
+...
+
+## Regole anti-doppioni
+
+- Prima di proporre o creare nuovi file/componenti, controlla SEMPRE se esiste già un file con nome simile (anche con estensione diversa) nella repo o nei path coinvolti.
+- Esegui sempre, prima di ogni milestone e dopo ogni refactor strutturale, il controllo:
+  ```powershell
+  Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+  ```
+- Se sono presenti doppioni, risolvi e documenta nel LOG_OPERATIVO.md.
+- Se la lista è vuota, annota nel log che la repo è pulita.
+- Dopo ogni refactor elimina i doppioni residui da `/src` o altre cartelle dismesse.
+
+...
+
+## Policy test automatici
+
+- Tutti i test sono in `/tests/`, con struttura libera e scalabile.
+- Esegui i test con `npm test` e assicurati che tutti passino prima di push.
+- Aggiorna README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md dopo ogni modifica a questa struttura.
+- Non lasciare test annidati in vecchie directory (`src/components/__tests__` o simili).
+
+...
+
+## Scenario test/manuale struttura e duplicati
+
+1. Esegui il controllo duplicati file (vedi comando sopra).
+2. Verifica che la cartella `/src` sia assente o vuota.
+3. Verifica che tutti i test siano in `/tests` e vengano eseguiti correttamente.
+4. Aggiorna log e documentazione dopo ogni modifica.
+
+...
+
+## Struttura attuale (2025-08-23)
+
+- `/app`: entrypoint unico, tutte le route, componenti, API, shared code.
+- `/tests`: test automatici (es: `/tests/components/clienti/`)
+- `/public`: asset statici
+- `/prisma`: schema e migrazioni Prisma
+- File di configurazione/doc root: `README.md`, `STANDARD_OPERATIVO.md`, `LOG_OPERATIVO.md`, `MAPPA_STRUTTURA_PROGETTO.md`, ecc.
+
+...
+
+## Regole di commit, milestone, log
+
+- Dopo ogni modifica strutturale, aggiorna tutti i file di processo e la mappa.
+- Alla chiusura di ogni milestone, verifica coerenza, progressività e presenza di timestamp UTC+2 nel log.
+- Crea subito una nuova milestone dopo la chiusura della precedente.
+
+...
+
+Ultimo aggiornamento: 2025-08-23 02:00 UTC+2
