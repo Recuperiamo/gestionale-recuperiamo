@@ -52,29 +52,52 @@ export async function POST(request) {
   try {
     const body = await request.json();
     console.log("BACKEND RICEVE BODY:", body); // DEBUG
-    const { clienteId, descrizione, oreAcquistate, dataAttivazione, stato } = body;
-    if (!clienteId || !oreAcquistate || !dataAttivazione || !stato) {
+
+    // Normalizza clienteId (accetta anche stringa numerica)
+    let clienteId = body.clienteId;
+    if (typeof clienteId === "string") clienteId = Number(clienteId);
+
+    // Validazione dettagliata
+    if (!clienteId || isNaN(clienteId) || clienteId <= 0) {
       return Response.json(
-        { error: "Dati obbligatori mancanti" },
+        { error: "Dati obbligatori mancanti: clienteId" },
+        { status: 400 }
+      );
+    }
+    if (!body.oreAcquistate || isNaN(Number(body.oreAcquistate)) || Number(body.oreAcquistate) <= 0) {
+      return Response.json(
+        { error: "Dati obbligatori mancanti: oreAcquistate" },
+        { status: 400 }
+      );
+    }
+    if (!body.dataAttivazione) {
+      return Response.json(
+        { error: "Dati obbligatori mancanti: dataAttivazione" },
         { status: 400 }
       );
     }
 
-    let finalDescrizione = descrizione;
+    // Default stato a "attivo" se non fornito
+    let stato = body.stato || "attivo";
+
+    // Se manca descrizione, genera progressivo
+    let finalDescrizione = body.descrizione;
     if (!finalDescrizione || finalDescrizione.trim() === "") {
       finalDescrizione = await getNextProgressivo(
         clienteId,
-        dataAttivazione || new Date()
+        body.dataAttivazione || new Date()
       );
     }
 
     const pacchetto = await prisma.pacchettoOre.create({
       data: {
-        clienteId: Number(clienteId),
+        clienteId: clienteId,
         descrizione: finalDescrizione,
-        oreAcquistate: Number(oreAcquistate),
-        oreResidue: Number(oreAcquistate),
-        dataAttivazione: new Date(dataAttivazione),
+        oreAcquistate: Number(body.oreAcquistate),
+        oreResidue: body.oreResidue !== undefined
+          ? Number(body.oreResidue)
+          : Number(body.oreAcquistate),
+        dataAttivazione: new Date(body.dataAttivazione),
         stato,
         sogliaOreResidue: body.sogliaOreResidue !== undefined ? body.sogliaOreResidue : null,
       },
@@ -82,6 +105,7 @@ export async function POST(request) {
     console.log("PACCHETTO CREATO:", pacchetto); // DEBUG
     return Response.json(pacchetto, { status: 201 });
   } catch (error) {
+    console.error("ERRORE POST /api/pacchetti:", error);
     return Response.json({ error: error.message }, { status: 400 });
   }
 }

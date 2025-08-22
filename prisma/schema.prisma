@@ -16,6 +16,7 @@ model User {
   accounts Account[]
   sessions Session[]
   role     Role      @relation(fields: [roleId], references: [id])
+  pacchettoAlertLetti PacchettoAlertLetto[] // <--- AGGIUNTA
 }
 
 model Role {
@@ -85,6 +86,7 @@ model PacchettoOre {
   sogliaOreResidue Int?
   attivita         Attivita[]
   cliente          Client     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  pacchettoAlertLetti PacchettoAlertLetto[] // <--- AGGIUNTA
 
   @@index([clienteId])
 }
@@ -96,4 +98,17 @@ model Attivita {
   oreConsumate Int
   pacchettoId  Int
   pacchetto    PacchettoOre @relation(fields: [pacchettoId], references: [id])
+}
+
+// AGGIUNTA FINALE: RELAZIONE ALERT LETTI PACCHETTI/UTENTE
+
+model PacchettoAlertLetto {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  pacchettoId Int
+  letto       Boolean       @default(true)
+  dataLetto   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id])
+  pacchetto   PacchettoOre  @relation(fields: [pacchettoId], references: [id])
+  @@unique([userId, pacchettoId])
 }

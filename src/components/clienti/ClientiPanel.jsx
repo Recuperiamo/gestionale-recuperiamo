@@ -8,7 +8,7 @@ import React, { useEffect, useState } from "react";
 import ClientiTable from "./ClientiTable";
 import ClientiForm from "./ClientiForm";
 import ClienteDettaglioModal from "./ClienteDettaglioModal";
-import Alert from "./Alert";
+import Alert from "../../Alert";
 import DiagnosiPanel from "./DiagnosiPanel";
 import { fetchClienti, deleteCliente, updateCliente, creaCliente } from "@/src/fetcher/clienti/clientiAPI";
 

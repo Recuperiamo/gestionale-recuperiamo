@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Alert from '@/components/Alert';
-import ClientiForm from '@/components/clienti/ClientiForm';
-import ClientiTable from '@/components/clienti/ClientiTable';
-import ClienteDettaglioModal from '@/components/clienti/ClienteDettaglioModal';
-
-console.log("DEBUG APP ENTRY POINT - clienti/page.js - 2025-08-17 12:00 UTC+2");
+import React, { useState, useEffect } from "react";
+import AuthGuard from '../components/AuthGuard';
+import Navbar from '../components/Navbar';
+import Alert from '../components/Alert';
+import ClientiForm from '../components/clienti/ClientiForm';
+import ClientiTable from '../components/clienti/ClientiTable';
+import ClienteDettaglioModal from '../components/clienti/ClienteDettaglioModal';
 
 export default function ClientiPage() {
   const [form, setForm] = useState({
@@ -23,6 +23,10 @@ export default function ClientiPage() {
   const [clienti, setClienti] = useState([]);
   const [editId, setEditId] = useState(null);
   const [dettaglioCliente, setDettaglioCliente] = useState(null);
+
+  // Collapse state
+  const [showForm, setShowForm] = useState(false);
+  const [showList, setShowList] = useState(false);
 
   // Carica lista clienti
   useEffect(() => {
@@ -168,33 +172,67 @@ export default function ClientiPage() {
   };
 
   return (
-    <>
+    <AuthGuard>
+      <Navbar />
       <Alert message={alert.message} type={alert.type} onClose={() => setAlert({ message: '', type: 'error' })} />
-      <ClientiForm
-        onAdd={handleFormSubmit}
-        form={form}
-        setForm={setForm}
-        editId={editId}
-        setEditId={setEditId}
-        loading={loading}
-        setAlert={setAlert}
-      />
-      <div className="max-w-3xl mx-auto my-8">
-        <h2 className="text-xl font-bold mb-2">Lista Clienti</h2>
-        <ClientiTable
-          clienti={clienti}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onViewDetails={handleViewDetails}
-          dettaglioCliente={dettaglioCliente}
-        />
+
+      {/* Collapse: Form nuovo cliente */}
+      <div className="max-w-3xl mx-auto mb-4 border-b border-gray-200">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 text-left text-lg font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-t transition"
+          aria-expanded={showForm}
+          onClick={() => setShowForm(s => !s)}
+        >
+          <span>➕ Nuovo cliente</span>
+          <span className="ml-2">{showForm ? "▲" : "▼"}</span>
+        </button>
+        <div className={`overflow-hidden transition-all duration-300 ${showForm ? "max-h-[800px] py-4 px-4 bg-white" : "max-h-0"}`}>
+          {showForm && (
+            <ClientiForm
+              onAdd={handleFormSubmit}
+              form={form}
+              setForm={setForm}
+              editId={editId}
+              setEditId={setEditId}
+              loading={loading}
+              setAlert={setAlert}
+            />
+          )}
+        </div>
       </div>
+
+      {/* Collapse: Lista clienti */}
+      <div className="max-w-3xl mx-auto mb-4 border-b border-gray-200">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 text-left text-lg font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-t transition"
+          aria-expanded={showList}
+          onClick={() => setShowList(s => !s)}
+        >
+          <span>📋 Lista clienti</span>
+          <span className="ml-2">{showList ? "▲" : "▼"}</span>
+        </button>
+        <div className={`overflow-hidden transition-all duration-300 ${showList ? "max-h-[2000px] py-4 px-2 bg-white" : "max-h-0"}`}>
+          {showList && (
+            <>
+              <h2 className="text-xl font-bold mb-2">Lista Clienti</h2>
+              <ClientiTable
+                clienti={clienti}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onViewDetails={handleViewDetails}
+                dettaglioCliente={dettaglioCliente}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
       {dettaglioCliente && (
         <ClienteDettaglioModal
           cliente={dettaglioCliente}
           onClose={handleCloseDetails}
         />
       )}
-    </>
+    </AuthGuard>
   );
 }

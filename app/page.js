@@ -1,180 +1,169 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import AuthGuard from "./components/AuthGuard";
 import Navbar from "./components/Navbar";
 import Link from "next/link";
 import '../styles/globals.css';
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
-  if (status === "loading") return null;
-  if (!session) {
-    router.replace("/signin");
-    return null;
-  }
-
-  // Solo admin può restare su dashboard, gli altri redirect a /profilo
-  if (session.user?.role !== "admin") {
-    router.replace("/profilo");
-    return null;
-  }
-
-  const userRole = session.user?.role || "Ruolo non definito";
-
   return (
-    <div style={{ minHeight: "100vh", background: "#20489a" }}>
-      <Navbar />
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          gap: "12px",
-          maxWidth: 540,
-          margin: "0 auto",
-          padding: "24px 0 0 0"
-        }}
-      >
-        {/* Bottone gestione clienti visibile solo per admin */}
-        {session.user?.role === "admin" && (
-          <Link
-            href="/clienti"
-            style={{
-              background: "#1cb0f6",
-              color: "#fff",
-              padding: "9px 22px",
-              borderRadius: "6px",
-              fontWeight: 600,
-              fontSize: 16,
-              textDecoration: "none",
-              transition: "background 0.2s"
-            }}
-            onMouseOver={e => (e.currentTarget.style.background = "#197dbb")}
-            onMouseOut={e => (e.currentTarget.style.background = "#1cb0f6")}
-          >
-            Gestione clienti
-          </Link>
-        )}
-        <Link
-          href="/profilo"
-          style={{
-            background: "#fff",
-            color: "#20489a",
-            padding: "9px 22px",
-            borderRadius: "6px",
-            fontWeight: 600,
-            fontSize: 16,
-            textDecoration: "none",
-            border: "1.5px solid #20489a"
-          }}
-        >
-          Profilo
-        </Link>
-      </div>
-      <main
-        style={{
-          maxWidth: 540,
-          margin: "40px auto 0 auto",
-          background: "#20489a",
-          color: "#fff",
-          padding: "0 0 32px 0",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{
-            fontSize: 32,
-            fontWeight: 700,
-            marginTop: 24,
-            marginBottom: 10,
-            letterSpacing: "-0.8px"
-          }}>
-            Dashboard Admin
-          </div>
-          <div style={{
-            fontSize: 18,
-            marginBottom: 24,
-            fontWeight: 400
-          }}>
-            Traccia le ore dei tuoi clienti, gestisci gli appuntamenti e condividi i riepiloghi.
-          </div>
-          <div style={{
-            fontSize: 15,
-            fontWeight: 600,
-            marginBottom: 6,
-            letterSpacing: "0.3px",
-            color: "#1cb0f6",
-          }}>
-            Ruolo attuale: <span style={{ color: "#fff", background: "#1cb0f6", borderRadius: "5px", padding: "2px 10px", marginLeft: "4px" }}>{userRole}</span>
-          </div>
-        </div>
-        <section
-          style={{
-            background: "#fff",
-            borderRadius: 18,
-            padding: "32px 32px 28px 32px",
-            margin: "0 0 36px 0",
-            boxShadow: "0 4px 20px 0 rgba(32,72,154,0.05)",
-            color: "#20489a",
-          }}
-        >
-          <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 22 }}>👤➕</span> Aggiungi un Nuovo Cliente
-          </div>
-          <form style={{ display: "flex", gap: 14 }}>
-            <input
+    <AuthGuard requireAdmin>
+      {session => {
+        const userRole = session.user?.role || "Ruolo non definito";
+        return (
+          <div style={{ minHeight: "100vh", background: "#20489a" }}>
+            <Navbar />
+            <div
               style={{
-                flex: 2,
-                padding: "10px 12px",
-                fontSize: 16,
-                borderRadius: 7,
-                border: "1.5px solid #dbe4f1",
-                outline: "none",
-                marginRight: 4,
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: "12px",
+                maxWidth: 540,
+                margin: "0 auto",
+                padding: "24px 0 0 0"
               }}
-              placeholder="Es. Mario Rossi"
-              type="text"
-              name="nome"
-              autoComplete="off"
-              disabled
-            />
-            <input
+            >
+              {/* Bottone gestione clienti visibile solo per admin */}
+              {session.user?.role === "admin" && (
+                <Link
+                  href="/clienti"
+                  style={{
+                    background: "#1cb0f6",
+                    color: "#fff",
+                    padding: "9px 22px",
+                    borderRadius: "6px",
+                    fontWeight: 600,
+                    fontSize: 16,
+                    textDecoration: "none",
+                    transition: "background 0.2s"
+                  }}
+                  onMouseOver={e => (e.currentTarget.style.background = "#197dbb")}
+                  onMouseOut={e => (e.currentTarget.style.background = "#1cb0f6")}
+                >
+                  Gestione clienti
+                </Link>
+              )}
+              <Link
+                href="/profilo"
+                style={{
+                  background: "#fff",
+                  color: "#20489a",
+                  padding: "9px 22px",
+                  borderRadius: "6px",
+                  fontWeight: 600,
+                  fontSize: 16,
+                  textDecoration: "none",
+                  border: "1.5px solid #20489a"
+                }}
+              >
+                Profilo
+              </Link>
+            </div>
+            <main
               style={{
-                flex: 1,
-                padding: "10px 12px",
-                fontSize: 16,
-                borderRadius: 7,
-                border: "1.5px solid #dbe4f1",
-                outline: "none",
-              }}
-              placeholder="Email"
-              type="email"
-              name="email"
-              autoComplete="off"
-              disabled
-            />
-            <button
-              type="submit"
-              style={{
+                maxWidth: 540,
+                margin: "40px auto 0 auto",
                 background: "#20489a",
                 color: "#fff",
-                border: "none",
-                borderRadius: 7,
-                padding: "10px 18px",
-                fontWeight: 600,
-                fontSize: 15,
-                cursor: "not-allowed"
+                padding: "0 0 32px 0",
               }}
-              disabled
             >
-              Aggiungi
-            </button>
-          </form>
-        </section>
-      </main>
-    </div>
+              <div style={{ textAlign: "center", marginBottom: 32 }}>
+                <div style={{
+                  fontSize: 32,
+                  fontWeight: 700,
+                  marginTop: 24,
+                  marginBottom: 10,
+                  letterSpacing: "-0.8px"
+                }}>
+                  Dashboard Admin
+                </div>
+                <div style={{
+                  fontSize: 18,
+                  marginBottom: 24,
+                  fontWeight: 400
+                }}>
+                  Traccia le ore dei tuoi clienti, gestisci gli appuntamenti e condividi i riepiloghi.
+                </div>
+                <div style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                  letterSpacing: "0.3px",
+                  color: "#1cb0f6",
+                }}>
+                  Ruolo attuale: <span style={{ color: "#fff", background: "#1cb0f6", borderRadius: "5px", padding: "2px 10px", marginLeft: "4px" }}>{userRole}</span>
+                </div>
+              </div>
+              <section
+                style={{
+                  background: "#fff",
+                  borderRadius: 18,
+                  padding: "32px 32px 28px 32px",
+                  margin: "0 0 36px 0",
+                  boxShadow: "0 4px 20px 0 rgba(32,72,154,0.05)",
+                  color: "#20489a",
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 22 }}>👤➕</span> Aggiungi un Nuovo Cliente
+                </div>
+                <form style={{ display: "flex", gap: 14 }}>
+                  <input
+                    style={{
+                      flex: 2,
+                      padding: "10px 12px",
+                      fontSize: 16,
+                      borderRadius: 7,
+                      border: "1.5px solid #dbe4f1",
+                      outline: "none",
+                      marginRight: 4,
+                    }}
+                    placeholder="Es. Mario Rossi"
+                    type="text"
+                    name="nome"
+                    autoComplete="off"
+                    disabled
+                  />
+                  <input
+                    style={{
+                      flex: 1,
+                      padding: "10px 12px",
+                      fontSize: 16,
+                      borderRadius: 7,
+                      border: "1.5px solid #dbe4f1",
+                      outline: "none",
+                    }}
+                    placeholder="Email"
+                    type="email"
+                    name="email"
+                    autoComplete="off"
+                    disabled
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      background: "#20489a",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 7,
+                      padding: "10px 18px",
+                      fontWeight: 600,
+                      fontSize: 15,
+                      cursor: "not-allowed"
+                    }}
+                    disabled
+                  >
+                    Aggiungi
+                  </button>
+                </form>
+              </section>
+            </main>
+          </div>
+        );
+      }}
+    </AuthGuard>
   );
 }
