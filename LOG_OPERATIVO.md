@@ -1,5 +1,13 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-
+### 2025-08-22 23:54 (UTC+2)
+- **Fix build Next.js**: individuato e risolto errore causato da `<ClientiProvider>` non definito in `app/layout.js`.
+- **Rimozione ClientiProvider**: eliminato wrapper `<ClientiProvider>` dal layout globale. Verificato che il provider non era più presente/importato altrove.
+- **Fix import Prisma**: verificate e corrette tutte le importazioni di prisma; ora tutte usano il path relativo corretto.
+- **Prisma generate**: eseguito `npx prisma generate` per rigenerare client dopo fix path.
+- **Pulizia cache e build**: eliminata cache `.next`, ricostruito progetto con successo.
+- **Verifica integrità**: testate tutte le pagine e API principali, incluso flusso not-found e autenticazione.
+- **Nessun errore residuo**: build e dev server OK, CRUD funzionanti lato backend/frontend, nessun warning né ReferenceError.
+- **Aggiornati README.md e STANDARD_OPERATIVO.md**: note sulle modifiche strutturali e standard path import prisma.
 # LOG OPERATIVO – Aggiornamento 2025-08-22 22:59 (UTC+2)
 
 ## 2025-08-22 22:59 (UTC+2)
