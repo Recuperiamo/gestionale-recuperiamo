@@ -1,6 +1,31 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### LOG OPERATIVO - Ultimo update: 2025-08-22 03:07 (UTC+2)
 
+- [2025-08-22 03:07 UTC+2] Fix propagazione id utente in sessione NextAuth:
+    - `authOptions.ts` aggiornato per propagare `user.id` in jwt e session.
+    - `route.js` delle API aggiornata per usare sempre `session.user.id`.
+    - Test manuale ciclo login + alert-letti OK, sessione ora contiene id e role.
+- [2025-08-22 03:05 UTC+2] Diagnosi e debug errori export/import `authOptions`, eliminati conflitti e duplicati.
+- [2025-08-22 02:40 UTC+2] Refactoring centralizzazione `authOptions.ts`, uniformati tutti gli import.
+- [2025-08-22 02:20 UTC+2] Debug errori 401 su GET/POST alert-letto, log SESSION DEBUG introdotto.
+- [2025-08-22 02:00 UTC+2] Build, start, test ciclo login e API alert pacchetti.
+- [2025-08-21 23:40 UTC+2] Inizio sessione, analisi errori Prisma e NextAuth su alert pacchetti.
 
+**Prossimo step (22/08):** nascondere creazione clienti e lista clienti agli utenti non admin (controllo role nel frontend e/o backend).
+
+- Data/Ora: 2025-08-21 22:55:00 (UTC+2)
+- Descrizione:
+  - Avviata sessione di debug strutturale su modale creazione pacchetto ore: persiste errore “Dati obbligatori mancanti” anche con select clienti popolato.
+  - Effettuata ricognizione struttura file reale (`dir /s /b src\components`): verificata presenza reale dei soli componenti elencati, nessun file inventato.
+  - Chiarito che ogni fix dovrà essere proposto solo sui file esistenti.
+  - Raccolte le informazioni necessarie per procedere con debug mirato:
+    1. Comandi ricerca fetch/API/props clienteId nei file reali.
+    2. Definizione necessità: shape risposta API clienti, endpoint effettivo, formato prop clienteId, body POST per pacchetti.
+    3. Blocco qualsiasi proposta di file inventato o duplicato fino a raccolta dati reale.
+  - Forniti (in chat) i comandi CMD/PowerShell per individuare tutte le chiamate API, props, shape dati e punti d’uso reali nei componenti coinvolti.
+  - Definito nuovo standard operativo di debug: ogni intervento futuro dovrà essere preceduto da verifica reale della struttura e delle API, con output allegato.
+  - Pronto a ricevere output di ricerca e dati shape oggetti/API per procedere con fix definitivo.
+  
 - Data/Ora: 2025-08-21 23:22:00 (UTC+2)
 - Descrizione: 
   - Integrati nella tabella pacchetti della UI (PacchettiList.jsx) due nuovi bottoni per ogni riga (“Modifica” ed “Elimina”).

@@ -1017,3 +1017,15 @@ Vedi file `STANDARD_OPERATIVO.md` per le regole vincolanti di sviluppo, debug e 
 ## Documentazione tecnica
 
 - Vedi STANDARD_OPERATIVO.md per dettagli su workflow, formato log e regole commit/push.
+
+
+- **Autenticazione:** NextAuth, credenziali custom e ruoli (admin/user), propagazione user.id e user.role nella sessione.
+- **API protette:** Accesso condizionato su base ruolo.
+- **Gestione alert pacchetti:** marcatura “letto”, visibilità per utente.
+- **Standard operativo:** vedi [STANDARD_OPERATIVO.md](STANDARD_OPERATIVO.md)
+
+## File e cartelle strutturali
+
+- `app/api/auth/[...nextauth]/authOptions.ts` – Configurazione NextAuth centralizzata.
+- `app/api/auth/[...nextauth]/route.js` – Handler NextAuth App Router.
+- `app/api/pacchetti/alert-letto/route.js` – API gestione alert pacchetti.

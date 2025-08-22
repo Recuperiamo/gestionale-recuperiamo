@@ -919,3 +919,7 @@ Ultimo aggiornamento: 2025-08-16 20:45 UTC+2
 
 - Dopo ogni patch UI che modifica la struttura dei componenti o la UX, aggiornare README.md e LOG_OPERATIVO.md.
 - Segnalare sempre in chat eventuali omissioni o rischi di duplicato.
+
+- `app/api/auth/[...nextauth]/authOptions.ts` – configurazione NextAuth centralizzata
+- `app/api/auth/[...nextauth]/route.js` – handler NextAuth
+- `app/api/pacchetti/alert-letto/route.js` – API alert pacchetti

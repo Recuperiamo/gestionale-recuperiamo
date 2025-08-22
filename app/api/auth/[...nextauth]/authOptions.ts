@@ -40,6 +40,7 @@ export const authOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;      // <--- PROPAGHIAMO ID NEL TOKEN
         token.role = user.role;
         token.name = user.name;
       }
@@ -47,6 +48,7 @@ export const authOptions = {
     },
     async session({ session, token }) {
       if (token) {
+        session.user.id = token.id;    // <--- PROPAGHIAMO ID NELLA SESSIONE
         session.user.role = token.role;
         session.user.name = token.name;
       }
