@@ -1,4 +1,8 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### 2025-08-22 23:57 (UTC+2)
+- **Aggiunto app/lib/prisma.js al repository**: file fondamentale per Prisma, ora versionato e pushato.
+- **Riepilogo stato**: build OK, tutte le dipendenze e path import sistemati, provider React superflui rimossi, log e file di standard aggiornati e pushati (vedi commit 75595e1 main).
+
 ### 2025-08-22 23:54 (UTC+2)
 - **Fix build Next.js**: individuato e risolto errore causato da `<ClientiProvider>` non definito in `app/layout.js`.
 - **Rimozione ClientiProvider**: eliminato wrapper `<ClientiProvider>` dal layout globale. Verificato che il provider non era più presente/importato altrove.
