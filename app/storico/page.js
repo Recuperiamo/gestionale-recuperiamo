@@ -1,4 +1,7 @@
+"use client";
+
 import React, { useEffect, useState } from "react";
+import Navbar from "../components/Navbar";
 import StoricoAttivitaTable from "../components/attivita/StoricoAttivitaTable.jsx";
 
 export default function StoricoPage() {
@@ -23,8 +26,11 @@ export default function StoricoPage() {
   if (loading) return <div>Caricamento dati storico...</div>;
 
   return (
-    <div style={{ maxWidth: 1150, margin: "38px auto 0 auto", padding: 18 }}>
-      <StoricoAttivitaTable attivita={attivita} clienti={clienti} pacchetti={pacchetti} />
-    </div>
+    <>
+      <Navbar />
+      <div style={{ maxWidth: 1150, margin: "38px auto 0 auto", padding: 18 }}>
+        <StoricoAttivitaTable attivita={attivita} clienti={clienti} pacchetti={pacchetti} />
+      </div>
+    </>
   );
 }

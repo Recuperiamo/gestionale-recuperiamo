@@ -1298,3 +1298,13 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 ---
 
 **Ultimo aggiornamento**: 2025-08-24 00:44 (UTC+2)
+
+## Funzionalità principali
+
+- Storico attività filtrabile/esportabile (PDF/XLS completato, export reale lato client)
+- Navigazione completa: la pagina storico (/storico) ora include la navbar, la navigazione tra tutte le pagine principali è sempre possibile.
+- Scenario test manuale storico attività: tutte le funzionalità export e navigazione confermate, milestone “storico attività: esportazione e navigazione completata”.
+
+---
+
+**Ultimo aggiornamento**: 2025-08-24 01:39 (UTC+2)

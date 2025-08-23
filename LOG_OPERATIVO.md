@@ -1,4 +1,14 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+**2025-08-24 01:39:00 (UTC+2)**
+Navbar integrata nella pagina Storico (/storico): ora la navigazione è sempre accessibile in tutte le pagine principali.  
+Scenario test manuale aggiornato, milestone “storico attività: export e navigazione” pronta per chiusura.  
+Aggiornati README.md, MAPPA_STRUTTURA_PROGETTO.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
+
+**2025-08-24 01:26:00 (UTC+2)**
+Completata integrazione export reale PDF e XLS nella tabella storico attività. Scenario test manuale export superato: export corretti, dati e filtri rispettati, nessun errore in console.  
+Aggiornati README.md, MAPPA_STRUTTURA_PROGETTO.md, STANDARD_OPERATIVO.md per milestone “storico attività: esportazione completata”.  
+Aperta nuova milestone “Ottimizzazione/bugfix export e refactoring storico”.
+
 **2025-08-24 00:44:00 (UTC+2)**
 Aggiornati MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md con l’esito scenario test manuale storico attività: punti 1-9 confermati, 10-11 non ancora integrati.  
 Pronto per proseguire con issue #36 (filtri preimpostati da dettaglio cliente/pacchetto e stress test).
