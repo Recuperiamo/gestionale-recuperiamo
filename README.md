@@ -1256,3 +1256,17 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - **Note:** tutti i componenti sono da implementare, nessun duplicato rilevato in repo.
 
 ---
+
+## Funzionalità
+- Gestione attività: creazione, modifica, eliminazione
+- Selezione pacchetto e cliente in fase di creazione attività
+- Filtri operativi su elenco attività: per cliente, pacchetto, intervallo temporale (dal-al)
+- Modale dettaglio attività e modale modifica
+- Validazione campi obbligatori e input step 0.5 per ore
+
+## Scenario test manuale
+- Creare, modificare, eliminare attività da UI
+- Selezionare correttamente pacchetto e cliente in creazione
+- Filtrare le attività per cliente, pacchetto, intervallo temporale (dal-al, anche in combinazione)
+- Gestione tabella vuota e reset filtri
+- Validazione campi obbligatori

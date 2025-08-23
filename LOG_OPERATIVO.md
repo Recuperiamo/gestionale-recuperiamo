@@ -1,4 +1,25 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+# LOG OPERATIVO – 2025-08-23 16:59 UTC+2
+
+- [2025-08-23 16:59 UTC+2] Aggiornato filtro attività: sostituito filtro singola data con intervallo temporale "Dal - Al" su app/attivita/page.js, aggiornata MAPPA_STRUTTURA_PROGETTO.md e README.md.
+- [2025-08-23 16:53 UTC+2] Aggiunti filtri operativi cliente/pacchetto/data su attività (app/attivita/page.js), aggiornata AttivitaList.jsx per tabella vuota, aggiornati MAPPA_STRUTTURA_PROGETTO.md e README.md secondo standard.
+### [2025-08-23 14:07 UTC+2]
+- **Apertura lavorazione issue #34 “UI attività e collegamento pacchetti” (milestone 5):**
+    - Nessun componente UI attività presente in repo (verifica con ricerca file/nome).
+    - Creata struttura file/componenti vuoti:
+        - app/attivita/page.js (pagina principale UI attività)
+        - app/components/attivita/AttivitaList.jsx (listing, filtri)
+        - app/components/attivita/AttivitaForm.jsx (form creazione/modifica)
+        - (opzionale) app/components/attivita/AttivitaDettaglioModal.jsx (modale dettaglio/azione)
+    - Aggiornati README.md, MAPPA_STRUTTURA_PROGETTO.md, STANDARD_OPERATIVO.md con nuova milestone e scenario test/manuale UI attività.
+    - Scenario test/manuale milestone 5 UI attività:
+        1. Creare, modificare, eliminare attività da UI
+        2. Verificare selezione corretta di pacchetto e cliente
+        3. Filtrare attività per cliente/pacchetto/data
+        4. Edge-case: attività senza pacchetto, errori validazione UI
+        5. Navigazione dettagliata, azioni da tabella (modifica/elimina)
+    - Pronto per sviluppo progressivo feature su branch attuale.
+    
 ### [2025-08-23 13:54 UTC+2]
 - **Chiusura reale issue #33 “Implementazione CRUD attività (API/handler)”**: superate tutte le task con test manuale su API attività (POST, PATCH, DELETE, GET, edge-case), output allegati, scenario test/manuale milestone 5 rispettato.
     - API RESTful attività funzionante (crea, modifica, elimina, dettagli)

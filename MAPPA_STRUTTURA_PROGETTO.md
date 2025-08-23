@@ -1,102 +1,125 @@
-# Mappa Struttura Progetto – Ultimo aggiornamento: 2025-08-23 13:54 (UTC+2)
+# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-23 16:59 (UTC+2)
 
-```plaintext
+---
+
+## STRUTTURA COMPLETA REPO
+
 gestionale-recuperiamo/
 │
-├── app/                       # Cartella principale Next.js (route, logica frontend/backend, componenti, API, layout)
-│   ├── api/                   # Route API (Next.js Route Handlers)
+├── app/
+│   ├── api/
 │   │   ├── attivita/
-│   │   │   └── route.js       # API: CRUD attività (usa Prisma, milestone 5, POST/GET/PATCH/DELETE, validazione, update ore pacchetto)
+│   │   │   └── route.js
 │   │   ├── user/
-│   │   │   └── route.js       # API: gestione utenti
-│   │   └── ...                # Altre route API
-│   │
-│   ├── lib/                   # Librerie interne (shared code)
-│   │   └── prisma.js          # Inizializzazione ed export client Prisma (DA NON RIMUOVERE)
-│   │
-│   ├── layout.js              # RootLayout globale, include <SessionProvider>
-│   ├── page.js                # Pagina principale (landing/homepage)
-│   ├── not-found.js           # Pagina 404 custom
-│   ├── ...                    # Altre pagine, layout, componenti
-│
-├── tests/                     # Test automatici/unitari (Jest, Testing Library, ecc.)
+│   │   │   └── route.js
+│   │   └── ...
 │   ├── components/
-│   │   └── clienti/
-│   │       ├── ClientiForm.integration.test.jsx
-│   │       └── validateClientiForm.test.js
-│   └── ...                    # Altri test organizzati per area/funzionalità
-│
-├── prisma/                    # Schema e migrazioni Prisma
-│   ├── schema.prisma          # Definizione modello database
-│   └── migrations/            # Directory migrazioni
-│
-├── public/                    # File statici (immagini, favicon, ecc.)
+│   │   ├── Navbar.js
+│   │   └── attivita/
+│   │       ├── AttivitaList.jsx
+│   │       ├── AttivitaForm.jsx
+│   │       ├── AttivitaDettaglioModal.jsx
+│   │       └── ...
+│   ├── lib/
+│   │   └── prisma.js
+│   ├── attivita/
+│   │   └── page.js
+│   ├── clienti/
+│   │   └── page.js
+│   ├── pacchetti/
+│   │   └── page.js
+│   ├── layout.js
+│   ├── page.js
+│   ├── not-found.js
 │   └── ...
 │
-├── node_modules/              # Dipendenze npm (NON versionare)
+├── tests/
+│   ├── components/
+│   │   ├── attivita/
+│   │   │   ├── AttivitaList.integration.test.jsx
+│   │   │   ├── AttivitaForm.integration.test.jsx
+│   │   │   └── AttivitaDettaglioModal.test.js
+│   │   ├── clienti/
+│   │   │   ├── ClientiForm.integration.test.jsx
+│   │   │   └── validateClientiForm.test.js
+│   │   └── ...
+│   └── ...
 │
-├── .env / .env.local          # Variabili ambiente (database, secret, ecc.)
-├── package.json               # Configurazione npm/yarn, scripts, dipendenze
-├── README.md                  # Documentazione principale, include questa mappa
-├── STANDARD_OPERATIVO.md      # Regole operative, convenzioni, checklist QA
-├── LOG_OPERATIVO.md           # Log operativo sempre aggiornato (reverse chronological, UTC+2)
-├── MAPPA_STRUTTURA_PROGETTO.md # Questo file, sempre aggiornato
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+│       ├── 20230823-initial/
+│       │   └── migration.sql
+│       └── ...
+│
+├── public/
+│   ├── favicon.ico
+│   ├── logo.png
+│   └── ...
+│
+├── .env
+├── .env.local
+├── .gitignore
+├── package.json
+├── README.md
+├── STANDARD_OPERATIVO.md
+├── LOG_OPERATIVO.md
+├── MAPPA_STRUTTURA_PROGETTO.md
 └── ...
-```
 
 ---
 
-## Legenda Directory e File Chiave
+## LEGENDA DIRECTORY E FILE CHIAVE
 
-- **app/**: Tutto il codice dell’applicazione Next.js (route, pagine, layout, API, provider, shared code, componenti).
-    - **api/**: Endpoint backend, handler REST/POST/GET per ogni risorsa (CRUD attività, utenti, ecc).
-    - **lib/prisma.js**: Client Prisma singleton, usato da tutte le route API per comunicare col database.
-    - **layout.js**: Layout radice, include solo <SessionProvider> (non più provider custom).
+- **app/**: Codice Next.js (route, pagine, layout, componenti, API, provider, shared code).
+    - **attivita/**: Route e logica UI attività, filtri, modali.
+    - **clienti/**: UI/CRUD clienti.
+    - **pacchetti/**: UI/CRUD pacchetti.
+    - **components/attivita/**: Tutti i componenti specifici per attività.
+    - **api/**: Endpoint backend; CRUD attività, utenti, etc.
+    - **lib/prisma.js**: Client Prisma singleton.
+    - **layout.js**: Layout root globale.
     - **not-found.js**: Pagina custom 404.
-- **tests/**: Test automatici (Jest, React Testing Library, ecc.), organizzati per area funzionale.  
-- **prisma/**: Tutto ciò che riguarda Prisma e il database.
-    - **schema.prisma**: Definizione DB, modelli, relazioni.
-    - **migrations/**: Migrazioni generate da Prisma migrate.
+- **tests/**: Test automatici (unit/integration, organized per area).
+- **prisma/**: Modello e migrazioni database (schema.prisma, migrations).
 - **public/**: File statici serviti da Next.js.
-- **.env / .env.local**: Variabili ambiente (NON committare secrets in repo pubblica!).
-- **package.json**: Scripts, dipendenze, configurazione progetto.
-- **README.md**: Documentazione utente/sviluppatore, inserire qui la mappa aggiornata.
-- **STANDARD_OPERATIVO.md**: Regole di formato, processi, best practice (vedi anche “personal instructions” Copilot).
-- **LOG_OPERATIVO.md**: Log operativo, sempre aggiornato, reverse chronological (ultimo evento in cima), orario UTC+2.
-- **MAPPA_STRUTTURA_PROGETTO.md**: Questo file, mantiene la struttura e la legenda aggiornata.
+- **.env / .env.local**: Variabili ambiente (NON committare secrets).
+- **README.md**: Documentazione principale, scenario test manuale, mappa struttura.
+- **STANDARD_OPERATIVO.md**: Regole di formato, processi, best practice.
+- **LOG_OPERATIVO.md**: Log operativo, reverse-chronological (UTC+2, ultimo evento in cima).
+- **MAPPA_STRUTTURA_PROGETTO.md**: Questo file, sempre aggiornata.
 
 ---
 
-## Note operative e scenario test/manuale
+## NOTE OPERATIVE
 
-**Dopo ogni modifica strutturale:**
-1. Aggiorna MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md.
-2. Esegui controllo duplicati file:
-   ```powershell
-   Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
-   ```
-   Se lista vuota: repo pulita. Se presenti file, risolvere e loggare.
-3. Esegui:
-   - `npm install`
-   - `npx prisma generate`
-   - `npm run build`
-   - `npm run dev`
-   - `npm test`
-4. Naviga tra tutte le route e verifica funzionamento app, API, test.
-5. Conferma che la struttura reale coincida con questa mappa.
+- TUTTI i file devono essere elencati nella struttura effettiva a ogni milestone o su richiesta.
+- SE vengono creati nuovi moduli/componenti, aggiorna questa mappa e segnala il possibile rischio di duplicati.
+- Dopo ogni modifica strutturale, aggiorna anche README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md.
+- Esegui SEMPRE il controllo duplicati file:
+  ```powershell
+  Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
+  ```
+  Se la lista è vuota repo OK, altrimenti risolvi subito e logga.
 
 ---
 
-## Scenario test/manuale milestone 5 – CRUD attività
+## SCENARIO TEST MANUALE (release attuale: filtro attività per intervallo temporale)
 
-1. POST `/api/attivita` → crea attività, aggiorna pacchetto
-2. PATCH `/api/attivita` → aggiorna attività, aggiorna ore residue pacchetto
-3. DELETE `/api/attivita` → elimina attività, ripristina ore residue pacchetto
-4. GET `/api/attivita` e `/api/attivita?id=ID` → verifica stato attività e pacchetto
-5. Edge-case: dati non validi/id errato → errore gestito, doppio inserimento crea record separati
-6. Ripetere con pacchetti/attività diversi, verificare coerenza dati
+1. Seleziona “Cliente”: la tabella mostra solo le attività di quel cliente.
+2. Seleziona “Pacchetto”: la tabella mostra solo le attività di quel pacchetto.
+3. Imposta solo “Dal”: la tabella mostra tutte le attività dalla data selezionata in poi.
+4. Imposta solo “Al”: la tabella mostra tutte le attività fino a quella data inclusa.
+5. Imposta sia “Dal” che “Al”: la tabella mostra solo le attività tra le due date (estremi inclusi).
+6. Combinazioni con altri filtri funzionano (AND logico).
+7. Reset filtri: tornano tutte le attività.
+8. Tabella vuota: se nessuna attività corrisponde ai filtri, compare il messaggio “Nessuna attività trovata”.
+9. Creazione/modifica/eliminazione: la tabella si aggiorna sempre secondo i filtri attivi.
 
 ---
 
-**Ultimo aggiornamento mappa:** 2025-08-23 13:54 (UTC+2)  
+## ULTIMO AGGIORNAMENTO MAPPA
+
+**Data e ora**: 2025-08-23 16:59 (UTC+2)  
+**Nota**: Struttura coerente con milestone attuale (feature filtri attività con intervallo temporale Dal-Al).  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**
