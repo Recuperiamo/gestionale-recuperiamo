@@ -1,5 +1,23 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+### [2025-08-23 10:00 UTC+2]
+- Modifica strutturale di `app/components/Navbar.js`:
+    - Inseriti link navigazione diretta a Dashboard, Gestione Clienti, Pacchetti.
+    - Evidenziamento pagina attiva.
+    - Conservata area utente/Esci sulla destra.
+    - Nessuna creazione di nuovi file.
+- Scenario test/manuale aggiornato per nuova struttura Navbar.
+- Regola operativa aggiuntiva: ogni nuova pagina principale va integrata nella Navbar contestualmente alla creazione.
+- Conferma funzionalità in chat.
+- Reminder comandi di debug e scenario test/manuale forniti in chat.
+
+- 2025-08-23 02:07 UTC+2: **CHIUSURA ISSUE #31 “Review milestone 4 e validazione log/timestamp”**
+    - Effettuata review finale milestone 4: tutte le issue collegate risultano chiuse e verificate.
+    - Validato LOG_OPERATIVO.md: coerenza e progressività dei timestamp, nessuna discrepanza riscontrata.
+    - README.md, STANDARD_OPERATIVO.md e MAPPA_STRUTTURA_PROGETTO.md confermati coerenti e aggiornati.
+    - Scenario test/manuale: chiusura milestone solo dopo controllo chiusura issue, log/timestamp e coerenza documentazione, tutti superati.
+    - File coinvolti: LOG_OPERATIVO.md, README.md, STANDARD_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md
+    - Outcome: milestone 4 chiusa con successo; si può procedere con la nuova milestone.
 -- 2025-08-23 02:05 UTC+2: **CHIUSURA ISSUE #30 “Aggiornamento documentazione e standard operativo milestone 4”**
     - Effettuata revisione di consistenza tra README.md, STANDARD_OPERATIVO.md e MAPPA_STRUTTURA_PROGETTO.md.
     - Verificata completa coerenza tra struttura repo, policy anti-doppioni, aggiornamento doc/log e scenario test/manuale.
