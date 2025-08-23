@@ -1,5 +1,18 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
-
+### [2025-08-23 10:14 UTC+2]
+- **Apertura milestone 5 “Gestione attività e rendicontazione”**: create e tracciate tutte le issue operative associate.
+    - #33 Implementazione CRUD attività (API/handler)
+    - #34 UI attività e collegamento pacchetti
+    - #35 Calcolo automatico ore residue su attività
+    - #37 Test manuale attività/rendicontazione e edge case
+    - #38 Aggiornamento doc e standard operativo milestone 5
+    - #39 Review e chiusura milestone 5
+- Tutte le issue risultano collegate alla milestone e presenti nel tracker GitHub.
+- Ogni issue contiene scenario test manuale e riferimenti alla milestone.
+- Scenario test/manuale milestone 5 inserito come riferimento operativo per la fase.
+- Pronto per sviluppo progressivo delle issue secondo roadmap.
+- File coinvolti: LOG_OPERATIVO.md, milestone GitHub, scenario test/manuale milestone 5
+- Outcome: milestone 5 formalmente aperta e tracciata, tutte le issue visibili e pronte per lavorazione.
 ### [2025-08-23 10:00 UTC+2]
 - Modifica strutturale di `app/components/Navbar.js`:
     - Inseriti link navigazione diretta a Dashboard, Gestione Clienti, Pacchetti.
