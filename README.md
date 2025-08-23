@@ -1270,3 +1270,13 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - Filtrare le attività per cliente, pacchetto, intervallo temporale (dal-al, anche in combinazione)
 - Gestione tabella vuota e reset filtri
 - Validazione campi obbligatori
+
+...
+
+## Nuove funzionalità
+
+- Endpoint `/api/clienti/[clienteId]/attivita`: restituisce tutte le attività riferite a un cliente, anche se collegate solo tramite pacchetti.
+- Componente React `AttivitaClienteList.jsx` per visualizzare tutte le attività di un cliente.
+- Flusso: dal dettaglio cliente (`ClienteDettaglioModal.jsx`) è possibile vedere tutte le attività collegate al cliente.
+
+...

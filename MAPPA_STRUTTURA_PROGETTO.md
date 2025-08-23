@@ -1,4 +1,4 @@
-# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-23 16:59 (UTC+2)
+# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-23 19:00 (UTC+2)
 
 ---
 
@@ -12,6 +12,10 @@ gestionale-recuperiamo/
 │   │   │   └── route.js
 │   │   ├── user/
 │   │   │   └── route.js
+│   │   ├── clienti/
+│   │   │   └── [clienteId]/
+│   │   │       └── attivita/
+│   │   │           └── route.js   # [NEW] Lista attività per cliente (via pacchetti)
 │   │   └── ...
 │   ├── components/
 │   │   ├── Navbar.js
@@ -19,6 +23,7 @@ gestionale-recuperiamo/
 │   │       ├── AttivitaList.jsx
 │   │       ├── AttivitaForm.jsx
 │   │       ├── AttivitaDettaglioModal.jsx
+│   │       ├── AttivitaClienteList.jsx   # [NEW] Lista attività di uno specifico cliente
 │   │       └── ...
 │   ├── lib/
 │   │   └── prisma.js
@@ -76,7 +81,9 @@ gestionale-recuperiamo/
     - **clienti/**: UI/CRUD clienti.
     - **pacchetti/**: UI/CRUD pacchetti.
     - **components/attivita/**: Tutti i componenti specifici per attività.
+        - **AttivitaClienteList.jsx**: [NEW] Visualizza lista attività di un cliente (via pacchetti).
     - **api/**: Endpoint backend; CRUD attività, utenti, etc.
+        - **clienti/[clienteId]/attivita/route.js**: [NEW] API attività per cliente.
     - **lib/prisma.js**: Client Prisma singleton.
     - **layout.js**: Layout root globale.
     - **not-found.js**: Pagina custom 404.
@@ -104,7 +111,9 @@ gestionale-recuperiamo/
 
 ---
 
-## SCENARIO TEST MANUALE (release attuale: filtro attività per intervallo temporale)
+## SCENARIO TEST MANUALE
+
+### Release attuale: filtro attività per intervallo temporale
 
 1. Seleziona “Cliente”: la tabella mostra solo le attività di quel cliente.
 2. Seleziona “Pacchetto”: la tabella mostra solo le attività di quel pacchetto.
@@ -118,8 +127,20 @@ gestionale-recuperiamo/
 
 ---
 
+### [NEW] Feature: Lista attività di un cliente (via pacchetti)
+
+1. Crea almeno due pacchetti per un cliente e aggiungi attività in entrambi.
+2. Accedi tramite endpoint `/api/clienti/[clienteId]/attivita`: devono risultare tutte le attività del cliente, anche su pacchetti diversi.
+3. Visualizza tramite `AttivitaClienteList.jsx`: devono essere mostrate tutte le attività per il cliente selezionato.
+4. Ripeti per altro cliente: solo le sue attività, nessuna attività di altri clienti.
+5. Verifica caso cliente senza pacchetti o senza attività: la lista deve risultare vuota.
+6. Test errori: ID cliente non valido, backend non raggiungibile.
+7. Testa link/vista dal dettaglio cliente, se integrato nella UI.
+
+---
+
 ## ULTIMO AGGIORNAMENTO MAPPA
 
-**Data e ora**: 2025-08-23 16:59 (UTC+2)  
-**Nota**: Struttura coerente con milestone attuale (feature filtri attività con intervallo temporale Dal-Al).  
+**Data e ora**: 2025-08-23 19:00 (UTC+2)  
+**Nota**: Aggiunti endpoint `/api/clienti/[clienteId]/attivita/route.js` e componente `AttivitaClienteList.jsx` per visualizzazione attività aggregate per cliente (via join ai pacchetti).  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**

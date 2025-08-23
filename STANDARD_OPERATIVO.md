@@ -1144,3 +1144,23 @@ Ultimo aggiornamento: 2025-08-23 02:00 UTC+2
 6. Ripetere con pacchetti/attività diversi, verificare coerenza dati
 
 ---
+Deve mostrare almeno TUTTI i file e cartelle effettivamente presenti (non solo principali o di esempio!)
+Deve comprendere la parte ATTUALE delle route, dei componenti, dei moduli, delle API e delle sottodirectory, con dettaglio di ogni file
+Deve contenere una legenda e uno scenario test manuale aggiornato
+Deve riportare il timestamp e le note operative aggiornate
+Non può omettere alcun file effettivo esistente nella repo, tranne quelli in .gitignore o node_modules
+
+...
+
+## Regole aggiuntive per attività cliente
+
+- Quando si aggiungono nuove API o componenti, aggiornare sempre anche MAPPA_STRUTTURA_PROGETTO.md e README.md.
+- Per la visualizzazione delle attività di un cliente, usare l’endpoint `/api/clienti/[clienteId]/attivita` e il componente `AttivitaClienteList.jsx`.
+- Scenario test manuale da seguire per questa feature:
+  1. Creare almeno 2 pacchetti per un cliente.
+  2. Inserire attività in entrambi i pacchetti.
+  3. Visualizzare le attività tramite la nuova vista: devono essere mostrate tutte, anche su pacchetti diversi.
+  4. Ripetere per altro cliente: non devono apparire attività di altri clienti.
+  5. Verificare che il caricamento, gli errori e lo stato “nessuna attività” siano gestiti correttamente.
+
+...
