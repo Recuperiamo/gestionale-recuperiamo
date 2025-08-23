@@ -35,7 +35,17 @@
 # STANDARD_OPERATIVO
 
 ## Regole vincolanti (aggiornamento: 2025-08-17 16:45 UTC+2)
+## Regole vincolanti (da rispettare SEMPRE)
 
+- MAPPA_STRUTTURA_PROGETTO.md va SEMPRE aggiornata e fornita come file COMPLETO, mai in formato PATCH, ma sempre come nuova versione integrale aggiornata rispetto alla precedente.
+- Dopo ogni modifica strutturale (aggiunta, spostamento, rinomina, eliminazione di file o cartelle), aggiorna SEMPRE anche STANDARD_OPERATIVO.md e README.md, e avvisa in chat.
+- - Tutti gli orari nel LOG_OPERATIVO.md devono essere in formato UTC+2, progressivi e coerenti.
+
+- Prima di proporre o creare nuovi file/componenti, controlla SEMPRE se esiste già un file con nome simile (anche con estensione diversa) nella repo o nei path coinvolti. Segnala in chat ogni caso dubbio o rischio di duplicato/conflitto.
+- Ogni gruppo di comandi va dato in due blocchi distinti: CMD e PowerShell, nessun commento nei blocchi, una riga = un comando, spiegazioni solo fuori. Fornisci sempre i comandi completi (mai parziali).
+- Scenario test/manuale: suggerisci e descrivi sempre uno scenario per ogni nuova feature/issue.
+
+---
 - Ogni file React/JSX in app/, app/components/ e percorsi analoghi DEVE avere `import React from "react";` in testa, anche se Next.js 13+ e anche se non esplicitamente richiesto.
 - Nelle API route Next.js (.ts/.js in app/api/...), NON usare tipizzazione TypeScript inline nei parametri delle callback. Se necessario, aggiungere `// @ts-nocheck` in testa al file per evitare warning/errori TS non risolvibili.
 - Dopo ogni modifica strutturale, aggiornare sempre sia LOG_OPERATIVO.md che README.md e STANDARD_OPERATIVO.md, segnalando in chat l'avvenuto aggiornamento.
@@ -1123,3 +1133,14 @@ Ultimo aggiornamento: 2025-08-23 02:00 UTC+2
 4. GET `/api/attivita` e `/api/attivita?id=ID` → verifica stato attività e pacchetto
 5. Edge-case: dati non validi/id errato → errore gestito, doppio inserimento crea record separati
 6. Ripetere con pacchetti/attività diversi, verificare coerenza dati
+
+## Scenario test/manuale milestone 5 – UI attività
+
+1. Creare/modificare/eliminare attività da UI (`/attivita`)
+2. Selezionare correttamente pacchetto e cliente (form con select, validazione)
+3. Filtrare attività per cliente/pacchetto/data nella lista
+4. Edge-case: attività senza pacchetto, errori validazione UI (form/feedback)
+5. Navigazione dettagliata, azioni da tabella (modifica/elimina)
+6. Ripetere con pacchetti/attività diversi, verificare coerenza dati
+
+---

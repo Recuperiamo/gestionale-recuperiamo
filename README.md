@@ -4,6 +4,12 @@
 Applicazione web per la gestione dei pacchetti ore, sviluppata in Next.js 15, TypeScript e Tailwind CSS.
 
 ---
+## Regole operative fondamentali
+
+- La mappa della struttura del progetto (MAPPA_STRUTTURA_PROGETTO.md) va SEMPRE aggiornata e fornita come file completo, mai come patch o estratto, dopo ogni modifica strutturale.
+- Dopo ogni modifica strutturale aggiorna anche STANDARD_OPERATIVO.md e README.md.
+- Tutti gli orari nel LOG_OPERATIVO.md devono essere in formato UTC+2, progressivi e coerenti.
+- Prima di creare nuovi file o componenti, controllare attentamente che non ne esistano già con nome simile.
 
 ## Struttura del progetto (2025-08-15)
 
@@ -1233,3 +1239,20 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
   Modifica una attività esistente, aggiorna ore residue se cambiano le ore consumate.
 - **DELETE /api/attivita**  
   Elimina una attività, ripristina le ore residue del pacchetto.
+
+  ## UI Gestione Attività (milestone 5, issue #34)
+
+- **Percorso:** `/attivita`
+- **Componenti principali:**  
+  - `AttivitaList.jsx` (elenco, filtri, azioni)
+  - `AttivitaForm.jsx` (creazione/modifica, selettori pacchetto/cliente)
+  - `AttivitaDettaglioModal.jsx` (modale opzionale dettaglio/azioni)
+- **Scenario test/manuale milestone 5 UI attività:**
+    1. Creare/modificare/eliminare attività da UI
+    2. Selezionare correttamente pacchetto e cliente (form con select)
+    3. Filtrare attività per cliente/pacchetto/data nella lista
+    4. Edge-case: attività senza pacchetto, errori validazione UI (form/feedback)
+    5. Navigazione dettagliata, azioni da tabella (modifica/elimina)
+- **Note:** tutti i componenti sono da implementare, nessun duplicato rilevato in repo.
+
+---
