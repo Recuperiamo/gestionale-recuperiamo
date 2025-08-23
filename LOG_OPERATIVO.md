@@ -1,4 +1,14 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+**2025-08-23 00:03:30 (UTC+2)**  
+Chiusa issue #35 “Calcolo automatico ore residue su attività” su branch principale dopo verifica test manuali, review log e scenario edge-case (overbooking, booking multiplo, rollback su eliminazione/modifica).  
+Tutti i test superati, esclusi solo registro e cronologia (demandati a milestone futura).  
+Aggiornati:  
+- README.md  
+- STANDARD_OPERATIVO.md  
+- MAPPA_STRUTTURA_PROGETTO.md  
+- LOG_OPERATIVO.md
+
 # LOG OPERATIVO – 2025-08-23 16:59 UTC+2
 
 - [2025-08-23 16:59 UTC+2] Aggiornato filtro attività: sostituito filtro singola data con intervallo temporale "Dal - Al" su app/attivita/page.js, aggiornata MAPPA_STRUTTURA_PROGETTO.md e README.md.

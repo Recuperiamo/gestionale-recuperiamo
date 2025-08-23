@@ -1280,3 +1280,13 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - Flusso: dal dettaglio cliente (`ClienteDettaglioModal.jsx`) è possibile vedere tutte le attività collegate al cliente.
 
 ...
+
+## Funzionalità principali
+
+- Gestione CRUD pacchetti ore e attività collegate
+- Calcolo automatico ore residue su inserimento, modifica, eliminazione attività
+- Gestione clienti e pacchetti per cliente
+- Filtri avanzati su attività per cliente, pacchetto, data, intervallo
+- Protezione overbooking (nessuna attività può superare le ore residue)
+- [NEW] Endpoint aggregato attività per cliente
+- [NEW] Componente AttivitaClienteList.jsx per visualizzazione attività aggregate per cliente
