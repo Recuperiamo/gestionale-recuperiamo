@@ -1,4 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+**2025-08-24 00:44:00 (UTC+2)**
+Aggiornati MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md con l’esito scenario test manuale storico attività: punti 1-9 confermati, 10-11 non ancora integrati.  
+Pronto per proseguire con issue #36 (filtri preimpostati da dettaglio cliente/pacchetto e stress test).
+
+**2025-08-24 00:25:00 (UTC+2)**
+Aggiornata Navbar (app/components/Navbar.js) con link/bottone per la pagina “Storico” (/storico) come da regola STANDARD_OPERATIVO.md.
+Aggiornati anche README.md, STANDARD_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md e LOG_OPERATIVO.md per tracciare la modifica strutturale e la regola di navigabilità.
+
 **2025-08-24 00:22:00 (UTC+2)**
 Integrata la sezione dichiarazioni struttura in MAPPA_STRUTTURA_PROGETTO.md (directory chiave, tipologia file contenuti, regole di inclusione), aggiornata la struttura con tutti i nuovi file per issue #36.  
 Aggiornati anche README.md e STANDARD_OPERATIVO.md per riflettere la nuova organizzazione e scenario test manuale storico attività.

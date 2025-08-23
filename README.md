@@ -1291,3 +1291,10 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - [NEW] Endpoint aggregato attività per cliente
 - [NEW] Componente AttivitaClienteList.jsx per visualizzazione attività aggregate per cliente
 - [NEW] Storico attività: componente StoricoAttivitaTable.jsx, pagina /storico, export dummy
+
+- Storico attività filtrabile/esportabile (PDF/XLS, placeholder)
+- Scenario test manuale storico attività: punti 1-9 confermati, punti 10-11 non ancora integrati (vedi MAPPA_STRUTTURA_PROGETTO.md).
+
+---
+
+**Ultimo aggiornamento**: 2025-08-24 00:44 (UTC+2)

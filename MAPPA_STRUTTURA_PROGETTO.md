@@ -1,4 +1,4 @@
-# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-24 00:22 (UTC+2)
+# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-24 00:44 (UTC+2)
 
 ---
 
@@ -189,18 +189,23 @@ gestionale-recuperiamo/
 
 ### [NEW] Feature: Storico attività filtrabile/esportabile
 
+**Scenario test manuale eseguito:**
 1. Accedi a /storico: vedi tabella storico con tutti i dati.
 2. Filtra per cliente, pacchetto, intervallo data: la tabella si aggiorna.
 3. Togli tutti i filtri: torna la lista completa.
 4. Clicca su Export PDF/XLS: alert di funzione non ancora implementata.
 5. Cambia filtri rapidamente: nessun errore, dati sempre coerenti.
 6. Nessun dato trovato: messaggio “Nessuna attività trovata”.
-7. (Da dettaglio cliente/pacchetto) Preimposta uno dei filtri e verifica il focus corretto.
+7. Creazione/modifica/eliminazione: la tabella si aggiorna secondo i filtri attivi.
+8. Tabella aggiornata live anche su reset filtri e cambio rapido.
+9. Tutti i campi visibili in tabella sono centrati (test di UI superato).
+10. (**Non integrato**) Navigazione da dettaglio cliente/pacchetto a storico con filtro pre-impostato.
+11. (**Non integrato**) Stress test con molte attività e filtri rapidi.
 
 ---
 
 ## ULTIMO AGGIORNAMENTO MAPPA
 
-**Data e ora**: 2025-08-24 00:22 (UTC+2)  
-**Nota**: Integrate dichiarazioni struttura per tutte le directory chiave e aggiornata sezione storico attività.  
+**Data e ora**: 2025-08-24 00:44 (UTC+2)  
+**Nota**: Scenario test manuale storico attività aggiornato: punti 1-9 confermati, 10-11 non ancora integrati.  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**
