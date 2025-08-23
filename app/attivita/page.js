@@ -4,14 +4,25 @@ import AttivitaForm from '../components/attivita/AttivitaForm'
 
 export default function AttivitaPage() {
   const [showForm, setShowForm] = useState(false)
+  const [formInitialData, setFormInitialData] = useState(null)
 
-  // Per test: dopo submit/annulla chiudi il form
+  // Apri form per nuova attività
+  const handleAdd = () => {
+    setFormInitialData(null)
+    setShowForm(true)
+  }
+  // Apri form per modifica attività
+  const handleEdit = (attivita) => {
+    setFormInitialData(attivita)
+    setShowForm(true)
+  }
+  // Chiudi form dopo submit/annulla
   const handleSuccess = () => setShowForm(false)
 
   return (
     <main>
       <h1>Gestione Attività</h1>
-      <button onClick={() => setShowForm(true)}>Nuova attività</button>
+      <button onClick={handleAdd}>Nuova attività</button>
       {showForm && (
         <div style={{
           background: "#fff",
@@ -21,10 +32,10 @@ export default function AttivitaPage() {
           boxShadow: "0 2px 8px #0002",
           maxWidth: 500
         }}>
-          <AttivitaForm onSuccess={handleSuccess} />
+          <AttivitaForm initialData={formInitialData} onSuccess={handleSuccess} />
         </div>
       )}
-      <AttivitaList />
+      <AttivitaList onEdit={handleEdit} />
     </main>
   )
 }

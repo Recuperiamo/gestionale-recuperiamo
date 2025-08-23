@@ -7,7 +7,9 @@ const ATTIVITA_DUMMY = [
     descrizione: "Consulenza strategica",
     oreConsumate: 3,
     pacchetto: "Ore Consulenza 2025",
+    pacchettoId: 1,
     cliente: "Alfa Srl",
+    clienteId: 1,
     data: "2025-08-22"
   },
   {
@@ -15,15 +17,21 @@ const ATTIVITA_DUMMY = [
     descrizione: "Formazione personale",
     oreConsumate: 2,
     pacchetto: "Pacchetto Training",
+    pacchettoId: 2,
     cliente: "Beta Spa",
+    clienteId: 2,
     data: "2025-08-21"
   }
 ]
 
-export default function AttivitaList() {
+export default function AttivitaList({ onEdit }) {
   // Handler placeholder
   const handleAction = (azione, attivita) => {
-    alert(`Azione: ${azione}\nID attività: ${attivita.id}`)
+    if (azione === "Modifica" && onEdit) {
+      onEdit(attivita)
+    } else {
+      alert(`Azione: ${azione}\nID attività: ${attivita.id}`)
+    }
   }
 
   return (
