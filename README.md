@@ -1290,3 +1290,4 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - Protezione overbooking (nessuna attività può superare le ore residue)
 - [NEW] Endpoint aggregato attività per cliente
 - [NEW] Componente AttivitaClienteList.jsx per visualizzazione attività aggregate per cliente
+- [NEW] Storico attività: componente StoricoAttivitaTable.jsx, pagina /storico, export dummy

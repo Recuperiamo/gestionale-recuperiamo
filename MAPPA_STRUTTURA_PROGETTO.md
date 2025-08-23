@@ -1,4 +1,4 @@
-# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-23 19:00 (UTC+2)
+# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-24 00:22 (UTC+2)
 
 ---
 
@@ -6,39 +6,45 @@
 
 gestionale-recuperiamo/
 │
-├── app/
-│   ├── api/
+├── app/                                              # [ROOT Next.js app]
+│   ├── api/                                         # [API Route Handlers]
 │   │   ├── attivita/
-│   │   │   └── route.js
+│   │   │   └── route.js                             # CRUD attività (API REST)
 │   │   ├── user/
-│   │   │   └── route.js
+│   │   │   └── route.js                             # API utente autenticazione/info
 │   │   ├── clienti/
 │   │   │   └── [clienteId]/
 │   │   │       └── attivita/
-│   │   │           └── route.js   # [NEW] Lista attività per cliente (via pacchetti)
-│   │   └── ...
-│   ├── components/
-│   │   ├── Navbar.js
-│   │   └── attivita/
-│   │       ├── AttivitaList.jsx
-│   │       ├── AttivitaForm.jsx
-│   │       ├── AttivitaDettaglioModal.jsx
-│   │       ├── AttivitaClienteList.jsx   # [NEW] Lista attività di uno specifico cliente
-│   │       └── ...
-│   ├── lib/
-│   │   └── prisma.js
-│   ├── attivita/
-│   │   └── page.js
-│   ├── clienti/
-│   │   └── page.js
-│   ├── pacchetti/
-│   │   └── page.js
-│   ├── layout.js
-│   ├── page.js
-│   ├── not-found.js
-│   └── ...
+│   │   │           └── route.js                     # [NEW] Lista attività per cliente (via pacchetti)
+│   │   └── ...                                      # [ALTRE API o future estensioni]
+│   ├── components/                                  # [Componenti React riutilizzabili]
+│   │   ├── Navbar.js                                # Navbar principale
+│   │   └── attivita/                                # Componenti attività
+│   │       ├── AttivitaList.jsx                     # Tabella attività filtrabile
+│   │       ├── AttivitaForm.jsx                     # Form CRUD attività
+│   │       ├── AttivitaDettaglioModal.jsx           # Modale dettaglio attività
+│   │       ├── AttivitaClienteList.jsx              # [NEW] Lista attività per cliente (via pacchetti)
+│   │       ├── StoricoAttivitaTable.jsx             # [NEW] Tabella storico attività filtrabile/esportabile
+│   │       └── ...                                  # [Altri componenti attività]
+│   ├── utils/                                       # [Funzioni di utilità condivise]
+│   │   ├── prisma.js                                # Client Prisma singleton
+│   │   ├── exportToPdf.js                           # [NEW] Export PDF (placeholder)
+│   │   ├── exportToXls.js                           # [NEW] Export XLS (placeholder)
+│   │   └── ...                                      # [Altre utility]
+│   ├── attivita/                                    # [Route UI attività]
+│   │   └── page.js                                  # Pagina principale attività
+│   ├── clienti/                                     # [Route UI clienti]
+│   │   └── page.js                                  # Pagina principale clienti
+│   ├── pacchetti/                                   # [Route UI pacchetti]
+│   │   └── page.js                                  # Pagina principale pacchetti
+│   ├── storico/                                     # [Route UI storico]
+│   │   └── page.js                                  # [NEW] Route principale storico attività
+│   ├── layout.js                                    # Layout root globale
+│   ├── page.js                                      # Home/dashboard
+│   ├── not-found.js                                 # Pagina custom 404
+│   └── ...                                          # [Altri file Next.js]
 │
-├── tests/
+├── tests/                                           # [Test automatici]
 │   ├── components/
 │   │   ├── attivita/
 │   │   │   ├── AttivitaList.integration.test.jsx
@@ -47,30 +53,69 @@ gestionale-recuperiamo/
 │   │   ├── clienti/
 │   │   │   ├── ClientiForm.integration.test.jsx
 │   │   │   └── validateClientiForm.test.js
-│   │   └── ...
-│   └── ...
+│   │   └── ...                                      # [Altri test]
+│   └── ...                                          # [Test di sistema/future]
 │
-├── prisma/
-│   ├── schema.prisma
+├── prisma/                                          # [Schema DB e migrazioni]
+│   ├── schema.prisma                                # Modello dati Prisma
 │   └── migrations/
 │       ├── 20230823-initial/
 │       │   └── migration.sql
-│       └── ...
+│       └── ...                                      # [Altre migrazioni]
 │
-├── public/
+├── public/                                          # [File statici Next.js]
 │   ├── favicon.ico
 │   ├── logo.png
 │   └── ...
 │
-├── .env
-├── .env.local
-├── .gitignore
-├── package.json
-├── README.md
-├── STANDARD_OPERATIVO.md
-├── LOG_OPERATIVO.md
-├── MAPPA_STRUTTURA_PROGETTO.md
-└── ...
+├── .env                                             # Variabili ambiente base
+├── .env.local                                       # Variabili ambiente local dev
+├── .gitignore                                       # Esclusioni git
+├── package.json                                     # Configurazione npm/progetto
+├── README.md                                        # Documentazione principale repo
+├── STANDARD_OPERATIVO.md                            # Regole operative vincolanti
+├── LOG_OPERATIVO.md                                 # Log operativo reverse-chronological (UTC+2)
+├── MAPPA_STRUTTURA_PROGETTO.md                      # Questo file, sempre aggiornata
+└── ...                                              # Altri file root (es. script, doc, config)
+
+---
+
+## DICHIARAZIONI STRUTTURA (per directory chiave)
+
+### app/api/
+- **Contenuto:** Solo route handler Next.js (file route.js o [endpoint]/route.js).
+- **Regole:** Unico entry-point per ogni risorsa/entità. Sottocartelle solo per subresource o endpoint specifici.
+- **Integrazione:** Chiamate da fetch lato frontend e test automatici.
+
+### app/components/
+- **Contenuto:** Solo componenti React riutilizzabili (file .jsx, .js).
+- **Regole:** Sottocartelle per area funzionale (es: attivita/), nessuna logica fetch diretta (solo props/eventi).
+- **Integrazione:** Import in page.js, modali, e altre UI.
+
+### app/utils/
+- **Contenuto:** Utility JS/TS (funzioni helper, export, prisma client, ecc).
+- **Regole:** Niente logica di UI, solo esportazioni di funzioni.
+- **Integrazione:** Usato da componenti, API, ecc.
+
+### app/[area]/
+- **Contenuto:** Route Next.js (page.js per vista, layout.js opzionale).
+- **Regole:** Una sola page.js per area/funzionalità. Integrazione solo di componenti dichiarati in app/components/.
+- **Integrazione:** Navigazione utente, routing Next.js.
+
+### tests/
+- **Contenuto:** Test automatici (unit/integration, organized per component/feature).
+- **Regole:** Sottocartelle per area, file test chiari, nessun codice di produzione.
+- **Integrazione:** npm test, CI.
+
+### prisma/
+- **Contenuto:** schema.prisma (modello DB), migrazioni.
+- **Regole:** Una sola schema.prisma per repo, migration per ogni modifica sostanziale modello dati.
+- **Integrazione:** prisma migrate, prisma generate.
+
+### public/
+- **Contenuto:** File statici serviti da Next.js (immagini, icone, ecc).
+- **Regole:** Solo asset, niente codice/app.
+- **Integrazione:** <img src="/logo.png"/> ecc.
 
 ---
 
@@ -82,11 +127,14 @@ gestionale-recuperiamo/
     - **pacchetti/**: UI/CRUD pacchetti.
     - **components/attivita/**: Tutti i componenti specifici per attività.
         - **AttivitaClienteList.jsx**: [NEW] Visualizza lista attività di un cliente (via pacchetti).
+        - **StoricoAttivitaTable.jsx**: [NEW] Tabella storico attività filtrabile/esportabile.
     - **api/**: Endpoint backend; CRUD attività, utenti, etc.
         - **clienti/[clienteId]/attivita/route.js**: [NEW] API attività per cliente.
+    - **utils/exportToPdf.js, exportToXls.js**: Utility export (placeholder).
     - **lib/prisma.js**: Client Prisma singleton.
     - **layout.js**: Layout root globale.
     - **not-found.js**: Pagina custom 404.
+    - **storico/page.js**: [NEW] Route principale storico attività.
 - **tests/**: Test automatici (unit/integration, organized per area).
 - **prisma/**: Modello e migrazioni database (schema.prisma, migrations).
 - **public/**: File statici serviti da Next.js.
@@ -139,8 +187,20 @@ gestionale-recuperiamo/
 
 ---
 
+### [NEW] Feature: Storico attività filtrabile/esportabile
+
+1. Accedi a /storico: vedi tabella storico con tutti i dati.
+2. Filtra per cliente, pacchetto, intervallo data: la tabella si aggiorna.
+3. Togli tutti i filtri: torna la lista completa.
+4. Clicca su Export PDF/XLS: alert di funzione non ancora implementata.
+5. Cambia filtri rapidamente: nessun errore, dati sempre coerenti.
+6. Nessun dato trovato: messaggio “Nessuna attività trovata”.
+7. (Da dettaglio cliente/pacchetto) Preimposta uno dei filtri e verifica il focus corretto.
+
+---
+
 ## ULTIMO AGGIORNAMENTO MAPPA
 
-**Data e ora**: 2025-08-23 19:00 (UTC+2)  
-**Nota**: Aggiunti endpoint `/api/clienti/[clienteId]/attivita/route.js` e componente `AttivitaClienteList.jsx` per visualizzazione attività aggregate per cliente (via join ai pacchetti).  
+**Data e ora**: 2025-08-24 00:22 (UTC+2)  
+**Nota**: Integrate dichiarazioni struttura per tutte le directory chiave e aggiornata sezione storico attività.  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**

@@ -1,4 +1,17 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+**2025-08-24 00:22:00 (UTC+2)**
+Integrata la sezione dichiarazioni struttura in MAPPA_STRUTTURA_PROGETTO.md (directory chiave, tipologia file contenuti, regole di inclusione), aggiornata la struttura con tutti i nuovi file per issue #36.  
+Aggiornati anche README.md e STANDARD_OPERATIVO.md per riflettere la nuova organizzazione e scenario test manuale storico attività.
+
+**2025-08-24 00:15:00 (UTC+2)**
+Creati nuovi file per funzionalità "storico attività e filtri":  
+- app/components/attivita/StoricoAttivitaTable.jsx  
+- app/storico/page.js  
+- app/utils/exportToPdf.js  
+- app/utils/exportToXls.js  
+Aggiornate MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md con la nuova feature e scenario test manuale.
+**2025-08-24 00:05:00 (UTC+2)**  
+Aperta la sessione di lavoro per issue #36 “Visualizzazione storico attività e filtri”.  
 
 **2025-08-23 00:03:30 (UTC+2)**  
 Chiusa issue #35 “Calcolo automatico ore residue su attività” su branch principale dopo verifica test manuali, review log e scenario edge-case (overbooking, booking multiplo, rollback su eliminazione/modifica).  
