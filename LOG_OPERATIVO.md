@@ -1,5 +1,19 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+-- 2025-08-23 02:05 UTC+2: **CHIUSURA ISSUE #30 “Aggiornamento documentazione e standard operativo milestone 4”**
+    - Effettuata revisione di consistenza tra README.md, STANDARD_OPERATIVO.md e MAPPA_STRUTTURA_PROGETTO.md.
+    - Verificata completa coerenza tra struttura repo, policy anti-doppioni, aggiornamento doc/log e scenario test/manuale.
+    - Nessun riferimento legacy o policy obsoleta presente nei file analizzati.
+    - Scenario test/manuale: rivista ogni policy, simulata una modifica, verificato log aggiornato e coerenza tra doc/standard operativo/mappa.
+    - File coinvolti: README.md, STANDARD_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md, LOG_OPERATIVO.md
+    - Outcome: issue chiusa con successo.
+
+- 2025-08-23 02:00 UTC+2: **ATTIVAZIONE ISSUE #30 “Aggiornamento documentazione e standard operativo milestone 4”**
+    - Inizio revisione e verifica consistenza tra README.md, STANDARD_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md secondo scenario test/manuale.
+- 2025-08-23 02:00 UTC+2: **CHIUSURA ISSUE #29 “Test manuale milestone 4 (pacchetti ore e alert)”**
+    - Tutti gli step dello scenario test/manuale di issue #29 sono stati eseguiti e confermati con esito positivo (CRUD pacchetti, alert soglia/esaurimento, build, test auto e manuali).
+    - File coinvolti: LOG_OPERATIVO.md, README.md (se aggiornato)
+    - Outcome: issue chiusa con successo.
 - 2025-08-23 01:53 UTC+2: **Aggiornamento MAPPA_STRUTTURA_PROGETTO.md**
     - Allineata la mappa a struttura attuale: eliminati tutti i riferimenti a `/src`, aggiornata legenda e descrizione per `/app` root logica e `/tests` sede esclusiva dei test.
     - Scenario test/manuale e note operative aggiornate.
