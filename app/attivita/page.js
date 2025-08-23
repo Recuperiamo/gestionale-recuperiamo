@@ -1,45 +1,17 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import AttivitaList from '../components/attivita/AttivitaList';
 import AttivitaForm from '../components/attivita/AttivitaForm';
 import AttivitaDettaglioModal from '../components/attivita/AttivitaDettaglioModal';
 
-const DUMMY_ATTIVITA = [
-  {
-    id: 1,
-    descrizione: "Consulenza strategica",
-    oreConsumate: 3,
-    pacchetto: "Ore Consulenza 2025",
-    pacchettoId: 1,
-    cliente: "Alfa Srl",
-    clienteId: 1,
-    data: "2025-08-22"
-  },
-  {
-    id: 2,
-    descrizione: "Formazione personale",
-    oreConsumate: 2,
-    pacchetto: "Pacchetto Training",
-    pacchettoId: 2,
-    cliente: "Beta Spa",
-    clienteId: 2,
-    data: "2025-08-21"
-  }
-];
-
-const PACCHETTI_DUMMY = [
-  { id: 1, nome: "Ore Consulenza 2025" },
-  { id: 2, nome: "Pacchetto Training" }
-];
-const CLIENTI_DUMMY = [
-  { id: 1, nome: "Alfa Srl" },
-  { id: 2, nome: "Beta Spa" }
-];
-
 export default function AttivitaPage() {
-  const [attivitaList, setAttivitaList] = useState(DUMMY_ATTIVITA);
+  const [attivitaList, setAttivitaList] = useState([]);
+    console.log("Attività passate ad AttivitaList:", attivitaList);
+
+  const [clienti, setClienti] = useState([]);
+  const [pacchetti, setPacchetti] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [formInitialData, setFormInitialData] = useState(null);
   const [dettaglioAttivita, setDettaglioAttivita] = useState(null);
@@ -49,6 +21,42 @@ export default function AttivitaPage() {
   const [filtroPacchetto, setFiltroPacchetto] = useState('');
   const [filtroDataDa, setFiltroDataDa] = useState('');
   const [filtroDataA, setFiltroDataA] = useState('');
+
+  // Carica attività da API
+  const fetchAttivita = () => {
+    fetch('/api/attivita')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setAttivitaList(data))
+      .catch(() => setAttivitaList([]));
+  };
+
+  // Carica clienti reali da API
+  const fetchClienti = () => {
+    fetch('/api/clienti')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setClienti(data))
+      .catch(() => setClienti([]));
+  };
+
+  // Carica pacchetti reali da API
+  const fetchPacchetti = () => {
+    fetch('/api/pacchetti')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setPacchetti(data))
+      .catch(() => setPacchetti([]));
+  };
+
+  useEffect(() => {
+    fetchAttivita();
+  }, []);
+
+  useEffect(() => {
+    fetchClienti();
+  }, []);
+
+  useEffect(() => {
+    fetchPacchetti();
+  }, []);
 
   // Funzione per filtrare per data in intervallo [da, a]
   function isInRange(data, da, a) {
@@ -60,12 +68,12 @@ export default function AttivitaPage() {
 
   // Applica i filtri
   const attivitaFiltrate = attivitaList.filter(a => {
-    return (
-      (!filtroCliente || a.clienteId === parseInt(filtroCliente)) &&
-      (!filtroPacchetto || a.pacchettoId === parseInt(filtroPacchetto)) &&
-      isInRange(a.data, filtroDataDa, filtroDataA)
-    );
-  });
+  return (
+    (!filtroCliente || a.pacchetto?.clienteId === parseInt(filtroCliente)) &&
+    (!filtroPacchetto || a.pacchettoId === parseInt(filtroPacchetto)) &&
+    isInRange(a.createdAt, filtroDataDa, filtroDataA)
+  );
+});
 
   // Apri form per nuova attività
   const handleAdd = () => {
@@ -77,20 +85,11 @@ export default function AttivitaPage() {
     setFormInitialData(attivita);
     setShowForm(true);
   };
-  // Chiudi form dopo submit/annulla + aggiorna lista
-  const handleSuccess = (data) => {
-    if (data && data.descrizione) {
-      if (data.id) {
-        // Modifica
-        setAttivitaList(list => list.map(a => a.id === data.id ? { ...a, ...data } : a));
-      } else {
-        // Nuova
-        setAttivitaList(list => [
-          ...list,
-          { ...data, id: Math.max(0, ...list.map(a => a.id)) + 1 }
-        ]);
-      }
-    }
+  // Chiudi form dopo submit/annulla + aggiorna lista da API
+  const handleSuccess = () => {
+    // Dopo operazione, ricarica dati veri da backend!
+    fetchAttivita();
+    fetchPacchetti();
     setShowForm(false);
     setFormInitialData(null);
   };
@@ -100,9 +99,16 @@ export default function AttivitaPage() {
   // Chiudi modale dettaglio
   const handleCloseDettaglio = () => setDettaglioAttivita(null);
   // Elimina attività
-  const handleDeleteDettaglio = (attivita) => {
+  const handleDeleteDettaglio = async (attivita) => {
     if (window.confirm("Sei sicuro di voler eliminare questa attività?")) {
-      setAttivitaList(list => list.filter(a => a.id !== attivita.id));
+      // DELETE reale
+      await fetch('/api/attivita', {
+        method: 'DELETE',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: attivita.id })
+      });
+      fetchAttivita();
+      fetchPacchetti();
       setDettaglioAttivita(null);
     }
   };
@@ -163,8 +169,8 @@ export default function AttivitaPage() {
               onChange={e => setFiltroCliente(e.target.value)}
               style={{ padding: "6px 10px", borderRadius: 5, border: "1px solid #cbe5fc", background: "#f8fafd" }}>
               <option value="">Tutti</option>
-              {CLIENTI_DUMMY.map(c => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
+              {clienti.map(c => (
+                <option key={c.id} value={c.id}>{c.nome_referente || c.ragione_sociale || c.nome || c.email}</option>
               ))}
             </select>
           </div>
@@ -175,8 +181,8 @@ export default function AttivitaPage() {
               onChange={e => setFiltroPacchetto(e.target.value)}
               style={{ padding: "6px 10px", borderRadius: 5, border: "1px solid #cbe5fc", background: "#f8fafd" }}>
               <option value="">Tutti</option>
-              {PACCHETTI_DUMMY.map(p => (
-                <option key={p.id} value={p.id}>{p.nome}</option>
+              {pacchetti.map(p => (
+                <option key={p.id} value={p.id}>{p.descrizione || p.nome}</option>
               ))}
             </select>
           </div>

@@ -1,12 +1,6 @@
 import React, { useState, useMemo } from "react";
-
-// Funzione di export dummy
-function exportToPdf(data) {
-  alert("Export PDF non ancora implementato.");
-}
-function exportToXls(data) {
-  alert("Export XLS non ancora implementato.");
-}
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
 
 export default function StoricoAttivitaTable({ attivita, clienti, pacchetti }) {
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -23,6 +17,50 @@ export default function StoricoAttivitaTable({ attivita, clienti, pacchetti }) {
       return matchCliente && matchPacchetto && matchDal && matchAl;
     });
   }, [attivita, filtroCliente, filtroPacchetto, dal, al]);
+
+  // Export XLSX
+  function exportToXls(data) {
+    const rows = data.map(a => ({
+      Descrizione: a.descrizione,
+      Ore: a.oreConsumate,
+      Pacchetto: a.pacchetto?.descrizione || "",
+      Cliente: a.pacchetto?.cliente?.nomeReferente || "",
+      Data: a.createdAt ? new Date(a.createdAt).toLocaleDateString("it-IT") : ""
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "StoricoAttivita");
+    XLSX.writeFile(workbook, "storico_attivita.xlsx");
+  }
+
+  // Export PDF - solo lato client, import dinamico
+  async function exportToPdf(data) {
+    if (typeof window === "undefined") return;
+
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF();
+    doc.text("Storico Attività", 14, 18);
+
+    const tableColumn = ["Descrizione", "Ore", "Pacchetto", "Cliente", "Data"];
+    const tableRows = data.map(a => [
+      a.descrizione,
+      a.oreConsumate,
+      a.pacchetto?.descrizione || "",
+      a.pacchetto?.cliente?.nomeReferente || "",
+      a.createdAt ? new Date(a.createdAt).toLocaleDateString("it-IT") : ""
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 24,
+      theme: "grid",
+      headStyles: { fillColor: [25, 118, 210] },
+      styles: { halign: "center", valign: "middle" }
+    });
+
+    doc.save("storico_attivita.pdf");
+  }
 
   return (
     <div>
@@ -56,28 +94,30 @@ export default function StoricoAttivitaTable({ attivita, clienti, pacchetti }) {
       }}>
         <thead>
           <tr style={{ background: "#f4f8fc" }}>
-            <th style={{ padding: "7px 8px" }}>Descrizione</th>
-            <th>Ore</th>
-            <th>Pacchetto</th>
-            <th>Cliente</th>
-            <th>Data</th>
+            <th style={{ padding: "12px 8px", textAlign: "center", verticalAlign: "middle" }}>Descrizione</th>
+            <th style={{ padding: "12px 8px", textAlign: "center", verticalAlign: "middle" }}>Ore</th>
+            <th style={{ padding: "12px 8px", textAlign: "center", verticalAlign: "middle" }}>Pacchetto</th>
+            <th style={{ padding: "12px 8px", textAlign: "center", verticalAlign: "middle" }}>Cliente</th>
+            <th style={{ padding: "12px 8px", textAlign: "center", verticalAlign: "middle" }}>Data</th>
           </tr>
         </thead>
         <tbody>
           {attivitaFiltrate.length === 0 ? (
             <tr>
-              <td colSpan={5} style={{ color: "#888", textAlign: "center", padding: 16 }}>
+              <td colSpan={5} style={{ color: "#888", textAlign: "center", padding: 32, verticalAlign: "middle" }}>
                 Nessuna attività trovata
               </td>
             </tr>
           ) : (
             attivitaFiltrate.map(a => (
               <tr key={a.id}>
-                <td>{a.descrizione}</td>
-                <td>{a.oreConsumate}</td>
-                <td>{a.pacchetto?.descrizione || ""}</td>
-                <td>{a.pacchetto?.cliente?.nomeReferente || ""}</td>
-                <td>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ""}</td>
+                <td style={{ textAlign: "center", verticalAlign: "middle" }}>{a.descrizione}</td>
+                <td style={{ textAlign: "center", verticalAlign: "middle" }}>{a.oreConsumate}</td>
+                <td style={{ textAlign: "center", verticalAlign: "middle" }}>{a.pacchetto?.descrizione || ""}</td>
+                <td style={{ textAlign: "center", verticalAlign: "middle" }}>{a.pacchetto?.cliente?.nomeReferente || ""}</td>
+                <td style={{ textAlign: "center", verticalAlign: "middle" }}>
+                  {a.createdAt ? new Date(a.createdAt).toLocaleDateString("it-IT") : ""}
+                </td>
               </tr>
             ))
           )}

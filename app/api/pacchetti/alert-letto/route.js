@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/authOptions";
-import { prisma } from "@/lib/prisma";
+import { prisma } from '../../../lib/prisma'
 
 export async function POST(req) {
   let session;

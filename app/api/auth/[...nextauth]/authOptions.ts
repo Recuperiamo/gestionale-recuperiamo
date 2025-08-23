@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { prisma } from '@/lib/prisma';
+import { prisma } from '../../../lib/prisma'
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 

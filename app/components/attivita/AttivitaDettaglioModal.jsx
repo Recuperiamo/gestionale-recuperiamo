@@ -8,6 +8,22 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
     if (onClose) onClose();
   };
 
+  // Utility per data
+  function formatDate(dateString) {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    return d.toLocaleDateString('it-IT');
+  }
+
+  // Accesso sicuro alle proprietà pacchetto/cliente
+  const pacchettoLabel = attivita.pacchetto?.descrizione || attivita.pacchetto?.nome || "";
+  const clienteLabel =
+    attivita.pacchetto?.cliente?.nomeReferente ||
+    attivita.pacchetto?.cliente?.ragione_sociale ||
+    attivita.pacchetto?.cliente?.nome ||
+    attivita.pacchetto?.cliente?.email ||
+    "";
+
   return (
     <div
       className="modal"
@@ -38,13 +54,13 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
           <b>Ore:</b> {attivita.oreConsumate}
         </div>
         <div style={{ marginBottom: 12 }}>
-          <b>Pacchetto:</b> {attivita.pacchetto}
+          <b>Pacchetto:</b> {pacchettoLabel}
         </div>
         <div style={{ marginBottom: 12 }}>
-          <b>Cliente:</b> {attivita.cliente}
+          <b>Cliente:</b> {clienteLabel}
         </div>
         <div style={{ marginBottom: 12 }}>
-          <b>Data:</b> {attivita.data}
+          <b>Data:</b> {formatDate(attivita.createdAt)}
         </div>
         <div style={{ margin: "20px 0 0 0", display: "flex", gap: 14, justifyContent: "flex-end" }}>
           {onEdit && (

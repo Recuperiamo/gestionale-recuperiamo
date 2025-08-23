@@ -133,7 +133,17 @@ export async function DELETE(request) {
     if (!id) {
       return Response.json({ error: "ID mancante" }, { status: 400 });
     }
-    await prisma.pacchettoOre.delete({ where: { id: Number(id) } });
+
+    // Elimina tutte le righe collegate in PacchettoAlertLetto che fanno riferimento al pacchetto
+    await prisma.pacchettoAlertLetto.deleteMany({
+      where: { pacchettoId: Number(id) }
+    });
+
+    // Elimina il pacchetto
+    await prisma.pacchettoOre.delete({
+      where: { id: Number(id) }
+    });
+
     return Response.json({ result: "Pacchetto eliminato" });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400 });

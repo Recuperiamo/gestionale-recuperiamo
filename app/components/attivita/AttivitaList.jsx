@@ -1,73 +1,69 @@
-import React from 'react'
+import React from 'react';
 
-// Dummy data d'esempio
-const ATTIVITA_DUMMY = [
-  {
-    id: 1,
-    descrizione: "Consulenza strategica",
-    oreConsumate: 3,
-    pacchetto: "Ore Consulenza 2025",
-    pacchettoId: 1,
-    cliente: "Alfa Srl",
-    clienteId: 1,
-    data: "2025-08-22"
-  },
-  {
-    id: 2,
-    descrizione: "Formazione personale",
-    oreConsumate: 2,
-    pacchetto: "Pacchetto Training",
-    pacchettoId: 2,
-    cliente: "Beta Spa",
-    clienteId: 2,
-    data: "2025-08-21"
-  }
-]
+function formatDate(dateString) {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  return d.toLocaleDateString('it-IT');
+}
 
-export default function AttivitaList({ onEdit }) {
-  // Handler placeholder
-  const handleAction = (azione, attivita) => {
-    if (azione === "Modifica" && onEdit) {
-      onEdit(attivita)
-    } else {
-      alert(`Azione: ${azione}\nID attività: ${attivita.id}`)
-    }
-  }
-
+export default function AttivitaList({ attivita, onDettaglio }) {
+  console.log("AttivitaList riceve:", attivita);
   return (
     <section>
-      <h2>Elenco Attività</h2>
-      <table style={{width: '100%', borderCollapse: 'collapse'}}>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: "#f8fafd", borderRadius: 8, boxShadow: "0 1px 4px #1976d220", fontSize: "1rem", marginTop: 8 }}>
         <thead>
           <tr>
-            <th>Descrizione</th>
-            <th>Ore</th>
-            <th>Pacchetto</th>
-            <th>Cliente</th>
-            <th>Data</th>
-            <th>Azioni</th>
+            <th style={{ textAlign: "left", padding: "12px 14px", fontWeight: 700, fontSize: "1.08rem", color: "#252525" }}>Descrizione</th>
+            <th style={{ textAlign: "right", padding: "12px 10px", fontWeight: 700 }}>Ore</th>
+            <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Pacchetto</th>
+            <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Cliente</th>
+            <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Data</th>
+            <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Azioni</th>
           </tr>
         </thead>
         <tbody>
-          {ATTIVITA_DUMMY.map(attivita => (
-            <tr key={attivita.id}>
-              <td>{attivita.descrizione}</td>
-              <td>{attivita.oreConsumate}</td>
-              <td>{attivita.pacchetto}</td>
-              <td>{attivita.cliente}</td>
-              <td>{attivita.data}</td>
-              <td>
-                <button onClick={() => handleAction('Dettaglio', attivita)}>Dettaglio</button>{' '}
-                <button onClick={() => handleAction('Modifica', attivita)}>Modifica</button>{' '}
-                <button onClick={() => handleAction('Elimina', attivita)}>Elimina</button>
+          {attivita.length === 0 ? (
+            <tr>
+              <td colSpan={6} style={{ textAlign: "center", color: "#888", padding: 24 }}>
+                Nessuna attività trovata
+              </td>
+            </tr>
+          ) : attivita.map(a => (
+            <tr key={a.id}
+              style={{
+                background: "#fff",
+                borderTop: "1px solid #e3eafc",
+                transition: "background 0.2s"
+              }}
+              onMouseOver={e => e.currentTarget.style.background = "#f2faff"}
+              onMouseOut={e => e.currentTarget.style.background = "#fff"}
+            >
+              <td style={{ padding: "10px 14px" }}>{a.descrizione}</td>
+              <td style={{ padding: "10px", textAlign: "right" }}>{a.oreConsumate}</td>
+              <td style={{ padding: "10px" }}>{a.pacchetto?.descrizione || ""}</td>
+              <td style={{ padding: "10px" }}>{a.pacchetto?.cliente?.nomeReferente || a.pacchetto?.cliente?.ragione_sociale || a.pacchetto?.cliente?.nome || a.pacchetto?.cliente?.email || ""}</td>
+              <td style={{ padding: "10px", textAlign: "center" }}>{formatDate(a.createdAt)}</td>
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                <button
+                  style={{
+                    fontSize: "0.98rem",
+                    padding: "4px 10px",
+                    border: "none",
+                    borderRadius: 3,
+                    marginRight: 5,
+                    background: "#e3eafc",
+                    color: "#1976d2",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "background 0.2s"
+                  }}
+                  onClick={() => onDettaglio(a)}
+                >Dettaglio</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div style={{marginTop: '1em', color: 'gray'}}>
-        <em>Funzionalità in sviluppo…</em>
-      </div>
     </section>
-  )
+  );
 }

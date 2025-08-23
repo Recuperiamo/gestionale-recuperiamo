@@ -1,0 +1,44 @@
+import React, { useEffect, useState } from "react";
+
+export default function AttivitaClienteList({ clienteId }) {
+  const [attivita, setAttivita] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState(null);
+
+  useEffect(() => {
+    if (!clienteId) return;
+    setLoading(true);
+    fetch(`/api/clienti/${clienteId}/attivita`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Errore nel recupero attività");
+        return res.json();
+      })
+      .then((data) => {
+        setAttivita(data);
+        setErrore(null);
+      })
+      .catch((e) => setErrore(e.message))
+      .finally(() => setLoading(false));
+  }, [clienteId]);
+
+  if (loading) return <div>Caricamento attività…</div>;
+  if (errore) return <div>Errore: {errore}</div>;
+  if (!attivita.length) return <div>Nessuna attività trovata per questo cliente.</div>;
+
+  return (
+    <div>
+      <h3>Attività del cliente</h3>
+      <ul>
+        {attivita.map((a) => (
+          <li key={a.id}>
+            <b>{a.descrizione}</b> - {a.oreConsumate}h
+            <br />
+            Pacchetto: {a.pacchetto?.nome ?? a.pacchetto?.id}
+            <br />
+            Data: {a.createdAt && new Date(a.createdAt).toLocaleString()}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
