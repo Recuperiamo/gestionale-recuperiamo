@@ -1220,3 +1220,16 @@ Applicazione su [http://localhost:3000](http://localhost:3000)
 ---
 
 Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
+
+## API Gestione Attività (milestone 5)
+
+- **POST   /api/attivita**  
+  Crea una nuova attività, aggiorna ore residue sul pacchetto associato.
+- **GET    /api/attivita**  
+  Restituisce la lista di tutte le attività (filtri opzionali: pacchettoId, clienteId).
+- **GET    /api/attivita?id=XX**  
+  Restituisce il dettaglio di una singola attività.
+- **PATCH  /api/attivita**  
+  Modifica una attività esistente, aggiorna ore residue se cambiano le ore consumate.
+- **DELETE /api/attivita**  
+  Elimina una attività, ripristina le ore residue del pacchetto.

@@ -1114,3 +1114,12 @@ Ultimo aggiornamento: 2025-08-22 22:35 (UTC+2)
 ...
 
 Ultimo aggiornamento: 2025-08-23 02:00 UTC+2
+
+## Scenario test/manuale milestone 5 – CRUD attività
+
+1. POST `/api/attivita` → crea attività, aggiorna pacchetto
+2. PATCH `/api/attivita` → aggiorna attività, aggiorna ore residue pacchetto
+3. DELETE `/api/attivita` → elimina attività, ripristina ore residue pacchetto
+4. GET `/api/attivita` e `/api/attivita?id=ID` → verifica stato attività e pacchetto
+5. Edge-case: dati non validi/id errato → errore gestito, doppio inserimento crea record separati
+6. Ripetere con pacchetti/attività diversi, verificare coerenza dati

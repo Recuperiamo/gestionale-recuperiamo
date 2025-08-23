@@ -1,4 +1,4 @@
-# Mappa Struttura Progetto – Ultimo aggiornamento: 2025-08-23 02:05 (UTC+2)
+# Mappa Struttura Progetto – Ultimo aggiornamento: 2025-08-23 13:54 (UTC+2)
 
 ```plaintext
 gestionale-recuperiamo/
@@ -6,7 +6,7 @@ gestionale-recuperiamo/
 ├── app/                       # Cartella principale Next.js (route, logica frontend/backend, componenti, API, layout)
 │   ├── api/                   # Route API (Next.js Route Handlers)
 │   │   ├── attivita/
-│   │   │   └── route.js       # API: CRUD attività (usa Prisma)
+│   │   │   └── route.js       # API: CRUD attività (usa Prisma, milestone 5, POST/GET/PATCH/DELETE, validazione, update ore pacchetto)
 │   │   ├── user/
 │   │   │   └── route.js       # API: gestione utenti
 │   │   └── ...                # Altre route API
@@ -54,7 +54,6 @@ gestionale-recuperiamo/
     - **layout.js**: Layout radice, include solo <SessionProvider> (non più provider custom).
     - **not-found.js**: Pagina custom 404.
 - **tests/**: Test automatici (Jest, React Testing Library, ecc.), organizzati per area funzionale.  
-  Esempio: `tests/components/clienti/ClientiForm.integration.test.jsx`
 - **prisma/**: Tutto ciò che riguarda Prisma e il database.
     - **schema.prisma**: Definizione DB, modelli, relazioni.
     - **migrations/**: Migrazioni generate da Prisma migrate.
@@ -88,5 +87,16 @@ gestionale-recuperiamo/
 
 ---
 
-**Ultimo aggiornamento mappa:** 2025-08-23 01:52 (UTC+2)  
+## Scenario test/manuale milestone 5 – CRUD attività
+
+1. POST `/api/attivita` → crea attività, aggiorna pacchetto
+2. PATCH `/api/attivita` → aggiorna attività, aggiorna ore residue pacchetto
+3. DELETE `/api/attivita` → elimina attività, ripristina ore residue pacchetto
+4. GET `/api/attivita` e `/api/attivita?id=ID` → verifica stato attività e pacchetto
+5. Edge-case: dati non validi/id errato → errore gestito, doppio inserimento crea record separati
+6. Ripetere con pacchetti/attività diversi, verificare coerenza dati
+
+---
+
+**Ultimo aggiornamento mappa:** 2025-08-23 13:54 (UTC+2)  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**

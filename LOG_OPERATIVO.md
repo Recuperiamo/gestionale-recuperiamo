@@ -1,4 +1,19 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+### [2025-08-23 13:54 UTC+2]
+- **Chiusura reale issue #33 “Implementazione CRUD attività (API/handler)”**: superate tutte le task con test manuale su API attività (POST, PATCH, DELETE, GET, edge-case), output allegati, scenario test/manuale milestone 5 rispettato.
+    - API RESTful attività funzionante (crea, modifica, elimina, dettagli)
+    - Collegamento attività → pacchetto (e cliente via pacchetto)
+    - Validazione dati, gestione errori, edge-case coperti (id errato, dati non validi, doppio inserimento, pacchetto non valido)
+    - Aggiornamento automatico ore residue su pacchetto dopo tutte le operazioni
+- **Scenario test/manuale milestone 5**:
+    1. POST attività: inserita e collegata a pacchetto, ore residue decrementate
+    2. PATCH attività: aggiornata e ore residue modificate
+    3. DELETE attività: eliminata e ore residue ripristinate
+    4. GET attività: verifica stato e dettaglio
+    5. Edge-case: errori gestiti su id/dati non validi, doppio inserimento
+- File coinvolti: app/api/attivita/route.js, LOG_OPERATIVO.md, README.md, STANDARD_OPERATIVO.md, MAPPA_STRUTTURA_PROGETTO.md
+- Outcome: issue #33 chiusa con successo, milestone 5 avanzata, CRUD attività pronta per use-case UI e rendicontazione.
+- Pronto per eventuale merge su branch principale, scenario test/manuale già ripetuto e validato.
 ### [2025-08-23 10:14 UTC+2]
 - **Apertura milestone 5 “Gestione attività e rendicontazione”**: create e tracciate tutte le issue operative associate.
     - #33 Implementazione CRUD attività (API/handler)
