@@ -1,5 +1,12 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+## 2025-08-24 12:45 (UTC+2)
+- Aggiornati file strutturali MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md per includere obbligo di logging su creazione ed eliminazione attività in Pacchetto_ChangeLog.
+- Ampliato scenario test manuale per storico modifiche pacchetto: ora richiede esplicitamente log di "creazione-attivita" e "eliminazione-attivita".
+- Aggiornata descrizione e procedura standard per la gestione del changelog.
+- Segnalata in README.md e STANDARD_OPERATIVO.md la novità operativa.
+- Orario di aggiornamento strutturale coerente in tutti i file.
+[2025-08-24 12:10 UTC+2] Aggiornata MAPPA_STRUTTURA_PROGETTO.md con riepilogo motivato delle tre pagine/funzioni: Attività, Storico attività, Storico modifiche, e aggiunta sezione su possibile consolidamento/fusione futura con scenario test manuale. Aggiornato README.md con riferimento esplicito alla nuova sezione.
 > Ultimo aggiornamento: 2025-08-24 03:46 UTC+2
 
 ---
