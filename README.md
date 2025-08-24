@@ -1306,5 +1306,37 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - Scenario test manuale storico attività: tutte le funzionalità export e navigazione confermate, milestone “storico attività: esportazione e navigazione completata”.
 
 ---
+- Storico attività filtrabile/esportabile (PDF/XLS completato, export reale lato client)
+- Navigazione completa: la pagina storico (/storico) ora include la navbar, la navigazione tra tutte le pagine principali è sempre possibile.
+- Deep link storico: dal dettaglio cliente puoi cliccare “Vedi storico attività” e arrivare su /storico col filtro già impostato (query string).
+- La funzione di deep link da pacchetto a storico NON è più prevista: il filtro per cliente mostra già tutte le attività dei suoi pacchetti; la UI è coerente e semplificata.
+- Scenario test manuale storico attività: tutte le funzionalità export, filtri e navigazione confermate; milestone “storico attività: export, navigazione e deep link” CHIUSA.
 
-**Ultimo aggiornamento**: 2025-08-24 01:39 (UTC+2)
+---
+
+**Ultimo aggiornamento**: 2025-08-24 02:00 (UTC+2)
+## [NEW] Storico variazioni ore residue pacchetto (Pacchetto_ChangeLog)
+
+- È attiva una tabella di audit trail che registra ogni modifica alle ore residue dei pacchetti (creazione/modifica/eliminazione attività, rettifiche manuali, errori).
+- Ogni evento salva: pacchetto, ore prima/dopo, tipo operazione, attività collegata (se presente), utente, timestamp, motivazione.
+- Lo storico è consultabile (API/UI in sviluppo).
+
+## Funzionalità principali
+
+- Gestione pacchetti ore (creazione, modifica, cancellazione)
+- CRUD attività con aggiornamento ore residue e pacchetti collegati
+- Alert automatici per soglie ore residue
+- **Storico modifiche attività (changelog):** ogni modifica alle ore delle attività viene tracciata per ogni pacchetto (in arrivo interfaccia di visualizzazione)
+- Autenticazione e protezione pagine (AuthGuard)
+
+## Struttura principale
+
+- Frontend Next.js, API REST collegate via prisma
+- Componenti modulari: PacchettiList, PacchettoForm, Alert, ecc.
+- In arrivo: componente `ChangelogTable.jsx` e route `/pacchetti/[id]/changelog` per visualizzare le modifiche storiche dei pacchetti
+
+## Scenario test manuale (changelog)
+
+1. PATCH attività con sola descrizione → nessuna nuova entry changelog
+2. PATCH attività con incremento ore superiore alle residue → errore, nessuna entry changelog
+3. PATCH attività con modifica ore valida → entry changelog corretta

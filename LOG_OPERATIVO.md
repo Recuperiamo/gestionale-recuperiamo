@@ -1,4 +1,53 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+
+> Ultimo aggiornamento: 2025-08-24 03:46 UTC+2
+
+---
+
+## Modifiche principali sessione 2025-08-24
+
+- Integrata la scrittura del changelog automatico in PATCH attività (`app/api/attivita/route.js`): ogni modifica a `oreConsumate` genera una entry su `Pacchetto_ChangeLog` con tutte le info richieste.
+- Test manuale eseguito: PATCH solo descrizione non crea changelog, PATCH con incremento ore oltre residue restituisce errore, PATCH con modifica valida scrive changelog.
+- Scenario test manuale completato e validato.
+- Chiarito che la UI principale per i pacchetti è `PacchettiList.jsx` e che la nuova UI changelog sarà in `/pacchetti/[id]/changelog`.
+- Definito piano per la nuova feature: componente `ChangelogTable.jsx` e nuova pagina `/pacchetti/[id]/changelog/page.js`.
+- To do: implementazione UI storico modifiche, collegamento dalla lista pacchetti.
+
+---
+
+## Scenario test manuale (changelog attività)
+
+1. PATCH solo descrizione → nessun nuovo changelog.
+2. PATCH con oreConsumate oltre residue → errore, nessun changelog.
+3. PATCH con oreConsumate valida → changelog OK.
+
+---
+
+## Stato sessione
+
+**Done:**  
+- PATCH attività con changelog automatico
+- Test manuale su tutti i casi edge
+- Piano dettagliato per UI storico modifiche
+
+**To do:**  
+- Creazione componente `ChangelogTable.jsx`
+- Pagina `/pacchetti/[id]/changelog/page.js`
+- Link/bottone "Storico modifiche" su ogni pacchetto in `PacchettiList.jsx`
+- Aggiornamento log-operativo e mappe dopo UI
+
+2025-08-24 02:19 (UTC+2) – Aggiunto modello Pacchetto_ChangeLog in schema.prisma, aggiornata MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md e scenario test manuale per storico variazioni ore residue pacchetto. (feature Pacchetto_ChangeLog, issue #40)
+
+**2025-08-24 02:00:00 (UTC+2)**
+Verificato funzionamento reale del deep link “Vedi storico attività” dal dettaglio cliente: confermato funzionante e coerente con lo scenario test.  
+Decisione condivisa: la funzione “deep link da dettaglio pacchetto a storico” NON è più prevista, poiché il filtro per cliente copre già tutte le attività dei pacchetti collegati.  
+Scenario test e documentazione aggiornati. Milestone “Visualizzazione storico attività e filtri” CHIUSA.
+
+**2025-08-24 01:40:00 (UTC+2)**
+Implementato deep link: dalle pagine di dettaglio cliente e pacchetto ora compare il bottone “Vedi storico attività” che porta su /storico con filtro preimpostato (query string).  
+La pagina storico e la tabella ricevono i filtri di default e si aggiornano di conseguenza.  
+Scenario test manuale aggiornato, milestone “storico attività: export, navigazione e deep link” pronta per chiusura.  
+Aggiornati README.md, MAPPA_STRUTTURA_PROGETTO.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md.
 **2025-08-24 01:39:00 (UTC+2)**
 Navbar integrata nella pagina Storico (/storico): ora la navigazione è sempre accessibile in tutte le pagine principali.  
 Scenario test manuale aggiornato, milestone “storico attività: export e navigazione” pronta per chiusura.  

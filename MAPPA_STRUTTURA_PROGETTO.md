@@ -1,4 +1,4 @@
-# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-24 00:44 (UTC+2)
+# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-24 03:48 (UTC+2)
 
 ---
 
@@ -16,16 +16,24 @@ gestionale-recuperiamo/
 │   │   │   └── [clienteId]/
 │   │   │       └── attivita/
 │   │   │           └── route.js                     # [NEW] Lista attività per cliente (via pacchetti)
+│   │   ├── pacchetti/
+│   │   │   └── [id]/
+│   │   │       └── changelog/
+│   │   │           └── route.js                     # [NEW] API storico variazioni ore residue pacchetto
 │   │   └── ...                                      # [ALTRE API o future estensioni]
 │   ├── components/                                  # [Componenti React riutilizzabili]
 │   │   ├── Navbar.js                                # Navbar principale
-│   │   └── attivita/                                # Componenti attività
-│   │       ├── AttivitaList.jsx                     # Tabella attività filtrabile
-│   │       ├── AttivitaForm.jsx                     # Form CRUD attività
-│   │       ├── AttivitaDettaglioModal.jsx           # Modale dettaglio attività
-│   │       ├── AttivitaClienteList.jsx              # [NEW] Lista attività per cliente (via pacchetti)
-│   │       ├── StoricoAttivitaTable.jsx             # [NEW] Tabella storico attività filtrabile/esportabile
-│   │       └── ...                                  # [Altri componenti attività]
+│   │   ├── clienti/
+│   │   │   └── ClienteDettaglioModal.jsx            # [CON bottone "Vedi storico attività" funzionante]
+│   │   ├── attivita/                                # Componenti attività
+│   │   │   ├── AttivitaList.jsx                     # Tabella attività filtrabile
+│   │   │   ├── AttivitaForm.jsx                     # Form CRUD attività
+│   │   │   ├── AttivitaDettaglioModal.jsx           # Modale dettaglio attività
+│   │   │   ├── AttivitaClienteList.jsx              # [NEW] Lista attività per cliente (via pacchetti)
+│   │   │   ├── StoricoAttivitaTable.jsx             # [NEW] Tabella storico attività filtrabile/esportabile
+│   │   │   └── ...                                  # [Altri componenti attività]
+│   │   ├── ChangelogTable.jsx                       # [NEW] Tabella storico modifiche pacchetto (in arrivo)
+│   │   └── ...                                      # [Altri componenti]
 │   ├── utils/                                       # [Funzioni di utilità condivise]
 │   │   ├── prisma.js                                # Client Prisma singleton
 │   │   ├── exportToPdf.js                           # [NEW] Export PDF (placeholder)
@@ -36,7 +44,10 @@ gestionale-recuperiamo/
 │   ├── clienti/                                     # [Route UI clienti]
 │   │   └── page.js                                  # Pagina principale clienti
 │   ├── pacchetti/                                   # [Route UI pacchetti]
-│   │   └── page.js                                  # Pagina principale pacchetti
+│   │   ├── page.js                                  # Pagina principale pacchetti
+│   │   └── [id]/
+│   │       └── changelog/
+│   │           └── page.js                          # [NEW] Pagina storico modifiche pacchetto (in arrivo)
 │   ├── storico/                                     # [Route UI storico]
 │   │   └── page.js                                  # [NEW] Route principale storico attività
 │   ├── layout.js                                    # Layout root globale
@@ -112,6 +123,12 @@ gestionale-recuperiamo/
 - **Regole:** Una sola schema.prisma per repo, migration per ogni modifica sostanziale modello dati.
 - **Integrazione:** prisma migrate, prisma generate.
 
+#### [NEW] Pacchetto_ChangeLog (storico variazioni ore residue pacchetto)
+- **File:** prisma/schema.prisma (model Pacchetto_ChangeLog), migrato via migrations/
+- **Contenuto:** Tracciamento di ogni variazione di ore residue su ogni pacchetto (creazione/modifica/eliminazione attività, rettifiche manuali, errori).
+- **Campi:** pacchetto, ore prima/dopo, tipo operazione, attività collegata (se presente), utente, timestamp, motivazione.
+- **Audit trail:** Consultabile da API/console, UI in sviluppo.
+
 ### public/
 - **Contenuto:** File statici serviti da Next.js (immagini, icone, ecc).
 - **Regole:** Solo asset, niente codice/app.
@@ -124,17 +141,22 @@ gestionale-recuperiamo/
 - **app/**: Codice Next.js (route, pagine, layout, componenti, API, provider, shared code).
     - **attivita/**: Route e logica UI attività, filtri, modali.
     - **clienti/**: UI/CRUD clienti.
+        - **ClienteDettaglioModal.jsx**: [Bottone "Vedi storico attività" funzionante]
     - **pacchetti/**: UI/CRUD pacchetti.
+        - **[id]/changelog/page.js**: [NEW] Pagina storico modifiche pacchetto (in arrivo)
     - **components/attivita/**: Tutti i componenti specifici per attività.
-        - **AttivitaClienteList.jsx**: [NEW] Visualizza lista attività di un cliente (via pacchetti).
-        - **StoricoAttivitaTable.jsx**: [NEW] Tabella storico attività filtrabile/esportabile.
-    - **api/**: Endpoint backend; CRUD attività, utenti, etc.
-        - **clienti/[clienteId]/attivita/route.js**: [NEW] API attività per cliente.
+        - **AttivitaClienteList.jsx**: Visualizza lista attività di un cliente (via pacchetti).
+        - **StoricoAttivitaTable.jsx**: Tabella storico attività filtrabile/esportabile.
+    - **components/ChangelogTable.jsx**: [NEW] Tabella storico modifiche pacchetto (in arrivo)
+    - **api/**: Endpoint backend; CRUD attività, utenti, ecc.
+        - **clienti/[clienteId]/attivita/route.js**: API attività per cliente.
+        - **pacchetti/[id]/changelog/route.js**: [NEW] API storico variazioni ore residue pacchetto
     - **utils/exportToPdf.js, exportToXls.js**: Utility export (placeholder).
     - **lib/prisma.js**: Client Prisma singleton.
     - **layout.js**: Layout root globale.
     - **not-found.js**: Pagina custom 404.
-    - **storico/page.js**: [NEW] Route principale storico attività.
+    - **storico/page.js**: Route principale storico attività.
+- **prisma/schema.prisma**: Modello dati Prisma, include ora anche Pacchetto_ChangeLog.
 - **tests/**: Test automatici (unit/integration, organized per area).
 - **prisma/**: Modello e migrazioni database (schema.prisma, migrations).
 - **public/**: File statici serviti da Next.js.
@@ -199,13 +221,25 @@ gestionale-recuperiamo/
 7. Creazione/modifica/eliminazione: la tabella si aggiorna secondo i filtri attivi.
 8. Tabella aggiornata live anche su reset filtri e cambio rapido.
 9. Tutti i campi visibili in tabella sono centrati (test di UI superato).
-10. (**Non integrato**) Navigazione da dettaglio cliente/pacchetto a storico con filtro pre-impostato.
-11. (**Non integrato**) Stress test con molte attività e filtri rapidi.
+10. (**Integrato solo per cliente**) Navigazione da dettaglio cliente a storico con filtro pre-impostato: OK, bottone funzionante.
+11. (**Non previsto**) Deep link da dettaglio pacchetto a storico: NON richiesto, la UI attuale soddisfa il requisito tramite filtro cliente.
+12. (**Non integrato**) Stress test con molte attività e filtri rapidi.
+
+---
+
+### [NEW] Feature: Storico variazioni ore residue pacchetto (Pacchetto_ChangeLog)
+
+1. Ogni modifica sulle ore residue di un pacchetto (creazione/modifica/eliminazione attività, rettifiche manuali, errori) genera un record in Pacchetto_ChangeLog.
+2. Verifica che il record contenga: pacchetto, ore prima/dopo, tipo operazione, attività collegata (se presente), utente, timestamp, motivazione.
+3. Recupero storico per pacchetto: la sequenza delle variazioni è progressiva e ricostruisce sempre il saldo ore.
+4. Rettifica manuale: compare sempre evento di tipo “rettifica”.
+5. Simulazione errore/anomalia: registra evento di tipo “errore” in ChangeLog.
+6. Audit trail consultabile da API o UI (in sviluppo).
 
 ---
 
 ## ULTIMO AGGIORNAMENTO MAPPA
 
-**Data e ora**: 2025-08-24 00:44 (UTC+2)  
-**Nota**: Scenario test manuale storico attività aggiornato: punti 1-9 confermati, 10-11 non ancora integrati.  
+**Data e ora**: 2025-08-24 03:48 (UTC+2)  
+**Nota**: Inserite route e componenti per storico modifiche pacchetto (ChangelogTable.jsx e [id]/changelog/page.js), scenario test manuale aggiornato.  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**
