@@ -1,4 +1,21 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+#2025-08-25 00.49#  UTC+2 
+[#41] Trigger SQL pacchetto/cliente su Attivita: script eseguito, verifica trigger attivo, test manuale superato (blocco inserimento pacchettoId non associato a clienteId), aggiornamento file strutturali, pronta chiusura milestone 41.
+[#41] Aggiornamento file strutturali per milestone 40-41 (README, STANDARD_OPERATIVO, MAPPA_STRUTTURA_PROGETTO), inserimento riferimenti scenario test, milestone e regole operative.
+[#41] Creazione/aggiornamento `sql/attivita_pacchetto_cliente_trigger.sql`, implementazione funzione e trigger, test FK, test NOT NULL, verifica path file e assenza duplicati, push su branch principale.
+[#40] Analisi bug: test manuale dimostra assenza trigger, scenario di errore, richiesta implementazione verifica pacchetto/cliente.
+[#40] Studio scenario Attivita: definizione test manuale vincoli FK, test obbligatorietà cliente/pacchetto, discussione path file SQL e struttura progetto.
+2025-08-24 22:53 UTC+2
+
+- Corretto bug eliminazione pacchetti: ora la DELETE controlla e cancella anche tutte le tabelle figlie (in particolare Pacchetto_ChangeLog) prima di eliminare PacchettoOre, risolvendo errore di vincolo di chiave esterna.
+- Inserito log dettagliato su ogni step della cancellazione in app/api/pacchetti/[id]/route.js per facilitare debug futuri.
+- Confermata e documentata la posizione corretta di lib/prisma.js (ora in /lib) e aggiornati tutti gli import relativi nelle API routes.
+- Scenario test manuale: eseguita eliminazione di un pacchetto con e senza riferimenti in tabelle collegate, verificando la corretta gestione dei vincoli e la presenza del logging dettagliato in console.
+- Aggiornata MAPPA_STRUTTURA_PROGETTO.md con note su relazione tra PacchettoOre e Pacchetto_ChangeLog e su gestione delle dipendenze in DELETE.
+- STANDARD_OPERATIVO.md: inserita nota sull’obbligo di logging dettagliato per tutte le operazioni di cancellazione che coinvolgono relazioni tra tabelle e sulla posizione di lib/prisma.js.
+done:
+    - Bug DELETE pacchetti risolto
+    - Logging operativo inserito e testato
 
 ## 2025-08-24 12:45 (UTC+2)
 - Aggiornati file strutturali MAPPA_STRUTTURA_PROGETTO.md, README.md, STANDARD_OPERATIVO.md per includere obbligo di logging su creazione ed eliminazione attività in Pacchetto_ChangeLog.

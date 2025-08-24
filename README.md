@@ -1329,6 +1329,10 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 - **Storico modifiche attività (changelog):** ogni modifica alle ore delle attività viene tracciata per ogni pacchetto (in arrivo interfaccia di visualizzazione)
 - Autenticazione e protezione pagine (AuthGuard)
 
+## Struttura e funzionalità correlate: attività e modifiche pacchetto
+
+Per un riepilogo dettagliato delle pagine/funzioni “Attività”, “Storico attività” e “Storico modifiche” e delle possibili opzioni di consolidamento futuro, consulta la sezione dedicata in MAPPA_STRUTTURA_PROGETTO.md.
+
 ## Struttura principale
 
 - Frontend Next.js, API REST collegate via prisma
@@ -1340,3 +1344,36 @@ Ultimo aggiornamento: 2025-08-23 01:41 UTC+2
 1. PATCH attività con sola descrizione → nessuna nuova entry changelog
 2. PATCH attività con incremento ore superiore alle residue → errore, nessuna entry changelog
 3. PATCH attività con modifica ore valida → entry changelog corretta
+
+## Funzionalità principali
+
+- Gestione Attività collegate a clienti e (opzionalmente) a pacchetti ore prepagati.
+- Vincoli:
+  - Ogni attività deve avere un cliente obbligatorio.
+  - Il pacchetto, se indicato, deve necessariamente essere di quel cliente (vincolo garantito da trigger SQL, issue #41).
+- Gestione CRUD per clienti, pacchetti ore, attività.
+- Ruoli, permessi, storico modifiche pacchetti.
+
+## Struttura
+
+- **sql/attivita_pacchetto_cliente_trigger.sql**: Funzione e trigger per vincolo pacchetto/cliente su Attivita.
+- **prisma/**: schema Prisma e migrazioni.
+- **app/**: codice Next.js (frontend, API, components).
+- **LOG_OPERATIVO.md**: storico operativo e traccia delle modifiche.
+
+## Scenario test manuale vincolo attività/pacchetto
+
+1. Inserimento Attivita solo con clienteId valido → OK
+2. Inserimento Attivita con clienteId e pacchettoId corretto (cioè pacchetto del cliente) → OK
+3. Inserimento Attivita con clienteId e pacchettoId di altro cliente → **ERRORE trigger**
+4. Inserimento Attivita senza clienteId → **ERRORE NOT NULL**
+5. Inserimento Attivita con clienteId non esistente → **ERRORE FK**
+6. Inserimento Attivita con pacchettoId non esistente → **ERRORE FK**
+
+---
+
+## Milestone/Issue correlate
+
+- [#40] Analisi, scenario test e bug vincolo pacchetto/cliente.
+- [#41] Implementazione trigger SQL attività-pacchetto-cliente.
+

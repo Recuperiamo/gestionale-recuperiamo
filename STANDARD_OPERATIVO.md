@@ -1162,5 +1162,26 @@ Non può omettere alcun file effettivo esistente nella repo, tranne quelli in .g
   3. Visualizzare le attività tramite la nuova vista: devono essere mostrate tutte, anche su pacchetti diversi.
   4. Ripetere per altro cliente: non devono apparire attività di altri clienti.
   5. Verificare che il caricamento, gli errori e lo stato “nessuna attività” siano gestiti correttamente.
+## [NEW] Policy storico variazioni ore residue pacchetto
 
+- Ogni operazione che modifica il valore delle ore residue di un pacchetto deve inserire un record in Pacchetto_ChangeLog.
+- Le rettifiche manuali, le eliminazioni e gli errori vanno tracciati con tipo operazione appropriato.
+- La documentazione e la mappa struttura devono essere aggiornate a ogni modifica strutturale su questo storico.
 ...
+
+## Logging operativo obbligatorio per DELETE con relazioni
+- Ogni API route che elimina dati con dipendenze (es. DELETE pacchetti) deve:
+  - Loggare in console l’inizio, il risultato di ogni operazione su tabelle figlie e il risultato finale.
+  - In caso di errore, loggare l’errore dettagliato.
+- Il logging deve mostrare chiaramente id, count di record eliminati, e ogni eventuale errore.
+
+## Posizione file lib/prisma.js
+- Il file lib/prisma.js deve essere posizionato nella root del progetto (`/lib/prisma.js`).
+- Tutte le importazioni delle API route devono puntare a "../../../lib/prisma" (relativo dalla route), oppure usare l’alias se configurato.
+
+- [#40] Analisi, scenario test e bug vincolo pacchetto/cliente
+- [#41] Implementazione trigger SQL attività-pacchetto-cliente
+
+## Aggiornamento documentazione e mappa struttura
+- Ogni modifica a operazioni critiche, logging o relazioni tra tabelle va riportata in MAPPA_STRUTTURA_PROGETTO.md e README.md.
+- In caso di variazioni strutturali o di standard operativo, aggiornare questa sezione e avvisare in chat.
