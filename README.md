@@ -28,6 +28,7 @@ Consulta **MAPPA_STRUTTURA_PROGETTO.md** per la struttura aggiornata e completa 
 - `/prisma/` — Schema e migrazioni Prisma
 - `/tests/` — Test automatici
 - File root: `README.md`, `STANDARD_OPERATIVO.md`, `LOG_OPERATIVO.md`, `MAPPA_STRUTTURA_PROGETTO.md`, configurazione Next.js/Tailwind/Prisma/ESLint
+- **elencocompleto.txt** — Elenco completo e aggiornato di tutti i file e path presenti nella repository. Da usare sempre per controllo duplicati e rischi di conflitto nomi (vedi STANDARD_OPERATIVO.md).
 
 ---
 
@@ -81,6 +82,7 @@ npm test            # Test automatici
 - Per procedure di contribuzione, regole operative, naming, policy di commit, scenario test/manuale: vedi **STANDARD_OPERATIVO.md**
 - Dopo ogni modifica strutturale, aggiorna **README.md**, **STANDARD_OPERATIVO.md**, **LOG_OPERATIVO.md** e **MAPPA_STRUTTURA_PROGETTO.md**
 - Consulta **LOG_OPERATIVO.md** per la cronologia dettagliata delle operazioni
+- **Usa SEMPRE elencocompleto.txt (root repo) per controllo duplicati file/nomi prima di ogni nuova creazione o proposta.**
 - Segnala in chat ogni dubbio, rischio di duplicato, anomalia o refactor
 
 ---

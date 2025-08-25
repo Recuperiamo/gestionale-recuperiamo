@@ -46,7 +46,8 @@
 
 ## 5. Policy anti-doppioni e controllo struttura
 
-- Prima di proporre o creare nuovi file/componenti, controlla SEMPRE se esiste già un file con nome simile (anche con estensione diversa).
+- **Prima di proporre, creare, rinominare o spostare file o directory, controlla SEMPRE la presenza di duplicati/omonimie usando “elencocompleto.txt” (root della repo, sempre aggiornato).**
+- **Se “elencocompleto.txt” manca o non è aggiornato, procedere solo dopo verifica manuale e segnalazione in chat.**
 - Prima di ogni chiusura milestone:  
   ```powershell
   Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
@@ -54,6 +55,7 @@
 - Se vengono trovati doppioni, risolvi e documenta in LOG_OPERATIVO.md prima di chiudere la milestone.
 - Ogni nuova cartella deve includere un file `context.md` con scopo, regole e best practice aggiornate.
 - Aggiorna sempre MAPPA_STRUTTURA_PROGETTO.md dopo ogni modifica strutturale.
+- **La generazione e/o l’aggiornamento di “elencocompleto.txt” è OBBLIGATORIA dopo ogni modifica strutturale alla repo.**
 
 ---
 

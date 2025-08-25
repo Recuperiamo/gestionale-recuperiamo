@@ -1,5 +1,42 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
+# LOG OPERATIVO – Gestionale Recuperiamo
+
+---
+
+## [2025-08-25 23:50 UTC+2] – Aggiornamento policy anti-doppioni e struttura documentazione
+
+**File coinvolti**
+- STANDARD_OPERATIVO.md
+- README.md
+- MAPPA_STRUTTURA_PROGETTO.md
+- LOG_OPERATIVO.md
+
+**Descrizione**
+- Inserite e rafforzate policy vincolanti per utilizzo, aggiornamento e verifica di `elencocompleto.txt` per controllo duplicati/omonimie.
+- Specificato obbligo di aggiornamento dopo ogni modifica strutturale.
+- Aggiornate sezioni operative, note e struttura nei tre file di policy.
+- Aggiornato LOG_OPERATIVO.md con questa operazione.
+
+**Scenario Test Manuale**
+1. Simula la creazione di un nuovo file in una directory qualsiasi.
+2. Prima della creazione consulta `elencocompleto.txt` in root e verifica l’assenza di omonimie o conflitti.
+3. Se il file esiste già (stesso nome, anche estensione diversa), segnala in chat e NON procedere.
+4. Dopo la creazione/aggiornamento di file strutturali, aggiorna anche `elencocompleto.txt` e assicurati che tutti i file modificati siano elencati correttamente.
+5. Esegui un controllo incrociato tra la reale struttura repo e l’elenco di `elencocompleto.txt`.
+6. Verifica che README.md e MAPPA_STRUTTURA_PROGETTO.md descrivano correttamente la presenza e la funzione vincolante di `elencocompleto.txt`.
+
+---
+
+# Storico recente (reverse order)
+
+## [2025-08-25 23:01 UTC+2] – Aggiornamento policy anti-doppioni e struttura documentazione
+
+
+---
+
+Ultimo aggiornamento log: 2025-08-25 23:01 UTC+2
+
 ## 2025-08-25 23:01 UTC+2 – NOTA: Orari riformattati per coerenza audit in base all’orario reale di sessione.
 
 ## 2025-08-25 23:01 UTC+2 – AUDIT RETROATTIVO Issue #41 “[Feature evolutiva] Attività collegate direttamente al cliente senza pacchetto”

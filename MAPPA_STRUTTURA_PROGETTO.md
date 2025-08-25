@@ -1,4 +1,4 @@
-# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-24 22:56 (UTC+2)
+# MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-25 23:15 (UTC+2)
 
 ---
 
@@ -96,6 +96,41 @@ gestionale-recuperiamo/
 
 ---
 
+## LEGENDA DIRECTORY E FILE CHIAVE
+
+- **README.md**:  
+  Documentazione principale della repo.  
+  Contiene **solo** descrizione, panoramica funzionale, struttura attuale del progetto, informazioni per utente e sviluppatore, avvio rapido e note operative generali.  
+  **Non** include policy operative, regole di processo o scenario test/manuale (che sono spostati in STANDARD_OPERATIVO.md).
+  Per ogni dubbio operativo, rimanda esplicitamente a STANDARD_OPERATIVO.md.
+
+- **STANDARD_OPERATIVO.md**:  
+  Raccolta **completa e vincolante** di tutte le regole operative, policy di processo, naming, scenario test/manuale, milestone, policy commit/push, anti-doppioni, ecc.  
+  È **l’unico punto di verità** per workflow, convenzioni, checklist, debug, policy CI/CD e tutte le pratiche di sviluppo e mantenimento.  
+  Ogni cambiamento strutturale o di policy va qui e **deve essere riportato in LOG_OPERATIVO.md**.
+
+- **LOG_OPERATIVO.md**:  
+  Log storico e operativo di tutte le modifiche rilevanti, audit, test manuali, note storiche, errori, refactor e ogni evento di rilievo.  
+  **Deve contenere tutte le informazioni (anche “sporco”)** per massima trasparenza e auditabilità.  
+  Gli orari sono sempre UTC+2, reverse order (più recente in cima).  
+  Non va “ripulito”: ogni dettaglio serve per possibili revisioni e controllo qualità.
+
+- **MAPPA_STRUTTURA_PROGETTO.md**:  
+  Questa mappa, **sempre aggiornata** e **mai per difetto**: ogni revisione deve essere almeno pari o più dettagliata/estensiva della precedente.  
+  Deve elencare **tutti** i file, cartelle, moduli, componenti, script e asset effettivamente presenti (eccetto quelli esclusi da .gitignore o node_modules).  
+  Deve contenere dichiarazioni e note per tutte le principali directory e feature, oltre a scenario test/manuale aggiornato a ogni milestone.
+
+  ### [NUOVO] elencocompleto.txt
+- **Contenuto:** Elenco di tutti i file e path della repository, sempre aggiornato dopo ogni modifica strutturale.
+- **Regole:** Deve essere usato come riferimento principale per controllo duplicati, omonimie e rischi di conflitto nomi file.
+- **Aggiornamento:** Ogni volta che cambia la struttura (aggiunta/rimozione/spostamento file) aggiorna sempre anche questo file.
+- **Obbligatorietà:** Nessuna operazione strutturale può essere proposta/creata senza averlo consultato e aggiornato.
+
+---
+
+
+---
+
 ## DICHIARAZIONI STRUTTURA (per directory chiave)
 
 ### app/api/
@@ -147,48 +182,18 @@ gestionale-recuperiamo/
 
 ---
 
-## LEGENDA DIRECTORY E FILE CHIAVE
-
-- **app/**: Codice Next.js (route, pagine, layout, componenti, API, provider, shared code).
-    - **attivita/**: Route e logica UI attività, filtri, modali.
-    - **clienti/**: UI/CRUD clienti.
-        - **ClienteDettaglioModal.jsx**: [Bottone "Vedi storico attività" funzionante]
-    - **pacchetti/**: UI/CRUD pacchetti.
-        - **[id]/changelog/page.js**: [NEW] Pagina storico modifiche pacchetto (in arrivo)
-    - **components/attivita/**: Tutti i componenti specifici per attività.
-        - **AttivitaClienteList.jsx**: Visualizza lista attività di un cliente (via pacchetti).
-        - **StoricoAttivitaTable.jsx**: Tabella storico attività filtrabile/esportabile.
-    - **components/ChangelogTable.jsx**: [NEW] Tabella storico modifiche pacchetto (in arrivo)
-    - **api/**: Endpoint backend; CRUD attività, utenti, ecc.
-        - **clienti/[clienteId]/attivita/route.js**: API attività per cliente.
-        - **pacchetti/[id]/changelog/route.js**: [NEW] API storico variazioni ore residue pacchetto
-    - **utils/exportToPdf.js, exportToXls.js**: Utility export (placeholder).
-    - **layout.js**: Layout root globale.
-    - **not-found.js**: Pagina custom 404.
-    - **storico/page.js**: Route principale storico attività.
-- **lib/prisma.js**: Client Prisma singleton. (**Spostato da app/utils/**)
-- **prisma/schema.prisma**: Modello dati Prisma, include ora anche Pacchetto_ChangeLog.
-- **tests/**: Test automatici (unit/integration, organized per area).
-- **prisma/**: Modello e migrazioni database (schema.prisma, migrations).
-- **public/**: File statici serviti da Next.js.
-- **.env / .env.local**: Variabili ambiente (NON committare secrets).
-- **README.md**: Documentazione principale, scenario test manuale, mappa struttura.
-- **STANDARD_OPERATIVO.md**: Regole di formato, processi, best practice.
-- **LOG_OPERATIVO.md**: Log operativo, reverse-chronological (UTC+2, ultimo evento in cima).
-- **MAPPA_STRUTTURA_PROGETTO.md**: Questo file, sempre aggiornata.
-
----
-
 ## NOTE OPERATIVE
 
-- TUTTI i file devono essere elencati nella struttura effettiva a ogni milestone o su richiesta.
-- SE vengono creati nuovi moduli/componenti, aggiorna questa mappa e segnala il possibile rischio di duplicati.
+- La mappa **non va mai ridotta**: ogni versione deve aggiungere dettagli, mai eliminarli.
 - Dopo ogni modifica strutturale, aggiorna anche README.md, STANDARD_OPERATIVO.md, LOG_OPERATIVO.md.
+- Ogni nuova feature, refactor, o introduzione di file/componente deve essere riflessa nella mappa prima di chiudere la milestone.
 - Esegui SEMPRE il controllo duplicati file:
   ```powershell
   Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name
   ```
   Se la lista è vuota repo OK, altrimenti risolvi subito e logga.
+- In caso di dubbio sulla destinazione di una informazione tra README, STANDARD_OPERATIVO o mappa, **chiedi conferma**.
+- Se la mappa dovesse risultare più corta o omettere aree rispetto alla versione precedente, **avvisa subito l’utente** prima di procedere.
 
 ---
 
@@ -306,6 +311,6 @@ Per migliorare la fruibilità e ridurre ridondanze, in futuro è possibile accor
 
 ## ULTIMO AGGIORNAMENTO MAPPA
 
-**Data e ora**: 2025-08-24 22:56 (UTC+2)  
-**Nota**: Spostato prisma.js in /lib. Aggiornata struttura e note operative; import API route ora sempre su /lib/prisma.js.  
+**Data e ora**: 2025-08-25 23:15 (UTC+2)  
+**Nota**: Aggiornata la legenda file chiave e le note operative secondo la nuova distinzione di ruolo tra README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md. Ribadita la policy “mai per difetto”.  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**
