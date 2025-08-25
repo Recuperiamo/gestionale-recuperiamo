@@ -1,6 +1,26 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 
-# LOG OPERATIVO – Gestionale Recuperiamo
+## [2025-08-25 00:54 UTC+2] – Fine sessione: razionalizzazione file progettazione, aggiornamento standard operativo
+
+- File coinvolti:
+    - REQUISITI_E_PROGETTAZIONE.md (creato/fusione)
+    - CHECKLIST_SCENARIO_PROGETTAZIONE.md (creato/fusione)
+    - STANDARD_OPERATIVO.md (aggiornato/manuale)
+    - LOG_OPERATIVO.md (aggiornato)
+    - GESTIONALE_REQUISITI_BASE.md (eliminato)
+    - MAPPA_FUNZIONALE_Version13.md (eliminato)
+    - STRUTTURA_DATI_BOZZA.md (eliminato)
+    - PROGETTAZIONE_CHECKLIST_Version73.md (eliminato)
+    - SCENARIO_TEST_MANUALE_PROGETTAZIONE.md (eliminato)
+    - SCENARIO_TEST_PROGETTAZIONE_Version73.md (eliminato)
+- Scenario Test:
+    1. Tutti i file fusi risultano presenti e completi, senza perdita di contenuti, nelle nuove versioni.
+    2. STANDARD_OPERATIVO.md contiene la nuova regola: controllo duplicati e omonimie solo tramite elencocompleto.txt, senza richiesta output manuale.
+    3. Tutte le regole di aggiornamento/controllo file strutturali sono coerenti e non ridondanti.
+    4. File vecchi eliminati dopo verifica contenuti e backup.
+    5. Nessun conflitto di naming o path, struttura aggiornata in MAPPA_STRUTTURA_PROGETTO.md.
+    6. LOG_OPERATIVO.md aggiornato in reverse order, timestamp UTC+2, scenario test descritto.
+- Pronto per chiusura sessione e merge.
 
 ---
 

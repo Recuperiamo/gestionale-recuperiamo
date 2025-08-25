@@ -15,6 +15,20 @@
 - Ogni sessione, ogni risposta, ogni modifica deve rispettare questo standard.
 - Chiedi sempre chiarimenti se contesto o obiettivi non sono chiari.
 
+## Gestione struttura, duplicati e file elencocompleto.txt
+
+- Il file elencocompleto.txt, situato nella root della repository, contiene SEMPRE la lista aggiornata e completa di tutti i file e directory, e rappresenta la fotografia ufficiale della struttura del progetto.
+- È OBBLIGATORIO aggiornare elencocompleto.txt:
+    - Dopo ogni modifica strutturale (aggiunta, spostamento, eliminazione di file/cartelle)
+    - Prima di ogni push/merge importante
+    - Alla chiusura di ogni sessione di lavoro, come da checklist END_SESSION.md
+- All’inizio di ogni sessione, è OBBLIGATORIO consultare elencocompleto.txt per:
+    - Validare la coerenza tra la struttura reale in locale e quella dichiarata
+    - Verificare la presenza di possibili duplicati/omonimie prima di proporre/creare nuovi file
+- In caso di assenza o incoerenza di elencocompleto.txt, FERMARE le lavorazioni e segnalare in chat prima di procedere.
+- Nessun push/merge di modifiche strutturali è consentito senza aggiornamento contestuale di elencocompleto.txt, MAPPA_STRUTTURA_PROGETTO.md, LOG_OPERATIVO.md e README.md.
+
+---
 ---
 
 ## 2. Policy di controllo avanzato (CI/CD e log operativo)
