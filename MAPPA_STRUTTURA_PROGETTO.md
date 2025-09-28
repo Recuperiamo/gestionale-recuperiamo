@@ -1,6 +1,90 @@
 # MAPPA_STRUTTURA_PROGETTO.md – Ultimo aggiornamento: 2025-08-25 23:15 (UTC+2)
 
 ---
+# Mappa Struttura Progetto (Aggiornata)
+
+> Ultimo aggiornamento: 2025-09-28 (UTC+2)
+
+app/
+│   layout.js
+│   page.js
+│
+├── api/
+│   ├── attivita/
+│   │   └── route.js
+│   ├── modifiche/
+│   │   └── route.js                          # API richieste modifica/cancellazione (override approvazione)
+│   ├── pacchetti/
+│   │   ├── route.js
+│   │   └── [id]/
+│   │       └── route.js
+│   ├── clienti/
+│   │   ├── route.js
+│   │   └── [id]/
+│   │       └── route.js (placeholder GET/PUT/DELETE)
+│   └── auth/
+│       └── [...nextauth]/
+│           ├── route.js
+│           └── authOptions.js
+│
+├── admin/
+│   └── modifiche/
+│       ├── page.js                           # Gestione richieste (stati, filtri, modale approvazione)
+│       └── ApprovaRichiestaModal.jsx         # Modale approvazione con override
+│
+├── pacchetti-lezioni/
+│   └── page.js                               # Vista cliente: lezioni prenotate / svolte + richieste inviate
+│
+├── clienti/
+│   └── page.js
+├── pacchetti/
+│   └── page.js
+├── attivita/
+│   └── page.js (se presente: UI admin attività – da riallineare con nuova logica)
+│
+├── components/
+│   ├── Navbar.jsx
+│   ├── Alert.jsx
+│   ├── AuthGuard.jsx
+│   ├── attivita/
+│   │   ├── AttivitaDettaglioModal.jsx        # Modale dettaglio lezione (per cliente include Richiedi modifica)
+│   ├── modifiche/
+│   │   ├── RichiestaModificaModal.jsx        # Modale cliente invio richiesta
+│   │   └── useRichiesteModifica.js           # Hook fetch richieste (se esistente)
+│   ├── clienti/
+│   │   ├── ClientiForm.jsx
+│   │   ├── ClientiTable.jsx
+│   │   └── ClienteDettaglioModal.jsx
+│   ├── pacchetti/
+│   │   ├── PacchettiList.jsx
+│   │   ├── PacchettoForm.jsx
+│   │   ├── PacchettoEditForm.jsx
+│   │   └── ConfirmDeleteModal.jsx
+│   └── utils/
+│       └── (varie)
+│
+├── (DA IMPLEMENTARE PROSSIMA SESSIONE)
+│   ├── lavagna/
+│   │   └── page.js (TODO)                    # Spazio note/conversazioni interne
+│   ├── classroom-materiali/
+│   │   └── page.js (TODO)                    # Scambio materiali (upload/download)
+│
+public/
+│   └── (assets)
+src/
+│   ├── fetcher/
+│   │   └── clienti/
+│   │       └── clientiAPI.js
+│   ├── lib/
+│   │   └── prisma.js (o index.js)
+│   └── (eventuali alias precedenti da uniformare)
+prisma/
+│   └── schema.prisma                        # Include RichiestaModifica + enums
+LOG_OPERATIVO.md
+STANDARD_OPERATIVO.md
+README.md
+ROADMAP_MILESTONE_ISSUE_BOZZA.md
+output.md
 
 gestionale-recuperiamo/
 │

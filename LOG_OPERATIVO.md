@@ -1,4 +1,40 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
+# LOG OPERATIVO
+Ultimo aggiornamento log: 2025-09-28 03:34 UTC+2
+
+## Entries Recenti (dal più recente)
+
+- [2025-09-28 03:34 UTC+2] Aggiunta approvazione avanzata richieste modifica:  
+  - Modale admin ApprovaRichiestaModal (override data/orario/durata)  
+  - API /api/modifiche: supporto overrideOrario, overrideDurataOre, noteAdmin  
+  - Distinzione prenotate/svolte nella pagina /pacchetti-lezioni con pulsante Richiedi modifica solo future  
+  - Flow richieste: pending → in_review → approved/rejected con validazioni finestra (7g cancellazione, 3g cambio giorno)  
+  - Aggiornata mappa progetto e pianificata introduzione pagine “lavagna” e “classroom-materiali”
+
+- [2025-09-28 03:15 UTC+2] Introdotta pagina /pacchetti-lezioni:  
+  - Tabelle separate lezioni future/past  
+  - Stato richieste e pulsante Richiedi modifica (cliente)  
+  - Integrazione hook useRichiesteModifica  
+
+- [2025-09-28 03:05 UTC+2] Implementata base richieste modifica:  
+  - Modello RichiestaModifica (enum tipo/stato)  
+  - API /api/modifiche con POST/GET/PATCH (approvazione diretta cancellazione)  
+  - Modale cliente RichiestaModificaModal  
+
+- (Voci precedenti – mantenere nelle versioni storiche)  
+
+## TODO PROSSIMA SESSIONE
+1. Test completo scenario (override durata/orario + rimborso ore) e registrazione risultati.
+2. Aggiunta pagine:
+   - /lavagna (gestione note comunicazioni interne)
+   - /classroom-materiali (upload/download materiali)
+3. Aggiornamento README + STANDARD_OPERATIVO con nuove sezioni UX richieste.
+4. Verifica uniformità path (evitare duplicati tra app/components e src/).
+5. Eventuale migrazione a TS graduale per /api/modifiche.
+
+## NOTE
+- Verificare se esiste ancora pagina app/attivita/page.js duplicata funzionalmente rispetto a /pacchetti-lezioni.
+- Controllare che gli alias @ non vengano più usati per nuovi file (refactor coerente).
 
 ## [2025-08-25 00:54 UTC+2] – Fine sessione: razionalizzazione file progettazione, aggiornamento standard operativo
 

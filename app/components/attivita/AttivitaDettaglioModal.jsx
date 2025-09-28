@@ -1,22 +1,10 @@
-import React from 'react';
+import React from "react";
 
 export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDelete }) {
   if (!attivita) return null;
 
-  const handleDelete = () => {
-    if (onDelete) onDelete(attivita);
-    if (onClose) onClose();
-  };
-
-  // Utility per data
-  function formatDate(dateString) {
-    if (!dateString) return "";
-    const d = new Date(dateString);
-    return d.toLocaleDateString('it-IT');
-  }
-
-  // Accesso sicuro alle proprietà pacchetto/cliente
   const pacchettoLabel = attivita.pacchetto?.descrizione || attivita.pacchetto?.nome || "";
+
   const clienteLabel =
     attivita.pacchetto?.cliente?.nomeReferente ||
     attivita.pacchetto?.cliente?.ragione_sociale ||
@@ -24,90 +12,124 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
     attivita.pacchetto?.cliente?.email ||
     "";
 
+  // PATCH: verifica se la lezione è parte di una ricorrenza
+  const isRicorrente = !!attivita.ricorrenzaId;
+
+  // Funzione di formattazione data
+  function formatDate(date) {
+    try {
+      return new Date(date).toLocaleString("it-IT");
+    } catch {
+      return date;
+    }
+  }
+
   return (
-    <div
-      className="modal"
-      style={{
-        position: "fixed",
-        top: 0, left: 0,
-        width: "100vw", height: "100vh",
-        background: "#1b253433",
-        zIndex: 2000,
-        display: "flex", alignItems: "center", justifyContent: "center"
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          padding: 28,
-          borderRadius: 9,
-          minWidth: 340,
-          maxWidth: 400,
-          boxShadow: "0 8px 36px #1976d250"
-        }}
-      >
-        <h3 style={{ color: "#1976d2", fontWeight: 600, marginTop: 0 }}>Dettaglio Attività</h3>
-        <div style={{ marginBottom: 12 }}>
+    <div className="modal-overlay" style={{ zIndex: 40 }}>
+      <div className="modal" style={{ maxWidth: 470 }}>
+        <button
+          className="modal-close"
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            right: 22,
+            top: 19,
+            background: "#f5f8ff",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: 20,
+            lineHeight: "20px",
+            color: "#4268b3"
+          }}
+        >
+          ×
+        </button>
+        <h3 style={{ color: "#1976d2", fontWeight: 600, marginTop: 0 }}>Dettaglio Lezione</h3>
+
+        {/* PATCH: info ricorrenza */}
+        {isRicorrente && (
+          <div style={{
+            background: "#e3eaff",
+            color: "#20489a",
+            border: "1.5px solid #20489a90",
+            borderRadius: 7,
+            padding: "9px 15px",
+            marginBottom: 14,
+            fontWeight: 500
+          }}>
+            Questa lezione fa parte di una ricorrenza.
+            <br />
+            Modifica batch delle lezioni ricorrenti disponibile <b>solo dalla schermata modifica</b>.
+          </div>
+        )}
+
+        <div style={{ margin: "18px 0 8px 0" }}>
           <b>Descrizione:</b> {attivita.descrizione}
         </div>
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 8 }}>
           <b>Ore:</b> {attivita.oreConsumate}
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <b>Pacchetto:</b> {pacchettoLabel}
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <b>Cliente:</b> {clienteLabel}
-        </div>
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 8 }}>
           <b>Data:</b> {formatDate(attivita.createdAt)}
         </div>
-        <div style={{ margin: "20px 0 0 0", display: "flex", gap: 14, justifyContent: "flex-end" }}>
-          {onEdit && (
-            <button
-              onClick={() => onEdit(attivita)}
-              style={{
-                background: "#e3eafc",
-                color: "#1976d2",
-                border: "none",
-                borderRadius: 5,
-                padding: "7px 16px",
-                fontWeight: 500,
-                fontSize: "0.96rem",
-                cursor: "pointer"
-              }}
-            >Modifica</button>
-          )}
-          {onDelete && (
-            <button
-              onClick={handleDelete}
-              style={{
-                background: "#ffebee",
-                color: "#c62828",
-                border: "none",
-                borderRadius: 5,
-                padding: "7px 16px",
-                fontWeight: 500,
-                fontSize: "0.96rem",
-                cursor: "pointer"
-              }}
-            >Elimina</button>
-          )}
+        <div style={{ marginBottom: 8 }}>
+          <b>Pacchetto:</b> {pacchettoLabel}
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          <b>Cliente:</b> {clienteLabel}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 22, gap: 10 }}>
           <button
-            onClick={onClose}
+            onClick={() => onEdit(attivita)}
             style={{
-              background: "#1976d2",
+              background: "#1cb0f6",
               color: "#fff",
               border: "none",
-              borderRadius: 5,
-              padding: "7px 16px",
-              fontWeight: 500,
-              fontSize: "0.96rem",
-              cursor: "pointer"
+              borderRadius: 7,
+              padding: "7px 14px",
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: "pointer",
+              boxShadow: "0 1px 4px #1cb0f640"
             }}
-          >Chiudi</button>
+          >
+            Modifica lezione
+          </button>
+          <button
+            onClick={() => onDelete && onDelete(attivita)}
+            style={{
+              background: "#f44336",
+              color: "#fff",
+              border: "none",
+              borderRadius: 7,
+              padding: "7px 14px",
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: "pointer",
+              boxShadow: "0 1px 4px #f4433640"
+            }}
+          >
+            Elimina lezione
+          </button>
         </div>
       </div>
+      <style>{`
+        .modal-overlay {
+          position: fixed;
+          left: 0; top: 0; width: 100vw; height: 100vh;
+          background: rgba(32,72,154,0.19);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .modal {
+          background: #fff;
+          padding: 32px 30px 24px 26px;
+          border-radius: 17px;
+          box-shadow: 0 6px 32px #20489a2c;
+          position: relative;
+        }
+      `}</style>
     </div>
   );
 }
