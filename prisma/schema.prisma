@@ -1,3 +1,8 @@
+// =====================================================
+// Prisma Schema - Gestionale Recuperiamo
+// Versione con richieste di modifica lezioni (FIX relazione Client <-> RichiestaModifica)
+// =====================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,16 +12,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/**
+ * ====================== AUTENTICAZIONE ======================
+ */
 model User {
-  id       Int       @id @default(autoincrement())
-  email    String    @unique
-  name     String?
-  password String
-  roleId   Int
-  accounts Account[]
-  sessions Session[]
-  role     Role      @relation(fields: [roleId], references: [id])
-  pacchettoAlertLetti PacchettoAlertLetto[] // <--- AGGIUNTA
+  id                  Int                   @id @default(autoincrement())
+  email               String                @unique
+  name                String?
+  password            String
+  roleId              Int
+  accounts            Account[]
+  sessions            Session[]
+  role                Role                  @relation(fields: [roleId], references: [id])
+  pacchettoAlertLetti PacchettoAlertLetto[]
 }
 
 model Role {
@@ -59,56 +67,133 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+/**
+ * ====================== CLIENTI / PACCHETTI ======================
+ */
 model Client {
-  id            Int            @id @default(autoincrement())
-  nomeReferente String
-  email         String
-  telefono      String?
-  indirizzo     String?
-  codiceFiscale String?        @unique
-  partitaIva    String?        @unique
-  note          String?
-  pacchetti     PacchettoOre[]
+  id                Int                 @id @default(autoincrement())
+  nomeReferente     String
+  email             String
+  telefono          String?
+  indirizzo         String?
+  codiceFiscale     String?             @unique
+  partitaIva        String?             @unique
+  note              String?
+  pacchetti         PacchettoOre[]
+  attivita          Attivita[]
+  richiesteModifica RichiestaModifica[] // <--- AGGIUNTO (lato opposto relazione)
 
   @@index([email])
 }
 
 model PacchettoOre {
-  id               Int        @id @default(autoincrement())
-  clienteId        Int
-  descrizione      String
-  oreAcquistate    Int
-  oreResidue       Int
-  dataAttivazione  DateTime
-  dataScadenza     DateTime?
-  stato            String
-  note             String?
-  sogliaOreResidue Int?
-  attivita         Attivita[]
-  cliente          Client     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  pacchettoAlertLetti PacchettoAlertLetto[] // <--- AGGIUNTA
+  id                  Int                   @id @default(autoincrement())
+  clienteId           Int
+  descrizione         String
+  oreAcquistate       Int
+  oreResidue          Int
+  dataAttivazione     DateTime
+  dataScadenza        DateTime?
+  stato               String
+  note                String?
+  sogliaOreResidue    Int?
+  attivita            Attivita[]
+  cliente             Client                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  pacchettoAlertLetti PacchettoAlertLetto[]
+  changelog           Pacchetto_ChangeLog[]
 
   @@index([clienteId])
 }
 
-model Attivita {
-  id           Int          @id @default(autoincrement())
-  createdAt    DateTime     @default(now())
-  descrizione  String?
-  oreConsumate Int
-  pacchettoId  Int
-  pacchetto    PacchettoOre @relation(fields: [pacchettoId], references: [id])
-}
-
-// AGGIUNTA FINALE: RELAZIONE ALERT LETTI PACCHETTI/UTENTE
-
 model PacchettoAlertLetto {
-  id          Int           @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   userId      Int
   pacchettoId Int
-  letto       Boolean       @default(true)
-  dataLetto   DateTime      @default(now())
-  user        User          @relation(fields: [userId], references: [id])
-  pacchetto   PacchettoOre  @relation(fields: [pacchettoId], references: [id])
+  letto       Boolean      @default(true)
+  dataLetto   DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id])
+  pacchetto   PacchettoOre @relation(fields: [pacchettoId], references: [id])
+
   @@unique([userId, pacchettoId])
+}
+
+model Pacchetto_ChangeLog {
+  id                   Int           @id @default(autoincrement())
+  pacchettoId          Int?
+  pacchetto            PacchettoOre? @relation(fields: [pacchettoId], references: [id], onDelete: SetNull)
+  pacchettoDescrizione String?
+  orePrima             Float
+  oreDopo              Float
+  tipoOperazione       String
+  attivitaId           Int?
+  attivita             Attivita?     @relation(fields: [attivitaId], references: [id], onDelete: SetNull)
+  utente               String
+  timestamp            DateTime      @default(now())
+  motivazione          String?
+}
+
+/**
+ * ====================== ATTIVITA ======================
+ */
+model Attivita {
+  id           Int                   @id @default(autoincrement())
+  createdAt    DateTime              @default(now())
+  descrizione  String?
+  oreConsumate Int
+  pacchettoId  Int?
+  pacchetto    PacchettoOre?         @relation(fields: [pacchettoId], references: [id])
+  clienteId    Int
+  cliente      Client                @relation(fields: [clienteId], references: [id])
+  ricorrenzaId Int?
+  changelog    Pacchetto_ChangeLog[]
+
+  orario    DateTime?
+  durataOre Float?
+  stato     String?
+
+  richiesteModifica RichiestaModifica[]
+
+  @@index([clienteId])
+  @@index([pacchettoId])
+  @@index([orario])
+}
+
+/**
+ * ====================== RICHIESTE MODIFICA ======================
+ */
+enum RichiestaStato {
+  pending
+  in_review
+  approved
+  rejected
+}
+
+enum RichiestaTipo {
+  cambio_data
+  cambio_orario
+  cancellazione
+}
+
+model RichiestaModifica {
+  id             Int            @id @default(autoincrement())
+  attivitaId     Int
+  clienteId      Int
+  tipo           RichiestaTipo
+  stato          RichiestaStato @default(pending)
+  nuovaData      DateTime?
+  nuovoOrario    DateTime?
+  nuovaDurataOre Float?
+  noteStudente   String?
+  noteAdmin      String?
+  processedAt    DateTime?
+  processedBy    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  attivita Attivita @relation(fields: [attivitaId], references: [id])
+  cliente  Client   @relation(fields: [clienteId], references: [id])
+
+  @@unique([attivitaId, stato], map: "uniq_attivita_stato")
+  @@index([clienteId])
+  @@index([attivitaId])
 }
