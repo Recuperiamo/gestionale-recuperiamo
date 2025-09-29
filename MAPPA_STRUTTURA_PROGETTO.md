@@ -3,6 +3,75 @@
 ---
 # Mappa Struttura Progetto (Aggiornata)
 
+# MAPPA STRUTTURA PROGETTO
+# Ultimo aggiornamento: 2025-09-29 03:50 UTC+2
+
+Root
+├─ README.md
+├─ STANDARD_OPERATIVO.md
+├─ LOG_OPERATIVO.md
+├─ MAPPA_STRUTTURA_PROGETTO.md
+├─ elencocompleto.txt
+├─ package.json
+├─ next.config.js
+├─ prisma/
+│  ├─ schema.prisma
+│  ├─ migrations/...
+├─ public/
+│  ├─ favicon.ico
+│  └─ (asset vari)
+├─ app/
+│  ├─ layout.js / layout.tsx (se presente)
+│  ├─ page.js (landing / dashboard redirect)
+│  ├─ api/
+│  │  ├─ attivita/...
+│  │  ├─ modifiche/...
+│  │  ├─ clienti/...
+│  │  └─ (altre route API)
+│  ├─ profilo/
+│  │  └─ page.js
+│  ├─ pacchetti-lezioni/
+│  │  └─ page.js
+│  ├─ lavagna/
+│  │  └─ page.js   (NUOVO prototipo)
+│  ├─ materiale/
+│  │  └─ page.js  (NUOVO prototipo)
+│  ├─ clienti/
+│  │  └─ page.js (se presente)
+│  ├─ pacchetti/
+│  │  └─ page.js (se presente)
+│  ├─ attivita/
+│  │  └─ page.js (se presente)
+│  ├─ calendario/
+│  │  └─ page.js (se presente calendario admin)
+│  ├─ storico/
+│  │  └─ page.js
+│  ├─ admin/
+│  │  ├─ modifiche/
+│  │  │  └─ ApprovaRichiestaModal.jsx
+│  │  └─ (altre eventuali sezioni admin)
+│  ├─ components/
+│  │  ├─ Navbar.js
+│  │  ├─ calendario/
+│  │  │  └─ CalendarioAttivita.jsx
+│  │  ├─ modifiche/
+│  │  │  ├─ RichiestaModificaModal.jsx   (modale unico per richieste cliente)
+│  │  │  ├─ useRichiesteModifica.js / .ts
+│  │  ├─ attivita/
+│  │  │  └─ AttivitaDettaglioModal.jsx
+│  │  ├─ pacchetti/...
+│  │  └─ (altri componenti UI condivisi)
+│  └─ (altri segmenti route / eventuali layout aggiuntivi)
+├─ tests/
+│  ├─ (spec, integration, e2e)
+└─ (configurazioni varie: eslint, tsconfig, ecc.)
+
+NOTE:
+- Pagine /lavagna e /materiale sono prototipi: al passaggio a produzione richiedono API dedicate (CRUD + permessi).
+- RichiestaModificaClienteModal rimossa/deprecata in favore di RichiestaModificaModal riutilizzata dal calendario (flag enableStudentRequests).
+- Qualsiasi aggiunta futura deve ampliare, non ridurre, la presente mappa.
+
+
 > Ultimo aggiornamento: 2025-09-28 (UTC+2)
 
 app/
