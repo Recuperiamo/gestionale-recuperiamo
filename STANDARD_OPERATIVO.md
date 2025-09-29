@@ -160,3 +160,112 @@
 ---
 
 Ultimo aggiornamento: 2025-08-25 23:01 UTC+2
+# STANDARD OPERATIVO – Gestionale Pacchetti Ore
+
+> **IMPORTANTE:**  
+> Tutte le regole vincolanti di processo, coding, naming, milestone, log operativo, checklist e test manuali sono raccolte qui.  
+> Dopo ogni modifica strutturale o di policy, aggiorna SEMPRE questo file e LOG_OPERATIVO.md.
+
+---
+
+## 1. Regole di governance e collaborazione
+- Segui SEMPRE tutte le regole vincolanti di formato e comportamento qui definite.
+- Dopo ogni step significativo aggiorna LOG_OPERATIVO.md e fornisci i comandi git per commit/push.
+- Ogni gruppo di comandi va dato in due blocchi distinti: CMD e PowerShell, nessun commento nei blocchi.
+- Quando modifichi file, fornisci SEMPRE file completi, elenca prima i file coinvolti, non cambiare stile.
+- Ogni sessione, ogni risposta, ogni modifica deve rispettare questo standard.
+- Chiedi sempre chiarimenti se contesto o obiettivi non sono chiari.
+
+## 2. Struttura aggiunta recente
+- Pagine prototipali introdotte: `/lavagna` e `/materiale`.
+- Calendario unificato con modale richieste integrata anche da profilo cliente (`enableStudentRequests`).
+- Gestione rapida richieste pending lato admin: badge cliccabile in “Lezioni Prenotate”.
+
+## 3. Gestione struttura, duplicati e elencocompleto.txt
+- `elencocompleto.txt` fotografa SEMPRE la struttura attuale.
+- Aggiornalo obbligatoriamente dopo:
+  - Aggiunta / rimozione / spostamento file o cartelle
+  - Introduzione nuove pagine (es. `/lavagna`, `/materiale`)
+  - Refactor con rinomina
+- Controllo duplicati obbligatorio prima di push:
+  - PowerShell:  
+    `Get-ChildItem -Recurse -File | Group-Object Name | Where-Object { $_.Count -gt 1 } | Select-Object -ExpandProperty Name`
+  - CMD equivalente via PowerShell o script dedicato.
+
+## 4. Policy aggiornamento file strutturali
+Aggiorna **SEMPRE** insieme quando cambia struttura o flusso core:
+- README.md
+- STANDARD_OPERATIVO.md
+- LOG_OPERATIVO.md
+- MAPPA_STRUTTURA_PROGETTO.md
+- elencocompleto.txt
+
+## 5. Workflow richieste modifica lezioni (vincolante)
+1. Cliente apre calendario profilo → clic lezione futura → modale (RichiestaModificaModal).
+2. Tipi consentiti: `cambio_data`, `cambio_orario`, `cancellazione`.
+3. Admin vede badge “pending” → modale Approva/Rifiuta (override durata, note admin, orario definitivo).
+4. Approva nuova modifica su lezione già modificata → richiesta precedente (approved) diventa `archived`.
+5. Colonne:
+   - “Data / Orario Lezione” → orario finale se approved, proposto se pending.
+   - “Orario originario” → mostra orarioOriginale solo se approved (e differente) o archived.
+6. Divieti:
+   - Niente doppia richiesta pending/in_review sulla stessa lezione.
+   - No richiesta su lezione passata (blocco lato client).
+
+## 6. Scenario test richieste (baseline)
+1. Cambio data → approve → badge “Modificata”
+2. Cambio orario successivo → archiviazione precedente
+3. Cancellazione → stato lezione = Cancellata
+4. Rifiuto → stato = rejected (riga visibile cliente/admin, sparisce badge)
+5. Catena 3 modifiche → orarioOriginale resta quello iniziale
+
+## 7. Policy naming / layout (immutate)
+- Componenti React: PascalCase
+- Variabili/funzioni: camelCase
+- Modelli DB: PascalCase
+- Cartelle: kebab-case o camelCase, niente spazi
+- Niente codice applicativo fuori da `/app`
+
+## 8. Log Operativo
+- Reverse chronological
+- Ogni entry:
+  - Timestamp UTC+2
+  - Descrizione sintetica
+  - File coinvolti
+  - Scenario test (se pertinente)
+- Non saltare aggiornamenti correlati tra file strutturali.
+
+## 9. Route prototipali
+- `/lavagna`: prototipo (lista lavagne, filtraggio admin vs cliente)
+- `/materiale`: prototipo (repository materiale pubblico/assegnato)
+- Finché prototipi: segnare ogni evoluzione funzionale nel log prima della stabilizzazione.
+
+## 10. Calendario unificato
+- Stesso componente base per admin e cliente
+- Cliente: richieste attivate via `enableStudentRequests`
+- Admin: gestione modali approvazione via badge in tabella lezioni
+
+## 11. Policy test / CI (estratto)
+- Prima del push: lint, test, controllo duplicati, aggiornamento log
+- Ogni PR: se tocca README / STANDARD / MAPPA / LOG → devono essere coerenti (ultima entry log aggiornata)
+
+## 12. Milestone e Audit
+- Chiudi milestone solo dopo:
+  - Audit duplicati
+  - Coerenza timestamp log
+  - Aggiornamento mappa + elencocompleto.txt
+  - Scenario test eseguito
+
+## 13. Materiale e Lavagna (linee guida temporanee)
+- Finché non esistono API reali:
+  - Mock limitati al minimo
+  - Nessun commit di file reali di contenuto sensibile
+- Future estensioni: ACL per materiale, versioning lavagna, tagging.
+
+## 14. Sicurezza
+- Nessuna credenziale in commit
+- .env* nel gitignore
+- Validare input richieste modifica lato server (stato lezione, duplicati, tempo minimo)
+
+## 15. Ultimo aggiornamento
+2025-09-29 03:50 UTC+2
