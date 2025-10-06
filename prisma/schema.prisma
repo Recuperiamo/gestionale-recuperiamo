@@ -1,6 +1,6 @@
 // =====================================================
 // Prisma Schema - Gestionale Recuperiamo
-// Versione con richieste di modifica lezioni (FIX relazione Client <-> RichiestaModifica)
+// Versione: rimozione unique (attivitaId, stato) per consentire archiviazioni multiple
 // =====================================================
 
 generator client {
@@ -25,6 +25,7 @@ model User {
   sessions            Session[]
   role                Role                  @relation(fields: [roleId], references: [id])
   pacchettoAlertLetti PacchettoAlertLetto[]
+  LavagnaTratto       LavagnaTratto[]
 }
 
 model Role {
@@ -81,7 +82,7 @@ model Client {
   note              String?
   pacchetti         PacchettoOre[]
   attivita          Attivita[]
-  richiesteModifica RichiestaModifica[] // <--- AGGIUNTO (lato opposto relazione)
+  richiesteModifica RichiestaModifica[]
 
   @@index([email])
 }
@@ -147,11 +148,13 @@ model Attivita {
   ricorrenzaId Int?
   changelog    Pacchetto_ChangeLog[]
 
-  orario    DateTime?
-  durataOre Float?
-  stato     String?
+  orario          DateTime?
+  orarioOriginale DateTime?
+  durataOre       Float?
+  stato           String?
 
   richiesteModifica RichiestaModifica[]
+  Lavagna           Lavagna?
 
   @@index([clienteId])
   @@index([pacchettoId])
@@ -166,6 +169,7 @@ enum RichiestaStato {
   in_review
   approved
   rejected
+  archived
 }
 
 enum RichiestaTipo {
@@ -193,7 +197,37 @@ model RichiestaModifica {
   attivita Attivita @relation(fields: [attivitaId], references: [id])
   cliente  Client   @relation(fields: [clienteId], references: [id])
 
-  @@unique([attivitaId, stato], map: "uniq_attivita_stato")
   @@index([clienteId])
   @@index([attivitaId])
+}
+
+model Lavagna {
+  id         Int             @id @default(autoincrement())
+  attivitaId Int             @unique
+  titolo     String?         @default("Lavagna")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  tratti     LavagnaTratto[]
+  attivita   Attivita        @relation(fields: [attivitaId], references: [id])
+
+  // Se vuoi un indice secondario per query future su createdAt:
+  @@index([createdAt])
+}
+
+model LavagnaTratto {
+  id           Int       @id @default(autoincrement())
+  lavagnaId    Int
+  autoreUserId Int
+  strumento    String // "penna" | "gomma" (possibile estensione)
+  colore       String? // es. "#20489a"
+  spessore     Float? // es. 2.5
+  punti        Json // [{x:.., y:..}, ...]
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+  lavagna      Lavagna   @relation(fields: [lavagnaId], references: [id])
+  autoreUser   User      @relation(fields: [autoreUserId], references: [id])
+
+  @@index([lavagnaId])
+  @@index([autoreUserId])
+  @@index([createdAt])
 }

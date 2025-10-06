@@ -8,6 +8,10 @@ import Navbar from "../components/Navbar";
 import { useRichiesteModifica } from "../components/modifiche/useRichiesteModifica";
 import AttivitaDettaglioModal from "../components/attivita/AttivitaDettaglioModal";
 import RichiestaModificaModal from "../components/modifiche/RichiestaModificaModal";
+import ApprovaRichiestaModal from "../admin/modifiche/ApprovaRichiestaModal";
+
+const GRACE_MS = 5 * 60 * 1000;
+const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 3600 * 1000);
 
 export default function PacchettiLezioniPage() {
   const { data: session, status } = useSession();
@@ -21,7 +25,25 @@ export default function PacchettiLezioniPage() {
   const [attivitaPerRichiesta, setAttivitaPerRichiesta] = useState(null);
   const [showRichiesta, setShowRichiesta] = useState(false);
 
+  const [selectedRichiesta, setSelectedRichiesta] = useState(null);
+  const [showModalApprova, setShowModalApprova] = useState(false);
+
   const isCliente = session?.user?.role === "cliente";
+  const isAdmin = !isCliente;
+
+  async function fetchAttivita() {
+    try {
+      const r = await fetch("/api/attivita", { cache: "no-store" });
+      if (!r.ok) throw new Error("Err " + r.status);
+      const js = await r.json();
+      setAttivita(Array.isArray(js) ? js : []);
+      setErrore(null);
+    } catch (e) {
+      setErrore(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (status === "loading") return;
@@ -29,70 +51,214 @@ export default function PacchettiLezioniPage() {
       router.replace("/signin");
       return;
     }
-    fetch("/api/attivita", { cache: "no-store" })
-      .then(r => {
-        if (!r.ok) throw new Error("Err " + r.status);
-        return r.json();
-      })
-      .then(js => {
-        setAttivita(Array.isArray(js) ? js : []);
-        setErrore(null);
-      })
-      .catch(e => setErrore(e.message))
-      .finally(() => setLoading(false));
+    fetchAttivita();
   }, [status, session, router]);
 
-  // Hook richieste
-  const { richieste, byAttivita, refetch } = useRichiesteModifica({ auto: isCliente });
+  const richiesteHook = useRichiesteModifica({ auto: isCliente || isAdmin });
+  const richiesteSafe = Array.isArray(richiesteHook?.richieste) ? richiesteHook.richieste : [];
+  const byAttivita = richiesteHook?.byAttivita || {};
+  const refetchRichieste = richiesteHook?.refetch || (() => Promise.resolve());
 
-  // Helpers
   function parseStart(a) {
-    return new Date(a.orario || a.createdAt);
+    return a?.orario ? new Date(a.orario) : new Date(a.createdAt);
   }
-  function formatDate(a) {
-    const d = parseStart(a);
-    const data = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    return `${data} ${time}`;
+  function isPast(a) { return parseStart(a).getTime() < (Date.now() - GRACE_MS); }
+  function isFuture(a) { return !isPast(a); }
+  function isCancelled(a) { return (a?.stato || "").toLowerCase() === "cancellata"; }
+  function formatDateFromValue(val) {
+    if (!val) return "—";
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("it-IT", {
+      day: "2-digit", month: "2-digit", year: "numeric"
+    }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
+  function formatDate(a) { return formatDateFromValue(parseStart(a)); }
   function hasOpenRequest(aId) {
     const list = byAttivita[aId] || [];
     return list.some(r => ["pending", "in_review"].includes(r.stato));
   }
-
+  function displayStato(a) {
+    const raw = (a?.stato || "").trim();
+    if (isCancelled(a)) return "Cancellata";
+    if (isPast(a) && (!raw || raw.toLowerCase() === "prenotata")) return "Svolta";
+    if (raw) return raw;
+    return "Prenotata";
+  }
   function canShowRequestButton(a) {
     if (!isCliente) return false;
     if (hasOpenRequest(a.id)) return false;
-    const start = parseStart(a).getTime();
-    const now = Date.now();
-    // Consideriamo prenotata se nel futuro o stato esplicitamente 'Prenotata'
-    const isFuture = start >= now;
-    const statoMatch = (a.stato || "").toLowerCase() === "prenotata";
-    return isFuture || statoMatch;
+    if (isCancelled(a)) return false;
+    if (!isFuture(a)) return false;
+    return true;
+  }
+  function isModificata(a) {
+    return a?.orarioOriginale && a?.orario && a.orarioOriginale !== a.orario;
   }
 
-  // Split prenotate / svolte
-  const { prenotate, svolte } = useMemo(() => {
-    const now = Date.now();
-    const pren = [];
-    const sv = [];
-    attivita.forEach(a => {
-      const startTs = parseStart(a).getTime();
-      const statoLower = (a.stato || "").toLowerCase();
-      const isPren =
-        statoLower === "prenotata" ||
-        startTs >= now;
-      if (isPren) pren.push(a); else sv.push(a);
+  function getRichiestaDisplayDate(r, att) {
+    if (att && ["approved", "archived"].includes(r.stato || "")) {
+      return formatDateFromValue(att.orario);
+    }
+    if (r.nuovoOrario) return formatDateFromValue(r.nuovoOrario);
+    if (r.nuovaData) {
+      const base = (att?.orarioOriginale) ? new Date(att.orarioOriginale) :
+                   (att?.orario ? new Date(att.orario) : null);
+      const nuova = new Date(r.nuovaData);
+      if (!isNaN(nuova.getTime())) {
+        if (base && !isNaN(base.getTime())) {
+          const local = new Date(
+            nuova.getFullYear(),
+            nuova.getMonth(),
+            nuova.getDate(),
+            base.getHours(),
+            base.getMinutes(), 0, 0
+          );
+          return formatDateFromValue(local);
+        }
+        return formatDateFromValue(new Date(
+          nuova.getFullYear(), nuova.getMonth(), nuova.getDate(), 0,0,0,0
+        ));
+      }
+    }
+    if (att) return formatDateFromValue(att.orario);
+    return r.attivitaId;
+  }
+
+  const { prenotate, svolte, cancellate } = useMemo(() => {
+    const future = [];
+    const past = [];
+    const canc = [];
+    (attivita || []).forEach(a => {
+      if (isCancelled(a)) {
+        if (isFuture(a)) future.push(a); else canc.push(a);
+      } else {
+        if (isFuture(a)) future.push(a); else past.push(a);
+      }
     });
-    pren.sort((a, b) => parseStart(a) - parseStart(b));              // future asc
-    sv.sort((a, b) => parseStart(b) - parseStart(a));                // past desc
-    return { prenotate: pren, svolte: sv };
+    future.sort((a, b) => parseStart(a) - parseStart(b));
+    past.sort((a, b) => parseStart(b) - parseStart(a));
+    canc.sort((a, b) => parseStart(b) - parseStart(a));
+    return { prenotate: future, svolte: past, cancellate: canc };
   }, [attivita]);
 
   function openDettaglio(a) { setAttivitaSelezionata(a); }
   function openRichiesta(a) {
     setAttivitaPerRichiesta(a);
     setShowRichiesta(true);
+  }
+  async function handleRichiestaSuccess() {
+    await Promise.all([refetchRichieste(), fetchAttivita()]);
+  }
+
+  function getBadgeForStato(r) {
+    return (
+      <Badge
+        color={
+          r.stato === "rejected" ? "#F8D7DA"
+            : r.stato === "approved" ? "#C7F7D7"
+            : r.stato === "in_review" ? "#D4F0FC"
+            : r.stato === "archived" ? "#E5E7EB"
+            : "#FFF3B0"
+        }
+        text={
+          r.stato === "rejected" ? "#721C24"
+            : r.stato === "approved" ? "#12753A"
+            : r.stato === "in_review" ? "#20489A"
+            : r.stato === "archived" ? "#374151"
+            : "#8C7800"
+        }
+      >
+        {r.stato}
+      </Badge>
+    );
+  }
+
+  const colsPrenotate = isCliente
+    ? ["Data / Orario", "Ore", "Richiesta Aperta", "Stato", "Azioni"]
+    : ["Data / Orario", "Descrizione", "Ore", "Richiesta Aperta", "Stato"];
+  const colsSvolte = isCliente
+    ? ["Data / Orario", "Ore", "Stato"]
+    : ["Data / Orario", "Descrizione", "Ore", "Stato"];
+  const colsCancellate = colsSvolte;
+  const colsRichiesteCliente = ["Data / Orario Lezione", "Orario originario", "Tipo", "Stato", "Creata"];
+  const colsRichiesteAdminRecenti = ["Data / Orario Lezione", "Orario originario", "Descrizione", "Tipo", "Stato", "Creata", "Azioni"];
+
+  function buildClienteRichiesteRows() {
+    return richiesteSafe
+      .filter(r => r && r.stato !== "archived")
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(r => {
+        const att = attivita.find(a => a.id === r.attivitaId);
+        const dateStr = getRichiestaDisplayDate(r, att);
+        let orarioOriginarioCell = "—";
+        if (
+          r.stato === "approved" &&
+          r.tipo !== "cancellazione" &&
+          att?.orarioOriginale &&
+          att?.orarioOriginale !== att?.orario
+        ) {
+          orarioOriginarioCell = formatDateFromValue(att.orarioOriginale);
+        }
+        const rowCells = [
+          dateStr,
+          orarioOriginarioCell,
+          r.tipo,
+          getBadgeForStato(r),
+          new Date(r.createdAt).toLocaleString("it-IT", {
+            day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+          })
+        ];
+        return { key: r.id, cells: rowCells };
+      });
+  }
+
+  function buildAdminRecentiRows() {
+    return richiesteSafe
+      .filter(r => {
+        if (!r?.createdAt) return false;
+        const d = new Date(r.createdAt);
+        return d >= THIRTY_DAYS_AGO;
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(r => {
+        const att = attivita.find(a => a.id === r.attivitaId);
+        const dateStr = getRichiestaDisplayDate(r, att);
+        let orarioOriginarioCell = "—";
+        if (
+          ["approved", "archived"].includes(r.stato) &&
+          r.tipo !== "cancellazione" &&
+          att?.orarioOriginale &&
+          att?.orarioOriginale !== att?.orario
+        ) {
+          orarioOriginarioCell = formatDateFromValue(att.orarioOriginale);
+        }
+        const descr = att
+          ? (att.descrizione || `Lezione #${att.id}`)
+          : `Lezione #${r.attivitaId}`;
+
+        const canGestisci = ["pending", "in_review"].includes(r.stato);
+
+        const rowCells = [
+          dateStr,
+          orarioOriginarioCell,
+          descr,
+          r.tipo,
+          getBadgeForStato(r),
+          new Date(r.createdAt).toLocaleString("it-IT", {
+            day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+          }),
+          canGestisci
+            ? <button
+                onClick={() => { setSelectedRichiesta(r); setShowModalApprova(true); }}
+                style={btnMiniPrimary}
+              >
+                Gestisci
+              </button>
+            : <span style={{ fontSize: 11, opacity: 0.6 }}>—</span>
+        ];
+        return { key: r.id, cells: rowCells };
+      });
   }
 
   return (
@@ -120,172 +286,160 @@ export default function PacchettiLezioniPage() {
           <div style={errBox}>Errore: {errore}</div>
         ) : (
           <>
-            {/* ================== LEZIONI PRENOTATE ================== */}
             <SectionTitle>Lezioni Prenotate (future / prenotate)</SectionTitle>
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione prenotata"
-                columns={["Data / Orario", "Descrizione", "Ore", "Richiesta Aperta", "Ultimo Stato", "Azioni"]}
-                rows={prenotate.map((a, i) => {
+                columns={colsPrenotate}
+                rows={prenotate.map(a => {
                   const reqList = byAttivita[a.id] || [];
                   const openReq = reqList.find(r => ["pending", "in_review"].includes(r.stato));
-                  const lastReq = [...reqList].sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt))[0];
-                  return {
-                    key: a.id,
-                    cells: [
-                      {
-                        content: formatDate(a),
-                        clickable: true,
-                        onClick: () => openDettaglio(a)
-                      },
-                      a.descrizione || `Lezione #${a.id}`,
-                      a.oreConsumate ?? a.durataOre ?? "—",
-                      openReq ? (
-                        <Badge color="#FFF3B0" text="#8C7800">{openReq.stato}</Badge>
-                      ) : "—",
-                      lastReq ? (
-                        <Badge
-                          color={
-                            lastReq.stato === "rejected"
-                              ? "#F8D7DA"
-                              : lastReq.stato === "approved"
-                              ? "#C7F7D7"
-                              : lastReq.stato === "in_review"
-                              ? "#D4F0FC"
-                              : "#FFF3B0"
-                          }
-                          text={
-                            lastReq.stato === "rejected"
-                              ? "#721C24"
-                              : lastReq.stato === "approved"
-                              ? "#12753A"
-                              : lastReq.stato === "in_review"
-                              ? "#20489A"
-                              : "#8C7800"
-                          }
+                  const cells = [];
+                  cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
+                  if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
+                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
+
+                  if (openReq) {
+                    const badge = (
+                      <Badge color="#FFF3B0" text="#8C7800">
+                        {openReq.stato}
+                      </Badge>
+                    );
+                    if (isAdmin) {
+                      cells.push(
+                        <span
+                          style={{ cursor: "pointer" }}
+                          title="Gestisci richiesta"
+                          onClick={() => {
+                            setSelectedRichiesta(openReq);
+                            setShowModalApprova(true);
+                          }}
                         >
-                          {lastReq.stato}
-                        </Badge>
-                      ) : "—",
-                      canShowRequestButton(a) ? (
-                        <button
-                          onClick={() => openRichiesta(a)}
-                          style={btnMiniPrimary}
+                          {badge}
+                        </span>
+                      );
+                    } else {
+                      cells.push(badge);
+                    }
+                  } else {
+                    cells.push("—");
+                  }
+
+                  const statoEl = (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{displayStato(a)}</span>
+                      {isModificata(a) && (
+                        <span
+                          title={`Originaria: ${formatDateFromValue(a.orarioOriginale)}`}
+                          style={badgeMod}
                         >
-                          Richiedi modifica
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 12, opacity: 0.6 }}>—</span>
-                      )
-                    ]
-                  };
+                          Modificata
+                        </span>
+                      )}
+                    </div>
+                  );
+                  cells.push(statoEl);
+
+                  if (!isAdmin) {
+                    cells.push(
+                      canShowRequestButton(a)
+                        ? <button onClick={() => openRichiesta(a)} style={btnMiniPrimary}>Richiedi modifica</button>
+                        : <span style={{ fontSize: 12, opacity: 0.55 }}>—</span>
+                    );
+                  }
+
+                  return { key: a.id, cells };
                 })}
               />
             </TableWrapper>
 
-            {/* ================== LEZIONI SVOLTE ================== */}
             <SectionTitle>Lezioni Svolte / Passate</SectionTitle>
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione svolta"
-                columns={["Data / Orario", "Descrizione", "Ore", "Ultimo Stato", "Richiesta Recente"]}
+                columns={colsSvolte}
                 rows={svolte.map(a => {
-                  const reqList = byAttivita[a.id] || [];
-                  const lastReq = [...reqList].sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt))[0];
-                  return {
-                    key: a.id,
-                    cells: [
-                      {
-                        content: formatDate(a),
-                        clickable: true,
-                        onClick: () => openDettaglio(a)
-                      },
-                      a.descrizione || `Lezione #${a.id}`,
-                      a.oreConsumate ?? a.durataOre ?? "—",
-                      (a.stato || "").length ? a.stato : "—",
-                      lastReq ? (
-                        <Badge
-                          color={
-                            lastReq.stato === "rejected"
-                              ? "#F8D7DA"
-                              : lastReq.stato === "approved"
-                              ? "#C7F7D7"
-                              : lastReq.stato === "in_review"
-                              ? "#D4F0FC"
-                              : "#FFF3B0"
-                          }
-                          text={
-                            lastReq.stato === "rejected"
-                              ? "#721C24"
-                              : lastReq.stato === "approved"
-                              ? "#12753A"
-                              : lastReq.stato === "in_review"
-                              ? "#20489A"
-                              : "#8C7800"
-                          }
+                  const cells = [];
+                  cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
+                  if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
+                  const statoEl = (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{displayStato(a)}</span>
+                      {isModificata(a) && (
+                        <span
+                          title={`Originaria: ${formatDateFromValue(a.orarioOriginale)}`}
+                          style={badgeMod}
                         >
-                          {lastReq.stato}
-                        </Badge>
-                      ) : "—"
-                    ]
-                  };
+                          Modificata
+                        </span>
+                      )}
+                    </div>
+                  );
+                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
+                  cells.push(statoEl);
+                  return { key: a.id, cells };
                 })}
               />
             </TableWrapper>
 
-            {/* ================== RICHIESTE INVIATE ================== */}
-            <SectionTitle>Richieste inviate (tutte)</SectionTitle>
+            <SectionTitle>Lezioni Cancellate</SectionTitle>
             <TableWrapper>
               <MainTable
-                emptyLabel="Nessuna richiesta"
-                columns={["ID", "Attività", "Tipo", "Stato", "Creata", "Dettagli"]}
-                rows={[...richieste]
-                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                  .map(r => ({
-                    key: r.id,
-                    cells: [
-                      r.id,
-                      r.attivitaId,
-                      r.tipo,
-                      <Badge
-                        key={"st" + r.id}
-                        color={
-                          r.stato === "rejected"
-                            ? "#F8D7DA"
-                            : r.stato === "approved"
-                            ? "#C7F7D7"
-                            : r.stato === "in_review"
-                            ? "#D4F0FC"
-                            : "#FFF3B0"
-                        }
-                        text={
-                          r.stato === "rejected"
-                            ? "#721C24"
-                            : r.stato === "approved"
-                            ? "#12753A"
-                            : r.stato === "in_review"
-                            ? "#20489A"
-                            : "#8C7800"
-                        }
-                      >
-                        {r.stato}
-                      </Badge>,
-                      new Date(r.createdAt).toLocaleString("it-IT", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      }),
-                      <span key={"det" + r.id} style={{ fontSize: 12 }}>
-                        {r.noteStudente ? `Studente: ${r.noteStudente}` : ""}
-                        {r.noteAdmin
-                          ? `${r.noteStudente ? " | " : ""}Admin: ${r.noteAdmin}`
-                          : ""}
-                      </span>
-                    ]
-                  }))}
+                emptyLabel="Nessuna lezione cancellata"
+                columns={colsCancellate}
+                rows={cancellate.map(a => {
+                  const cells = [];
+                  cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
+                  if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
+                  const statoEl = (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>{displayStato(a)}</span>
+                      {isModificata(a) && (
+                        <span
+                          title={`Originaria: ${formatDateFromValue(a.orarioOriginale)}`}
+                          style={badgeMod}
+                        >
+                          Modificata
+                        </span>
+                      )}
+                    </div>
+                  );
+                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
+                  cells.push(statoEl);
+                  return { key: a.id, cells };
+                })}
               />
             </TableWrapper>
+
+            {isCliente && (
+              <>
+                <SectionTitle>Richieste inviate (tutte)</SectionTitle>
+                <TableWrapper>
+                  <MainTable
+                    emptyLabel="Nessuna richiesta"
+                    columns={colsRichiesteCliente}
+                    rows={buildClienteRichiesteRows()}
+                  />
+                </TableWrapper>
+              </>
+            )}
+
+            {isAdmin && (
+              <>
+                <SectionTitle>Richieste recenti (ultimi 30 giorni)</SectionTitle>
+                <TableWrapper>
+                  <MainTable
+                    emptyLabel="Nessuna richiesta nel periodo"
+                    columns={colsRichiesteAdminRecenti}
+                    rows={buildAdminRecentiRows()}
+                  />
+                </TableWrapper>
+              </>
+            )}
+
+            <div style={{ marginTop: -12, fontSize: 11.5, color: "#5a6d90" }}>
+              <strong>Legenda:</strong> <span style={badgeMod}>Modificata</span> = lezione spostata rispetto all’orario originario.
+            </div>
           </>
         )}
       </main>
@@ -303,10 +457,26 @@ export default function PacchettiLezioniPage() {
           open={showRichiesta}
           attivita={attivitaPerRichiesta}
           existingRichieste={byAttivita[attivitaPerRichiesta.id] || []}
-          onSuccess={() => { refetch && refetch(); }}
+          onSuccess={handleRichiestaSuccess}
           onClose={() => {
             setShowRichiesta(false);
             setAttivitaPerRichiesta(null);
+          }}
+        />
+      )}
+
+      {isAdmin && showModalApprova && selectedRichiesta && (
+        <ApprovaRichiestaModal
+          richiesta={selectedRichiesta}
+          onClose={() => {
+            setShowModalApprova(false);
+            setSelectedRichiesta(null);
+          }}
+          onApproved={async () => {
+            await Promise.all([refetchRichieste(), fetchAttivita()]);
+          }}
+          onRejected={async () => {
+            await Promise.all([refetchRichieste(), fetchAttivita()]);
           }}
         />
       )}
@@ -314,22 +484,9 @@ export default function PacchettiLezioniPage() {
   );
 }
 
-/* ========== Presentational Subcomponents / Styles ========== */
 function SectionTitle({ children }) {
-  return (
-    <h2
-      style={{
-        fontSize: 22,
-        fontWeight: 700,
-        margin: "0 0 16px",
-        color: "#20489a"
-      }}
-    >
-      {children}
-    </h2>
-  );
+  return <h2 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 16px", color: "#20489a" }}>{children}</h2>;
 }
-
 function TableWrapper({ children }) {
   return (
     <div
@@ -345,38 +502,28 @@ function TableWrapper({ children }) {
     </div>
   );
 }
-
-function MainTable({ columns, rows, emptyLabel }) {
+function MainTable({ columns = [], rows = [], emptyLabel }) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const safeCols = Array.isArray(columns) ? columns : [];
   return (
-    <table
-      style={{
-        width: "100%",
-        borderCollapse: "separate",
-        borderSpacing: 0
-      }}
-    >
+    <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
       <thead>
         <tr>
-          {columns.map(c => (
-            <Th key={c}>{c}</Th>
-          ))}
+          {safeCols.map(c => <Th key={c}>{c}</Th>)}
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 && (
+        {safeRows.length === 0 && (
           <tr>
-            <td
-              colSpan={columns.length}
-              style={{ textAlign: "center", padding: 30, color: "#5e6b85" }}
-            >
+            <td colSpan={safeCols.length || 1} style={{ textAlign: "center", padding: 30, color: "#5e6b85" }}>
               {emptyLabel}
             </td>
           </tr>
         )}
-        {rows.map(r => (
+        {safeRows.map(r => (
           <tr key={r.key} style={{ background: Number(r.key) % 2 ? "#fff" : "#f7fafd" }}>
             {r.cells.map((cell, idx) => {
-              if (typeof cell === "object" && cell !== null && "content" in cell) {
+              if (cell && typeof cell === "object" && "content" in cell) {
                 return (
                   <Td
                     key={idx}
@@ -395,7 +542,6 @@ function MainTable({ columns, rows, emptyLabel }) {
     </table>
   );
 }
-
 function Th({ children }) {
   return (
     <th
@@ -413,7 +559,6 @@ function Th({ children }) {
     </th>
   );
 }
-
 function Td({ children, style, onClick }) {
   return (
     <td
@@ -431,7 +576,6 @@ function Td({ children, style, onClick }) {
     </td>
   );
 }
-
 function Badge({ children, color, text }) {
   return (
     <span
@@ -452,7 +596,6 @@ function Badge({ children, color, text }) {
   );
 }
 
-/* ========== Shared styles ========== */
 const errBox = {
   background: "#F8D7DA",
   border: "1px solid #E58B94",
@@ -462,7 +605,6 @@ const errBox = {
   fontWeight: 600,
   marginBottom: 30
 };
-
 const btnMiniPrimary = {
   background: "#2563eb",
   color: "#fff",
@@ -473,4 +615,13 @@ const btnMiniPrimary = {
   fontSize: 12,
   cursor: "pointer",
   boxShadow: "0 1px 4px #2563eb55"
+};
+const badgeMod = {
+  background: "#FFEED5",
+  color: "#924400",
+  padding: "2px 8px",
+  borderRadius: 8,
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1
 };

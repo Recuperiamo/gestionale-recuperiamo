@@ -1,0 +1,14 @@
+app\components\attivita\AttivitaDettaglioModal.jsx:export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDelete }) {
+app\components\attivita\AttivitaDettaglioModal.jsx:  if (!attivita) return null;
+app\components\attivita\AttivitaDettaglioModal.jsx:    if (onDelete) onDelete(attivita);
+app\components\attivita\AttivitaDettaglioModal.jsx:  const pacchettoLabel = attivita.pacchetto?.descrizione || attivita.pacchetto?.nome || "";
+app\components\attivita\AttivitaDettaglioModal.jsx:    attivita.pacchetto?.cliente?.nomeReferente ||
+app\components\attivita\AttivitaDettaglioModal.jsx:    attivita.pacchetto?.cliente?.ragione_sociale ||
+app\components\attivita\AttivitaDettaglioModal.jsx:    attivita.pacchetto?.cliente?.nome ||
+app\components\attivita\AttivitaDettaglioModal.jsx:    attivita.pacchetto?.cliente?.email ||
+app\components\attivita\AttivitaDettaglioModal.jsx:        <h3 style={{ color: "#1976d2", fontWeight: 600, marginTop: 0 }}>Dettaglio Attività</h3>
+app\components\attivita\AttivitaDettaglioModal.jsx:          <b>Descrizione:</b> {attivita.descrizione}
+app\components\attivita\AttivitaDettaglioModal.jsx:          <b>Ore:</b> {attivita.oreConsumate}
+app\components\attivita\AttivitaDettaglioModal.jsx:          <b>Data:</b> {formatDate(attivita.createdAt)}
+app\components\attivita\AttivitaDettaglioModal.jsx:              onClick={() => onEdit(attivita)}
+app\components\clienti\ClienteDettaglioModal.jsx:            Vedi storico attività

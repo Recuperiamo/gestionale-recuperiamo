@@ -1,62 +1,85 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
 import { prisma } from '../../lib/prisma'
+import { logPacchettoChange } from '../utils/pacchettoChangelog'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../auth/[...nextauth]/authOptions'
 
-/**
- * API CRUD Attività (milestone 5 - issue #33)
- * ----------------------------------------------------
- * - POST   /api/attivita        → crea attività (collega pacchetto, aggiorna ore residue)
- * - GET    /api/attivita        → lista tutte le attività (opz: filtro pacchettoId/clienteId)
- * - GET    /api/attivita?id=XX  → dettaglio singola attività
- * - PATCH  /api/attivita        → modifica attività (descrizione/oreConsumate)
- * - DELETE /api/attivita        → elimina attività
- *
- * Scenario test/manuale:
- * 1. Crea attività via API, verifica inserimento e collegamento a pacchetto/cliente
- * 2. Modifica ed elimina attività, verifica aggiornamento dati e ore residue
- * 3. Verifica aggiornamento automatico ore residue sul pacchetto
- * 4. Edge-case: attività senza pacchetto, dati non validi, ore > residue, doppio inserimento
- */
+export const runtime = 'nodejs';
 
-// ========== GET: Lista tutte o singola attività ==========
+// ------------------ Helpers ------------------
+function toPositiveNumber(value) {
+  if (value === null || value === undefined) return null
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+const DAY_STR_TO_NUM = {
+  sun: 0, sunday:0, dom:0,
+  mon: 1, monday:1, lun:1, monday:1,
+  tue: 2, tuesday:2, mar:2,
+  wed: 3, wednesday:3, mer:3,
+  thu: 4, thursday:4, gio:4,
+  fri: 5, friday:5, ven:5,
+  sat: 6, saturday:6, sab:6
+};
+
+function normalizeGiorniMixed(giorni) {
+  if (!Array.isArray(giorni)) return [];
+  return giorni.map(g => {
+    if (typeof g === 'number') return g;
+    if (typeof g === 'string') {
+      const key = g.trim().toLowerCase();
+      if (key in DAY_STR_TO_NUM) return DAY_STR_TO_NUM[key];
+      // Tentativo: abbreviazione 3 lettere
+      if (key.slice(0,3) in DAY_STR_TO_NUM) return DAY_STR_TO_NUM[key.slice(0,3)];
+    }
+    return null;
+  }).filter(v => v !== null && v >=0 && v <=6)
+     .filter((v,i,a)=>a.indexOf(v)===i) // unique
+     .sort();
+}
+
+// ------------------ GET ------------------
 export async function GET(request) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const pacchettoId = searchParams.get('pacchettoId')
-    const clienteId = searchParams.get('clienteId')
+    const clienteIdQuery = searchParams.get('clienteId')
+
+    const isCliente = session.user?.role === 'cliente'
+    const sessionClienteId = session.user?.clienteId ? Number(session.user.clienteId) : null
+    if (isCliente && !sessionClienteId)
+      return NextResponse.json({ error: 'Profilo incompleto (clienteId mancante)' }, { status: 403 })
+
+    let effectiveClienteId = null
+    if (isCliente) effectiveClienteId = sessionClienteId
+    else if (clienteIdQuery) effectiveClienteId = Number(clienteIdQuery)
 
     if (id) {
-      // Dettaglio singola attività
       const attivita = await prisma.attivita.findUnique({
         where: { id: Number(id) },
-        include: {
-          pacchetto: {
-            include: { cliente: true }
-          }
-        }
+        include: { pacchetto: { include: { cliente: true } } }
       })
-      if (!attivita) {
-        return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
-      }
+      if (!attivita) return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
+      if (isCliente && attivita.clienteId !== sessionClienteId)
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       return NextResponse.json(attivita)
     }
 
-    // Filtro opzionale per pacchettoId/clienteId
-    let where = {}
+    const where = {}
+    if (effectiveClienteId) where.clienteId = effectiveClienteId
     if (pacchettoId) where.pacchettoId = Number(pacchettoId)
-    if (clienteId) where.pacchetto = { clienteId: Number(clienteId) }
 
     const attivitaList = await prisma.attivita.findMany({
       where,
-      include: {
-        pacchetto: {
-          include: { cliente: true }
-        }
-      },
+      include: { pacchetto: { include: { cliente: true } } },
       orderBy: { createdAt: 'desc' }
     })
-    console.log(">>> [DEBUG] Lista attività GET:", attivitaList);
     return NextResponse.json(attivitaList)
   } catch (err) {
     console.error('Errore GET /api/attivita:', err)
@@ -64,178 +87,296 @@ export async function GET(request) {
   }
 }
 
-// ========== POST: Crea nuova attività ==========
+// ------------------ POST (singola + ricorrente/nidificata) ------------------
 export async function POST(request) {
+  let body;
   try {
-    const body = await request.json()
-    console.log('>>> [DEBUG] Richiesta POST attività, body:', body);
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Body JSON non valido' }, { status: 400 })
+  }
 
-    const { pacchettoId, oreConsumate, descrizione } = body
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
-    // Validazioni base
-    if (!pacchettoId || !Number.isInteger(oreConsumate) || oreConsumate <= 0) {
-      return NextResponse.json({ error: 'Parametri non validi' }, { status: 400 })
+  console.log('[ATTIVITA][POST][RAW BODY]', body)
+
+  // Estrazione top-level
+  let {
+    tipo,
+    pacchettoId,
+    clienteId,
+    descrizione,
+    oreConsumate,
+    durataOre,
+    durata,
+    orario,
+    giorni,
+    dataInizio,
+    dataFine,
+    oraInizio,
+    utente = session.user?.email || 'admin'
+  } = body
+
+  // Caso: payload annidato in body.ricorrenza (il tuo caso attuale)
+  if (!tipo && body.ricorrenza) {
+    tipo = 'ricorrente'
+    const r = body.ricorrenza
+    // Copia se mancanti
+    if (!giorni && r.giorni) giorni = r.giorni
+    if (!dataInizio && r.dataInizio) dataInizio = r.dataInizio
+    if (!dataFine && r.dataFine) dataFine = r.dataFine
+    if (!durataOre && !oreConsumate && !durata && r.durata) durata = r.durata
+    if (!oraInizio && r.orarioInizio) oraInizio = r.orarioInizio
+  }
+
+  // Normalizzazione durata
+  const durataNormalizzata =
+    toPositiveNumber(oreConsumate) ||
+    toPositiveNumber(durataOre) ||
+    toPositiveNumber(durata) ||
+    null
+
+  // Pacchetti / parametri obbligatori
+  if (!pacchettoId || !clienteId || !descrizione) {
+    return NextResponse.json({
+      error: 'Parametri obbligatori mancanti',
+      fields: { pacchettoId, clienteId, descrizione }
+    }, { status: 400 })
+  }
+
+  if (session.user?.role === 'cliente' &&
+      Number(clienteId) !== Number(session.user?.clienteId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const pacchetto = await prisma.pacchettoOre.findUnique({
+    where: { id: Number(pacchettoId) }
+  })
+  if (!pacchetto) return NextResponse.json({ error: 'Pacchetto non trovato' }, { status: 404 })
+  if (pacchetto.clienteId !== Number(clienteId))
+    return NextResponse.json({ error: 'Pacchetto non appartiene al cliente' }, { status: 400 })
+  if (pacchetto.stato !== 'attivo')
+    return NextResponse.json({ error: 'Pacchetto non attivo o scaduto' }, { status: 400 })
+
+  // ----- RICORRENTE -----
+  if (tipo === 'ricorrente') {
+    if (!durataNormalizzata) {
+      return NextResponse.json({ error: 'Durata ricorrenza non valida (durata/durataOre/oreConsumate mancante)' }, { status: 400 })
+    }
+    const giorniNorm = normalizeGiorniMixed(giorni);
+    if (!giorniNorm.length) {
+      return NextResponse.json({ error: 'Giorni ricorrenza mancanti o non validi', original: giorni }, { status: 400 })
+    }
+    if (!dataInizio || !dataFine) {
+      return NextResponse.json({ error: 'Range date mancante' }, { status: 400 })
     }
 
-    // Recupera pacchetto
-    const pacchetto = await prisma.pacchettoOre.findUnique({
-      where: { id: pacchettoId },
-      include: { cliente: true }
+    const start = new Date(dataInizio + 'T00:00:00')
+    const end = new Date(dataFine + 'T23:59:59')
+    if (end < start) return NextResponse.json({ error: 'Range date invertito' }, { status: 400 })
+
+    const occorrenze = []
+    const cur = new Date(start)
+    const [hh, mm] = (oraInizio || '15:00').split(':')
+
+    while (cur <= end) {
+      if (giorniNorm.includes(cur.getDay())) {
+        const dt = new Date(cur.getTime())
+        dt.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0)
+        occorrenze.push(dt)
+      }
+      cur.setDate(cur.getDate() + 1)
+    }
+
+    const requiredHours = occorrenze.length * durataNormalizzata
+    console.log('[ATTIVITA][RICORRENZA][DEBUG]', {
+      occorrenze: occorrenze.length,
+      giorniNorm,
+      durataPerOccorrenza: durataNormalizzata,
+      requiredHours,
+      oreResidue: pacchetto.oreResidue,
+      inputRange: { dataInizio, dataFine }
     })
-    console.log('>>> [DEBUG] Pacchetto trovato:', pacchetto);
 
-    if (!pacchetto) {
-      return NextResponse.json({ error: 'Pacchetto non trovato' }, { status: 404 })
+    if (occorrenze.length === 0) {
+      return NextResponse.json({ error: 'Nessuna occorrenza generata', giorniNorm }, { status: 400 })
     }
-    if (pacchetto.stato !== 'attivo') {
-      return NextResponse.json({ error: 'Pacchetto non attivo o scaduto' }, { status: 400 })
-    }
-    if (pacchetto.oreResidue < oreConsumate) {
-      return NextResponse.json({ error: 'Ore residue insufficienti' }, { status: 400 })
+    if (requiredHours > pacchetto.oreResidue) {
+      return NextResponse.json({
+        error: 'Ore insufficienti',
+        requiredHours,
+        oreResidue: pacchetto.oreResidue
+      }, { status: 400 })
     }
 
-    // Crea attività e aggiorna ore residue in transazione
-    console.log('>>> [DEBUG] Valore oreResidue PRIMA:', pacchetto.oreResidue, 'Richiesta oreConsumate:', oreConsumate);
-
-    const [attivita, pacchettoAggiornato] = await prisma.$transaction([
-      prisma.attivita.create({
-        data: {
-          pacchettoId,
-          oreConsumate,
-          descrizione
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const rows = []
+        for (const dt of occorrenze) {
+          const att = await tx.attivita.create({
+            data: {
+              pacchettoId: Number(pacchettoId),
+              clienteId: Number(clienteId),
+              descrizione,
+              oreConsumate: durataNormalizzata,
+              durataOre: durataNormalizzata,
+              orario: dt,
+              stato: 'Prenotata'
+            }
+          })
+          rows.push(att)
         }
-      }),
+        await tx.pacchettoOre.update({
+          where: { id: Number(pacchettoId) },
+          data: {
+            oreResidue: { decrement: requiredHours },
+            stato: pacchetto.oreResidue - requiredHours === 0 ? 'esaurito' : 'attivo'
+          }
+        })
+        return rows
+      })
+
+      await logPacchettoChange({
+        pacchettoId: Number(pacchettoId),
+        tipoOperazione: 'creazione-ricorrenza',
+        orePrima: pacchetto.oreResidue,
+        oreDopo: pacchetto.oreResidue - requiredHours,
+        attivitaId: null,
+        utente,
+        motivazione: `Ricorrenza: ${descrizione}`,
+        pacchettoDescrizione: pacchetto.descrizione
+      })
+
+      return NextResponse.json({
+        ok: true,
+        tipo: 'ricorrente',
+        createCount: created.length,
+        requiredHours
+      }, { status: 201 })
+    } catch (e) {
+      console.error('[ATTIVITA][RICORRENZA][ERRORE TX]', e)
+      return NextResponse.json({ error: 'Errore transazione ricorrenza' }, { status: 500 })
+    }
+  }
+
+  // ----- SINGOLA -----
+  if (!durataNormalizzata) {
+    return NextResponse.json({ error: 'Durata/ore mancanti o non valide (singola)' }, { status: 400 })
+  }
+  if (pacchetto.oreResidue < durataNormalizzata) {
+    return NextResponse.json({ error: 'Ore residue insufficienti' }, { status: 400 })
+  }
+
+  const dataCreate = {
+    pacchettoId: Number(pacchettoId),
+    clienteId: Number(clienteId),
+    oreConsumate: durataNormalizzata,
+    descrizione,
+    durataOre: durataNormalizzata
+  }
+  if (orario) {
+    const d = new Date(orario)
+    if (!isNaN(d.getTime())) dataCreate.orario = d
+  }
+
+  try {
+    const [attivitaCreata, pacchettoAggiornato] = await prisma.$transaction([
+      prisma.attivita.create({ data: dataCreate }),
       prisma.pacchettoOre.update({
-        where: { id: pacchettoId },
+        where: { id: Number(pacchettoId) },
         data: {
-          oreResidue: { decrement: oreConsumate },
-          stato: pacchetto.oreResidue - oreConsumate === 0 ? 'esaurito' : 'attivo'
+          oreResidue: { decrement: durataNormalizzata },
+          stato: pacchetto.oreResidue - durataNormalizzata === 0 ? 'esaurito' : 'attivo'
         }
       })
     ])
 
-    return NextResponse.json({ attivita, pacchetto: pacchettoAggiornato })
+    await logPacchettoChange({
+      pacchettoId: Number(pacchettoId),
+      tipoOperazione: 'creazione-attivita',
+      orePrima: pacchetto.oreResidue,
+      oreDopo: pacchetto.oreResidue - durataNormalizzata,
+      attivitaId: attivitaCreata.id,
+      utente,
+      motivazione: descrizione,
+      pacchettoDescrizione: pacchetto.descrizione
+    })
+
+    return NextResponse.json({ attivita: attivitaCreata, pacchetto: pacchettoAggiornato }, { status: 201 })
   } catch (err) {
-    console.error('Errore POST /api/attivita:', err)
+    console.error('Errore POST /api/attivita (singola):', err)
     return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
   }
 }
 
-// ========== PATCH: Modifica attività ==========
+// ------------------ PATCH ------------------
 export async function PATCH(request) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     const body = await request.json()
-    const { id, descrizione, oreConsumate } = body
+    const { id, descrizione } = body
+    if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID attività obbligatorio' }, { status: 400 })
-    }
+    const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
+    if (!att) return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
+    if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId))
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    // Recupera attività esistente
-    const attivita = await prisma.attivita.findUnique({
-      where: { id: Number(id) }
+    const upd = await prisma.attivita.update({
+      where: { id: Number(id) },
+      data: { descrizione: typeof descrizione === 'string' ? descrizione : att.descrizione }
     })
-    if (!attivita) {
-      return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
-    }
-
-    // Recupera pacchetto collegato
-    const pacchetto = await prisma.pacchettoOre.findUnique({
-      where: { id: attivita.pacchettoId }
-    })
-    if (!pacchetto) {
-      return NextResponse.json({ error: 'Pacchetto collegato non trovato' }, { status: 404 })
-    }
-
-    // Gestione update oreConsumate: aggiorna ore residue sul pacchetto
-    let nuovoOreConsumate = attivita.oreConsumate
-    let updateFields = {}
-    if (typeof oreConsumate === 'number' && oreConsumate > 0 && oreConsumate !== attivita.oreConsumate) {
-      const differenza = oreConsumate - attivita.oreConsumate
-      // Se incremento: verifica ore residue sufficienti
-      if (differenza > 0 && pacchetto.oreResidue < differenza) {
-        return NextResponse.json({ error: 'Ore residue insufficienti per incremento' }, { status: 400 })
-      }
-      nuovoOreConsumate = oreConsumate
-      updateFields.oreConsumate = oreConsumate
-    }
-    if (typeof descrizione === 'string') {
-      updateFields.descrizione = descrizione
-    }
-    if (Object.keys(updateFields).length === 0) {
-      return NextResponse.json({ error: 'Nessun campo da aggiornare' }, { status: 400 })
-    }
-
-    // Transazione: aggiorna attività e ore residue pacchetto
-    const updates = [
-      prisma.attivita.update({
-        where: { id: Number(id) },
-        data: updateFields
-      })
-    ]
-    if (nuovoOreConsumate !== attivita.oreConsumate) {
-      updates.push(
-        prisma.pacchettoOre.update({
-          where: { id: attivita.pacchettoId },
-          data: {
-            oreResidue: { decrement: nuovoOreConsumate - attivita.oreConsumate },
-            stato: pacchetto.oreResidue - (nuovoOreConsumate - attivita.oreConsumate) === 0 ? 'esaurito' : 'attivo'
-          }
-        })
-      )
-    }
-
-    const [attivitaAggiornata, pacchettoAggiornato] = await prisma.$transaction(updates)
-
-    return NextResponse.json({ attivita: attivitaAggiornata, pacchetto: pacchettoAggiornato || pacchetto })
+    return NextResponse.json({ attivita: upd })
   } catch (err) {
     console.error('Errore PATCH /api/attivita:', err)
     return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
   }
 }
 
-// ========== DELETE: Elimina attività ==========
+// ------------------ DELETE ------------------
 export async function DELETE(request) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     const body = await request.json()
     const { id } = body
-    if (!id) {
-      return NextResponse.json({ error: 'ID attività obbligatorio' }, { status: 400 })
-    }
+    if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
 
-    const attivita = await prisma.attivita.findUnique({
-      where: { id: Number(id) }
-    })
-    if (!attivita) {
-      return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
-    }
-    // Recupera pacchetto
-    const pacchetto = await prisma.pacchettoOre.findUnique({
-      where: { id: attivita.pacchettoId }
-    })
-    if (!pacchetto) {
-      return NextResponse.json({ error: 'Pacchetto collegato non trovato' }, { status: 404 })
-    }
+    const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
+    if (!att) return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
+    if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId))
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    // Transazione: elimina attività e ripristina ore residue su pacchetto
-    const [attivitaEliminata, pacchettoAggiornato] = await prisma.$transaction([
-      prisma.attivita.delete({
-        where: { id: Number(id) }
-      }),
+    const pacchetto = await prisma.pacchettoOre.findUnique({ where: { id: att.pacchettoId } })
+    if (!pacchetto) return NextResponse.json({ error: 'Pacchetto non trovato (collegato)' }, { status: 404 })
+
+    const [deleted, pacchettoUpd] = await prisma.$transaction([
+      prisma.attivita.delete({ where: { id: att.id } }),
       prisma.pacchettoOre.update({
-        where: { id: attivita.pacchettoId },
+        where: { id: att.pacchettoId },
         data: {
-          oreResidue: { increment: attivita.oreConsumate },
+          oreResidue: { increment: att.oreConsumate },
           stato: 'attivo'
         }
       })
     ])
 
-    return NextResponse.json({ deleted: attivitaEliminata, pacchetto: pacchettoAggiornato })
+    await logPacchettoChange({
+      pacchettoId: att.pacchettoId,
+      tipoOperazione: 'eliminazione-attivita',
+      orePrima: pacchetto.oreResidue,
+      oreDopo: pacchetto.oreResidue + att.oreConsumate,
+      attivitaId: att.id,
+      utente: session.user?.email || 'admin',
+      motivazione: att.descrizione,
+      pacchettoDescrizione: pacchetto.descrizione
+    })
+
+    return NextResponse.json({ deleted, pacchetto: pacchettoUpd })
   } catch (err) {
     console.error('Errore DELETE /api/attivita:', err)
     return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
   }
 }
-
-export const runtime = 'nodejs'

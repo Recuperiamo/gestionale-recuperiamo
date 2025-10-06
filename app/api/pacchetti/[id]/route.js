@@ -1,65 +1,54 @@
-import { PrismaClient } from "@prisma/client";
+// @ts-nocheck
+import { prisma } from "../../../../lib/prisma";
 
-const prisma = new PrismaClient();
-
-// Next.js 13+: bisogna usare context.params come secondo argomento
-
-export async function GET(request, context) {
-  const id = context?.params?.id;
-  if (!id) {
-    return Response.json({ error: "Parametro id mancante" }, { status: 400 });
-  }
-  try {
-    const pacchetto = await prisma.pacchettoOre.findUnique({
-      where: { id: Number(id) },
-      include: {
-        cliente: { select: { id: true, nomeReferente: true } },
-        attivita: true,
-      },
-    });
-    if (!pacchetto) {
-      return Response.json({ error: "Pacchetto non trovato" }, { status: 404 });
-    }
-    return Response.json(pacchetto);
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 400 });
-  }
-}
-
+// PATCH pacchetto
 export async function PATCH(request, context) {
-  const id = context?.params?.id;
-  if (!id) {
-    return Response.json({ error: "Parametro id mancante" }, { status: 400 });
-  }
+  const { id } = await context.params;
+  let data;
   try {
-    const body = await request.json();
-    const pacchetto = await prisma.pacchettoOre.update({
+    data = await request.json();
+  } catch {
+    return Response.json({ error: "JSON non valido" }, { status: 400 });
+  }
+  if (!id) return Response.json({ error: "Parametro id mancante" }, { status: 400 });
+
+  try {
+    const updated = await prisma.pacchettoOre.update({
       where: { id: Number(id) },
-      data: body,
+      data,
     });
-    return Response.json(pacchetto);
+    return Response.json(updated);
   } catch (error) {
+    console.error("[PACCHETTI][PATCH] ERRORE:", error);
     return Response.json({ error: error.message }, { status: 400 });
   }
 }
 
+// DELETE pacchetto + dipendenze
 export async function DELETE(request, context) {
-  const id = context?.params?.id;
-  if (!id) {
-    return Response.json({ error: "Parametro id mancante" }, { status: 400 });
-  }
+  const { id } = await context.params;
+  console.log("[PACCHETTI][DELETE] Inizio cancellazione pacchetto id:", id);
+  if (!id) return Response.json({ error: "Parametro id mancante" }, { status: 400 });
+
   try {
-    // ELIMINAZIONE MANUALE DIPENDENZE PacchettoAlertLetto
-    await prisma.pacchettoAlertLetto.deleteMany({
+    const resAlertLetto = await prisma.pacchettoAlertLetto.deleteMany({
       where: { pacchettoId: Number(id) }
     });
+    console.log(`[PACCHETTI][DELETE] AlertLetto eliminati: ${resAlertLetto.count}`);
 
-    // Poi elimina il pacchetto
-    await prisma.pacchettoOre.delete({
-      where: { id: Number(id) },
+    const resChangeLog = await prisma.pacchetto_ChangeLog.deleteMany({
+      where: { pacchettoId: Number(id) }
     });
-    return Response.json({ result: "Pacchetto eliminato" });
+    console.log(`[PACCHETTI][DELETE] ChangeLog eliminati: ${resChangeLog.count}`);
+
+    const resPacchetto = await prisma.pacchettoOre.delete({
+      where: { id: Number(id) }
+    });
+    console.log(`[PACCHETTI][DELETE] PacchettoOre eliminato id: ${resPacchetto.id}`);
+
+    return Response.json({ result: "Pacchetto eliminato", id });
   } catch (error) {
+    console.error("[PACCHETTI][DELETE] ERRORE:", error);
     return Response.json({ error: error.message }, { status: 400 });
   }
 }

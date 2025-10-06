@@ -7,6 +7,7 @@ import Alert from '../components/Alert';
 import ClientiForm from '../components/clienti/ClientiForm';
 import ClientiTable from '../components/clienti/ClientiTable';
 import ClienteDettaglioModal from '../components/clienti/ClienteDettaglioModal';
+import AdminOnly from '../components/auth/AdminOnly';
 
 export default function ClientiPage() {
   const [form, setForm] = useState({
@@ -24,11 +25,9 @@ export default function ClientiPage() {
   const [editId, setEditId] = useState(null);
   const [dettaglioCliente, setDettaglioCliente] = useState(null);
 
-  // Collapse state
   const [showForm, setShowForm] = useState(false);
   const [showList, setShowList] = useState(false);
 
-  // Carica lista clienti
   useEffect(() => {
     fetchClienti();
   }, []);
@@ -43,7 +42,6 @@ export default function ClientiPage() {
     }
   };
 
-  // PATCH: mapping campi frontend → backend
   const mapFormToApi = (formData) => ({
     nomeReferente: formData.nome,
     email: formData.email,
@@ -89,7 +87,7 @@ export default function ClientiPage() {
       note: cliente.note || '',
     });
     setEditId(cliente.id);
-    setDettaglioCliente(null); // chiudi la modale se era aperta
+    setDettaglioCliente(null);
     setAlert({ message: '', type: 'error' });
   };
 
@@ -111,15 +109,7 @@ export default function ClientiPage() {
       }
       setAlert({ message: 'Cliente aggiornato con successo!', type: 'success' });
       setEditId(null);
-      setForm({
-        nome: '',
-        email: '',
-        telefono: '',
-        indirizzo: '',
-        cf: '',
-        piva: '',
-        note: ''
-      });
+      setForm({ nome: '', email: '', telefono: '', indirizzo: '', cf: '', piva: '', note: '' });
       fetchClienti();
     } catch (e) {
       setAlert({ message: 'Errore di rete', type: 'error' });
@@ -151,88 +141,86 @@ export default function ClientiPage() {
   };
 
   const handleFormSubmit = (data) => {
-    if (editId) {
-      handleUpdate(data);
-    } else {
-      handleAdd(data);
-    }
+    if (editId) handleUpdate(data);
+    else handleAdd(data);
   };
 
-  // --- PATCH: chiudi dettagli se ri-clicchi Dettagli sullo stesso cliente ---
   const handleViewDetails = (cliente) => {
     if (dettaglioCliente && dettaglioCliente.id === cliente.id) {
-      setDettaglioCliente(null); // se già aperto su questo cliente, chiudi
+      setDettaglioCliente(null);
     } else {
       setDettaglioCliente(cliente);
     }
   };
 
-  const handleCloseDetails = () => {
-    setDettaglioCliente(null);
-  };
+  const handleCloseDetails = () => setDettaglioCliente(null);
 
   return (
     <AuthGuard>
-      <Navbar />
-      <Alert message={alert.message} type={alert.type} onClose={() => setAlert({ message: '', type: 'error' })} />
-
-      {/* Collapse: Form nuovo cliente */}
-      <div className="max-w-3xl mx-auto mb-4 border-b border-gray-200">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 text-left text-lg font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-t transition"
-          aria-expanded={showForm}
-          onClick={() => setShowForm(s => !s)}
-        >
-          <span>➕ Nuovo cliente</span>
-          <span className="ml-2">{showForm ? "▲" : "▼"}</span>
-        </button>
-        <div className={`overflow-hidden transition-all duration-300 ${showForm ? "max-h-[800px] py-4 px-4 bg-white" : "max-h-0"}`}>
-          {showForm && (
-            <ClientiForm
-              onAdd={handleFormSubmit}
-              form={form}
-              setForm={setForm}
-              editId={editId}
-              setEditId={setEditId}
-              loading={loading}
-              setAlert={setAlert}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Collapse: Lista clienti */}
-      <div className="max-w-3xl mx-auto mb-4 border-b border-gray-200">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 text-left text-lg font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-t transition"
-          aria-expanded={showList}
-          onClick={() => setShowList(s => !s)}
-        >
-          <span>📋 Lista clienti</span>
-          <span className="ml-2">{showList ? "▲" : "▼"}</span>
-        </button>
-        <div className={`overflow-hidden transition-all duration-300 ${showList ? "max-h-[2000px] py-4 px-2 bg-white" : "max-h-0"}`}>
-          {showList && (
-            <>
-              <h2 className="text-xl font-bold mb-2">Lista Clienti</h2>
-              <ClientiTable
-                clienti={clienti}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onViewDetails={handleViewDetails}
-                dettaglioCliente={dettaglioCliente}
-              />
-            </>
-          )}
-        </div>
-      </div>
-
-      {dettaglioCliente && (
-        <ClienteDettaglioModal
-          cliente={dettaglioCliente}
-          onClose={handleCloseDetails}
+      <AdminOnly redirectTo="/profilo">
+        <Navbar />
+        <Alert
+          message={alert.message}
+          type={alert.type}
+          onClose={() => setAlert({ message: '', type: 'error' })}
         />
-      )}
+
+        <div className="max-w-3xl mx-auto mb-4 border-b border-gray-200">
+          <button
+            className="w-full flex items-center justify-between px-4 py-3 text-left text-lg font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-t transition"
+            aria-expanded={showForm}
+            onClick={() => setShowForm(s => !s)}
+          >
+            <span>➕ Nuovo cliente</span>
+            <span className="ml-2">{showForm ? "▲" : "▼"}</span>
+          </button>
+          <div className={`overflow-hidden transition-all duration-300 ${showForm ? "max-h-[800px] py-4 px-4 bg-white" : "max-h-0"}`}>
+            {showForm && (
+              <ClientiForm
+                onAdd={handleFormSubmit}
+                form={form}
+                setForm={setForm}
+                editId={editId}
+                setEditId={setEditId}
+                loading={loading}
+                setAlert={setAlert}
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto mb-4 border-b border-gray-200">
+          <button
+            className="w-full flex items-center justify-between px-4 py-3 text-left text-lg font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-t transition"
+            aria-expanded={showList}
+            onClick={() => setShowList(s => !s)}
+          >
+            <span>📋 Lista clienti</span>
+            <span className="ml-2">{showList ? "▲" : "▼"}</span>
+          </button>
+          <div className={`overflow-hidden transition-all duration-300 ${showList ? "max-h-[2000px] py-4 px-2 bg-white" : "max-h-0"}`}>
+            {showList && (
+              <>
+                <h2 className="text-xl font-bold mb-2">Lista Clienti</h2>
+                <ClientiTable
+                  clienti={clienti}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onViewDetails={handleViewDetails}
+                  dettaglioCliente={dettaglioCliente}
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {dettaglioCliente && (
+          <ClienteDettaglioModal
+            cliente={dettaglioCliente}
+            onClose={handleCloseDetails}
+          />
+        )}
+      </AdminOnly>
     </AuthGuard>
   );
 }

@@ -45,11 +45,10 @@ export function validateClientiForm(form) {
       errors.push("Inserisci un indirizzo email valido.");
     } else if (domain && blacklistDomains.includes(domain.toLowerCase())) {
       errors.push("Non sono ammessi indirizzi email di test o placeholder.");
-    } else if (local.length < 6) {
-      errors.push("L'email deve avere almeno 6 caratteri prima della @.");
     } else if (simpleEmails.some((re) => re.test(email))) {
       errors.push("L'email è troppo semplice o sembra un placeholder.");
     }
+    // RIMOSSO controllo local.length < 6
   }
 
   // Telefono: solo cifre, opzionale
