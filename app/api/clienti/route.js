@@ -19,7 +19,12 @@ function isValidPIVA(piva) {
 export async function POST(req) {
   try {
     const body = await req.json();
+    // PATCH: log diagnostico avanzato
     console.log('BODY RICEVUTO', body);
+    console.log('EMAIL RICEVUTA DAL CLIENT:', JSON.stringify(body.email));
+    console.log('EMAIL DOPO TRIM:', JSON.stringify(body.email?.trim()));
+    console.log('EMAIL DOPO TRIM/LOWER:', JSON.stringify(body.email?.trim().toLowerCase()));
+
     // Validazione obbligatorietà e formato
     if (!body.nomeReferente || !body.nomeReferente.trim()) {
       return new Response(
@@ -33,7 +38,9 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-    if (!isValidEmail(body.email)) {
+    // PATCH: validazione su email completamente ripulita
+    const emailForValidation = body.email.trim().toLowerCase();
+    if (!isValidEmail(emailForValidation)) {
       return new Response(
         JSON.stringify({ error: 'Formato email non valido' }),
         { status: 400 }
@@ -56,7 +63,7 @@ export async function POST(req) {
     const nuovoCliente = await prisma.client.create({
       data: {
         nomeReferente: body.nomeReferente.trim(),
-        email: body.email.trim(),
+        email: emailForValidation,
         telefono: body.telefono?.trim() || null,
         indirizzo: body.indirizzo?.trim() || null,
         codiceFiscale: body.codiceFiscale?.trim() || null,
@@ -146,7 +153,9 @@ export async function PUT(req) {
         { status: 400 }
       );
     }
-    if (!isValidEmail(body.email)) {
+    // PATCH: validazione su email completamente ripulita
+    const emailForValidation = body.email.trim().toLowerCase();
+    if (!isValidEmail(emailForValidation)) {
       return new Response(
         JSON.stringify({ error: 'Formato email non valido' }),
         { status: 400 }
@@ -169,7 +178,7 @@ export async function PUT(req) {
       where: { id: Number(id) },
       data: {
         nomeReferente: body.nomeReferente.trim(),
-        email: body.email.trim(),
+        email: emailForValidation,
         telefono: body.telefono?.trim() || null,
         indirizzo: body.indirizzo?.trim() || null,
         codiceFiscale: body.codiceFiscale?.trim() || null,

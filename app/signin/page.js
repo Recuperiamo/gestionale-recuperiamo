@@ -1,121 +1,148 @@
 "use client";
 
-import React from "react";
-import { signIn, useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Navbar from "../components/Navbar";
+import React, { useState } from "react";
+import { signIn } from "next-auth/react";
+import RegisterClientModal from "../components/auth/RegisterClientModal";
 
 export default function SignInPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
 
-  useEffect(() => {
-    if (session) {
-      router.replace("/");
+  async function submit(e) {
+    e.preventDefault();
+    setErr(null);
+    setLoading(true);
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password
+      });
+      if (res?.error) {
+        setErr("Credenziali non valide");
+      } else {
+        // Redirect dopo login
+        window.location.href = "/profilo";
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
     }
-  }, [session, router]);
-
-  if (session) return null;
+  }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#20489a" }}>
-      <Navbar />
-      <main
-        style={{
-          maxWidth: 420,
-          margin: "70px auto 0 auto",
-          background: "#fff",
-          borderRadius: 18,
-          padding: "40px 34px 34px 34px",
-          boxShadow: "0 4px 20px 0 rgba(32,72,154,0.07)",
-          color: "#20489a",
-        }}
-      >
-        <h2 style={{ fontWeight: 700, fontSize: 27, marginBottom: 16, textAlign: "center" }}>
-          Accedi al tuo account
-        </h2>
-        <form
-          autoComplete="off"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setErr("");
-            const res = await signIn("credentials", {
-              email,
-              password,
-              redirect: false
-            });
-            if (res?.error) setErr("Credenziali non valide");
-          }}
-        >
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ fontWeight: 600, fontSize: 16, marginBottom: 6, display: "block" }}>
-              Email
-            </label>
-            <input
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                fontSize: 16,
-                borderRadius: 7,
-                border: "1.5px solid #dbe4f1",
-                outline: "none",
-              }}
-              placeholder="tuo@email.it"
-              type="email"
-              name="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
-          <div style={{ marginBottom: 28 }}>
-            <label style={{ fontWeight: 600, fontSize: 16, marginBottom: 6, display: "block" }}>
-              Password
-            </label>
-            <input
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                fontSize: 16,
-                borderRadius: 7,
-                border: "1.5px solid #dbe4f1",
-                outline: "none",
-              }}
-              placeholder="••••••••"
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-          </div>
+    <div style={wrapper}>
+      <div style={card}>
+        <h1 style={title}>Accedi</h1>
+        <form onSubmit={submit} style={form}>
+          <label style={lbl}>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e=>setEmail(e.target.value)}
+            style={inp}
+            required
+          />
+          <label style={lbl}>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e=>setPassword(e.target.value)}
+            style={inp}
+            required
+          />
+          {err && <div style={errorBox}>{err}</div>}
           <button
             type="submit"
-            style={{
-              background: "#1cb0f6",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 16,
-              padding: "12px 0",
-              border: "none",
-              borderRadius: 7,
-              width: "100%",
-            }}
+            disabled={loading}
+            style={loading ? btnDisabled : btnPrimary}
           >
-            Accedi
+            {loading ? "Attendere..." : "Login"}
           </button>
-          {err && <div style={{ color: "#D32F2F", margin: "18px 0 0 0", fontWeight: 600, textAlign: "center" }}>{err}</div>}
         </form>
-        <div style={{ marginTop: 18, fontSize: 14, color: "#4268b3", textAlign: "center" }}>
-          Non hai un account? <span style={{ color: "#1cb0f6", fontWeight: 600 }}>Contatta l'amministratore</span>
+        <div style={{ marginTop:20, fontSize:13, textAlign:"center" }}>
+          Non hai ancora un account?{" "}
+          <button
+            onClick={()=>setShowRegister(true)}
+            style={linkBtn}
+            type="button"
+          >
+            Registrati
+          </button>
         </div>
-      </main>
+      </div>
+
+      <RegisterClientModal
+        open={showRegister}
+        onClose={()=>setShowRegister(false)}
+        onSuccess={()=> {
+          setShowRegister(false);
+          // opzionale: window.location.href = '/profilo';
+        }}
+      />
     </div>
   );
 }
+
+/* === Styles (semplificati) === */
+const wrapper = {
+  minHeight:"100vh",
+  display:"flex",
+  alignItems:"center",
+  justifyContent:"center",
+  background:"#f5f8ff",
+  fontFamily:"'Inter','Segoe UI',Arial,sans-serif",
+  padding:"20px"
+};
+const card = {
+  background:"#fff",
+  padding:"38px 36px 34px",
+  borderRadius:18,
+  width:"min(420px,100%)",
+  boxShadow:"0 6px 28px rgba(32,72,154,0.18)",
+  color:"#20489a"
+};
+const title = { margin:"0 0 18px", fontSize:30, fontWeight:800, textAlign:"center" };
+const form = { display:"flex", flexDirection:"column", gap:14 };
+const lbl = { fontSize:12, fontWeight:600, letterSpacing:".4px" };
+const inp = {
+  border:"1.5px solid #4268b3",
+  borderRadius:8,
+  padding:"9px 11px",
+  fontSize:14,
+  color:"#20489a"
+};
+const btnPrimary = {
+  background:"#1cb0f6",
+  color:"#fff",
+  border:"none",
+  fontWeight:700,
+  padding:"10px 20px",
+  fontSize:15,
+  borderRadius:10,
+  cursor:"pointer",
+  marginTop:6
+};
+const btnDisabled = { ...btnPrimary, background:"#9dcfe7", cursor:"wait" };
+const errorBox = {
+  background:"#F8D7DA",
+  border:"1px solid #E58B94",
+  color:"#721C24",
+  padding:"8px 10px",
+  borderRadius:8,
+  fontSize:13,
+  fontWeight:600
+};
+const linkBtn = {
+  background:"none",
+  color:"#1cb0f6",
+  border:"none",
+  cursor:"pointer",
+  fontWeight:700,
+  textDecoration:"underline",
+  padding:0
+};

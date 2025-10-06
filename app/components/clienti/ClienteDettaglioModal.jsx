@@ -18,6 +18,27 @@ export default function ClienteDettaglioModal({ cliente, onClose }) {
           <div><b>Nome:</b> {nomeCliente}</div>
           <div><b>Email:</b> {emailCliente}</div>
         </div>
+        <div style={{ margin: "12px 0" }}>
+          <a
+            href={`/storico?clienteId=${cliente.id}`}
+            style={{
+              display: "inline-block",
+              background: "#1976d2",
+              color: "#fff",
+              border: "none",
+              borderRadius: "5px",
+              padding: "7px 18px",
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: "1em",
+              cursor: "pointer"
+            }}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Vedi storico attività
+          </a>
+        </div>
         <hr />
         <PacchettiClienteList clienteId={cliente.id} />
         <div className="footer">

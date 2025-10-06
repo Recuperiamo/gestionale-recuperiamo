@@ -3,6 +3,7 @@ import PacchettoForm from "./PacchettoForm";
 import PacchettoEditForm from "./PacchettoEditForm";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import Alert from "../Alert";
+import Link from "next/link";
 
 function fetchPacchetti(clienteId = null) {
   let url = "/api/pacchetti";
@@ -159,18 +160,38 @@ export default function PacchettiList({
                   <td className="text-center align-middle">{p.oreResidue}</td>
                   <td className="text-center align-middle">{p.stato}</td>
                   <td className="text-center align-middle">
-                    <button
-                      className="mr-1 px-2 py-1 bg-yellow-200 rounded"
-                      onClick={() => goToPacchettoEdit(p)}
-                    >
-                      Modifica
-                    </button>
-                    <button
-                      className="px-2 py-1 bg-red-200 rounded"
-                      onClick={() => handleDeletePacchetto(p)}
-                    >
-                      Elimina
-                    </button>
+                    <div className="flex flex-row gap-2 justify-center items-center">
+                      {/* Bottone Modifica */}
+                      <button
+                        className="mr-1 px-2 py-1 bg-yellow-200 rounded"
+                        onClick={() => goToPacchettoEdit(p)}
+                        title="Modifica pacchetto"
+                      >
+                        Modifica
+                      </button>
+                      {/* Bottone Elimina */}
+                      <button
+                        className="px-2 py-1 bg-red-200 rounded"
+                        onClick={() => handleDeletePacchetto(p)}
+                        title="Elimina pacchetto"
+                      >
+                        Elimina
+                      </button>
+                      {/* Divisore visivo */}
+                      <span className="mx-2 text-gray-300 select-none">|</span>
+                      {/* Bottone Storico Modifiche */}
+                      <Link
+                        href={`/pacchetti/${p.id}/changelog`}
+                        className="inline-flex items-center px-2 py-1 border border-blue-400 text-blue-700 bg-white rounded hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs"
+                        aria-label={`Vedi storico modifiche pacchetto ${p.id}`}
+                        title="Visualizza lo storico delle modifiche alle ore residue di questo pacchetto"
+                      >
+                        <svg className="w-4 h-4 mr-1 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Storico modifiche
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               );
