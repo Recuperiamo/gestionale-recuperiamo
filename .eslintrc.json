@@ -1,7 +1,11 @@
 {
   "root": true,
   "extends": [
-    "plugin:@next/next/recommended"
+    "plugin:@next/next/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "plugins": [
+    "react-hooks"
   ],
   "rules": {
     "react/react-in-jsx-scope": "off"
