@@ -7,20 +7,15 @@ import React, {
   useMemo
 } from "react";
 import { io } from "socket.io-client";
+import { getAblyChannel } from "../../lib/realtime/ablyClient";
 
 /**
- * LavagnaCanvas – versione completa integrata Socket.IO + sync "new-lavagna"
- * 
+ * LavagnaCanvas – LIVE con Socket.IO su /api/socketio
  * - Penna, gomma (puntuale/intero tratto)
  * - Undo/redo, export PNG
- * - Overlay blocco se sessione non pronta
- * - Sincronizzazione stroke live e cursori
- * - Emissione evento "new-lavagna" se la lavagna è nuova (prop isNewLavagna)
- * - Pulsante "Pulisci lavagna" solo per admin/operatori
- * 
- * Props aggiuntive:
- * - clienteId: ID cliente per sync lista lavagne
- * - isNewLavagna: TRUE solo se la lavagna è appena creata (fa emit new-lavagna)
+ * - Sincronizzazione live stroke:start/points/done/delete e clear-lavagna
+ * - Emissione evento "new-lavagna" se la lavagna è nuova (isNewLavagna)
+ * - Pulsante "Pulisci lavagna" solo per admin
  */
 
 export default function LavagnaCanvas({
@@ -37,6 +32,7 @@ export default function LavagnaCanvas({
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const socketRef = useRef(null);
+  const ablyRef = useRef({ ch: null });
 
   const [strumento, setStrumento] = useState("penna");
   const [colore, setColore] = useState("#20489a");
@@ -51,52 +47,151 @@ export default function LavagnaCanvas({
   const [redoStack, setRedoStack] = useState([]);
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
 
-  const isAdmin = ["admin", "operatore"].includes((ruolo || "").toLowerCase());
+  const isAdmin = String(ruolo || "").toLowerCase() === "admin";
   const eraseSessionRef = useRef({
     ids: new Set(),
     lastX: null,
     lastY: null
   });
 
+  // Stream remoti in tempo reale (non persistiti finché non "done")
+  const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
+  const currentStreamId = useRef(null);
+  const throttler = useRef({ last: 0 });
+
   // === SOCKET.IO SETUP ===
+  // Replace with Ably-first setup, fallback to Socket.IO
   useEffect(() => {
     if (!attivitaId) return;
-    const s = io(undefined, { withCredentials: true });
-    socketRef.current = s;
-    s.emit("join:lavagna", { attivitaId });
 
-    // Emissione evento "new-lavagna" quando la lavagna è nuova
-    if (isNewLavagna && lavagnaId && clienteId) {
-      s.emit("new-lavagna", { lavagna: { id: lavagnaId, attivitaId }, clienteId });
+    const ablyCh = getAblyChannel(`lavagna:${attivitaId}`);
+    ablyRef.current.ch = ablyCh;
+    if (ablyCh && process.env.NODE_ENV !== 'production') {
+      console.log('[LavagnaCanvas] Ably channel attached lavagna:' + attivitaId);
     }
 
-    // Stroke sync live (esempio base, integra solo se vuoi realtime)
-    s.on("stroke:start", (msg) => {
-      // TODO: integra la ricezione stroke live qui se vuoi
-    });
-    s.on("stroke:points", (msg) => {
-      // TODO: integra la ricezione punti live qui se vuoi
-    });
-    s.on("stroke:done", (msg) => {
-      // TODO: integra la ricezione stroke done qui se vuoi
-    });
-    s.on("stroke:delete", (msg) => {
-      // TODO: integra la ricezione delete live qui se vuoi
-    });
-    s.on("cursor", (msg) => {
-      // TODO: integra la ricezione cursore qui se vuoi
-    });
-    s.on("clear-lavagna", () => {
+    const onStart = (msg) => {
+      const { streamId, strumento, colore, spessore, start } = msg || {};
+      if (!streamId || !start) return;
+      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:start]', streamId, start);
+      remoteStreams.current.set(streamId, {
+        strumento,
+        colore,
+        spessore,
+        punti: [start]
+      });
+      drawAll();
+    };
+
+    const onPoints = (msg) => {
+      const { streamId, points } = msg || {};
+      if (!streamId || !Array.isArray(points) || points.length === 0) return;
+      const st = remoteStreams.current.get(streamId);
+      if (!st) return;
+      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:points]', streamId, points.length);
+      st.punti.push(...points);
+      drawAll();
+    };
+
+    const onDone = (msg) => {
+      const { streamId } = msg || {};
+      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:done]', streamId);
+      const st = remoteStreams.current.get(streamId);
+      if (st && st.punti.length >= 2) {
+        const definitivo = prepareStroke({
+          id: `remote-${Date.now()}`,
+          strumento: st.strumento,
+          colore: st.colore,
+          spessore: st.spessore,
+          punti: st.punti,
+          autoreUserId: "remote"
+        });
+        setTratti((prev) => [...prev, definitivo]);
+      }
+      remoteStreams.current.delete(streamId);
+      drawAll();
+    };
+
+    const onDelete = (msg) => {
+      const { strokeId } = msg || {};
+      if (!strokeId) return;
+      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:delete]', strokeId);
+      setTratti((prev) => prev.filter((t) => t.id !== strokeId));
+      drawAll();
+    };
+
+    const onClear = () => {
+      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv clear-lavagna]');
       setTratti([]);
       setUndoStack([]);
       setRedoStack([]);
-    });
+      remoteStreams.current.clear();
+      drawAll();
+    };
+
+    if (ablyCh) {
+      ablyCh.subscribe("stroke:start", onStart);
+      ablyCh.subscribe("stroke:points", onPoints);
+      ablyCh.subscribe("stroke:done", onDone);
+      ablyCh.subscribe("stroke:delete", onDelete);
+      ablyCh.subscribe("clear-lavagna", onClear);
+    } else {
+      const base = process.env.NEXT_PUBLIC_SOCKET_URL;
+      const socketPath = base ? undefined : "/api/socketio";
+      const url = base || undefined;
+      if (!base) fetch("/api/socketio").catch(() => {});
+      const s = io(url, {
+        path: socketPath,
+        transports: ["websocket", "polling"],
+        withCredentials: true
+      });
+      socketRef.current = s;
+
+      s.on("connect", () => {
+        s.emit("join:lavagna", { attivitaId });
+        if (clienteId) s.emit("join:lavagne", { clienteId });
+        if (isNewLavagna && lavagnaId && clienteId) {
+          s.emit("new-lavagna", { lavagna: { id: lavagnaId, attivitaId }, clienteId });
+        }
+      });
+      s.on("stroke:start", onStart);
+      s.on("stroke:points", onPoints);
+      s.on("stroke:done", onDone);
+      s.on("stroke:delete", onDelete);
+      s.on("clear-lavagna", onClear);
+    }
 
     return () => {
-      s.disconnect();
-      socketRef.current = null;
+      if (ablyCh) {
+        try {
+          ablyCh.unsubscribe("stroke:start", onStart);
+          ablyCh.unsubscribe("stroke:points", onPoints);
+          ablyCh.unsubscribe("stroke:done", onDone);
+          ablyCh.unsubscribe("stroke:delete", onDelete);
+          ablyCh.unsubscribe("clear-lavagna", onClear);
+          ablyCh.detach?.();
+        } catch {}
+      }
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
-  }, [lavagnaId, attivitaId, clienteId, isNewLavagna]);
+  }, [lavagnaId, attivitaId, clienteId, isNewLavagna, drawAll]);
+
+  // Helper per inviare eventi realtime su Ably o Socket.IO
+  const emitOrPublish = useCallback((eventName, payload) => {
+    if (ablyRef.current.ch) {
+      try {
+        if (process.env.NODE_ENV !== 'production') console.log('[publish ' + eventName + ']', payload?.streamId || '');
+        ablyRef.current.ch.publish(eventName, payload, (err) => {
+          if (err) console.error('[publish error ' + eventName + ']', err);
+        });
+      } catch {}
+    } else {
+      socketRef.current?.emit(eventName, payload);
+    }
+  }, []);
 
   // == UTILITIES ==
   function prepareStroke(s) {
@@ -177,11 +272,12 @@ export default function LavagnaCanvas({
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
       const ctx = canvas.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctxRef.current = ctx;
-      redraw(ctx);
+      drawAll();
     }
     resize();
     window.addEventListener("resize", resize);
@@ -189,29 +285,61 @@ export default function LavagnaCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tratti, altezza]);
 
-  const redraw = useCallback(
-    (context) => {
-      const ctx = context || ctxRef.current;
-      if (!ctx) return;
-      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      tratti.forEach((t) => {
-        if (!t.punti || t.punti.length < 2) return;
-        ctx.globalCompositeOperation =
-          t.strumento === "gomma" ? "destination-out" : "source-over";
-        ctx.strokeStyle =
-          t.strumento === "gomma" ? "#fff" : t.colore || "#20489a";
-        ctx.lineWidth = t.spessore || 3;
-        ctx.beginPath();
-        t.punti.forEach((p, i) => {
-          if (i === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        });
-        ctx.stroke();
+  const drawAll = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    // Disegni già persistiti
+    tratti.forEach((t) => {
+      if (!t.punti || t.punti.length < 2) return;
+      ctx.globalCompositeOperation =
+        t.strumento === "gomma" ? "destination-out" : "source-over";
+      ctx.strokeStyle =
+        t.strumento === "gomma" ? "#fff" : t.colore || "#20489a";
+      ctx.lineWidth = t.spessore || 3;
+      ctx.beginPath();
+      t.punti.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
       });
-      ctx.globalCompositeOperation = "source-over";
-    },
-    [tratti]
-  );
+      ctx.stroke();
+    });
+
+    // Stream remoti in corso
+    for (const st of remoteStreams.current.values()) {
+      if (!st.punti || st.punti.length < 2) continue;
+      ctx.globalCompositeOperation =
+        st.strumento === "gomma" ? "destination-out" : "source-over";
+      ctx.strokeStyle =
+        st.strumento === "gomma" ? "#fff" : st.colore || "#20489a";
+      ctx.lineWidth = st.spessore || 3;
+      ctx.beginPath();
+      st.punti.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+    }
+
+    // Disegno locale in corso (non ancora persistito)
+    if (puntiCorrenti.length >= 2) {
+      ctx.globalCompositeOperation =
+        strumento === "gomma" && gommaPuntuale
+          ? "destination-out"
+          : "source-over";
+      ctx.strokeStyle = strumento === "gomma" ? "#fff" : colore;
+      ctx.lineWidth = spessore;
+      ctx.beginPath();
+      puntiCorrenti.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+  }, [tratti, puntiCorrenti, strumento, gommaPuntuale, colore, spessore]);
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
@@ -225,15 +353,14 @@ export default function LavagnaCanvas({
           setUndoStack((prev) => [...prev, { type: "delete", stroke: st }]);
           setRedoStack([]);
           if (typeof st.id === "number") {
-            fetch(`/api/lavagna/tratto/${st.id}`, { method: "DELETE" }).catch(
-              () => {}
-            );
+            fetch(`/api/lavagna/tratto/${st.id}`, { method: "DELETE" }).catch(() => {});
+            emitOrPublish("stroke:delete", { attivitaId, strokeId: st.id });
           }
         }
       }
-      redraw();
+      drawAll();
     },
-    [tratti, redraw]
+    [tratti, drawAll, attivitaId]
   );
 
   // == POINTER EVENTS ==
@@ -260,6 +387,18 @@ export default function LavagnaCanvas({
     setDisegnando(true);
     setPuntiCorrenti([{ x, y }]);
     setRedoStack([]);
+
+    // Avvia stream live
+    currentStreamId.current = `${utenteId}-${Date.now()}`;
+    emitOrPublish("stroke:start", {
+      attivitaId,
+      streamId: currentStreamId.current,
+      strumento,
+      colore: strumento === "gomma" ? null : colore,
+      spessore,
+      start: { x, y }
+    });
+    if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[publish stroke:start]', currentStreamId.current);
   }
 
   function pointerMove(e) {
@@ -286,7 +425,19 @@ export default function LavagnaCanvas({
 
     setPuntiCorrenti((prev) => {
       const nuovo = [...prev, { x, y }];
-      disegnaTemporaneo(nuovo);
+      drawAll();
+
+      // Throttle invio punti (~25ms)
+      const now = performance.now();
+      if (now - (throttler.current.last || 0) > 25) {
+        throttler.current.last = now;
+        emitOrPublish("stroke:points", {
+          attivitaId,
+          streamId: currentStreamId.current,
+          points: [{ x, y }]
+        });
+        if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[publish stroke:points]', currentStreamId.current);
+      }
       return nuovo;
     });
   }
@@ -318,27 +469,13 @@ export default function LavagnaCanvas({
     setTratti((prev) => [...prev, nuovo]);
     setUndoStack((prev) => [...prev, { type: "add", stroke: nuovo }]);
     setPuntiCorrenti([]);
-    salvaTratto(nuovo);
-  }
 
-  function disegnaTemporaneo(punti) {
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-    redraw(ctx);
-    if (punti.length < 2) return;
-    ctx.globalCompositeOperation =
-      strumento === "gomma" && gommaPuntuale
-        ? "destination-out"
-        : "source-over";
-    ctx.strokeStyle = strumento === "gomma" ? "#fff" : colore;
-    ctx.lineWidth = spessore;
-    ctx.beginPath();
-    punti.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.stroke();
-    ctx.globalCompositeOperation = "source-over";
+    // Chiudi stream live
+    emitOrPublish("stroke:done", { attivitaId, streamId: currentStreamId.current });
+    currentStreamId.current = null;
+
+    // Persistenza su DB
+    salvaTratto(nuovo);
   }
 
   // == SALVATAGGIO STROKE ==
@@ -380,6 +517,7 @@ export default function LavagnaCanvas({
       console.error(e);
     } finally {
       setSalvando(false);
+      drawAll();
     }
   }
 
@@ -397,14 +535,13 @@ export default function LavagnaCanvas({
         typeof sid === "number" &&
         (isAdmin || last.stroke.autoreUserId === utenteId)
       ) {
-        fetch(`/api/lavagna/tratto/${sid}`, { method: "DELETE" }).catch(
-          () => {}
-        );
+        fetch(`/api/lavagna/tratto/${sid}`, { method: "DELETE" }).catch(() => {});
+        emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
       }
     } else if (last.type === "delete") {
       setTratti((prev) => [...prev, last.stroke]);
     }
-    redraw();
+    drawAll();
   }
 
   function redo() {
@@ -419,12 +556,11 @@ export default function LavagnaCanvas({
       const sid = action.stroke.id;
       setTratti((prev) => prev.filter((s) => s.id !== sid));
       if (typeof sid === "number") {
-        fetch(`/api/lavagna/tratto/${sid}`, { method: "DELETE" }).catch(
-          () => {}
-        );
+        fetch(`/api/lavagna/tratto/${sid}`, { method: "DELETE" }).catch(() => {});
+        emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
       }
     }
-    redraw();
+    drawAll();
   }
 
   // == EXPORT ==
@@ -438,19 +574,17 @@ export default function LavagnaCanvas({
     a.click();
   }
 
-  // == PULISCI LAVAGNA (solo admin/operatori) ==
+  // == PULISCI LAVAGNA (solo admin) ==
   const handlePulisciLavagna = useCallback(() => {
     if (!isAdmin) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
-    // Cancella i tratti localmente
+    // Cancella localmente
     setTratti([]);
     setUndoStack([]);
     setRedoStack([]);
-    // Notifica tutti i client tramite socket
-    if (socketRef.current) {
-      socketRef.current.emit("clear-lavagna", { lavagnaId, attivitaId });
-    }
-    // Se hai anche una API server-side, puoi aggiungere qui la chiamata (opzionale):
+    // Notifica tutti i client
+    emitOrPublish("clear-lavagna", { lavagnaId, attivitaId });
+    // (Opzionale) DELETE lato server dei tratti persistiti
     // fetch(`/api/lavagna/tratti?lavagnaId=${lavagnaId}`, { method: "DELETE" });
   }, [isAdmin, lavagnaId, attivitaId]);
 
@@ -531,7 +665,6 @@ export default function LavagnaCanvas({
             </button>
           )}
         </div>
-        {/* Pulsante pulisci lavagna solo per admin/operatori */}
         {isAdmin && (
           <div style={st.group}>
             <button
