@@ -5,8 +5,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
-// RIMOSSO: import RichiestaModificaClienteModal (non serve più)
-// RIMOSSO: useRichiesteModifica (gestito già dentro CalendarioAttivita quando enableStudentRequests=true)
 
 const MAIN_FONT = `'Segoe UI','Arial','Helvetica',sans-serif`;
 
@@ -32,7 +30,7 @@ export default function ProfiloPage() {
   }
 
   function toggleView() {
-    setCalView(v => (v === "week" ? "month" : "week"));
+    setCalView((v) => (v === "week" ? "month" : "week"));
   }
 
   return (
@@ -46,7 +44,7 @@ export default function ProfiloPage() {
           borderRadius: 28,
           padding: "42px 44px 50px",
           boxShadow: "0 6px 34px rgba(32,72,154,0.15)",
-          color: "#20489a"
+          color: "#20489a",
         }}
       >
         <h2
@@ -56,7 +54,7 @@ export default function ProfiloPage() {
             marginBottom: 28,
             textAlign: "center",
             color: "#20489a",
-            letterSpacing: "0.5px"
+            letterSpacing: "0.5px",
           }}
         >
           Calendario lezioni
@@ -67,23 +65,21 @@ export default function ProfiloPage() {
             fontSize: 18,
             textAlign: "center",
             marginBottom: 26,
-            lineHeight: 1.5
+            lineHeight: 1.5,
           }}
         >
           <div>
             <span style={{ fontWeight: 700 }}>Nome:</span> {session.user?.name || "—"}
           </div>
-          <div>
-            <span style={{ fontWeight: 700 }}>Email:</span> {session.user?.email || "—"}
-          </div>
+          {/* Email rimossa come da richiesta */}
         </section>
 
         <div style={{ textAlign: "center", marginBottom: 18 }}>
           <button
             onClick={toggleView}
             style={switchBtnStyle}
-            onMouseOver={e => (e.currentTarget.style.background = "#b2e4fc")}
-            onMouseOut={e => (e.currentTarget.style.background = "#e3eefe")}
+            onMouseOver={(e) => (e.currentTarget.style.background = "#b2e4fc")}
+            onMouseOut={(e) => (e.currentTarget.style.background = "#e3eefe")}
           >
             {calView === "week" ? "Vista Mensile" : "Vista Settimanale"}
           </button>
@@ -95,7 +91,7 @@ export default function ProfiloPage() {
           allowNavigation={true}
           forceClienteId={session.user?.clienteId}
           showLegend={true}
-          enableStudentRequests={true}  // Usa il flusso nativo con RichiestaModificaModal
+          enableStudentRequests={true}
         />
 
         {msg && (
@@ -107,7 +103,7 @@ export default function ProfiloPage() {
               color: "#12753a",
               borderRadius: 10,
               textAlign: "center",
-              fontWeight: 600
+              fontWeight: 600,
             }}
           >
             {msg}
@@ -128,5 +124,5 @@ const switchBtnStyle = {
   padding: "10px 22px",
   boxShadow: "0 2px 6px rgba(32,72,154,0.20)",
   cursor: "pointer",
-  transition: "background 0.2s"
+  transition: "background 0.2s",
 };

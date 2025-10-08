@@ -10,10 +10,13 @@ export default function Navbar() {
   const pathname = usePathname();
   if (status === "loading") return null;
 
-  const role = session?.user?.role;
+  const role = session?.user?.role ? String(session.user.role).toLowerCase() : undefined;
 
-  // Admin / Operatore
-  const navLinksAdmin = [
+  const isStaff = role === "admin" || role === "operatore";
+  const isAdmin = role === "admin";
+
+  // Staff (admin/operatore) base links
+  const navLinksStaffBase = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/clienti", label: "Clienti" },
     { href: "/pacchetti", label: "Pacchetti" },
@@ -21,20 +24,19 @@ export default function Navbar() {
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/calendario", label: "Calendario" },
     { href: "/lavagna", label: "Lavagna" },
-    { href: "/materiale", label: "Materiale" },
-    { href: "/storico", label: "Storico" }
+    { href: "/materiale", label: "Materiale" }
   ];
 
-  // Cliente
+  // Client links (niente "Storico")
   const navLinksCliente = [
     { href: "/profilo", label: "Profilo" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/lavagna", label: "Lavagna" },
-    { href: "/materiale", label: "Materiale" },
-    { href: "/storico", label: "Storico" }
+    { href: "/materiale", label: "Materiale" }
   ];
 
-  const links = (role === "admin" || role === "operatore") ? navLinksAdmin : navLinksCliente;
+  // Costruzione finale dei link: "Storico" SOLO per admin
+  const links = isStaff ? [...navLinksStaffBase, ...(isAdmin ? [{ href: "/storico", label: "Storico" }] : [])] : navLinksCliente;
 
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
@@ -71,7 +73,7 @@ export default function Navbar() {
       }}
     >
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {links.map(l => (
+        {links.map((l) => (
           <Link key={l.href} href={l.href} style={linkStyle(isActive(l.href))}>
             {l.label}
           </Link>
