@@ -3,8 +3,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
-// RIMOSSO: import RichiestaModificaClienteModal (non serve più)
-// RIMOSSO: useRichiesteModifica (gestito già dentro CalendarioAttivita quando enableStudentRequests=true)
 
 const MAIN_FONT = `'Segoe UI','Arial','Helvetica',sans-serif`;
 
@@ -71,9 +69,7 @@ export default function ProfiloPage() {
           <div>
             <span style={{ fontWeight: 700 }}>Nome:</span> {session.user?.name || "—"}
           </div>
-          <div>
-            <span style={{ fontWeight: 700 }}>Email:</span> {session.user?.email || "—"}
-          </div>
+          {/* RIMOSSA riga Email */}
         </section>
 
         <div style={{ textAlign: "center", marginBottom: 18 }}>
@@ -93,8 +89,7 @@ export default function ProfiloPage() {
           allowNavigation={true}
           forceClienteId={session.user?.clienteId}
           showLegend={true}
-          enableStudentRequests={true}  // Usa il flusso nativo con RichiestaModificaModal
-          // IMPORTANTE: non passare onEventClick, altrimenti il modale nativo non si apre
+          enableStudentRequests={true}
         />
 
         {msg && (

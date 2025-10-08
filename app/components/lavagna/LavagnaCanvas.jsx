@@ -10,13 +10,14 @@ import { io } from "socket.io-client";
 
 /**
  * LavagnaCanvas – versione completa integrata Socket.IO + sync "new-lavagna"
- *
+ * 
  * - Penna, gomma (puntuale/intero tratto)
  * - Undo/redo, export PNG
  * - Overlay blocco se sessione non pronta
  * - Sincronizzazione stroke live e cursori
  * - Emissione evento "new-lavagna" se la lavagna è nuova (prop isNewLavagna)
- *
+ * - Pulsante "Pulisci lavagna" solo per admin/operatori
+ * 
  * Props aggiuntive:
  * - clienteId: ID cliente per sync lista lavagne
  * - isNewLavagna: TRUE solo se la lavagna è appena creata (fa emit new-lavagna)
@@ -84,6 +85,11 @@ export default function LavagnaCanvas({
     });
     s.on("cursor", (msg) => {
       // TODO: integra la ricezione cursore qui se vuoi
+    });
+    s.on("clear-lavagna", () => {
+      setTratti([]);
+      setUndoStack([]);
+      setRedoStack([]);
     });
 
     return () => {
@@ -432,6 +438,22 @@ export default function LavagnaCanvas({
     a.click();
   }
 
+  // == PULISCI LAVAGNA (solo admin/operatori) ==
+  const handlePulisciLavagna = useCallback(() => {
+    if (!isAdmin) return;
+    if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
+    // Cancella i tratti localmente
+    setTratti([]);
+    setUndoStack([]);
+    setRedoStack([]);
+    // Notifica tutti i client tramite socket
+    if (socketRef.current) {
+      socketRef.current.emit("clear-lavagna", { lavagnaId, attivitaId });
+    }
+    // Se hai anche una API server-side, puoi aggiungere qui la chiamata (opzionale):
+    // fetch(`/api/lavagna/tratti?lavagnaId=${lavagnaId}`, { method: "DELETE" });
+  }, [isAdmin, lavagnaId, attivitaId]);
+
   // == TOOLBAR ==
   const toolbar = useMemo(
     () => (
@@ -440,12 +462,14 @@ export default function LavagnaCanvas({
           <button
             style={btn(strumento === "penna")}
             onClick={() => setStrumento("penna")}
+            type="button"
           >
             Penna
           </button>
           <button
             style={btn(strumento === "gomma")}
             onClick={() => setStrumento("gomma")}
+            type="button"
           >
             Gomma
           </button>
@@ -480,6 +504,7 @@ export default function LavagnaCanvas({
             style={btn(false)}
             onClick={undo}
             disabled={!undoStack.length}
+            type="button"
           >
             Undo
           </button>
@@ -487,10 +512,11 @@ export default function LavagnaCanvas({
             style={btn(false)}
             onClick={redo}
             disabled={!redoStack.length}
+            type="button"
           >
             Redo
           </button>
-          <button style={btn(false)} onClick={exportPNG}>
+          <button style={btn(false)} onClick={exportPNG} type="button">
             Export PNG
           </button>
           {openInNewWindow && attivitaId && (
@@ -499,11 +525,29 @@ export default function LavagnaCanvas({
               onClick={() =>
                 window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")
               }
+              type="button"
             >
               Apri in un'altra finestra
             </button>
           )}
         </div>
+        {/* Pulsante pulisci lavagna solo per admin/operatori */}
+        {isAdmin && (
+          <div style={st.group}>
+            <button
+              style={{
+                ...btn(false),
+                background: "#ff6464",
+                color: "#fff",
+                fontWeight: 700
+              }}
+              onClick={handlePulisciLavagna}
+              type="button"
+            >
+              🧹 Pulisci lavagna
+            </button>
+          </div>
+        )}
         {salvando && <span style={st.saving}>Salvataggio…</span>}
       </div>
     ),
@@ -516,7 +560,9 @@ export default function LavagnaCanvas({
       salvando,
       gommaPuntuale,
       openInNewWindow,
-      attivitaId
+      attivitaId,
+      isAdmin,
+      handlePulisciLavagna
     ]
   );
 

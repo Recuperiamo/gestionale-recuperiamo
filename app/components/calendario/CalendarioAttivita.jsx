@@ -10,19 +10,13 @@ import React, {
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction"; // IMPORTANTE!
 import { useSession } from "next-auth/react";
 import { mapAttivita, colorsForStato } from "../../utils/calendario/mapping";
 import { useRichiesteModifica } from "../modifiche/useRichiesteModifica";
 import RichiestaModificaModal from "../modifiche/RichiestaModificaModal";
+import AttivitaForm from "../attivita/AttivitaForm";
 
-/**
- * Legenda (ordine cronologico richiesto):
- * Conclusa, Oggi, Prossima, Prenotata, Ripianificata, Cancellata
- *
- * Aggiunte:
- * - ALT+click evento => apre /lavagna?attivitaId=<id> in nuova scheda
- * - Pre-creazione lavagna 5 minuti prima dell'inizio lezione (idempotente)
- */
 export default function CalendarioAttivita({
   initialMode = "week",
   allowModeSwitch = false,
@@ -87,6 +81,10 @@ export default function CalendarioAttivita({
   const byAttivita = byAttivitaRaw;
   const [selectedEvent, setSelectedEvent] = useState(null);
 
+  // Stato per form creazione attività
+  const [showCreate, setShowCreate] = useState(false);
+  const [createInitialData, setCreateInitialData] = useState(null);
+
   // Ref per evitare troppi pre-create consecutivi
   const lastPrecreateRef = useRef(0);
 
@@ -113,7 +111,7 @@ export default function CalendarioAttivita({
     return () => {
       abort = true;
     };
-  }, [effectiveClienteId]);
+  }, [effectiveClienteId, showCreate]); // showCreate per refresh su nuova attività
 
   /* Mapping eventi */
   const { events } = useMemo(() => mapAttivita(attivita), [attivita]);
@@ -122,7 +120,6 @@ export default function CalendarioAttivita({
   useEffect(() => {
     if (!events.length) return;
     const now = Date.now();
-    // Esegui al massimo ogni 60 secondi
     if (now - lastPrecreateRef.current < 60000) return;
     lastPrecreateRef.current = now;
 
@@ -140,7 +137,6 @@ export default function CalendarioAttivita({
 
     if (!upcomingIds.length) return;
 
-    // POST precreate
     fetch("/api/lavagna/precreate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,7 +144,6 @@ export default function CalendarioAttivita({
     }).catch(() => {});
   }, [events]);
 
-  /* Layout dinamico settimana */
   const recomputeWeekLayout = useCallback(
     anchor => {
       if (mode !== "week") return;
@@ -284,7 +279,6 @@ export default function CalendarioAttivita({
       if (c.border) info.el.style.borderColor = c.border;
       if (c.text) info.el.style.color = c.text;
     }
-    // Per eventuale overlay dev (se abilitato)
     info.el.setAttribute("data-event-id", info.event.id);
   }, [enableAdminRequests, isAdmin, openRequestByAttId]);
 
@@ -308,6 +302,25 @@ export default function CalendarioAttivita({
     });
     return `${fmt.format(ws)} – ${fmt.format(we)}`;
   }, [currentDate, mode]);
+
+  // handle slot click solo per admin/operator
+  const handleDateClick = info => {
+    if (!isAdmin) return;
+    // DEBUG: verifica che la funzione venga chiamata
+    console.log("DEBUG handleDateClick:", info);
+    setCreateInitialData({
+      orario: info.date.toISOString(),
+      descrizione: "",
+    });
+    setShowCreate(true);
+  };
+
+  const handleSuccessCreate = () => {
+    setShowCreate(false);
+    setCreateInitialData(null);
+    setLoading(true);
+    setTimeout(() => setLoading(false), 250);
+  };
 
   if (loading) return <div style={styles.loadingBox}>Caricamento calendario…</div>;
   if (errore) return <div style={styles.errorBox}>Errore calendario: {errore}</div>;
@@ -340,7 +353,7 @@ export default function CalendarioAttivita({
       <FullCalendar
         ref={calendarRef}
         key={mode}
-        plugins={[timeGridPlugin, dayGridPlugin]}
+        plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
         initialView={weekView ? "timeGridWeek" : "dayGridMonth"}
         initialDate={currentDate}
         allDaySlot={false}
@@ -420,6 +433,10 @@ export default function CalendarioAttivita({
             });
           }
         }}
+        dateClick={isAdmin ? handleDateClick : undefined}
+        selectable={!!isAdmin}
+        selectMirror={true}
+        unselectAuto={false}
       />
 
       {showLegend && (
@@ -448,6 +465,18 @@ export default function CalendarioAttivita({
         />
       )}
 
+      {/* MODALE CREAZIONE ATTIVITÀ SOLO PER ADMIN */}
+      {isAdmin && showCreate && (
+        <AttivitaForm
+          initialData={createInitialData}
+          onSuccess={handleSuccessCreate}
+          onClose={() => {
+            setShowCreate(false);
+            setCreateInitialData(null);
+          }}
+        />
+      )}
+
       <style jsx global>{globalStyles}</style>
       <style jsx global>{`
         .evt-clickable { cursor: pointer; }
@@ -463,17 +492,6 @@ export default function CalendarioAttivita({
           border-radius:10px;
           box-shadow:0 1px 2px rgba(0,0,0,0.15);
         }
-        /* (Facoltativo DEV) Overlay ID evento:
-        .cal-event::before {
-          content: attr(data-event-id);
-          position: absolute;
-          top: 2px;
-          left: 4px;
-          font-size: 9px;
-          font-weight: 700;
-          color: rgba(0,0,0,0.35);
-          pointer-events: none;
-        } */
       `}</style>
     </div>
   );
@@ -515,7 +533,6 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-/* Styles */
 const styles = {
   wrapper: {
     background: "#f5f8ff",

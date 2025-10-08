@@ -1,0 +1,190 @@
+import { promises as fs } from "fs";
+import path from "path";
+import { NextResponse } from "next/server";
+import { v4 as uuidv4 } from "uuid";
+
+// Cartella dove vengono salvati i materiali (crea se non esiste)
+const UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "materiali");
+const INDEX_FILE = path.join(UPLOAD_DIR, "materiali.json");
+
+async function ensureUploadDir() {
+  await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  try { await fs.access(INDEX_FILE); }
+  catch { await fs.writeFile(INDEX_FILE, "[]", "utf-8"); }
+}
+
+async function readIndex() {
+  await ensureUploadDir();
+  try {
+    const raw = await fs.readFile(INDEX_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+async function writeIndex(list) {
+  await ensureUploadDir();
+  await fs.writeFile(INDEX_FILE, JSON.stringify(list, null, 2), "utf-8");
+}
+
+// Questo esempio presuppone che tu abbia un modo reale per ottenere la sessione utente
+// Sostituiscilo con la tua logica NextAuth!
+function getUserFromRequest(req) {
+  // TODO: rimpiazza con logica auth reale! Esempio:
+  // return { role: "admin", clienteId: 10 };
+  return { role: "admin", clienteId: 1 };
+}
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url);
+  const fileId = searchParams.get("fileId");
+  const filterClienteId = searchParams.get("clienteId");
+  const user = getUserFromRequest(req);
+
+  await ensureUploadDir();
+  const index = await readIndex();
+
+  if (fileId) {
+    // Download file
+    const meta = index.find(m => m.id === fileId);
+    if (!meta) return NextResponse.json({ error: "File non trovato" }, { status: 404 });
+    // Permessi: admin/operator tutto, studente solo i suoi
+    if (user?.role !== "admin" && user?.role !== "operatore") {
+      if (String(meta.clienteId) !== String(user?.clienteId)) {
+        return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
+      }
+    }
+    const filePath = path.join(UPLOAD_DIR, meta.nomeSalvato);
+    try {
+      const fileBuf = await fs.readFile(filePath);
+      return new NextResponse(fileBuf, {
+        headers: {
+          "Content-Type": meta.mime || "application/octet-stream",
+          "Content-Disposition": `attachment; filename="${meta.nomeOriginale}"`
+        }
+      });
+    } catch {
+      return NextResponse.json({ error: "Errore lettura file" }, { status: 500 });
+    }
+  } else {
+    // Lista materiali filtrata per permessi
+    let results = index;
+    if (user?.role === "admin" || user?.role === "operatore") {
+      // Admin/operator: filtro opzionale per clienteId
+      if (filterClienteId) {
+        results = results.filter(m => String(m.clienteId) === String(filterClienteId));
+      }
+    } else {
+      // Studente: vede solo i suoi
+      results = results.filter(m => String(m.clienteId) === String(user?.clienteId));
+    }
+    return NextResponse.json(results);
+  }
+}
+
+export async function POST(req) {
+  const user = getUserFromRequest(req);
+  if (!user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
+
+  const formData = await req.formData();
+  const file = formData.get("file");
+  if (!file) return NextResponse.json({ error: "File mancante" }, { status: 400 });
+
+  // clienteId obbligatorio!
+  let clienteId = formData.get("clienteId");
+  if (!clienteId) {
+    // Se non passato, usa quello della sessione
+    clienteId = user?.clienteId;
+  }
+  if (!clienteId) {
+    return NextResponse.json({ error: "clienteId obbligatorio" }, { status: 400 });
+  }
+
+  // Titolo/label: opzionale, default datalog
+  let titolo = formData.get("titolo");
+  if (!titolo) {
+    const now = new Date();
+    titolo = now.toISOString().slice(0,19).replace(/[-:T]/g,"_");
+  }
+  const materia = formData.get("materia") || "";
+
+  await ensureUploadDir();
+  const id = uuidv4();
+  const ext = path.extname(file.name);
+  const nomeSalvato = `${id}${ext}`;
+  const filePath = path.join(UPLOAD_DIR, nomeSalvato);
+
+  const arrayBuffer = await file.arrayBuffer();
+  await fs.writeFile(filePath, Buffer.from(arrayBuffer));
+
+  const index = await readIndex();
+  const meta = {
+    id,
+    nomeSalvato,
+    nomeOriginale: file.name,
+    titolo,
+    materia,
+    clienteId,
+    tipo: ext.replace(/^\./, "").toLowerCase(),
+    updatedAt: new Date().toISOString(),
+    mime: file.type || "application/octet-stream"
+  };
+  index.push(meta);
+  await writeIndex(index);
+
+  return NextResponse.json({ ok: true, materiale: meta });
+}
+
+// ==== DELETE: elimina singolo materiale o batch ====
+export async function DELETE(req) {
+  const { searchParams } = new URL(req.url);
+  const fileId = searchParams.get("fileId");
+  const clienteId = searchParams.get("clienteId");
+  const all = searchParams.get("all") === "true";
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const user = getUserFromRequest(req);
+
+  if (user?.role !== "admin" && user?.role !== "operatore") {
+    return NextResponse.json({ error: "Solo admin/operatori possono cancellare materiale." }, { status: 403 });
+  }
+
+  await ensureUploadDir();
+  let index = await readIndex();
+
+  // Elimina materiale singolo
+  if (fileId) {
+    const i = index.findIndex(m => m.id === fileId);
+    if (i === -1) return NextResponse.json({ error: "Materiale non trovato" }, { status: 404 });
+    const filePath = path.join(UPLOAD_DIR, index[i].nomeSalvato);
+    try { await fs.unlink(filePath); } catch {}
+    index.splice(i, 1);
+    await writeIndex(index);
+    return NextResponse.json({ ok: true, deleted: fileId });
+  }
+
+  // Elimina tutti o batch per clienteId
+  if (clienteId && all) {
+    let toDelete = index.filter(m => String(m.clienteId) === String(clienteId));
+    // Filtra per date se presenti
+    if (from || to) {
+      const fromDate = from ? new Date(from) : null;
+      const toDate = to ? new Date(to) : null;
+      toDelete = toDelete.filter(m => {
+        const upd = new Date(m.updatedAt);
+        if (fromDate && upd < fromDate) return false;
+        if (toDate && upd > toDate) return false;
+        return true;
+      });
+    }
+    const ids = toDelete.map(m => m.id);
+    for (const mat of toDelete) {
+      try { await fs.unlink(path.join(UPLOAD_DIR, mat.nomeSalvato)); } catch {}
+    }
+    index = index.filter(m => !ids.includes(m.id));
+    await writeIndex(index);
+    return NextResponse.json({ ok: true, deleted: ids.length });
+  }
+
+  return NextResponse.json({ error: "Parametro mancante per cancellazione" }, { status: 400 });
+}
