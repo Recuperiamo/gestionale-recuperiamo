@@ -131,8 +131,8 @@ export const authOptions = {
     signIn: "/signin"
   },
 
+  // (Opzionale) Eventi next-auth se desideri logging:
   /**
-   * (Opzionale) Eventi next-auth se desideri logging:
    * events: {
    *   signIn(message) { console.log('SIGNIN', message); },
    *   signOut(message) { console.log('SIGNOUT', message); },
@@ -140,8 +140,6 @@ export const authOptions = {
    * },
    */
 
-  /**
-   * (Opzionale) debug: true in dev se vuoi log extra
-   */
-  // debug: process.env.NODE_ENV === 'development'
+  // AGGIUNGI QUESTA RIGA QUI SOTTO (debug attivo sempre)
+  debug: true,
 };
