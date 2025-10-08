@@ -11,34 +11,39 @@ const giorniSettimana = [
 ];
 
 export default function AttivitaForm({ initialData, onSuccess, onClose }) {
-  const isEdit = !!initialData;
+  const isEdit = !!initialData?.id;
   const isRicorrente = !!initialData?.ricorrenzaId;
   const [modificaBatch, setModificaBatch] = useState(isRicorrente ? "singola" : null);
 
-  const [descrizione, setDescrizione] = useState(initialData?.descrizione || "");
+  const initialOrarioDate =
+    initialData?.orario
+      ? new Date(initialData.orario)
+      : initialData?.createdAt
+      ? new Date(initialData.createdAt)
+      : null;
 
-  // NUOVI STATI per singola
-  const initialOrarioDate = initialData?.orario ? new Date(initialData.orario) : (initialData?.createdAt ? new Date(initialData.createdAt) : null);
+  const [descrizione, setDescrizione] = useState(initialData?.descrizione || "");
   const [dataSingola, setDataSingola] = useState(
-    initialOrarioDate ? initialOrarioDate.toISOString().slice(0,10) : ""
+    initialOrarioDate ? initialOrarioDate.toISOString().slice(0, 10) : ""
   );
   const [oraInizioSingola, setOraInizioSingola] = useState(
     initialOrarioDate
-      ? `${String(initialOrarioDate.getHours()).padStart(2,"0")}:${String(initialOrarioDate.getMinutes()).padStart(2,"0")}`
+      ? `${String(initialOrarioDate.getHours()).padStart(2, "0")}:${String(
+          initialOrarioDate.getMinutes()
+        ).padStart(2, "0")}`
       : ""
   );
   const [durataOreSingola, setDurataOreSingola] = useState(
     initialData?.durataOre || initialData?.oreConsumate || 1
   );
 
-  // CAMPi legacy ancora usati per il caso ricorrente
   const [pacchettoId, setPacchettoId] = useState(initialData?.pacchettoId || "");
   const [clienteId, setClienteId] = useState(initialData?.clienteId || "");
 
   // Ricorrenza
   const [tipoLezione, setTipoLezione] = useState(isEdit && isRicorrente ? "singola" : "singola");
   const [selectedDays, setSelectedDays] = useState([]);
-  const [orarioInizio, setOrarioInizio] = useState("");  // per ricorrenza
+  const [orarioInizio, setOrarioInizio] = useState(""); // per ricorrenza
   const [durata, setDurata] = useState("");
   const [dataInizioRic, setDataInizioRic] = useState("");
   const [dataFineRic, setDataFineRic] = useState("");
@@ -52,13 +57,25 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const [errorForm, setErrorForm] = useState(null);
   const [loadingSubmit, setLoadingSubmit] = useState(false);
 
+  // Precompila data/ora se passati da calendario
+  useEffect(() => {
+    if (!isEdit && initialData?.orario) {
+      const dt = new Date(initialData.orario);
+      setDataSingola(dt.toISOString().slice(0, 10));
+      setOraInizioSingola(
+        `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`
+      );
+    }
+    // eslint-disable-next-line
+  }, [initialData?.orario]);
+
   function calcolaOrarioFine(orarioInizio, durata) {
     if (!orarioInizio || !durata) return "";
     const [hh, mm] = orarioInizio.split(":").map(Number);
     const durataMinuti = Math.round(Number(durata) * 60);
     const dataOrario = new Date(2000, 1, 1, hh, mm);
     dataOrario.setMinutes(dataOrario.getMinutes() + durataMinuti);
-    return `${String(dataOrario.getHours()).padStart(2,"0")}:${String(dataOrario.getMinutes()).padStart(2,"0")}`;
+    return `${String(dataOrario.getHours()).padStart(2, "0")}:${String(dataOrario.getMinutes()).padStart(2, "0")}`;
   }
   const orarioFine = calcolaOrarioFine(orarioInizio, durata);
 
@@ -67,7 +84,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
       setLoadingClienti(true);
       fetch("/api/clienti")
         .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-        .then(data => { setClienti(data); setErrorClienti(null); })
+        .then(data => { setClienti(Array.isArray(data) ? data : data.clienti ?? []); setErrorClienti(null); })
         .catch(() => { setClienti([]); setErrorClienti("Impossibile caricare l'elenco clienti"); })
         .finally(() => setLoadingClienti(false));
     }
@@ -420,7 +437,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
                   <option value="">Seleziona cliente</option>
                   {clienti.map(c => (
                     <option key={c.id} value={c.id}>
-                      {c.nome_referente || c.ragione_sociale || c.nome || c.email}
+                      {c.nomeReferente || c.ragione_sociale || c.nome || c.email}
                     </option>
                   ))}
                 </select>

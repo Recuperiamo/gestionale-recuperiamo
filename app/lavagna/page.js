@@ -10,6 +10,40 @@ export default function PaginaLavagna() {
   const [lavagna, setLavagna] = useState(null);
   const [loading, setLoading] = useState(false);
   const [attivitaId, setAttivitaId] = useState("");
+  const [clienti, setClienti] = useState([]);
+  const [clienteId, setClienteId] = useState("");
+
+  const isAdmin = /^(admin|operatore)$/i.test(session?.user?.role || "");
+
+  // Carica clienti solo per admin
+  useEffect(() => {
+    if (status === "authenticated" && isAdmin) {
+      fetch("/api/clienti")
+        .then(r => r.json())
+        .then(data => {
+          // DEBUG: logga la risposta dei clienti per capire cosa arriva
+          console.log("DEBUG clienti:", data);
+          if (Array.isArray(data.clienti)) {
+            setClienti(data.clienti);
+          } else if (Array.isArray(data)) {
+            setClienti(data);
+          } else {
+            setClienti([]);
+          }
+        })
+        .catch(e => {
+          console.error("ERRORE fetch clienti:", e);
+          setClienti([]);
+        });
+    }
+  }, [status, isAdmin]);
+
+  // Imposta clienteId automatico per clienti normali
+  useEffect(() => {
+    if (status === "authenticated" && !isAdmin) {
+      setClienteId(session?.user?.clienteId || "");
+    }
+  }, [status, isAdmin, session]);
 
   async function carica(id) {
     if (!id) return;
@@ -53,15 +87,8 @@ export default function PaginaLavagna() {
 
   // DEBUG: Mostra tutto l'oggetto session.user per capire dove trovare il clienteId corretto
   console.log("DEBUG session.user:", session.user);
-
-  // FIX: Usa clienteId di test se admin e clienteId non valorizzato
-  let clienteId = session.user?.clienteId;
-  if (!clienteId && session.user?.role === "admin") {
-    clienteId = 1; // <-- sostituisci con l'id del cliente da testare
-  }
   console.log("DEBUG clienteId passato a LavagneList:", clienteId);
 
-  const isAdmin = /^(admin|operatore)$/i.test(session.user.role || "");
   const titoloBase = lavagna?.titolo || "";
   let titoloAdmin = lavagna?.titoloVisuale || titoloBase;
   if (
@@ -79,11 +106,39 @@ export default function PaginaLavagna() {
       <Navbar />
       <main style={mainStyle}>
         <h1 style={titolo}>Lavagna Interattiva</h1>
-<LavagneList clienteId={clienteId} onSelect={handleLavagnaSelect} sessionUser={session.user} />
+        {isAdmin && (
+          <div style={{ marginBottom: 20 }}>
+            <label>
+              <span style={{ fontWeight: 600, marginRight: 10 }}>Cliente: </span>
+              <select
+                value={clienteId}
+                onChange={e => {
+                  setClienteId(e.target.value);
+                  setAttivitaId(""); // reset selezione lavagna
+                  setLavagna(null);
+                }}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ccc",
+                  fontSize: 15,
+                  minWidth: 190,
+                }}
+              >
+                <option value="">Seleziona cliente…</option>
+                {clienti.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nomeReferente || c.email} (ID: {c.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        <LavagneList clienteId={clienteId} onSelect={handleLavagnaSelect} sessionUser={session.user} />
         {!attivitaId && !lavagna && (
           <div style={infoBox}>
-            Nessuna lavagna selezionata. Apri una lezione dal calendario con ALT+click
-            per creare/visualizzare la sua lavagna.
+            Nessuna lavagna disponibile.
           </div>
         )}
 
@@ -118,13 +173,13 @@ const mainStyle = {
   padding: "38px 46px 54px",
   boxShadow: "0 6px 34px rgba(32,72,154,0.15)",
   fontFamily: "'Inter','Segoe UI',Arial,sans-serif",
-  color: "#20489a"
+  color: "#20489a",
 };
 const titolo = { margin: "0 0 18px", fontSize: 34, fontWeight: 800 };
 const headerLine = {
   fontSize: 14,
   fontWeight: 600,
-  marginBottom: 12
+  marginBottom: 12,
 };
 const infoBox = {
   background: "#e3eefe",
@@ -133,5 +188,5 @@ const infoBox = {
   padding: "12px 16px",
   borderRadius: 12,
   fontSize: 13,
-  fontWeight: 600
+  fontWeight: 600,
 };
