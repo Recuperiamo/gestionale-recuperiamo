@@ -54,7 +54,7 @@ export default function LavagnaCanvas({
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const [zoom, setZoom] = useState(1); // 1 = 100%
-  const palette = ["#20489a", "#000000", "#ff0000", "#1cb0f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444"]; 
+  const palette = ["#20489a", "#000000", "#ff0000", "#22c55e", "#f59e0b"]; 
 
   const isAdmin = String(ruolo || "").toLowerCase() === "admin";
   const eraseSessionRef = useRef({
@@ -72,10 +72,14 @@ export default function LavagnaCanvas({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    // sfondo
-    const W = ctx.canvas.width / (window.devicePixelRatio || 1);
-    const H = ctx.canvas.height / (window.devicePixelRatio || 1);
-    // fill base
+    // applichiamo lo zoom per TUTTO (sfondo + contenuto) così si scala coerentemente
+    const dpr = window.devicePixelRatio || 1;
+    const W = ctx.canvas.width / dpr;
+    const H = ctx.canvas.height / dpr;
+    ctx.save();
+    ctx.scale(zoom, zoom);
+
+    // sfondo (dentro lo scale per coerenza visiva)
     if (sfondo === 'nero') {
       ctx.fillStyle = '#000';
     } else {
@@ -83,9 +87,8 @@ export default function LavagnaCanvas({
     }
     ctx.fillRect(0, 0, W, H);
 
-    // pattern righe / quadretti / punti
     if (sfondo === 'righe' || sfondo === 'quadretti' || sfondo === 'punti') {
-      const step = 32; // px
+      const step = 32; // unità canvas
       ctx.strokeStyle = sfondo === 'righe' ? '#e5e7eb' : '#e2e8f0';
       ctx.fillStyle = '#e5e7eb';
       ctx.lineWidth = 1;
@@ -115,10 +118,6 @@ export default function LavagnaCanvas({
         }
       }
     }
-
-    // applichiamo lo zoom per lo strato di disegno
-    ctx.save();
-    ctx.scale(zoom, zoom);
 
     // Tratti persistiti
     tratti.forEach((t) => {
@@ -153,8 +152,8 @@ export default function LavagnaCanvas({
       ctx.stroke();
     }
 
-    ctx.restore();
-    ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  ctx.globalCompositeOperation = 'source-over';
   }, [tratti, strumento, gommaPuntuale, colore, spessore, sfondo, zoom]);
 
   // Loop di rendering per il disegno locale
@@ -389,6 +388,17 @@ export default function LavagnaCanvas({
     return () => window.removeEventListener("resize", resize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tratti, altezza]);
+
+  // Zoom via rotella mouse
+  const onWheel = useCallback((e) => {
+    if (!e.ctrlKey && !e.metaKey) return; // usa ctrl+rotella per zoom per evitare scroll normale
+    e.preventDefault();
+    const delta = e.deltaY;
+    setZoom((z) => {
+      const next = Math.min(2, Math.max(0.5, z * (delta > 0 ? 0.9 : 1.1)));
+      return Math.round(next * 100) / 100;
+    });
+  }, []);
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
@@ -700,11 +710,7 @@ export default function LavagnaCanvas({
             <option value="quadretti">Quadretti</option>
             <option value="punti">Punti</option>
           </select>
-          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <span style={{ fontSize:12, color:'#20489a', fontWeight:600 }}>Zoom</span>
-            <input type="range" min={50} max={200} value={Math.round(zoom*100)} onChange={(e)=>setZoom(Number(e.target.value)/100)} />
-            <span style={st.sizeLabel}>{Math.round(zoom*100)}%</span>
-          </div>
+          {/* Zoom slider rimosso: lo zoom si controlla con CTRL + rotella */}
         </div>
         {salvando && <span style={st.saving}>Salvataggio…</span>}
       </div>
@@ -725,21 +731,31 @@ export default function LavagnaCanvas({
   // == RENDER ==
   return (
     <div style={st.wrapper}>
+      {/* Azioni in alto a destra all'esterno della lavagna */}
+      <div style={st.topRightActionsOuter}>
+        <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
+        <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
+        <button style={btn(false)} onClick={exportPNG} type="button">Export PNG</button>
+        <button style={btn(false)} onClick={exportPDF} type="button">Export PDF</button>
+        {openInNewWindow && attivitaId && (
+          <button
+            style={btn(false)}
+            onClick={() => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")}
+            type="button"
+          >
+            Apri in un'altra finestra
+          </button>
+        )}
+      </div>
       <div style={st.canvasBox}>
         {toolbar}
-        {/* Azioni in alto a destra per entrambi gli user */}
-        <div style={st.topRightActions}>
-          <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
-          <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
-          <button style={btn(false)} onClick={exportPNG} type="button">Export PNG</button>
-          <button style={btn(false)} onClick={exportPDF} type="button">Export PDF</button>
-        </div>
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
           onPointerMove={pointerMove}
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
+          onWheel={onWheel}
           style={{
             ...st.canvas,
             cursor: strumento === 'gomma'
@@ -788,6 +804,13 @@ const st = {
     gap: 8,
     zIndex: 2
   },
+  topRightActionsOuter: {
+    position: "relative",
+    display: "flex",
+    gap: 8,
+    justifyContent: "flex-end",
+    marginBottom: 8
+  },
   group: {
     display: "flex",
     gap: 8,
@@ -798,8 +821,8 @@ const st = {
     border: "1px solid #dbe6f5"
   },
   color: {
-    width: 40,
-    height: 40,
+    width: 22,
+    height: 22,
     padding: 0,
     border: "none",
     background: "transparent",

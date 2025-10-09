@@ -105,6 +105,13 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
     }
   }, [clienteId, isEdit]);
 
+  // Auto-select if exactly one pacchetto is available
+  useEffect(() => {
+    if (!isEdit && Array.isArray(pacchetti) && pacchetti.length === 1) {
+      setPacchettoId(String(pacchetti[0].id));
+    }
+  }, [pacchetti, isEdit]);
+
   useEffect(() => {
     if (!isEdit) setPacchettoId("");
   }, [clienteId, isEdit]);
