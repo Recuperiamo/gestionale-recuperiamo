@@ -54,7 +54,12 @@ export default function LavagnaCanvas({
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const [zoom, setZoom] = useState(1); // 1 = 100%
-  const palette = ["#20489a", "#000000", "#ff0000", "#22c55e", "#f59e0b"]; 
+  const palette = ["#2563eb", "#fb7185", "#10b981", "#f59e0b", "#8b5cf6"]; 
+  const colorInputRef = useRef(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
+  const panningRef = useRef({ active: false, lastX: 0, lastY: 0 });
+  const touchesRef = useRef(new Map()); // pointerId -> { x,y }
+  const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
 
   const isAdmin = String(ruolo || "").toLowerCase() === "admin";
   const eraseSessionRef = useRef({
@@ -72,11 +77,13 @@ export default function LavagnaCanvas({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    // applichiamo lo zoom per TUTTO (sfondo + contenuto) così si scala coerentemente
+    // applichiamo pan e zoom per TUTTO (sfondo + contenuto) così si scala coerentemente
     const dpr = window.devicePixelRatio || 1;
     const W = ctx.canvas.width / dpr;
     const H = ctx.canvas.height / dpr;
     ctx.save();
+    // Trasformazione world->screen: prima trasla, poi scala
+    ctx.translate(-pan.x, -pan.y);
     ctx.scale(zoom, zoom);
 
     // sfondo (dentro lo scale per coerenza visiva)
@@ -85,32 +92,37 @@ export default function LavagnaCanvas({
     } else {
       ctx.fillStyle = '#fff';
     }
-    ctx.fillRect(0, 0, W, H);
+    // dimensioni viewport in unità mondo
+    const viewW = W / zoom;
+    const viewH = H / zoom;
+    ctx.fillRect(pan.x, pan.y, viewW, viewH);
 
     if (sfondo === 'righe' || sfondo === 'quadretti' || sfondo === 'punti') {
       const step = 32; // unità canvas
       ctx.strokeStyle = sfondo === 'righe' ? '#e5e7eb' : '#e2e8f0';
       ctx.fillStyle = '#e5e7eb';
       ctx.lineWidth = 1;
+      const startY = Math.floor(pan.y / step) * step;
+      const startX = Math.floor(pan.x / step) * step;
       if (sfondo === 'righe' || sfondo === 'quadretti') {
-        for (let y = step; y < H; y += step) {
+        for (let y = startY; y < pan.y + viewH; y += step) {
           ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(W, y);
+          ctx.moveTo(pan.x, y);
+          ctx.lineTo(pan.x + viewW, y);
           ctx.stroke();
         }
       }
       if (sfondo === 'quadretti') {
-        for (let x = step; x < W; x += step) {
+        for (let x = startX; x < pan.x + viewW; x += step) {
           ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, H);
+          ctx.moveTo(x, pan.y);
+          ctx.lineTo(x, pan.y + viewH);
           ctx.stroke();
         }
       }
       if (sfondo === 'punti') {
-        for (let y = step; y < H; y += step) {
-          for (let x = step; x < W; x += step) {
+        for (let y = startY; y < pan.y + viewH; y += step) {
+          for (let x = startX; x < pan.x + viewW; x += step) {
             ctx.beginPath();
             ctx.arc(x, y, 1, 0, Math.PI * 2);
             ctx.fill();
@@ -119,7 +131,7 @@ export default function LavagnaCanvas({
       }
     }
 
-    // Tratti persistiti
+    // Tratti persistiti (coordinate in unità mondo)
     tratti.forEach((t) => {
       if (!t.punti || t.punti.length < 2) return;
       ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
@@ -130,7 +142,7 @@ export default function LavagnaCanvas({
       ctx.stroke();
     });
 
-    // Stream remoti in corso
+    // Stream remoti in corso (unità mondo)
     for (const st of remoteStreams.current.values()) {
       if (!st.punti || st.punti.length < 2) continue;
       ctx.globalCompositeOperation = st.strumento === 'gomma' ? 'destination-out' : 'source-over';
@@ -141,7 +153,7 @@ export default function LavagnaCanvas({
       ctx.stroke();
     }
 
-    // Tratto locale in corso
+    // Tratto locale in corso (unità mondo)
     const puntiLocali = puntiCorrentiRef.current;
     if (puntiLocali.length >= 2) {
       ctx.globalCompositeOperation = (strumento === 'gomma' && gommaPuntuale) ? 'destination-out' : 'source-over';
@@ -154,7 +166,7 @@ export default function LavagnaCanvas({
 
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, strumento, gommaPuntuale, colore, spessore, sfondo, zoom]);
+  }, [tratti, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
 
   // Loop di rendering per il disegno locale
   const renderLoop = useCallback(() => {
@@ -357,10 +369,16 @@ export default function LavagnaCanvas({
 
   // Coordinate helper considerando lo zoom
   const getPoint = useCallback((e) => {
-    const x = e.nativeEvent.offsetX / zoom;
-    const y = e.nativeEvent.offsetY / zoom;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.nativeEvent.clientX;
+    const clientY = e.nativeEvent.clientY;
+    const offX = clientX - rect.left;
+    const offY = clientY - rect.top;
+    const x = pan.x + offX / zoom;
+    const y = pan.y + offY / zoom;
     return { x, y };
-  }, [zoom]);
+  }, [zoom, pan.x, pan.y]);
 
   // == RESIZE & REDRAW ==
   useEffect(() => {
@@ -391,14 +409,23 @@ export default function LavagnaCanvas({
 
   // Zoom via rotella mouse
   const onWheel = useCallback((e) => {
-    if (!e.ctrlKey && !e.metaKey) return; // usa ctrl+rotella per zoom per evitare scroll normale
+    // Zoom solo sulla lavagna: intercetta sempre la rotella sul canvas
     e.preventDefault();
-    const delta = e.deltaY;
-    setZoom((z) => {
-      const next = Math.min(2, Math.max(0.5, z * (delta > 0 ? 0.9 : 1.1)));
-      return Math.round(next * 100) / 100;
-    });
-  }, []);
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const offX = e.clientX - rect.left;
+    const offY = e.clientY - rect.top;
+    const worldBefore = { x: pan.x + offX / zoom, y: pan.y + offY / zoom };
+    const factor = e.deltaY > 0 ? 0.9 : 1.1; // out/in
+    const newZoom = Math.min(2, Math.max(0.5, Math.round((zoom * factor) * 100) / 100));
+    // mantieni il punto sotto il cursore fermo
+    const newPan = {
+      x: worldBefore.x - offX / newZoom,
+      y: worldBefore.y - offY / newZoom,
+    };
+    setZoom(newZoom);
+    setPan(newPan);
+  }, [zoom, pan.x, pan.y]);
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
@@ -427,6 +454,34 @@ export default function LavagnaCanvas({
 
   // == POINTER EVENTS ==
   function pointerDown(e) {
+    // Tasto destro: pan
+    if (e.nativeEvent.button === 2) {
+      const canvas = canvasRef.current;
+      canvas.setPointerCapture?.(e.nativeEvent.pointerId);
+      panningRef.current.active = true;
+      panningRef.current.lastX = e.nativeEvent.clientX;
+      panningRef.current.lastY = e.nativeEvent.clientY;
+      return;
+    }
+
+    // Touch multi-dita: gesti pan/zoom
+    if (e.nativeEvent.pointerType === 'touch') {
+      touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
+      if (touchesRef.current.size === 2) {
+        const pts = Array.from(touchesRef.current.values());
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const dist = Math.hypot(dx, dy);
+        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        const rect = canvasRef.current.getBoundingClientRect();
+        const midOff = { x: mid.x - rect.left, y: mid.y - rect.top };
+        const midWorld = { x: pan.x + midOff.x / zoom, y: pan.y + midOff.y / zoom };
+        gestureRef.current = { mode: 'panzoom', startZoom: zoom, startPan: { ...pan }, startDist: dist, startMidWorld: midWorld };
+        setDisegnando(false);
+        return;
+      }
+    }
+
     setDisegnando(true);
     const punto = getPoint(e);
 
@@ -451,6 +506,42 @@ export default function LavagnaCanvas({
   }
 
   function pointerMove(e) {
+    // Panning con tasto destro
+    if (panningRef.current.active) {
+      const dx = e.nativeEvent.clientX - panningRef.current.lastX;
+      const dy = e.nativeEvent.clientY - panningRef.current.lastY;
+      panningRef.current.lastX = e.nativeEvent.clientX;
+      panningRef.current.lastY = e.nativeEvent.clientY;
+      setPan((p) => ({ x: p.x - dx / zoom, y: p.y - dy / zoom }));
+      return;
+    }
+
+    // Pan/zoom multitouch
+    if (e.nativeEvent.pointerType === 'touch' && gestureRef.current.mode === 'panzoom') {
+      if (touchesRef.current.has(e.nativeEvent.pointerId)) {
+        touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
+      }
+      if (touchesRef.current.size >= 2) {
+        const pts = Array.from(touchesRef.current.values());
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const dist = Math.hypot(dx, dy);
+        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        const rect = canvasRef.current.getBoundingClientRect();
+        const midOff = { x: mid.x - rect.left, y: mid.y - rect.top };
+        const g = gestureRef.current;
+        // aggiorna zoom
+        const newZoom = Math.min(2, Math.max(0.5, g.startZoom * (dist / (g.startDist || 1))));
+        setZoom(newZoom);
+        // mantieni il punto medio mondo ancorato allo stesso punto dello schermo
+        const midWorld = g.startMidWorld;
+        const newPanX = midWorld.x - midOff.x / newZoom;
+        const newPanY = midWorld.y - midOff.y / newZoom;
+        setPan({ x: newPanX, y: newPanY });
+      }
+      return;
+    }
+
     if (!disegnando) return;
     const punto = getPoint(e);
 
@@ -467,6 +558,10 @@ export default function LavagnaCanvas({
   }
 
   function pointerUp() {
+    if (panningRef.current.active) {
+      panningRef.current.active = false;
+    }
+    // Touch end handling is in pointerCancel/pointerUp below
     if (animationFrameId.current) {
       cancelAnimationFrame(animationFrameId.current);
       animationFrameId.current = null;
@@ -508,6 +603,18 @@ export default function LavagnaCanvas({
     currentStreamId.current = null;
     eraseSessionRef.current.ids.clear();
     drawAll(); // Chiamata finale per pulire il tratto locale
+  }
+
+  function pointerCancel(e) {
+    if (panningRef.current.active) {
+      panningRef.current.active = false;
+    }
+    if (e?.nativeEvent?.pointerType === 'touch') {
+      touchesRef.current.delete(e.nativeEvent.pointerId);
+      if (touchesRef.current.size < 2 && gestureRef.current.mode === 'panzoom') {
+        gestureRef.current.mode = 'none';
+      }
+    }
   }
 
   // == SALVATAGGIO STROKE ==
@@ -682,17 +789,29 @@ export default function LavagnaCanvas({
               <span style={st.toggleLbl}>Gomma puntuale</span>
             </label>
           )}
-          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             {palette.map((c) => (
-              <button key={c} onClick={() => setColore(c)} type="button" title={c}
-                style={{ width:22, height:22, borderRadius:6, border: c===colore? '2px solid #20489a':'1px solid #dbe6f5', background:c, cursor:'pointer' }} />
+              <button
+                key={c}
+                onClick={() => setColore(c)}
+                type="button"
+                title={c}
+                style={{ width:22, height:22, borderRadius:6, border: c===colore? '2px solid #20489a':'1px solid #dbe6f5', background:c, cursor:'pointer' }}
+              />
             ))}
+            {/* Picker nascosto + pulsante "ruota colori" */}
             <input
+              ref={colorInputRef}
               type="color"
-              disabled={strumento === "gomma"}
               value={colore}
               onChange={(e) => setColore(e.target.value)}
-              style={st.color}
+              style={{ position:'absolute', width:1, height:1, opacity:0, pointerEvents:'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => colorInputRef.current?.click()}
+              title="Altro colore"
+              style={st.colorWheelBtn}
             />
           </div>
           <input
@@ -755,7 +874,9 @@ export default function LavagnaCanvas({
           onPointerMove={pointerMove}
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
+          onPointerCancel={pointerCancel}
           onWheel={onWheel}
+          onContextMenu={(e) => e.preventDefault()}
           style={{
             ...st.canvas,
             cursor: strumento === 'gomma'
@@ -828,6 +949,14 @@ const st = {
     background: "transparent",
     cursor: "pointer"
   },
+  colorWheelBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: '50%',
+    border: '1px solid #dbe6f5',
+    background: 'conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)',
+    cursor: 'pointer'
+  },
   sizeLabel: { fontSize: 12, fontWeight: 600, color: "#20489a" },
   saving: { fontSize: 12, fontWeight: 600, color: "#8C7800" },
   canvasBox: {
@@ -838,6 +967,7 @@ const st = {
     overflow: "hidden"
   },
   canvas: {
+    // Permetti gesti (pinch-zoom, pan) controllati dal componente
     touchAction: "none",
     display: "block",
     cursor: "crosshair",
