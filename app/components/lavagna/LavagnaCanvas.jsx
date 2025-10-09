@@ -39,7 +39,7 @@ export default function LavagnaCanvas({
     (trattiIniziali || []).map(prepareStroke)
   );
   const [disegnando, setDisegnando] = useState(false);
-  const [puntiCorrenti, setPuntiCorrenti] = useState([]);
+  const puntiCorrentiRef = useRef([]);
   const [salvando, setSalvando] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -51,6 +51,13 @@ export default function LavagnaCanvas({
     lastX: null,
     lastY: null
   });
+  const animationFrameId = useRef(null);
+
+  // Loop di rendering per il disegno locale
+  const renderLoop = useCallback(() => {
+    drawAll();
+    animationFrameId.current = requestAnimationFrame(renderLoop);
+  }, [drawAll]);
 
   // Stream remoti in tempo reale (non persistiti finché non "done")
   const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
@@ -86,17 +93,18 @@ export default function LavagnaCanvas({
     }
 
     // Tratto locale in corso
-    if (puntiCorrenti.length >= 2) {
+    const puntiLocali = puntiCorrentiRef.current;
+    if (puntiLocali.length >= 2) {
       ctx.globalCompositeOperation = (strumento === 'gomma' && gommaPuntuale) ? 'destination-out' : 'source-over';
       ctx.strokeStyle = strumento === 'gomma' ? '#fff' : colore;
       ctx.lineWidth = spessore;
       ctx.beginPath();
-      puntiCorrenti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      puntiLocali.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
       ctx.stroke();
     }
 
     ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, puntiCorrenti, strumento, gommaPuntuale, colore, spessore]);
+  }, [tratti, strumento, gommaPuntuale, colore, spessore]);
 
   // === SOCKET.IO SETUP ===
   // Replace with Ably-first setup, fallback to Socket.IO
@@ -333,7 +341,8 @@ export default function LavagnaCanvas({
       return;
     }
 
-    setPuntiCorrenti([punto]);
+    puntiCorrentiRef.current = [punto];
+    animationFrameId.current = requestAnimationFrame(renderLoop);
     
     const streamId = `${utenteId}-${Date.now()}`;
     currentStreamId.current = streamId;
@@ -350,18 +359,18 @@ export default function LavagnaCanvas({
   function pointerMove(e) {
     if (!disegnando) return;
     
-    const now = Date.now();
-    if (now - throttler.current.last < 30) return; // Limita a ~30fps
-    throttler.current.last = now;
-
     const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
 
     if (strumento === 'gomma' && !gommaPuntuale) {
       eraseStrokeAt(punto.x, punto.y);
       return;
     }
+    
+    puntiCorrentiRef.current.push(punto);
 
-    setPuntiCorrenti(prev => [...prev, punto]);
+    const now = Date.now();
+    if (now - throttler.current.last < 30) return; // Limita a ~30fps
+    throttler.current.last = now;
 
     emitOrPublish('stroke:points', {
       streamId: currentStreamId.current,
@@ -370,16 +379,21 @@ export default function LavagnaCanvas({
   }
 
   function pointerUp() {
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
     if (!disegnando) return;
     setDisegnando(false);
     
-    if (strumento !== 'gomma' && puntiCorrenti.length >= 2) {
+    const puntiFinali = puntiCorrentiRef.current;
+    if (strumento !== 'gomma' && puntiFinali.length >= 2) {
       const nuovoTratto = prepareStroke({
         id: `local-${Date.now()}`,
         strumento,
         colore,
         spessore,
-        punti: puntiCorrenti,
+        punti: puntiFinali,
         autoreUserId: utenteId,
       });
       setTratti(prev => [...prev, nuovoTratto]);
@@ -390,9 +404,10 @@ export default function LavagnaCanvas({
 
     emitOrPublish('stroke:done', { streamId: currentStreamId.current });
     
-    setPuntiCorrenti([]);
+    puntiCorrentiRef.current = [];
     currentStreamId.current = null;
     eraseSessionRef.current.ids.clear();
+    drawAll(); // Chiamata finale per pulire il tratto locale
   }
 
   // == SALVATAGGIO STROKE ==
