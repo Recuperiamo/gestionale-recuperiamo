@@ -198,30 +198,38 @@ export default function LavagnaCanvas({
 
   // Helper per inviare eventi realtime (semplice: aspetta attach e invia)
   const emitOrPublish = useCallback((eventName, payload) => {
+    console.log(`[emitOrPublish] Chiamata per evento: ${eventName}`, payload);
     const ch = ablyRef.current.ch;
-    if (!ch) return;
+    if (!ch) {
+      console.warn("[emitOrPublish] Canale Ably non ancora disponibile.");
+      return;
+    }
 
     const doPublish = () => {
       try {
-        if (process.env.NODE_ENV !== 'production') console.log(`[publish ${eventName}] state=${ch.state}`, payload?.streamId || '');
-        ch.publish(eventName, payload, (err) => {
-          if (err) {
-            console.error(`[publish error ${eventName}]`, err?.message || err);
-          }
-        });
-      } catch (e) {
-        console.error(`[publish threw ${eventName}]`, e);
+        ch.publish(eventName, payload);
+        console.log(`[emitOrPublish] Evento '${eventName}' pubblicato con successo.`);
+      } catch (error) {
+        console.error(`[emitOrPublish] Errore durante la pubblicazione dell'evento '${eventName}':`, error);
       }
     };
 
+    console.log(`[emitOrPublish] Stato del canale Ably: ${ch.state}`);
     if (ch.state !== 'attached') {
-      whenChannelAttached(ch.name).then(doPublish).catch(() => {
-        if (process.env.NODE_ENV !== 'production') console.warn(`[publish drop ${eventName}] attach failed`);
-      });
+      console.log(`[emitOrPublish] Il canale non è 'attached'. In attesa di 'whenChannelAttached' per l'evento ${eventName}.`);
+      whenChannelAttached(ch.name)
+        .then(() => {
+          console.log(`[emitOrPublish] Canale diventato 'attached'. Pubblicazione dell'evento ${eventName}.`);
+          doPublish();
+        })
+        .catch(err => {
+          console.error(`[emitOrPublish] [publish drop ${eventName}] attach failed:`, err);
+        });
     } else {
+      console.log(`[emitOrPublish] Il canale è già 'attached'. Pubblicazione immediata dell'evento ${eventName}.`);
       doPublish();
     }
-  }, []);
+  }, [lavagnaId]);
 
   // == UTILITIES ==
   function prepareStroke(s) {
@@ -341,117 +349,48 @@ export default function LavagnaCanvas({
 
   // == POINTER EVENTS ==
   function pointerDown(e) {
-    if (utenteId == null) {
-      // Overlay attivo → blocca disegno
-      return;
-    }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    console.log("[pointerDown] Evento scatenato.");
+    setIsDrawing(true);
+    const point = getPoint(e);
+    const newPath = [[point.x, point.y, e.pressure]];
+    
+    setHistory(prev => [...prev.slice(0, currentPathIndex + 1), newPath]);
+    setCurrentPathIndex(prev => prev + 1);
 
-    if (strumento === "gomma" && !gommaPuntuale) {
-      eraseSessionRef.current.ids = new Set();
-      eraseSessionRef.current.lastX = x;
-      eraseSessionRef.current.lastY = y;
-      setDisegnando(true);
-      eraseStrokeAt(x, y);
-      return;
-    }
-
-    setDisegnando(true);
-    setPuntiCorrenti([{ x, y }]);
-    setRedoStack([]);
-
-    // Avvia stream live
-    currentStreamId.current = `${utenteId}-${Date.now()}`;
-    emitOrPublish("stroke:start", {
-      attivitaId,
-      streamId: currentStreamId.current,
-      strumento,
-      colore: strumento === "gomma" ? null : colore,
-      spessore,
-      start: { x, y }
+    emitOrPublish('stroke:start', {
+      lavagnaId,
+      path: newPath,
+      color,
+      strokeWidth,
+      tool,
     });
-    if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[publish stroke:start]', currentStreamId.current);
   }
 
   function pointerMove(e) {
-    if (!disegnando) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!isDrawing) return;
+    console.log("[pointerMove] Evento scatenato.");
+    const point = getPoint(e);
+    const currentPath = history[currentPathIndex];
+    if (currentPath) {
+      const updatedPath = [...currentPath, [point.x, point.y, e.pressure]];
+      const newHistory = [...history];
+      newHistory[currentPathIndex] = updatedPath;
+      setHistory(newHistory);
 
-    if (strumento === "gomma" && !gommaPuntuale) {
-      const lasX = eraseSessionRef.current.lastX;
-      const lasY = eraseSessionRef.current.lastY;
-      if (
-        lasX === null ||
-        Math.hypot(x - lasX, y - lasY) > Math.max(4, spessore * 0.6)
-      ) {
-        eraseSessionRef.current.lastX = x;
-        eraseSessionRef.current.lastY = y;
-        eraseStrokeAt(x, y);
-      }
-      return;
+      emitOrPublish('stroke:points', {
+        lavagnaId,
+        points: [point.x, point.y, e.pressure],
+        pathIndex: currentPathIndex,
+      });
     }
-
-    setPuntiCorrenti((prev) => {
-      const nuovo = [...prev, { x, y }];
-      drawAll();
-
-      // Throttle invio punti (~25ms)
-      const now = performance.now();
-      if (now - (throttler.current.last || 0) > 25) {
-        throttler.current.last = now;
-        emitOrPublish("stroke:points", {
-          attivitaId,
-          streamId: currentStreamId.current,
-          points: [{ x, y }]
-        });
-        if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[publish stroke:points]', currentStreamId.current);
-      }
-      return nuovo;
-    });
   }
 
   function pointerUp() {
-    if (!disegnando) return;
-    if (strumento === "gomma" && !gommaPuntuale) {
-      setDisegnando(false);
-      eraseSessionRef.current.lastX = null;
-      eraseSessionRef.current.lastY = null;
-      return;
+    console.log("[pointerUp] Evento scatenato.");
+    if (isDrawing) {
+      setIsDrawing(false);
+      emitOrPublish('stroke:done', { lavagnaId, pathIndex: currentPathIndex });
     }
-
-    setDisegnando(false);
-    if (puntiCorrenti.length < 2) {
-      setPuntiCorrenti([]);
-      return;
-    }
-    const tempId = "temp-" + Date.now();
-    const nuovo = prepareStroke({
-      id: tempId,
-      strumento,
-      colore: strumento === "gomma" ? null : colore,
-      spessore,
-      punti: puntiCorrenti,
-      autoreUserId: utenteId
-    });
-
-    setTratti((prev) => [...prev, nuovo]);
-    setUndoStack((prev) => [...prev, { type: "add", stroke: nuovo }]);
-    setPuntiCorrenti([]);
-
-    // Chiudi stream live
-    emitOrPublish("stroke:done", { attivitaId, streamId: currentStreamId.current });
-    currentStreamId.current = null;
-
-    // Persistenza su DB
-    salvaTratto(nuovo);
   }
 
   // == SALVATAGGIO STROKE ==
@@ -677,26 +616,34 @@ export default function LavagnaCanvas({
 
   // == RENDER ==
   return (
-    <div style={st.wrapper}>
-      {toolbar}
-      <div style={{ ...st.canvasBox, height: altezza }}>
+    <div className="flex flex-col h-full">
+      <div className="flex-none p-4 bg-gray-100 border-b">
+        <div className="flex items-center space-x-4">
+          <select value={tool} onChange={(e) => setTool(e.target.value)} className="p-2 border rounded">
+            <option value="penna">Penna</option>
+            <option value="gomma">Gomma</option>
+          </select>
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 p-0 border rounded" />
+          <input type="range" min="1" max="10" value={strokeWidth} onChange={(e) => setStrokeWidth(e.target.value)} className="w-32" />
+          <button onClick={handleUndo} disabled={currentPathIndex < 0} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Undo</button>
+          <button onClick={handleRedo} disabled={currentPathIndex >= history.length - 1} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Redo</button>
+          <button onClick={exportToPNG} className="px-4 py-2 bg-blue-500 text-white rounded">Export PNG</button>
+          <button onClick={handleClear} className="px-4 py-2 bg-red-500 text-white rounded">Pulisci lavagna</button>
+        </div>
+      </div>
+      <div className="flex-grow relative" style={{ touchAction: 'none' }}>
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
           onPointerMove={pointerMove}
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
-          style={st.canvas}
+          className="absolute top-0 left-0 w-full h-full bg-white"
         />
-        {utenteId == null && (
-          <div style={overlayBlock}>
-            <div>Sessione non pronta…</div>
-          </div>
-        )}
       </div>
     </div>
   );
-}
+};
 
 // == STYLES ==
 const st = {
