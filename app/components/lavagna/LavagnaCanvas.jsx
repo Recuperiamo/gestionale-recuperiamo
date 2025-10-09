@@ -53,18 +53,7 @@ export default function LavagnaCanvas({
   });
   const animationFrameId = useRef(null);
 
-  // Loop di rendering per il disegno locale
-  const renderLoop = useCallback(() => {
-    drawAll();
-    animationFrameId.current = requestAnimationFrame(renderLoop);
-  }, [drawAll]);
-
-  // Stream remoti in tempo reale (non persistiti finché non "done")
-  const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
-  const currentStreamId = useRef(null);
-  const throttler = useRef({ last: 0 });
-
-  // Disegno completo astratto (spostato prima dell'useEffect realtime per evitare TDZ minificata)
+  // Disegno completo
   const drawAll = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
@@ -106,8 +95,18 @@ export default function LavagnaCanvas({
     ctx.globalCompositeOperation = 'source-over';
   }, [tratti, strumento, gommaPuntuale, colore, spessore]);
 
-  // === SOCKET.IO SETUP ===
-  // Replace with Ably-first setup, fallback to Socket.IO
+  // Loop di rendering per il disegno locale
+  const renderLoop = useCallback(() => {
+    drawAll();
+    animationFrameId.current = requestAnimationFrame(renderLoop);
+  }, [drawAll]);
+
+  // Stream remoti in tempo reale (non persistiti finché non "done")
+  const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
+  const currentStreamId = useRef(null);
+  const throttler = useRef({ last: 0 });
+
+  // Setup Ably
   useEffect(() => {
     if (!attivitaId) return;
 
@@ -302,8 +301,6 @@ export default function LavagnaCanvas({
     return () => window.removeEventListener("resize", resize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tratti, altezza]);
-
-  // drawAll spostata sopra
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
