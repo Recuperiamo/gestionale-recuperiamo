@@ -106,19 +106,19 @@ export default function LavagnaCanvas({
     const channelName = `lavagna:${attivitaId}`;
     const ablyCh = getAblyChannel(channelName);
     ablyRef.current.ch = ablyCh;
-    if (ablyCh && process.env.NODE_ENV !== 'production') {
-      console.log('[LavagnaCanvas] Ably channel state init', channelName, ablyCh.state);
-      whenChannelAttached(channelName).then(() => {
-        if (process.env.NODE_ENV !== 'production') console.log('[LavagnaCanvas] Ably channel attached', channelName);
-      }).catch(err => {
-        console.warn('[LavagnaCanvas] channel attach failed', err?.message);
-      });
-    }
+    
+    console.log('[LavagnaCanvas] Ably channel state init', channelName, ablyCh.state);
+    whenChannelAttached(channelName).then(() => {
+      console.log('[LavagnaCanvas] Ably channel attached', channelName);
+    }).catch(err => {
+      console.warn('[LavagnaCanvas] channel attach failed', err?.message);
+    });
 
     const onStart = (msg) => {
-      const { streamId, strumento, colore, spessore, start } = msg || {};
+      const { data } = msg;
+      const { streamId, strumento, colore, spessore, start } = data || {};
       if (!streamId || !start) return;
-      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:start]', streamId, start);
+      console.log('[recv stroke:start]', streamId, start);
       remoteStreams.current.set(streamId, {
         strumento,
         colore,
@@ -129,18 +129,20 @@ export default function LavagnaCanvas({
     };
 
     const onPoints = (msg) => {
-      const { streamId, points } = msg || {};
+      const { data } = msg;
+      const { streamId, points } = data || {};
       if (!streamId || !Array.isArray(points) || points.length === 0) return;
       const st = remoteStreams.current.get(streamId);
       if (!st) return;
-      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:points]', streamId, points.length);
+      console.log('[recv stroke:points]', streamId, points.length);
       st.punti.push(...points);
       drawAll();
     };
 
     const onDone = (msg) => {
-      const { streamId } = msg || {};
-      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:done]', streamId);
+      const { data } = msg;
+      const { streamId } = data || {};
+      console.log('[recv stroke:done]', streamId);
       const st = remoteStreams.current.get(streamId);
       if (st && st.punti.length >= 2) {
         const definitivo = prepareStroke({
@@ -158,15 +160,16 @@ export default function LavagnaCanvas({
     };
 
     const onDelete = (msg) => {
-      const { strokeId } = msg || {};
+      const { data } = msg;
+      const { strokeId } = data || {};
       if (!strokeId) return;
-      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv stroke:delete]', strokeId);
+      console.log('[recv stroke:delete]', strokeId);
       setTratti((prev) => prev.filter((t) => t.id !== strokeId));
       drawAll();
     };
 
     const onClear = () => {
-      if (ablyRef.current.ch && process.env.NODE_ENV !== 'production') console.log('[recv clear-lavagna]');
+      console.log('[recv clear-lavagna]');
       setTratti([]);
       setUndoStack([]);
       setRedoStack([]);
@@ -174,27 +177,19 @@ export default function LavagnaCanvas({
       drawAll();
     };
 
-    if (ablyCh) {
-      ablyCh.subscribe("stroke:start", onStart);
-      ablyCh.subscribe("stroke:points", onPoints);
-      ablyCh.subscribe("stroke:done", onDone);
-      ablyCh.subscribe("stroke:delete", onDelete);
-      ablyCh.subscribe("clear-lavagna", onClear);
-    }
+    ablyCh.subscribe(onStart);
+    ablyCh.subscribe("stroke:points", onPoints);
+    ablyCh.subscribe("stroke:done", onDone);
+    ablyCh.subscribe("stroke:delete", onDelete);
+    ablyCh.subscribe("clear-lavagna", onClear);
 
     return () => {
-      if (ablyCh) {
-        try {
-          ablyCh.unsubscribe("stroke:start", onStart);
-          ablyCh.unsubscribe("stroke:points", onPoints);
-          ablyCh.unsubscribe("stroke:done", onDone);
-          ablyCh.unsubscribe("stroke:delete", onDelete);
-          ablyCh.unsubscribe("clear-lavagna", onClear);
-          ablyCh.detach?.();
-        } catch {}
-      }
+      try {
+        ablyCh.unsubscribe();
+        ablyCh.detach?.();
+      } catch {}
     };
-  }, [lavagnaId, attivitaId, clienteId, isNewLavagna, drawAll]);
+  }, [attivitaId, drawAll]);
 
   // Helper per inviare eventi realtime (semplice: aspetta attach e invia)
   const emitOrPublish = useCallback((eventName, payload) => {
@@ -661,6 +656,14 @@ export default function LavagnaCanvas({
           <button onClick={undo} disabled={!undoStack.length} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Undo</button>
           <button onClick={redo} disabled={!redoStack.length} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Redo</button>
           <button onClick={exportPNG} className="px-4 py-2 bg-blue-500 text-white rounded">Export PNG</button>
+          {openInNewWindow && (
+            <button
+              onClick={() => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")}
+              className="px-4 py-2 bg-green-500 text-white rounded"
+            >
+              Apri in un'altra finestra
+            </button>
+          )}
           <button onClick={handlePulisciLavagna} className="px-4 py-2 bg-red-500 text-white rounded">Pulisci lavagna</button>
         </div>
       </div>
