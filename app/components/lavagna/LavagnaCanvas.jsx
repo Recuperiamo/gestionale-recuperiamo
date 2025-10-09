@@ -157,7 +157,7 @@ export default function LavagnaCanvas({
       const { data } = msg;
       const { strokeId } = data || {};
       if (!strokeId) return;
-      setTratti((prev) => prev.filter((t) => t.id !== strokeId));
+      setTratti((prev) => prev.filter((t) => String(t.id) !== String(strokeId)));
       drawAll();
     };
 
@@ -308,15 +308,19 @@ export default function LavagnaCanvas({
           eraseSessionRef.current.ids.add(st.id);
           setUndoStack((prev) => [...prev, { type: "delete", stroke: st }]);
           setRedoStack([]);
+          
+          // Pubblica sempre la cancellazione
+          emitOrPublish("stroke:delete", { attivitaId, strokeId: st.id });
+
+          // Se l'ID è numerico, è un tratto salvato, quindi chiamiamo anche l'API
           if (typeof st.id === "number") {
             fetch(`/api/lavagna/tratto/${st.id}`, { method: "DELETE" }).catch(() => {});
-            emitOrPublish("stroke:delete", { attivitaId, strokeId: st.id });
           }
         }
       }
       drawAll();
     },
-    [tratti, drawAll, attivitaId]
+    [tratti, drawAll, attivitaId, emitOrPublish]
   );
 
   // == POINTER EVENTS ==
