@@ -107,10 +107,7 @@ export default function LavagnaCanvas({
     const ablyCh = getAblyChannel(channelName);
     ablyRef.current.ch = ablyCh;
     
-    console.log('[LavagnaCanvas] Ably channel state init', channelName, ablyCh.state);
-    whenChannelAttached(channelName).then(() => {
-      console.log('[LavagnaCanvas] Ably channel attached', channelName);
-    }).catch(err => {
+    whenChannelAttached(channelName).catch(err => {
       console.warn('[LavagnaCanvas] channel attach failed', err?.message);
     });
 
@@ -118,7 +115,6 @@ export default function LavagnaCanvas({
       const { data } = msg;
       const { streamId, strumento, colore, spessore, start } = data || {};
       if (!streamId || !start) return;
-      console.log('[recv stroke:start]', streamId, start);
       remoteStreams.current.set(streamId, {
         strumento,
         colore,
@@ -134,7 +130,6 @@ export default function LavagnaCanvas({
       if (!streamId || !Array.isArray(points) || points.length === 0) return;
       const st = remoteStreams.current.get(streamId);
       if (!st) return;
-      console.log('[recv stroke:points]', streamId, points.length);
       st.punti.push(...points);
       drawAll();
     };
@@ -142,7 +137,6 @@ export default function LavagnaCanvas({
     const onDone = (msg) => {
       const { data } = msg;
       const { streamId } = data || {};
-      console.log('[recv stroke:done]', streamId);
       const st = remoteStreams.current.get(streamId);
       if (st && st.punti.length >= 2) {
         const definitivo = prepareStroke({
@@ -163,13 +157,11 @@ export default function LavagnaCanvas({
       const { data } = msg;
       const { strokeId } = data || {};
       if (!strokeId) return;
-      console.log('[recv stroke:delete]', strokeId);
       setTratti((prev) => prev.filter((t) => t.id !== strokeId));
       drawAll();
     };
 
     const onClear = () => {
-      console.log('[recv clear-lavagna]');
       setTratti([]);
       setUndoStack([]);
       setRedoStack([]);
@@ -177,7 +169,7 @@ export default function LavagnaCanvas({
       drawAll();
     };
 
-    ablyCh.subscribe(onStart);
+    ablyCh.subscribe("stroke:start", onStart);
     ablyCh.subscribe("stroke:points", onPoints);
     ablyCh.subscribe("stroke:done", onDone);
     ablyCh.subscribe("stroke:delete", onDelete);
@@ -193,35 +185,20 @@ export default function LavagnaCanvas({
 
   // Helper per inviare eventi realtime (semplice: aspetta attach e invia)
   const emitOrPublish = useCallback((eventName, payload) => {
-    console.log(`[emitOrPublish] Chiamata per evento: ${eventName}`, payload);
     const ch = ablyRef.current.ch;
-    if (!ch) {
-      console.warn("[emitOrPublish] Canale Ably non ancora disponibile.");
-      return;
-    }
+    if (!ch) return;
 
     const doPublish = () => {
-      try {
-        ch.publish(eventName, payload);
-        console.log(`[emitOrPublish] Evento '${eventName}' pubblicato con successo.`);
-      } catch (error) {
-        console.error(`[emitOrPublish] Errore durante la pubblicazione dell'evento '${eventName}':`, error);
-      }
+      ch.publish(eventName, payload);
     };
 
-    console.log(`[emitOrPublish] Stato del canale Ably: ${ch.state}`);
     if (ch.state !== 'attached') {
-      console.log(`[emitOrPublish] Il canale non è 'attached'. In attesa di 'whenChannelAttached' per l'evento ${eventName}.`);
       whenChannelAttached(ch.name)
-        .then(() => {
-          console.log(`[emitOrPublish] Canale diventato 'attached'. Pubblicazione dell'evento ${eventName}.`);
-          doPublish();
-        })
+        .then(doPublish)
         .catch(err => {
-          console.error(`[emitOrPublish] [publish drop ${eventName}] attach failed:`, err);
+          console.error(`[publish drop ${eventName}] attach failed:`, err);
         });
     } else {
-      console.log(`[emitOrPublish] Il canale è già 'attached'. Pubblicazione immediata dell'evento ${eventName}.`);
       doPublish();
     }
   }, [lavagnaId]);
@@ -344,9 +321,14 @@ export default function LavagnaCanvas({
 
   // == POINTER EVENTS ==
   function pointerDown(e) {
-    console.log("[pointerDown] Evento scatenato.");
     setDisegnando(true);
     const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+
+    if (strumento === 'gomma' && !gommaPuntuale) {
+      eraseStrokeAt(punto.x, punto.y);
+      return;
+    }
+
     setPuntiCorrenti([punto]);
     
     const streamId = `${utenteId}-${Date.now()}`;
@@ -363,13 +345,18 @@ export default function LavagnaCanvas({
 
   function pointerMove(e) {
     if (!disegnando) return;
-    console.log("[pointerMove] Evento scatenato.");
     
     const now = Date.now();
     if (now - throttler.current.last < 30) return; // Limita a ~30fps
     throttler.current.last = now;
 
     const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+
+    if (strumento === 'gomma' && !gommaPuntuale) {
+      eraseStrokeAt(punto.x, punto.y);
+      return;
+    }
+
     setPuntiCorrenti(prev => [...prev, punto]);
 
     emitOrPublish('stroke:points', {
@@ -379,11 +366,10 @@ export default function LavagnaCanvas({
   }
 
   function pointerUp() {
-    console.log("[pointerUp] Evento scatenato.");
     if (!disegnando) return;
     setDisegnando(false);
     
-    if (puntiCorrenti.length >= 2) {
+    if (strumento !== 'gomma' && puntiCorrenti.length >= 2) {
       const nuovoTratto = prepareStroke({
         id: `local-${Date.now()}`,
         strumento,
@@ -503,13 +489,11 @@ export default function LavagnaCanvas({
 
   // == PULISCI LAVAGNA (solo admin) ==
   const handlePulisciLavagna = useCallback(() => {
-    console.log("[handleClear] Funzione chiamata");
     if (!isAdmin) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
     
     // Notifica realtime
     if (ablyRef.current.ch) {
-      console.log("[handleClear] Tentativo di pubblicare 'clear-lavagna'");
       emitOrPublish("clear-lavagna", { lavagnaId, attivitaId });
     }
 
@@ -517,7 +501,6 @@ export default function LavagnaCanvas({
     fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' })
       .then(res => {
         if (res.ok) {
-          console.log("[handleClear] API call per pulire la lavagna riuscita");
           // Cancella localmente solo dopo successo API
           setTratti([]);
           setUndoStack([]);
@@ -644,37 +627,16 @@ export default function LavagnaCanvas({
 
   // == RENDER ==
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-none p-4 bg-gray-100 border-b">
-        <div className="flex items-center space-x-4">
-          <select value={strumento} onChange={(e) => setStrumento(e.target.value)} className="p-2 border rounded">
-            <option value="penna">Penna</option>
-            <option value="gomma">Gomma</option>
-          </select>
-          <input type="color" value={colore} onChange={(e) => setColore(e.target.value)} className="w-10 h-10 p-0 border rounded" />
-          <input type="range" min="1" max="10" value={spessore} onChange={(e) => setSpessore(e.target.value)} className="w-32" />
-          <button onClick={undo} disabled={!undoStack.length} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Undo</button>
-          <button onClick={redo} disabled={!redoStack.length} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Redo</button>
-          <button onClick={exportPNG} className="px-4 py-2 bg-blue-500 text-white rounded">Export PNG</button>
-          {openInNewWindow && (
-            <button
-              onClick={() => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")}
-              className="px-4 py-2 bg-green-500 text-white rounded"
-            >
-              Apri in un'altra finestra
-            </button>
-          )}
-          <button onClick={handlePulisciLavagna} className="px-4 py-2 bg-red-500 text-white rounded">Pulisci lavagna</button>
-        </div>
-      </div>
-      <div className="flex-grow relative" style={{ touchAction: 'none' }}>
+    <div style={st.wrapper}>
+      {toolbar}
+      <div style={st.canvasBox}>
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
           onPointerMove={pointerMove}
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
-          className="absolute top-0 left-0 w-full h-full bg-white"
+          style={{...st.canvas, cursor: strumento === 'gomma' && !gommaPuntuale ? 'not-allowed' : 'crosshair'}}
         />
       </div>
     </div>
