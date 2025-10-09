@@ -565,15 +565,15 @@ export default function LavagnaCanvas({
   const handlePulisciLavagna = useCallback(() => {
     if (!isAdmin) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
-    // Cancella localmente
+    // Cancella localmente subito (ottimistic UI)
     setTratti([]);
     setUndoStack([]);
     setRedoStack([]);
-    // Notifica tutti i client
+    // Persist: soft delete tutti i tratti lato server
+    fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' }).catch(() => {});
+    // Notifica realtime
     emitOrPublish("clear-lavagna", { lavagnaId, attivitaId });
-    // (Opzionale) DELETE lato server dei tratti persistiti
-    // fetch(`/api/lavagna/tratti?lavagnaId=${lavagnaId}`, { method: "DELETE" });
-  }, [isAdmin, lavagnaId, attivitaId]);
+  }, [isAdmin, lavagnaId, attivitaId, emitOrPublish]);
 
   // == TOOLBAR ==
   const toolbar = useMemo(
