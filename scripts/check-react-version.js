@@ -9,12 +9,14 @@ const ROOT = process.cwd();
 const BUILD_DIR = path.join(ROOT, '.next');
 const ENFORCE = process.env.ENFORCE_REACT18 === '1';
 
-// Patterns that would indicate a React 19 (stable or canary) bundle slipped in.
+// We limit detection to stronger signatures to avoid generic matches of other libs with 19.x versions.
+// The previous broad /19.x/ pattern caused many false positives in package.json files.
 const BLOCK_PATTERNS = [
-  /19\.\d+\.\d+(-canary[-\w]*)?/i,           // any 19.x.x or 19.x.x-canary
-  /react-dom@19/i,
-  /react@19/i,
-  /19\.2\.0-canary/i,                          // specifically the canary you pasted
+  /19\.2\.0-canary[-\w]*/i,          // exact canary family you pasted
+  /react-dom@19\b/i,                  // explicit react-dom 19 reference
+  /react@19\b/i,                      // explicit react 19 reference
+  /react-dom\\?\.production\\?\.min\\?\.js[^\n]*19\.\d+\.\d+/i, // react-dom production bundle containing 19.x marker
+  /"version"\s*:\s*"19\.[0-9]+\.[0-9]+(-canary[^"]*)?"\s*,?\s*\n(?=.*"name"\s*:\s*"react(-dom)?")/i // react or react-dom package.json declaring 19
 ];
 
 function scanFiles(dir) {
@@ -32,19 +34,21 @@ function scanFiles(dir) {
         if (ent.name === 'cache') continue;
         stack.push(full);
       } else if (ent.isFile()) {
-        // Only inspect reasonably small text-like assets
-        if (/\.(js|mjs|cjs|txt|json)$/.test(ent.name)) {
-          const size = fs.statSync(full).size;
-          if (size > 2_000_000) continue; // skip huge chunks to keep it fast
-          try {
-            const content = fs.readFileSync(full, 'utf8');
-            for (const pat of BLOCK_PATTERNS) {
-              if (pat.test(content)) {
-                results.push({ file: full, pattern: pat.toString() });
-                break; // avoid duplicate entries for same file
-              }
-            }
-          } catch { /* ignore read errors */ }
+        // Only inspect relevant artifact file types
+        if (!/\.(js|mjs|cjs|json)$/.test(ent.name)) continue;
+        // Ignore package.json for unrelated packages unless it's react or react-dom.
+        if (ent.name === 'package.json' && !/react(-dom)?/.test(current)) continue;
+        const size = fs.statSync(full).size;
+        if (size > 2_000_000) continue; // skip huge files for speed
+        let content;
+        try { content = fs.readFileSync(full, 'utf8'); } catch { continue; }
+        // Quick prefilter: look for 'react' or the exact canary snippet to avoid scanning arbitrary files.
+        if (!/react|19\.2\.0-canary/i.test(content)) continue;
+        for (const pat of BLOCK_PATTERNS) {
+          if (pat.test(content)) {
+            results.push({ file: full, pattern: pat.toString() });
+            break;
+          }
         }
       }
     }

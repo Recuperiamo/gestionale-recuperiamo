@@ -2,6 +2,7 @@
 import "../styles/globals.css";
 import React from "react";
 import { SessionProvider } from "next-auth/react";
+import DebugClientRuntime from "./components/debug/DebugClientRuntime";
 
 
 export default function RootLayout({ children }) {
@@ -9,6 +10,7 @@ export default function RootLayout({ children }) {
     <html lang="it">
       <body>
         <SessionProvider>
+          <DebugClientRuntime />
           {children}
         </SessionProvider>
       </body>
