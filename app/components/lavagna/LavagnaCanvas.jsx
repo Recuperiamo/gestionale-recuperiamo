@@ -350,47 +350,64 @@ export default function LavagnaCanvas({
   // == POINTER EVENTS ==
   function pointerDown(e) {
     console.log("[pointerDown] Evento scatenato.");
-    setIsDrawing(true);
-    const point = getPoint(e);
-    const newPath = [[point.x, point.y, e.pressure]];
+    setDisegnando(true);
+    const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+    setPuntiCorrenti([punto]);
     
-    setHistory(prev => [...prev.slice(0, currentPathIndex + 1), newPath]);
-    setCurrentPathIndex(prev => prev + 1);
+    const streamId = `${utenteId}-${Date.now()}`;
+    currentStreamId.current = streamId;
 
     emitOrPublish('stroke:start', {
-      lavagnaId,
-      path: newPath,
-      color,
-      strokeWidth,
-      tool,
+      streamId,
+      strumento,
+      colore,
+      spessore,
+      start: punto,
     });
   }
 
   function pointerMove(e) {
-    if (!isDrawing) return;
+    if (!disegnando) return;
     console.log("[pointerMove] Evento scatenato.");
-    const point = getPoint(e);
-    const currentPath = history[currentPathIndex];
-    if (currentPath) {
-      const updatedPath = [...currentPath, [point.x, point.y, e.pressure]];
-      const newHistory = [...history];
-      newHistory[currentPathIndex] = updatedPath;
-      setHistory(newHistory);
+    
+    const now = Date.now();
+    if (now - throttler.current.last < 30) return; // Limita a ~30fps
+    throttler.current.last = now;
 
-      emitOrPublish('stroke:points', {
-        lavagnaId,
-        points: [point.x, point.y, e.pressure],
-        pathIndex: currentPathIndex,
-      });
-    }
+    const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+    setPuntiCorrenti(prev => [...prev, punto]);
+
+    emitOrPublish('stroke:points', {
+      streamId: currentStreamId.current,
+      points: [punto],
+    });
   }
 
   function pointerUp() {
     console.log("[pointerUp] Evento scatenato.");
-    if (isDrawing) {
-      setIsDrawing(false);
-      emitOrPublish('stroke:done', { lavagnaId, pathIndex: currentPathIndex });
+    if (!disegnando) return;
+    setDisegnando(false);
+    
+    if (puntiCorrenti.length >= 2) {
+      const nuovoTratto = prepareStroke({
+        id: `local-${Date.now()}`,
+        strumento,
+        colore,
+        spessore,
+        punti: puntiCorrenti,
+        autoreUserId: utenteId,
+      });
+      setTratti(prev => [...prev, nuovoTratto]);
+      setUndoStack(prev => [...prev, { type: 'add', stroke: nuovoTratto }]);
+      setRedoStack([]);
+      salvaTratto(nuovoTratto);
     }
+
+    emitOrPublish('stroke:done', { streamId: currentStreamId.current });
+    
+    setPuntiCorrenti([]);
+    currentStreamId.current = null;
+    eraseSessionRef.current.ids.clear();
   }
 
   // == SALVATAGGIO STROKE ==
@@ -491,16 +508,32 @@ export default function LavagnaCanvas({
 
   // == PULISCI LAVAGNA (solo admin) ==
   const handlePulisciLavagna = useCallback(() => {
+    console.log("[handleClear] Funzione chiamata");
     if (!isAdmin) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
-    // Cancella localmente subito (ottimistic UI)
-    setTratti([]);
-    setUndoStack([]);
-    setRedoStack([]);
-    // Persist: soft delete tutti i tratti lato server
-    fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' }).catch(() => {});
+    
     // Notifica realtime
-    emitOrPublish("clear-lavagna", { lavagnaId, attivitaId });
+    if (ablyRef.current.ch) {
+      console.log("[handleClear] Tentativo di pubblicare 'clear-lavagna'");
+      emitOrPublish("clear-lavagna", { lavagnaId, attivitaId });
+    }
+
+    // Persist: soft delete tutti i tratti lato server
+    fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' })
+      .then(res => {
+        if (res.ok) {
+          console.log("[handleClear] API call per pulire la lavagna riuscita");
+          // Cancella localmente solo dopo successo API
+          setTratti([]);
+          setUndoStack([]);
+          setRedoStack([]);
+        } else {
+          console.error("[handleClear] Errore API nel pulire la lavagna:", res.statusText);
+        }
+      })
+      .catch(error => {
+        console.error("[handleClear] Eccezione nella chiamata API per pulire la lavagna:", error);
+      });
   }, [isAdmin, lavagnaId, attivitaId, emitOrPublish]);
 
   // == TOOLBAR ==
@@ -619,16 +652,16 @@ export default function LavagnaCanvas({
     <div className="flex flex-col h-full">
       <div className="flex-none p-4 bg-gray-100 border-b">
         <div className="flex items-center space-x-4">
-          <select value={tool} onChange={(e) => setTool(e.target.value)} className="p-2 border rounded">
+          <select value={strumento} onChange={(e) => setStrumento(e.target.value)} className="p-2 border rounded">
             <option value="penna">Penna</option>
             <option value="gomma">Gomma</option>
           </select>
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-10 h-10 p-0 border rounded" />
-          <input type="range" min="1" max="10" value={strokeWidth} onChange={(e) => setStrokeWidth(e.target.value)} className="w-32" />
-          <button onClick={handleUndo} disabled={currentPathIndex < 0} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Undo</button>
-          <button onClick={handleRedo} disabled={currentPathIndex >= history.length - 1} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Redo</button>
-          <button onClick={exportToPNG} className="px-4 py-2 bg-blue-500 text-white rounded">Export PNG</button>
-          <button onClick={handleClear} className="px-4 py-2 bg-red-500 text-white rounded">Pulisci lavagna</button>
+          <input type="color" value={colore} onChange={(e) => setColore(e.target.value)} className="w-10 h-10 p-0 border rounded" />
+          <input type="range" min="1" max="10" value={spessore} onChange={(e) => setSpessore(e.target.value)} className="w-32" />
+          <button onClick={undo} disabled={!undoStack.length} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Undo</button>
+          <button onClick={redo} disabled={!redoStack.length} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Redo</button>
+          <button onClick={exportPNG} className="px-4 py-2 bg-blue-500 text-white rounded">Export PNG</button>
+          <button onClick={handlePulisciLavagna} className="px-4 py-2 bg-red-500 text-white rounded">Pulisci lavagna</button>
         </div>
       </div>
       <div className="flex-grow relative" style={{ touchAction: 'none' }}>
