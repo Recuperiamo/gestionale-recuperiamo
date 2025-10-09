@@ -59,6 +59,47 @@ export default function LavagnaCanvas({
   const currentStreamId = useRef(null);
   const throttler = useRef({ last: 0 });
 
+  // Disegno completo astratto (spostato prima dell'useEffect realtime per evitare TDZ minificata)
+  const drawAll = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    // Tratti persistiti
+    tratti.forEach((t) => {
+      if (!t.punti || t.punti.length < 2) return;
+      ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = t.strumento === 'gomma' ? '#fff' : t.colore || '#20489a';
+      ctx.lineWidth = t.spessore || 3;
+      ctx.beginPath();
+      t.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    });
+
+    // Stream remoti in corso
+    for (const st of remoteStreams.current.values()) {
+      if (!st.punti || st.punti.length < 2) continue;
+      ctx.globalCompositeOperation = st.strumento === 'gomma' ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = st.strumento === 'gomma' ? '#fff' : st.colore || '#20489a';
+      ctx.lineWidth = st.spessore || 3;
+      ctx.beginPath();
+      st.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    }
+
+    // Tratto locale in corso
+    if (puntiCorrenti.length >= 2) {
+      ctx.globalCompositeOperation = (strumento === 'gomma' && gommaPuntuale) ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = strumento === 'gomma' ? '#fff' : colore;
+      ctx.lineWidth = spessore;
+      ctx.beginPath();
+      puntiCorrenti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+  }, [tratti, puntiCorrenti, strumento, gommaPuntuale, colore, spessore]);
+
   // === SOCKET.IO SETUP ===
   // Replace with Ably-first setup, fallback to Socket.IO
   useEffect(() => {
@@ -285,61 +326,7 @@ export default function LavagnaCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tratti, altezza]);
 
-  const drawAll = useCallback(() => {
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    // Disegni già persistiti
-    tratti.forEach((t) => {
-      if (!t.punti || t.punti.length < 2) return;
-      ctx.globalCompositeOperation =
-        t.strumento === "gomma" ? "destination-out" : "source-over";
-      ctx.strokeStyle =
-        t.strumento === "gomma" ? "#fff" : t.colore || "#20489a";
-      ctx.lineWidth = t.spessore || 3;
-      ctx.beginPath();
-      t.punti.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.stroke();
-    });
-
-    // Stream remoti in corso
-    for (const st of remoteStreams.current.values()) {
-      if (!st.punti || st.punti.length < 2) continue;
-      ctx.globalCompositeOperation =
-        st.strumento === "gomma" ? "destination-out" : "source-over";
-      ctx.strokeStyle =
-        st.strumento === "gomma" ? "#fff" : st.colore || "#20489a";
-      ctx.lineWidth = st.spessore || 3;
-      ctx.beginPath();
-      st.punti.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.stroke();
-    }
-
-    // Disegno locale in corso (non ancora persistito)
-    if (puntiCorrenti.length >= 2) {
-      ctx.globalCompositeOperation =
-        strumento === "gomma" && gommaPuntuale
-          ? "destination-out"
-          : "source-over";
-      ctx.strokeStyle = strumento === "gomma" ? "#fff" : colore;
-      ctx.lineWidth = spessore;
-      ctx.beginPath();
-      puntiCorrenti.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.stroke();
-    }
-
-    ctx.globalCompositeOperation = "source-over";
-  }, [tratti, puntiCorrenti, strumento, gommaPuntuale, colore, spessore]);
+  // drawAll spostata sopra
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
