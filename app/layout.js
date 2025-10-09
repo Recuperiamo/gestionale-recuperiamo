@@ -1,18 +1,18 @@
-"use client";
 import "../styles/globals.css";
 import React from "react";
-import { SessionProvider } from "next-auth/react";
-import DebugClientRuntime from "./components/debug/DebugClientRuntime";
+import { Providers } from "./providers";
 
+export const metadata = {
+  title: 'Recuperiamo',
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="it">
       <body>
-        <SessionProvider>
-          <DebugClientRuntime />
+        <Providers>
           {children}
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );
