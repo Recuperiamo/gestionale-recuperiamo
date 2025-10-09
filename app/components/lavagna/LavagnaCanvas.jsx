@@ -7,6 +7,7 @@ import React, {
   useMemo
 } from "react";
 import { getAblyChannel, whenChannelAttached } from "../../lib/realtime/ablyClient";
+import { jsPDF } from "jspdf";
 
 /**
  * LavagnaCanvas – LIVE con Socket.IO su /api/socketio
@@ -50,6 +51,10 @@ export default function LavagnaCanvas({
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
+  const [showTools, setShowTools] = useState(true);
+  const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
+  const [zoom, setZoom] = useState(1); // 1 = 100%
+  const palette = ["#20489a", "#000000", "#ff0000", "#1cb0f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444"]; 
 
   const isAdmin = String(ruolo || "").toLowerCase() === "admin";
   const eraseSessionRef = useRef({
@@ -63,7 +68,57 @@ export default function LavagnaCanvas({
   const drawAll = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
+    // pulisci
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+    // sfondo
+    const W = ctx.canvas.width / (window.devicePixelRatio || 1);
+    const H = ctx.canvas.height / (window.devicePixelRatio || 1);
+    // fill base
+    if (sfondo === 'nero') {
+      ctx.fillStyle = '#000';
+    } else {
+      ctx.fillStyle = '#fff';
+    }
+    ctx.fillRect(0, 0, W, H);
+
+    // pattern righe / quadretti / punti
+    if (sfondo === 'righe' || sfondo === 'quadretti' || sfondo === 'punti') {
+      const step = 32; // px
+      ctx.strokeStyle = sfondo === 'righe' ? '#e5e7eb' : '#e2e8f0';
+      ctx.fillStyle = '#e5e7eb';
+      ctx.lineWidth = 1;
+      if (sfondo === 'righe' || sfondo === 'quadretti') {
+        for (let y = step; y < H; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(W, y);
+          ctx.stroke();
+        }
+      }
+      if (sfondo === 'quadretti') {
+        for (let x = step; x < W; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, H);
+          ctx.stroke();
+        }
+      }
+      if (sfondo === 'punti') {
+        for (let y = step; y < H; y += step) {
+          for (let x = step; x < W; x += step) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    // applichiamo lo zoom per lo strato di disegno
+    ctx.save();
+    ctx.scale(zoom, zoom);
 
     // Tratti persistiti
     tratti.forEach((t) => {
@@ -98,8 +153,9 @@ export default function LavagnaCanvas({
       ctx.stroke();
     }
 
+    ctx.restore();
     ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, strumento, gommaPuntuale, colore, spessore]);
+  }, [tratti, strumento, gommaPuntuale, colore, spessore, sfondo, zoom]);
 
   // Loop di rendering per il disegno locale
   const renderLoop = useCallback(() => {
@@ -111,21 +167,58 @@ export default function LavagnaCanvas({
   const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
   const currentStreamId = useRef(null);
   const throttler = useRef({ last: 0 });
+  // buffer per pubblicare punti in batch (meno segmentazione remota)
+  const outgoingBufferRef = useRef([]);
+  const outgoingRAFRef = useRef(null);
 
-  // Setup Ably
+  // Setup Ably helpers and subscriptions
+  const channelName = useMemo(
+    () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
+    [attivitaId, lavagnaId]
+  );
+
+  const emitOrPublish = useCallback(
+    (name, data) => {
+      const ch = ablyRef.current.ch;
+      if (!ch) return;
+      whenChannelAttached(channelName)
+        .then(() => ch.publish(name, data))
+        .catch(() => {});
+    },
+    [channelName]
+  );
+
+  const flushOutgoing = useCallback(() => {
+    if (!currentStreamId.current) {
+      outgoingRAFRef.current = null;
+      outgoingBufferRef.current = [];
+      return;
+    }
+    const batch = outgoingBufferRef.current;
+    if (batch.length) {
+      emitOrPublish('stroke:points', {
+        streamId: currentStreamId.current,
+        points: batch.slice()
+      });
+      outgoingBufferRef.current = [];
+    }
+    // Continua finché si disegna
+    if (disegnando) {
+      outgoingRAFRef.current = requestAnimationFrame(flushOutgoing);
+    } else {
+      outgoingRAFRef.current = null;
+    }
+  }, [emitOrPublish, disegnando]);
+
   useEffect(() => {
-    if (!attivitaId) return;
-
-    const channelName = `lavagna:${attivitaId}`;
-    const ablyCh = getAblyChannel(channelName);
-    ablyRef.current.ch = ablyCh;
-    
-    whenChannelAttached(channelName).catch(err => {
+    const ch = getAblyChannel(channelName);
+    ablyRef.current.ch = ch;
+    whenChannelAttached(channelName).catch((err) => {
       console.warn('[LavagnaCanvas] channel attach failed', err?.message);
     });
 
     const onStart = (msg) => {
-      const { data } = msg;
+      const { data } = msg || {};
       const { streamId, strumento, colore, spessore, start } = data || {};
       if (!streamId || !start) return;
       remoteStreams.current.set(streamId, {
@@ -138,7 +231,7 @@ export default function LavagnaCanvas({
     };
 
     const onPoints = (msg) => {
-      const { data } = msg;
+      const { data } = msg || {};
       const { streamId, points } = data || {};
       if (!streamId || !Array.isArray(points) || points.length === 0) return;
       const st = remoteStreams.current.get(streamId);
@@ -148,17 +241,17 @@ export default function LavagnaCanvas({
     };
 
     const onDone = (msg) => {
-      const { data } = msg;
+      const { data } = msg || {};
       const { streamId } = data || {};
       const st = remoteStreams.current.get(streamId);
       if (st && st.punti.length >= 2) {
         const definitivo = prepareStroke({
-          id: streamId, // Usa l'ID dello stream per coerenza
+          id: streamId,
           strumento: st.strumento,
           colore: st.colore,
           spessore: st.spessore,
           punti: st.punti,
-          autoreUserId: "remote"
+          autoreUserId: 'remote'
         });
         setTratti((prev) => [...prev, definitivo]);
       }
@@ -167,7 +260,7 @@ export default function LavagnaCanvas({
     };
 
     const onDelete = (msg) => {
-      const { data } = msg;
+      const { data } = msg || {};
       const { strokeId } = data || {};
       if (!strokeId) return;
       setTratti((prev) => prev.filter((t) => String(t.id) !== String(strokeId)));
@@ -178,51 +271,33 @@ export default function LavagnaCanvas({
       setTratti([]);
       setUndoStack([]);
       setRedoStack([]);
-      remoteStreams.current.clear();
       drawAll();
     };
 
-    ablyCh.subscribe("stroke:start", onStart);
-    ablyCh.subscribe("stroke:points", onPoints);
-    ablyCh.subscribe("stroke:done", onDone);
-    ablyCh.subscribe("stroke:delete", onDelete);
-    ablyCh.subscribe("clear-lavagna", onClear);
+    ch.subscribe('stroke:start', onStart);
+    ch.subscribe('stroke:points', onPoints);
+    ch.subscribe('stroke:done', onDone);
+    ch.subscribe('stroke:delete', onDelete);
+    ch.subscribe('clear-lavagna', onClear);
 
     return () => {
       try {
-        ablyCh.unsubscribe();
-        ablyCh.detach?.();
-      } catch {}
+        ch.unsubscribe('stroke:start', onStart);
+        ch.unsubscribe('stroke:points', onPoints);
+        ch.unsubscribe('stroke:done', onDone);
+        ch.unsubscribe('stroke:delete', onDelete);
+        ch.unsubscribe('clear-lavagna', onClear);
+      } catch (_) {}
     };
-  }, [attivitaId, drawAll]);
-
-  // Helper per inviare eventi realtime (semplice: aspetta attach e invia)
-  const emitOrPublish = useCallback((eventName, payload) => {
-    const ch = ablyRef.current.ch;
-    if (!ch) return;
-
-    const doPublish = () => {
-      ch.publish(eventName, payload);
-    };
-
-    if (ch.state !== 'attached') {
-      whenChannelAttached(ch.name)
-        .then(doPublish)
-        .catch(err => {
-          console.error(`[publish drop ${eventName}] attach failed:`, err);
-        });
-    } else {
-      doPublish();
-    }
-  }, [lavagnaId]);
+  }, [channelName, drawAll]);
 
   // == UTILITIES ==
   function prepareStroke(s) {
     if (!s || !Array.isArray(s.punti)) return s;
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
     for (const p of s.punti) {
       if (p.x < minX) minX = p.x;
       if (p.y < minY) minY = p.y;
@@ -281,6 +356,13 @@ export default function LavagnaCanvas({
     return false;
   }
 
+  // Coordinate helper considerando lo zoom
+  const getPoint = useCallback((e) => {
+    const x = e.nativeEvent.offsetX / zoom;
+    const y = e.nativeEvent.offsetY / zoom;
+    return { x, y };
+  }, [zoom]);
+
   // == RESIZE & REDRAW ==
   useEffect(() => {
     function resize() {
@@ -336,7 +418,7 @@ export default function LavagnaCanvas({
   // == POINTER EVENTS ==
   function pointerDown(e) {
     setDisegnando(true);
-    const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+    const punto = getPoint(e);
 
     if (strumento === 'gomma' && !gommaPuntuale) {
       eraseStrokeAt(punto.x, punto.y);
@@ -360,8 +442,7 @@ export default function LavagnaCanvas({
 
   function pointerMove(e) {
     if (!disegnando) return;
-    
-    const punto = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+    const punto = getPoint(e);
 
     if (strumento === 'gomma' && !gommaPuntuale) {
       eraseStrokeAt(punto.x, punto.y);
@@ -369,15 +450,10 @@ export default function LavagnaCanvas({
     }
     
     puntiCorrentiRef.current.push(punto);
-
-    const now = Date.now();
-    if (now - throttler.current.last < 30) return; // Limita a ~30fps
-    throttler.current.last = now;
-
-    emitOrPublish('stroke:points', {
-      streamId: currentStreamId.current,
-      points: [punto],
-    });
+    outgoingBufferRef.current.push(punto);
+    if (!outgoingRAFRef.current) {
+      outgoingRAFRef.current = requestAnimationFrame(flushOutgoing);
+    }
   }
 
   function pointerUp() {
@@ -385,10 +461,22 @@ export default function LavagnaCanvas({
       cancelAnimationFrame(animationFrameId.current);
       animationFrameId.current = null;
     }
+    if (outgoingRAFRef.current) {
+      cancelAnimationFrame(outgoingRAFRef.current);
+      outgoingRAFRef.current = null;
+    }
     if (!disegnando) return;
     setDisegnando(false);
+    // Flush finale di eventuali punti in buffer
+    if (outgoingBufferRef.current.length) {
+      emitOrPublish('stroke:points', {
+        streamId: currentStreamId.current,
+        points: outgoingBufferRef.current,
+      });
+      outgoingBufferRef.current = [];
+    }
     
-    const puntiFinali = puntiCorrentiRef.current;
+  const puntiFinali = puntiCorrentiRef.current;
     if (strumento !== 'gomma' && puntiFinali.length >= 2) {
       const nuovoTratto = prepareStroke({
         id: currentStreamId.current, // Usa l'ID dello stream per coerenza
@@ -510,6 +598,23 @@ export default function LavagnaCanvas({
     a.click();
   }
 
+  function exportPDF() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const img = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    // Fit image preserving aspect
+    const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
+    const w = canvas.width * ratio;
+    const h = canvas.height * ratio;
+    const x = (pageW - w) / 2;
+    const y = (pageH - h) / 2;
+    pdf.addImage(img, 'PNG', x, y, w, h);
+    pdf.save(`lavagna-${lavagnaId}.pdf`);
+  }
+
   // == PULISCI LAVAGNA (solo admin) ==
   const handlePulisciLavagna = useCallback(() => {
     if (!isAdmin) return;
@@ -538,9 +643,10 @@ export default function LavagnaCanvas({
   }, [isAdmin, lavagnaId, attivitaId, emitOrPublish]);
 
   // == TOOLBAR ==
+  // Toolbar in basso al centro
   const toolbar = useMemo(
     () => (
-      <div style={st.toolbar}>
+      <div style={st.bottomToolbar}>
         <div style={st.group}>
           <button
             style={btn(strumento === "penna")}
@@ -566,13 +672,19 @@ export default function LavagnaCanvas({
               <span style={st.toggleLbl}>Gomma puntuale</span>
             </label>
           )}
-          <input
-            type="color"
-            disabled={strumento === "gomma"}
-            value={colore}
-            onChange={(e) => setColore(e.target.value)}
-            style={st.color}
-          />
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {palette.map((c) => (
+              <button key={c} onClick={() => setColore(c)} type="button" title={c}
+                style={{ width:22, height:22, borderRadius:6, border: c===colore? '2px solid #20489a':'1px solid #dbe6f5', background:c, cursor:'pointer' }} />
+            ))}
+            <input
+              type="color"
+              disabled={strumento === "gomma"}
+              value={colore}
+              onChange={(e) => setColore(e.target.value)}
+              style={st.color}
+            />
+          </div>
           <input
             type="range"
             min={1}
@@ -581,55 +693,19 @@ export default function LavagnaCanvas({
             onChange={(e) => setSpessore(Number(e.target.value))}
           />
           <span style={st.sizeLabel}>{spessore}px</span>
-        </div>
-        <div style={st.group}>
-          <button
-            style={btn(false)}
-            onClick={undo}
-            disabled={!undoStack.length}
-            type="button"
-          >
-            Undo
-          </button>
-          <button
-            style={btn(false)}
-            onClick={redo}
-            disabled={!redoStack.length}
-            type="button"
-          >
-            Redo
-          </button>
-          <button style={btn(false)} onClick={exportPNG} type="button">
-            Export PNG
-          </button>
-          {openInNewWindow && attivitaId && (
-            <button
-              style={btn(false)}
-              onClick={() =>
-                window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")
-              }
-              type="button"
-            >
-              Apri in un'altra finestra
-            </button>
-          )}
-        </div>
-        {isAdmin && (
-          <div style={st.group}>
-            <button
-              style={{
-                ...btn(false),
-                background: "#ff6464",
-                color: "#fff",
-                fontWeight: 700
-              }}
-              onClick={handlePulisciLavagna}
-              type="button"
-            >
-              🧹 Pulisci lavagna
-            </button>
+          <select value={sfondo} onChange={(e)=>setSfondo(e.target.value)} style={{ padding:'6px 8px', borderRadius:8 }}>
+            <option value="bianco">Bianco</option>
+            <option value="nero">Nero</option>
+            <option value="righe">Righe</option>
+            <option value="quadretti">Quadretti</option>
+            <option value="punti">Punti</option>
+          </select>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ fontSize:12, color:'#20489a', fontWeight:600 }}>Zoom</span>
+            <input type="range" min={50} max={200} value={Math.round(zoom*100)} onChange={(e)=>setZoom(Number(e.target.value)/100)} />
+            <span style={st.sizeLabel}>{Math.round(zoom*100)}%</span>
           </div>
-        )}
+        </div>
         {salvando && <span style={st.saving}>Salvataggio…</span>}
       </div>
     ),
@@ -641,18 +717,23 @@ export default function LavagnaCanvas({
       redoStack.length,
       salvando,
       gommaPuntuale,
-      openInNewWindow,
-      attivitaId,
-      isAdmin,
-      handlePulisciLavagna
+      sfondo,
+      zoom
     ]
   );
 
   // == RENDER ==
   return (
     <div style={st.wrapper}>
-      {toolbar}
       <div style={st.canvasBox}>
+        {toolbar}
+        {/* Azioni in alto a destra per entrambi gli user */}
+        <div style={st.topRightActions}>
+          <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
+          <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
+          <button style={btn(false)} onClick={exportPNG} type="button">Export PNG</button>
+          <button style={btn(false)} onClick={exportPDF} type="button">Export PDF</button>
+        </div>
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
@@ -674,12 +755,38 @@ export default function LavagnaCanvas({
 // == STYLES ==
 const st = {
   wrapper: { width: "100%", userSelect: "none" },
-  toolbar: {
+  bottomToolbar: {
+    position: "absolute",
+    left: "50%",
+    bottom: 18,
+    transform: "translateX(-50%)",
     display: "flex",
-    flexWrap: "wrap",
-    gap: 12,
+    gap: 8,
     alignItems: "center",
-    marginBottom: 12
+    background: "rgba(248,251,255,0.95)",
+    padding: "8px 10px",
+    borderRadius: 12,
+    border: "1px solid #dbe6f5",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
+    zIndex: 2
+  },
+  toolbarToggle: {
+    border: "none",
+    background: "#e3eefe",
+    color: "#20489a",
+    borderRadius: 8,
+    fontWeight: 700,
+    width: 32,
+    height: 32,
+    cursor: "pointer"
+  },
+  topRightActions: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    display: "flex",
+    gap: 8,
+    zIndex: 2
   },
   group: {
     display: "flex",
