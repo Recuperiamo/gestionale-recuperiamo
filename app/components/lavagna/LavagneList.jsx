@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { getAblyChannel } from "@/app/lib/realtime/ablyClient";
+import { getAblyChannel } from "../../lib/realtime/ablyClient";
 
 export default function LavagneList({ clienteId, onSelect, sessionUser }) {
   const [lavagne, setLavagne] = useState([]);
