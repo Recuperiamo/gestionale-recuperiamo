@@ -7,14 +7,15 @@ export async function DELETE(_req, { params }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-
-    const id = Number(params.id);
-    if (isNaN(id)) return NextResponse.json({ error: "ID non valido" }, { status: 400 });
+    const rawId = params.id;
+    const numericId = Number(rawId);
+    const whereClause = Number.isNaN(numericId) ? { streamId: rawId } : { id: numericId };
 
     const tratto = await prisma.lavagnaTratto.findUnique({
-      where: { id },
+      where: whereClause,
       select: {
         id: true,
+        streamId: true,
         autoreUserId: true,
         lavagna: {
           select: {
@@ -26,19 +27,19 @@ export async function DELETE(_req, { params }) {
     if (!tratto) return NextResponse.json({ error: "Tratto non trovato" }, { status: 404 });
 
     const isAdmin = ["admin", "operatore"].includes(session.user.role);
-    const isAutore = session.user.id === tratto.autoreUserId;
-    const sameCliente = session.user.clienteId === tratto.lavagna.attivita.clienteId;
+    const isAutore = String(session.user.id) === String(tratto.autoreUserId);
+    const sameCliente = String(session.user.clienteId) === String(tratto.lavagna.attivita.clienteId);
 
     if (session.user.role === "cliente" && (!sameCliente || !isAutore)) {
       return NextResponse.json({ error: "Puoi cancellare solo i tuoi tratti" }, { status: 403 });
     }
 
     await prisma.lavagnaTratto.update({
-      where: { id },
+      where: { id: tratto.id },
       data: { deletedAt: new Date() }
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, id: tratto.id, streamId: tratto.streamId });
   } catch (e) {
     console.error("DELETE /api/lavagna/tratto/:id error", e);
     return NextResponse.json({ error: e.message }, { status: 500 });

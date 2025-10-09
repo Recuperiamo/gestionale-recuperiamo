@@ -216,6 +216,7 @@ model Lavagna {
 
 model LavagnaTratto {
   id           Int       @id @default(autoincrement())
+  streamId     String?   @unique
   lavagnaId    Int
   autoreUserId Int
   strumento    String // "penna" | "gomma" (possibile estensione)

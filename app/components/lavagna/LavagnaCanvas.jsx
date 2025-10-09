@@ -36,7 +36,13 @@ export default function LavagnaCanvas({
   const [colore, setColore] = useState("#20489a");
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
-    (trattiIniziali || []).map(prepareStroke)
+    (trattiIniziali || []).map((s) =>
+      prepareStroke({
+        ...s,
+        dbId: s.id,
+        id: s.streamId || s.id,
+      })
+    )
   );
   const [disegnando, setDisegnando] = useState(false);
   const puntiCorrentiRef = useRef([]);
@@ -147,7 +153,7 @@ export default function LavagnaCanvas({
       const st = remoteStreams.current.get(streamId);
       if (st && st.punti.length >= 2) {
         const definitivo = prepareStroke({
-          id: `remote-${Date.now()}`,
+          id: streamId, // Usa l'ID dello stream per coerenza
           strumento: st.strumento,
           colore: st.colore,
           spessore: st.spessore,
@@ -314,13 +320,12 @@ export default function LavagnaCanvas({
           setUndoStack((prev) => [...prev, { type: "delete", stroke: st }]);
           setRedoStack([]);
           
-          // Pubblica sempre la cancellazione
+          // Pubblica sempre la cancellazione (usa streamId)
           emitOrPublish("stroke:delete", { attivitaId, strokeId: st.id });
 
-          // Se l'ID è numerico, è un tratto salvato, quindi chiamiamo anche l'API
-          if (typeof st.id === "number") {
-            fetch(`/api/lavagna/tratto/${st.id}`, { method: "DELETE" }).catch(() => {});
-          }
+          // Cancella lato server: preferisci dbId se presente, altrimenti streamId
+          const delId = st.dbId ?? st.id;
+          fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
         }
       }
       drawAll();
@@ -386,7 +391,7 @@ export default function LavagnaCanvas({
     const puntiFinali = puntiCorrentiRef.current;
     if (strumento !== 'gomma' && puntiFinali.length >= 2) {
       const nuovoTratto = prepareStroke({
-        id: `local-${Date.now()}`,
+        id: currentStreamId.current, // Usa l'ID dello stream per coerenza
         strumento,
         colore,
         spessore,
@@ -419,6 +424,7 @@ export default function LavagnaCanvas({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: t.id, // Invia l'ID univoco
           lavagnaId,
           strumento: t.strumento,
           colore: t.colore,
@@ -428,7 +434,11 @@ export default function LavagnaCanvas({
       });
       const js = await res.json();
       if (res.ok) {
-        const definitivo = prepareStroke(js.tratto);
+        const definitivo = prepareStroke({
+          ...js.tratto,
+          dbId: js.tratto.id,
+          id: t.id, // mantieni lo streamId come id locale coerente
+        });
         setTratti((prev) =>
           prev.map((s) => (s.id === t.id ? definitivo : s))
         );
@@ -458,13 +468,11 @@ export default function LavagnaCanvas({
     setRedoStack((r) => [last, ...r]);
 
     if (last.type === "add") {
-      const sid = last.stroke.id;
+      const sid = last.stroke.id; // streamId
       setTratti((prev) => prev.filter((s) => s.id !== sid));
-      if (
-        typeof sid === "number" &&
-        (isAdmin || last.stroke.autoreUserId === utenteId)
-      ) {
-        fetch(`/api/lavagna/tratto/${sid}`, { method: "DELETE" }).catch(() => {});
+      const delId = last.stroke.dbId ?? sid;
+      if (isAdmin || last.stroke.autoreUserId === utenteId) {
+        fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
         emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
       }
     } else if (last.type === "delete") {
@@ -482,12 +490,11 @@ export default function LavagnaCanvas({
     if (action.type === "add") {
       setTratti((prev) => [...prev, action.stroke]);
     } else if (action.type === "delete") {
-      const sid = action.stroke.id;
+      const sid = action.stroke.id; // streamId
       setTratti((prev) => prev.filter((s) => s.id !== sid));
-      if (typeof sid === "number") {
-        fetch(`/api/lavagna/tratto/${sid}`, { method: "DELETE" }).catch(() => {});
-        emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
-      }
+      const delId = action.stroke.dbId ?? sid;
+      fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
+      emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
     }
     drawAll();
   }
@@ -652,7 +659,12 @@ export default function LavagnaCanvas({
           onPointerMove={pointerMove}
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
-          style={{...st.canvas, cursor: strumento === 'gomma' && !gommaPuntuale ? 'not-allowed' : 'crosshair'}}
+          style={{
+            ...st.canvas,
+            cursor: strumento === 'gomma'
+              ? `url(${st.eraserCursor}) 4 20, auto`
+              : `url(${st.penCursor}) 0 24, crosshair`
+          }}
         />
       </div>
     </div>
@@ -715,7 +727,24 @@ const st = {
     fontWeight: 600,
     color: "#20489a",
     letterSpacing: ".3px"
-  }
+  },
+  // cursori SVG embedded (data URL)
+  penCursor:
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path d="M3 21l3-1 11-11-2-2L4 18l-1 3z" fill="#20489a"/>
+        <path d="M14 5l2 2 2-2-2-2-2 2z" fill="#1cb0f6"/>
+      </svg>
+    `),
+  eraserCursor:
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path d="M3 16l7-7 8 8-3 3H6z" fill="#ff6464"/>
+        <path d="M10 9l2-2 8 8-2 2z" fill="#ffd1d1"/>
+      </svg>
+    `)
 };
 
 const btn = (active) => ({

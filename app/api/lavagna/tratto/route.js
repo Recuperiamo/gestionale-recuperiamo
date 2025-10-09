@@ -9,7 +9,7 @@ export async function POST(req) {
     if (!session) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
     const body = await req.json();
-    const { lavagnaId, strumento, colore, spessore, punti } = body || {};
+    const { id: streamId, lavagnaId, strumento, colore, spessore, punti } = body || {};
 
     if (!lavagnaId || !Array.isArray(punti) || punti.length < 2) {
       return NextResponse.json({ error: "Dati tratto non validi" }, { status: 400 });
@@ -59,18 +59,29 @@ export async function POST(req) {
       return NextResponse.json({ error: "Troppi punti nel tratto (>4000)" }, { status: 413 });
     }
 
-    const tratto = await prisma.lavagnaTratto.create({
-      data: {
-        lavagnaId,
-        autoreUserId,
-        strumento: strumento || "penna",
-        colore: strumento === "gomma" ? null : (colore || "#20489a"),
-        spessore: spessore ?? 3,
-        punti
-      },
+    const trattoData = {
+      streamId,
+      lavagnaId,
+      autoreUserId,
+      strumento: strumento || "penna",
+      colore: strumento === "gomma" ? null : (colore || "#20489a"),
+      spessore: spessore ?? 3,
+      punti
+    };
+
+    const tratto = await prisma.lavagnaTratto.upsert({
+      where: { streamId: streamId },
+      update: trattoData,
+      create: trattoData,
       select: {
-        id: true, strumento: true, colore: true, spessore: true, punti: true,
-        autoreUserId: true, createdAt: true
+        id: true,
+        streamId: true,
+        strumento: true,
+        colore: true,
+        spessore: true,
+        punti: true,
+        autoreUserId: true,
+        createdAt: true
       }
     });
 
