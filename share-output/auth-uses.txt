@@ -1,0 +1,24 @@
+app\api\attivita\route.js:5:import { getServerSession } from 'next-auth'
+app\api\auth\[...nextauth]\authOptions.ts:3:import CredentialsProvider from "next-auth/providers/credentials";
+app\api\auth\[...nextauth]\route.js:1:import NextAuth from "next-auth";
+app\api\lavagna\precreate\route.js:3:import { getServerSession } from "next-auth";
+app\api\lavagna\realtime\route.js:1:import { getServerSession } from "next-auth";
+app\api\lavagna\route.js:3:import { getServerSession } from "next-auth";
+app\api\lavagna\tratto\route.js:3:import { getServerSession } from "next-auth";
+app\api\lavagna\tratto\[id]\route.js:3:import { getServerSession } from "next-auth";
+app\api\me\route.js:2:import { getServerSession } from "next-auth";
+app\api\modifiche\route.js:4:import { getServerSession } from 'next-auth';
+app\api\pacchetti\alert-letto\route.js:1:import { getServerSession } from "next-auth";
+app\calendario\page.js:4:import { useSession } from "next-auth/react";
+app\components\AuthGuard.js:2:import { useSession } from "next-auth/react";
+app\components\Navbar.js:4:import { useSession, signOut } from "next-auth/react";
+app\lavagna\full\page.js:3:import { useSession } from "next-auth/react";
+app\lavagna\page.js:3:import { useSession } from "next-auth/react";
+app\layout.js:4:import { SessionProvider } from "next-auth/react";
+app\materiale\page.js:3:import { useSession } from "next-auth/react";
+app\pacchetti-lezioni\page.js:4:import { useSession } from "next-auth/react";
+app\profile\page.js:3:import { useSession } from "next-auth/react";
+app\profilo\page.js:4:import { useSession } from "next-auth/react";
+app\settings\page.js:3:import { useSession } from "next-auth/react";
+app\signin\page.js:4:import { signIn } from "next-auth/react";
+app\storico\page.js:8:import { useSession } from "next-auth/react";

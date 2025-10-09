@@ -1,0 +1,1 @@
+C:\Users\mauzr\Desktop\Sito\gestionale-pacchetti-ore\gestionale-recuperiamo\prisma\schema.prisma

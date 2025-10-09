@@ -5,7 +5,11 @@ import Link from "next/link";
 async function fetchChangelog(pacchettoId) {
   try {
     // Usa baseUrl assoluto per fetch SSR/server component
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    // Ordine fallback: NEXT_PUBLIC_BASE_URL -> NEXTAUTH_URL -> localhost
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      process.env.NEXTAUTH_URL ||
+      "http://localhost:3000";
     const res = await fetch(`${baseUrl}/api/pacchetti/${pacchettoId}/changelog`, { cache: "no-store" });
     if (!res.ok) throw new Error(`Errore ${res.status}`);
     return await res.json();

@@ -1,0 +1,2 @@
+origin	https://github.com/Recuperiamo/gestionale-recuperiamo.git (fetch)
+origin	https://github.com/Recuperiamo/gestionale-recuperiamo.git (push)

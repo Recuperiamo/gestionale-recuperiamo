@@ -1,0 +1,14 @@
+specVersion: "1"
+services:
+  - type: web
+    name: recuperiamo-realtime
+    rootDir: realtime-server
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    healthCheckPath: /
+    plan: free
+    envVars:
+      - key: CORS_ORIGIN
+        value: https://recuperiamo.vercel.app

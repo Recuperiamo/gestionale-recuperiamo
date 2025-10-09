@@ -12,6 +12,7 @@ temp/
 # Configurazioni ambiente locali
 .env
 .env.*
+.env.local
 !.env.example
 
 # File di sistema/OS
@@ -44,6 +45,16 @@ allfiles.txt
 duplicates.txt
 justnames.txt
 sortednames.txt
+
+# Uploads e file utente
+uploads/
+
+# Artefatti Prisma e engines locali
+.prisma/
+node_modules/.prisma*/
+**/query_engine-*.dll.node
+**/libquery_engine-*.so.node
+**/libquery_engine-*.dylib.node
 
 # Escludi file AI personali non strategici (aggiungi qui eventuali nuovi)
 # (Lascia AI_PERSONALIZZAZIO.md SOLO se confermato da te)
