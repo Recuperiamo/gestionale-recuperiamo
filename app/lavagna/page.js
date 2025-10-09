@@ -72,7 +72,7 @@ export default function PaginaLavagna() {
 
   function handleLavagnaSelect(lavagna) {
     setAttivitaId(lavagna.attivitaId);
-    setLavagna(lavagna);
+    carica(lavagna.attivitaId);
   }
 
   if (status === "loading") {
