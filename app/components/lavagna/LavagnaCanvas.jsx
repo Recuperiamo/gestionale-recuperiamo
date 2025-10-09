@@ -6,7 +6,6 @@ import React, {
   useCallback,
   useMemo
 } from "react";
-import { io } from "socket.io-client";
 import { getAblyChannel, whenChannelAttached } from "../../lib/realtime/ablyClient";
 
 /**
@@ -31,7 +30,6 @@ export default function LavagnaCanvas({
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const socketRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
   const [strumento, setStrumento] = useState("penna");
@@ -112,8 +110,6 @@ export default function LavagnaCanvas({
       console.log('[LavagnaCanvas] Ably channel state init', channelName, ablyCh.state);
       whenChannelAttached(channelName).then(() => {
         if (process.env.NODE_ENV !== 'production') console.log('[LavagnaCanvas] Ably channel attached', channelName);
-        // Flush eventuale coda publish se definita
-        flushQueueRef.current?.();
       }).catch(err => {
         console.warn('[LavagnaCanvas] channel attach failed', err?.message);
       });
@@ -184,30 +180,6 @@ export default function LavagnaCanvas({
       ablyCh.subscribe("stroke:done", onDone);
       ablyCh.subscribe("stroke:delete", onDelete);
       ablyCh.subscribe("clear-lavagna", onClear);
-    } else {
-      const base = process.env.NEXT_PUBLIC_SOCKET_URL;
-      const socketPath = base ? undefined : "/api/socketio";
-      const url = base || undefined;
-      if (!base) fetch("/api/socketio").catch(() => {});
-      const s = io(url, {
-        path: socketPath,
-        transports: ["websocket", "polling"],
-        withCredentials: true
-      });
-      socketRef.current = s;
-
-      s.on("connect", () => {
-        s.emit("join:lavagna", { attivitaId });
-        if (clienteId) s.emit("join:lavagne", { clienteId });
-        if (isNewLavagna && lavagnaId && clienteId) {
-          s.emit("new-lavagna", { lavagna: { id: lavagnaId, attivitaId }, clienteId });
-        }
-      });
-      s.on("stroke:start", onStart);
-      s.on("stroke:points", onPoints);
-      s.on("stroke:done", onDone);
-      s.on("stroke:delete", onDelete);
-      s.on("clear-lavagna", onClear);
     }
 
     return () => {
@@ -221,62 +193,33 @@ export default function LavagnaCanvas({
           ablyCh.detach?.();
         } catch {}
       }
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
     };
   }, [lavagnaId, attivitaId, clienteId, isNewLavagna, drawAll]);
 
-  // Helper per inviare eventi realtime su Ably o Socket.IO
-  // Coda per eventi publish prima dell'attach del canale Ably
-  const publishQueueRef = useRef([]); // {eventName, payload}
-  const flushQueueRef = useRef(null);
-  flushQueueRef.current = () => {
-    const ch = ablyRef.current.ch;
-    if (!ch || ch.state !== 'attached') return;
-    if (!publishQueueRef.current.length) return;
-    const items = [...publishQueueRef.current];
-    publishQueueRef.current = [];
-    items.forEach(item => {
-      try {
-        ch.publish(item.eventName, item.payload, (err) => {
-          if (err) {
-            if (process.env.NODE_ENV !== 'production') console.warn('[publish retry later]', item.eventName, err?.message);
-            publishQueueRef.current.push(item);
-          }
-        });
-      } catch (e) {
-        publishQueueRef.current.push(item);
-      }
-    });
-  };
-
+  // Helper per inviare eventi realtime (semplice: aspetta attach e invia)
   const emitOrPublish = useCallback((eventName, payload) => {
     const ch = ablyRef.current.ch;
-    if (ch) {
-      if (ch.state !== 'attached') {
-        publishQueueRef.current.push({ eventName, payload });
-        whenChannelAttached(ch.name).then(() => flushQueueRef.current?.()).catch(() => {});
-        return;
-      }
+    if (!ch) return;
+
+    const doPublish = () => {
       try {
-        if (process.env.NODE_ENV !== 'production') console.log('[publish ' + eventName + ']', payload?.streamId || '');
+        if (process.env.NODE_ENV !== 'production') console.log(`[publish ${eventName}] state=${ch.state}`, payload?.streamId || '');
         ch.publish(eventName, payload, (err) => {
           if (err) {
-            console.error('[publish error ' + eventName + ']', err);
-            if (['suspended','detached'].includes(ch.state)) {
-              publishQueueRef.current.push({ eventName, payload });
-              whenChannelAttached(ch.name).then(() => flushQueueRef.current?.()).catch(() => {});
-            }
+            console.error(`[publish error ${eventName}]`, err?.message || err);
           }
         });
       } catch (e) {
-        publishQueueRef.current.push({ eventName, payload });
-        whenChannelAttached(ch.name).then(() => flushQueueRef.current?.()).catch(() => {});
+        console.error(`[publish threw ${eventName}]`, e);
       }
+    };
+
+    if (ch.state !== 'attached') {
+      whenChannelAttached(ch.name).then(doPublish).catch(() => {
+        if (process.env.NODE_ENV !== 'production') console.warn(`[publish drop ${eventName}] attach failed`);
+      });
     } else {
-      socketRef.current?.emit(eventName, payload);
+      doPublish();
     }
   }, []);
 
