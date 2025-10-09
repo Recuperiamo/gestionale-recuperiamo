@@ -7,7 +7,7 @@ import React, {
   useMemo
 } from "react";
 import { io } from "socket.io-client";
-import { getAblyChannel } from "../../lib/realtime/ablyClient";
+import { getAblyChannel, whenChannelAttached } from "../../lib/realtime/ablyClient";
 
 /**
  * LavagnaCanvas – LIVE con Socket.IO su /api/socketio
@@ -105,10 +105,18 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!attivitaId) return;
 
-    const ablyCh = getAblyChannel(`lavagna:${attivitaId}`);
+    const channelName = `lavagna:${attivitaId}`;
+    const ablyCh = getAblyChannel(channelName);
     ablyRef.current.ch = ablyCh;
     if (ablyCh && process.env.NODE_ENV !== 'production') {
-      console.log('[LavagnaCanvas] Ably channel attached lavagna:' + attivitaId);
+      console.log('[LavagnaCanvas] Ably channel state init', channelName, ablyCh.state);
+      whenChannelAttached(channelName).then(() => {
+        if (process.env.NODE_ENV !== 'production') console.log('[LavagnaCanvas] Ably channel attached', channelName);
+        // Flush eventuale coda publish se definita
+        flushQueueRef.current?.();
+      }).catch(err => {
+        console.warn('[LavagnaCanvas] channel attach failed', err?.message);
+      });
     }
 
     const onStart = (msg) => {
@@ -221,14 +229,52 @@ export default function LavagnaCanvas({
   }, [lavagnaId, attivitaId, clienteId, isNewLavagna, drawAll]);
 
   // Helper per inviare eventi realtime su Ably o Socket.IO
+  // Coda per eventi publish prima dell'attach del canale Ably
+  const publishQueueRef = useRef([]); // {eventName, payload}
+  const flushQueueRef = useRef(null);
+  flushQueueRef.current = () => {
+    const ch = ablyRef.current.ch;
+    if (!ch || ch.state !== 'attached') return;
+    if (!publishQueueRef.current.length) return;
+    const items = [...publishQueueRef.current];
+    publishQueueRef.current = [];
+    items.forEach(item => {
+      try {
+        ch.publish(item.eventName, item.payload, (err) => {
+          if (err) {
+            if (process.env.NODE_ENV !== 'production') console.warn('[publish retry later]', item.eventName, err?.message);
+            publishQueueRef.current.push(item);
+          }
+        });
+      } catch (e) {
+        publishQueueRef.current.push(item);
+      }
+    });
+  };
+
   const emitOrPublish = useCallback((eventName, payload) => {
-    if (ablyRef.current.ch) {
+    const ch = ablyRef.current.ch;
+    if (ch) {
+      if (ch.state !== 'attached') {
+        publishQueueRef.current.push({ eventName, payload });
+        whenChannelAttached(ch.name).then(() => flushQueueRef.current?.()).catch(() => {});
+        return;
+      }
       try {
         if (process.env.NODE_ENV !== 'production') console.log('[publish ' + eventName + ']', payload?.streamId || '');
-        ablyRef.current.ch.publish(eventName, payload, (err) => {
-          if (err) console.error('[publish error ' + eventName + ']', err);
+        ch.publish(eventName, payload, (err) => {
+          if (err) {
+            console.error('[publish error ' + eventName + ']', err);
+            if (['suspended','detached'].includes(ch.state)) {
+              publishQueueRef.current.push({ eventName, payload });
+              whenChannelAttached(ch.name).then(() => flushQueueRef.current?.()).catch(() => {});
+            }
+          }
         });
-      } catch {}
+      } catch (e) {
+        publishQueueRef.current.push({ eventName, payload });
+        whenChannelAttached(ch.name).then(() => flushQueueRef.current?.()).catch(() => {});
+      }
     } else {
       socketRef.current?.emit(eventName, payload);
     }
