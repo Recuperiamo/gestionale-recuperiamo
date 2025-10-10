@@ -33,7 +33,7 @@ export default function LavagnaCanvas({
   const ctxRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
-  const [strumento, setStrumento] = useState("penna");
+  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano
   const [colore, setColore] = useState("#20489a");
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
@@ -54,12 +54,40 @@ export default function LavagnaCanvas({
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const [zoom, setZoom] = useState(1); // 1 = 100%
-  const palette = ["#2563eb", "#fb7185", "#10b981", "#f59e0b", "#8b5cf6"]; 
+  const palette = [
+    "#2563eb", // blu
+    "#fb7185", // rosa
+    "#10b981", // verde
+    "#f59e0b", // arancio
+    "#8b5cf6", // viola
+    "#fff200", // giallo
+    "#ff00cc", // fucsia
+    "#00fff7", // turchese
+    "#ff8000", // arancio acceso
+    "#00ff00", // verde acceso
+    "#ff0000", // rosso
+    "#00f", // blu acceso
+    "#fff", // bianco
+    "#000", // nero
+    "linear-gradient(90deg, #ff0080, #7928ca)", // arcobaleno
+    "repeating-linear-gradient(45deg, #fff, #fff 2px, #ffd700 2px, #ffd700 4px)", // glitter oro
+  ];
   const colorInputRef = useRef(null);
+  const [showPenPopover, setShowPenPopover] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0 });
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
+
+  // Shapes and selection
+  const [forme, setForme] = useState([]); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
+  const previewShapeRef = useRef(null);
+  const drawingShapeRef = useRef(false);
+  const selectingRef = useRef({ active: false, start: null });
+  const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
+  const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
+  const draggingSelectionRef = useRef({ active: false, startWorld: null, offsets: null });
 
   const isAdmin = String(ruolo || "").toLowerCase() === "admin";
   const eraseSessionRef = useRef({
@@ -132,6 +160,39 @@ export default function LavagnaCanvas({
     }
 
     // Tratti persistiti (coordinate in unità mondo)
+    // Disegno forme preesistenti (prima dei tratti)
+    for (const f of forme) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = f.colore || '#20489a';
+      ctx.lineWidth = f.spessore || 3;
+      if (f.kind === 'rettangolo') {
+        ctx.strokeRect(f.x, f.y, f.w, f.h);
+      } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
+        const cx = f.x + f.w / 2;
+        const cy = f.y + f.h / 2;
+        const rx = Math.abs(f.w) / 2;
+        const ry = Math.abs(f.h) / 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (f.kind === 'linea') {
+        ctx.beginPath();
+        ctx.moveTo(f.x, f.y);
+        ctx.lineTo(f.x2, f.y2);
+        ctx.stroke();
+      }
+      // Se selezionata, evidenzia
+      if (selectedItems.forme.includes(f.id)) {
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6,4]);
+        if (f.kind === 'linea') ctx.strokeRect(Math.min(f.x,f.x2)-6, Math.min(f.y,f.y2)-6, Math.abs(f.x2-f.x)+12, Math.abs(f.y2-f.y)+12);
+        else ctx.strokeRect(f.x-6, f.y-6, f.w+12, f.h+12);
+        ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }
     tratti.forEach((t) => {
       if (!t.punti || t.punti.length < 2) return;
       ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
@@ -164,9 +225,52 @@ export default function LavagnaCanvas({
       ctx.stroke();
     }
 
+      // Preview shape
+      const ps = previewShapeRef.current;
+      if (ps) {
+        ctx.save();
+        ctx.strokeStyle = ps.colore || '#20489a';
+        ctx.lineWidth = ps.spessore || 2;
+        ctx.setLineDash([6,4]);
+        if (ps.kind === 'rettangolo') {
+          const x = Math.min(ps.x, ps.x2);
+          const y = Math.min(ps.y, ps.y2);
+          const w = Math.abs(ps.x2 - ps.x);
+          const h = Math.abs(ps.y2 - ps.y);
+          ctx.strokeRect(x, y, w, h);
+        } else if (ps.kind === 'cerchio' || ps.kind === 'ellisse') {
+          const x = Math.min(ps.x, ps.x2);
+          const y = Math.min(ps.y, ps.y2);
+          const w = Math.abs(ps.x2 - ps.x);
+          const h = Math.abs(ps.y2 - ps.y);
+          const cx = x + w/2; const cy = y + h/2;
+          ctx.beginPath(); ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2); ctx.stroke();
+        } else if (ps.kind === 'linea') {
+          ctx.beginPath(); ctx.moveTo(ps.x, ps.y); ctx.lineTo(ps.x2, ps.y2); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Selection box overlay (world coords)
+      if (selectionBox) {
+        ctx.save();
+        ctx.setTransform(1,0,0,1,0,0);
+        // transform world->screen
+        const sx = (selectionBox.x1 - pan.x) * zoom;
+        const sy = (selectionBox.y1 - pan.y) * zoom;
+        const sx2 = (selectionBox.x2 - pan.x) * zoom;
+        const sy2 = (selectionBox.y2 - pan.y) * zoom;
+        const rx = Math.min(sx, sx2); const ry = Math.min(sy, sy2);
+        const rw = Math.abs(sx2 - sx); const rh = Math.abs(sy2 - sy);
+        ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.restore();
+      }
+
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
+  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
 
   // Loop di rendering per il disegno locale
   const renderLoop = useCallback(() => {
@@ -409,23 +513,24 @@ export default function LavagnaCanvas({
 
   // Zoom via rotella mouse
   const onWheel = useCallback((e) => {
-    // Zoom solo sulla lavagna: intercetta sempre la rotella sul canvas
+    // Zoom solo sulla lavagna, sempre con rotella, ancorato al cursore
     e.preventDefault();
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const offX = e.clientX - rect.left;
     const offY = e.clientY - rect.top;
     const worldBefore = { x: pan.x + offX / zoom, y: pan.y + offY / zoom };
-    const factor = e.deltaY > 0 ? 0.9 : 1.1; // out/in
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(2, Math.max(0.5, Math.round((zoom * factor) * 100) / 100));
-    // mantieni il punto sotto il cursore fermo
     const newPan = {
       x: worldBefore.x - offX / newZoom,
       y: worldBefore.y - offY / newZoom,
     };
     setZoom(newZoom);
     setPan(newPan);
-  }, [zoom, pan.x, pan.y]);
+    // Aggiorna subito la lavagna per feedback immediato
+    setTimeout(drawAll, 0);
+  }, [zoom, pan.x, pan.y, drawAll]);
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
@@ -454,8 +559,32 @@ export default function LavagnaCanvas({
 
   // == POINTER EVENTS ==
   function pointerDown(e) {
-    // Tasto destro: pan
-    if (e.nativeEvent.button === 2) {
+    // Ignore right click
+    if (e?.nativeEvent?.button === 2) return;
+
+    // Touch start tracking
+    if (e?.nativeEvent?.pointerType === 'touch') {
+      touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
+    }
+
+    // Start shape drawing (rect/circle/line)
+    if (['rettangolo', 'cerchio', 'linea'].includes(strumento)) {
+      const p = getPoint(e);
+      previewShapeRef.current = { kind: strumento, x: p.x, y: p.y, x2: p.x, y2: p.y, colore, spessore };
+      drawingShapeRef.current = true;
+      return;
+    }
+
+    // Lazzo: start selection
+    if (strumento === 'lazzo') {
+      const p = getPoint(e);
+      selectingRef.current = { active: true, start: p };
+      setSelectionBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+      return;
+    }
+
+    // Mano: start panning
+    if (strumento === 'mano') {
       const canvas = canvasRef.current;
       canvas.setPointerCapture?.(e.nativeEvent.pointerId);
       panningRef.current.active = true;
@@ -464,7 +593,38 @@ export default function LavagnaCanvas({
       return;
     }
 
-    // Touch multi-dita: gesti pan/zoom
+    // Default: start stroke
+    setDisegnando(true);
+    const punto = getPoint(e);
+    puntiCorrentiRef.current = [punto];
+    animationFrameId.current = requestAnimationFrame(renderLoop);
+    const streamId = `${utenteId}-${Date.now()}`;
+    currentStreamId.current = streamId;
+    emitOrPublish('stroke:start', {
+      streamId,
+      strumento,
+      colore,
+      spessore,
+      start: punto,
+    });
+  }
+
+  function pointerMove(e) {
+    // If panning active (hand) update pan
+    if (panningRef.current.active) {
+      const dx = e.nativeEvent.clientX - panningRef.current.lastX;
+      const dy = e.nativeEvent.clientY - panningRef.current.lastY;
+      panningRef.current.lastX = e.nativeEvent.clientX;
+      panningRef.current.lastY = e.nativeEvent.clientY;
+      setPan((p) => {
+        const nuovo = { x: p.x - dx / zoom, y: p.y - dy / zoom };
+        setTimeout(drawAll, 0);
+        return nuovo;
+      });
+      return;
+    }
+
+    // Multitouch pan/zoom
     if (e.nativeEvent.pointerType === 'touch') {
       touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
       if (touchesRef.current.size === 2) {
@@ -482,74 +642,30 @@ export default function LavagnaCanvas({
       }
     }
 
-    setDisegnando(true);
-    const punto = getPoint(e);
-
-    if (strumento === 'gomma' && !gommaPuntuale) {
-      eraseStrokeAt(punto.x, punto.y);
+    // Update shape preview if drawing a shape
+    if (drawingShapeRef.current && previewShapeRef.current) {
+      const p = getPoint(e);
+      previewShapeRef.current.x2 = p.x; previewShapeRef.current.y2 = p.y;
+      setTimeout(drawAll, 0);
       return;
     }
 
-    puntiCorrentiRef.current = [punto];
-    animationFrameId.current = requestAnimationFrame(renderLoop);
-    
-    const streamId = `${utenteId}-${Date.now()}`;
-    currentStreamId.current = streamId;
-
-    emitOrPublish('stroke:start', {
-      streamId,
-      strumento,
-      colore,
-      spessore,
-      start: punto,
-    });
-  }
-
-  function pointerMove(e) {
-    // Panning con tasto destro
-    if (panningRef.current.active) {
-      const dx = e.nativeEvent.clientX - panningRef.current.lastX;
-      const dy = e.nativeEvent.clientY - panningRef.current.lastY;
-      panningRef.current.lastX = e.nativeEvent.clientX;
-      panningRef.current.lastY = e.nativeEvent.clientY;
-      setPan((p) => ({ x: p.x - dx / zoom, y: p.y - dy / zoom }));
+    // Update selection box if lazo active
+    if (selectingRef.current.active) {
+      const p = getPoint(e);
+      setSelectionBox({ x1: selectingRef.current.start.x, y1: selectingRef.current.start.y, x2: p.x, y2: p.y });
       return;
     }
 
-    // Pan/zoom multitouch
-    if (e.nativeEvent.pointerType === 'touch' && gestureRef.current.mode === 'panzoom') {
-      if (touchesRef.current.has(e.nativeEvent.pointerId)) {
-        touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
-      }
-      if (touchesRef.current.size >= 2) {
-        const pts = Array.from(touchesRef.current.values());
-        const dx = pts[1].x - pts[0].x;
-        const dy = pts[1].y - pts[0].y;
-        const dist = Math.hypot(dx, dy);
-        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
-        const rect = canvasRef.current.getBoundingClientRect();
-        const midOff = { x: mid.x - rect.left, y: mid.y - rect.top };
-        const g = gestureRef.current;
-        // aggiorna zoom
-        const newZoom = Math.min(2, Math.max(0.5, g.startZoom * (dist / (g.startDist || 1))));
-        setZoom(newZoom);
-        // mantieni il punto medio mondo ancorato allo stesso punto dello schermo
-        const midWorld = g.startMidWorld;
-        const newPanX = midWorld.x - midOff.x / newZoom;
-        const newPanY = midWorld.y - midOff.y / newZoom;
-        setPan({ x: newPanX, y: newPanY });
-      }
-      return;
-    }
-
+    // If not drawing stroke, nothing to do
     if (!disegnando) return;
-    const punto = getPoint(e);
 
+    const punto = getPoint(e);
     if (strumento === 'gomma' && !gommaPuntuale) {
       eraseStrokeAt(punto.x, punto.y);
       return;
     }
-    
+
     puntiCorrentiRef.current.push(punto);
     outgoingBufferRef.current.push(punto);
     if (!outgoingRAFRef.current) {
@@ -560,6 +676,7 @@ export default function LavagnaCanvas({
   function pointerUp() {
     if (panningRef.current.active) {
       panningRef.current.active = false;
+      return; // non proseguire con logica disegno quando si rilascia pan
     }
     // Touch end handling is in pointerCancel/pointerUp below
     if (animationFrameId.current) {
@@ -570,6 +687,33 @@ export default function LavagnaCanvas({
       cancelAnimationFrame(outgoingRAFRef.current);
       outgoingRAFRef.current = null;
     }
+    // If currently drawing a shape, finalize it
+    if (drawingShapeRef.current && previewShapeRef.current) {
+      const ps = previewShapeRef.current;
+      const x = Math.min(ps.x, ps.x2); const y = Math.min(ps.y, ps.y2);
+      const w = Math.abs(ps.x2 - ps.x); const h = Math.abs(ps.y2 - ps.y);
+      const id = `shape-${Date.now()}`;
+      const kind = ps.kind === 'cerchio' && h !== w ? 'ellisse' : ps.kind;
+      setForme(prev => [...prev, { id, kind, x, y, w, h, x2:ps.x2, y2:ps.y2, colore: ps.colore, spessore: ps.spessore }]);
+      previewShapeRef.current = null; drawingShapeRef.current = false; setTimeout(drawAll, 0);
+      return;
+    }
+
+    // If finishing a lazo selection, compute selected items
+    if (selectingRef.current.active) {
+      selectingRef.current.active = false;
+      const sb = selectionBox;
+      if (sb) {
+        const x1 = Math.min(sb.x1,sb.x2), x2 = Math.max(sb.x1,sb.x2);
+        const y1 = Math.min(sb.y1,sb.y2), y2 = Math.max(sb.y1,sb.y2);
+        const selTratti = tratti.map((t,i)=> (t._bb && t._bb.minX>=x1 && t._bb.maxX<=x2 && t._bb.minY>=y1 && t._bb.maxY<=y2) ? i : null).filter(i=>i!==null);
+        const selForme = forme.map((f)=> (f.x>=x1 && f.x+f.w<=x2 && f.y>=y1 && f.y+f.h<=y2) ? f.id : null).filter(i=>i!==null);
+        setSelectedItems({ tratti: selTratti, forme: selForme });
+      }
+      setSelectionBox(null);
+      return;
+    }
+
     if (!disegnando) return;
     setDisegnando(false);
     // Flush finale di eventuali punti in buffer
@@ -580,8 +724,8 @@ export default function LavagnaCanvas({
       });
       outgoingBufferRef.current = [];
     }
-    
-  const puntiFinali = puntiCorrentiRef.current;
+
+    const puntiFinali = puntiCorrentiRef.current;
     if (strumento !== 'gomma' && puntiFinali.length >= 2) {
       const nuovoTratto = prepareStroke({
         id: currentStreamId.current, // Usa l'ID dello stream per coerenza
@@ -598,7 +742,7 @@ export default function LavagnaCanvas({
     }
 
     emitOrPublish('stroke:done', { streamId: currentStreamId.current });
-    
+
     puntiCorrentiRef.current = [];
     currentStreamId.current = null;
     eraseSessionRef.current.ids.clear();
@@ -614,6 +758,17 @@ export default function LavagnaCanvas({
       if (touchesRef.current.size < 2 && gestureRef.current.mode === 'panzoom') {
         gestureRef.current.mode = 'none';
       }
+    }
+    // Reset drawing/preview state
+    if (drawingShapeRef.current) {
+      drawingShapeRef.current = false;
+      previewShapeRef.current = null;
+      setTimeout(drawAll, 0);
+    }
+    if (selectingRef.current.active) {
+      selectingRef.current.active = false;
+      setSelectionBox(null);
+      setTimeout(drawAll, 0);
     }
   }
 
@@ -760,76 +915,118 @@ export default function LavagnaCanvas({
   }, [isAdmin, lavagnaId, attivitaId, emitOrPublish]);
 
   // == TOOLBAR ==
+  // == LAZO: selezione, sposta, duplica ==
+  // == LAZO: selezione, sposta, duplica ==
+
+
   // Toolbar in basso al centro
   const toolbar = useMemo(
     () => (
-      <div style={st.bottomToolbar}>
-        <div style={st.group}>
+      <div style={st.bottomToolbarDock}>
+        <div style={st.toolbarPill}>
+          {/* Lazzo (freccia selezione) */}
           <button
-            style={btn(strumento === "penna")}
-            onClick={() => setStrumento("penna")}
             type="button"
+            style={iconBtn(strumento === 'lazzo')}
+            onClick={() => { setStrumento('lazzo'); setShowPenPopover(false); setShowMoreMenu(false); }}
+            title="Seleziona/sposta/duplica"
           >
-            Penna
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 9-7 2-2 7-9-18z" fill={strumento==='lazzo'? '#fff':'#20489a'}/></svg>
           </button>
+          {/* Forme: rettangolo, cerchio, linea */}
+          <button type="button" style={iconBtn(strumento === 'rettangolo')} onClick={() => { setStrumento('rettangolo'); setShowPenPopover(false); setShowMoreMenu(false); }} title="Rettangolo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke={strumento==='rettangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+          </button>
+          <button type="button" style={iconBtn(strumento === 'cerchio')} onClick={() => { setStrumento('cerchio'); setShowPenPopover(false); setShowMoreMenu(false); }} title="Cerchio">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke={strumento==='cerchio'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+          </button>
+          <button type="button" style={iconBtn(strumento === 'linea')} onClick={() => { setStrumento('linea'); setShowPenPopover(false); setShowMoreMenu(false); }} title="Linea">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
+          </button>
+          {/* Penna magica (placeholder) */}
+          <button type="button" style={iconBtn(strumento === 'magicpen')} onClick={() => { setStrumento('magicpen'); setShowPenPopover(false); setShowMoreMenu(false); }} title="Penna magica (auto-figure)">
+            <span style={{fontSize:18}}>✨</span>
+          </button>
+          {/* Mano / Pan */}
           <button
-            style={btn(strumento === "gomma")}
-            onClick={() => setStrumento("gomma")}
             type="button"
+            style={iconBtn(strumento === 'mano')}
+            onClick={() => { setStrumento('mano'); setShowPenPopover(false); setShowMoreMenu(false); }}
+            title="Sposta lavagna (mano)"
           >
-            Gomma
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
           </button>
-          {strumento === "gomma" && (
-            <label style={st.toggleWrap}>
-              <input
-                type="checkbox"
-                checked={gommaPuntuale}
-                onChange={(e) => setGommaPuntuale(e.target.checked)}
-              />
-              <span style={st.toggleLbl}>Gomma puntuale</span>
-            </label>
-          )}
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            {palette.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColore(c)}
-                type="button"
-                title={c}
-                style={{ width:22, height:22, borderRadius:6, border: c===colore? '2px solid #20489a':'1px solid #dbe6f5', background:c, cursor:'pointer' }}
-              />
-            ))}
-            {/* Picker nascosto + pulsante "ruota colori" */}
-            <input
-              ref={colorInputRef}
-              type="color"
-              value={colore}
-              onChange={(e) => setColore(e.target.value)}
-              style={{ position:'absolute', width:1, height:1, opacity:0, pointerEvents:'none' }}
-            />
+          {/* Penna con popover */}
+          <div style={{ position:'relative' }}>
             <button
               type="button"
-              onClick={() => colorInputRef.current?.click()}
-              title="Altro colore"
-              style={st.colorWheelBtn}
-            />
+              style={iconBtn(strumento === 'penna')}
+              onClick={() => { setStrumento('penna'); setShowPenPopover(v=>!v); setShowMoreMenu(false); }}
+              title="Penna"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 21l3-1 11-11-2-2L4 18l-1 3z" fill={strumento==='penna'? '#fff':'#20489a'}/></svg>
+            </button>
+            {showPenPopover && (
+              <div style={st.popover}>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', maxWidth:180 }}>
+                  {palette.map((c, i) => (
+                    <button key={i} onClick={() => setColore(c)} title={c}
+                      style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        border: c===colore? '2.5px solid #20489a':'1.5px solid #dbe6f5',
+                        background: c.includes('gradient') ? undefined : c,
+                        backgroundImage: c.includes('gradient') ? c : undefined,
+                        boxShadow: c===colore? '0 0 0 2px #fff, 0 0 0 4px #20489a':'0 1px 2px #dbe6f588',
+                        cursor:'pointer', transition:'box-shadow .15s',
+                        outline: 'none', margin:2
+                      }}
+                    />
+                  ))}
+                  <input ref={colorInputRef} type="color" value={colore} onChange={(e)=>setColore(e.target.value)} style={{ position:'absolute', width:1, height:1, opacity:0 }} />
+                  <button type="button" onClick={()=>colorInputRef.current?.click()} title="Altri colori" style={{
+                    width:28, height:28, borderRadius:8, border:'1.5px solid #dbe6f5', background:'#fff', backgroundImage:'conic-gradient(red, orange, yellow, green, blue, violet, red)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, cursor:'pointer', margin:2
+                  }}>🎨</button>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10 }}>
+                  <span style={st.sizeLabel}>{spessore}px</span>
+                  <input type="range" min={1} max={25} value={spessore} onChange={(e)=>setSpessore(Number(e.target.value))} />
+                </div>
+              </div>
+            )}
           </div>
-          <input
-            type="range"
-            min={1}
-            max={25}
-            value={spessore}
-            onChange={(e) => setSpessore(Number(e.target.value))}
-          />
-          <span style={st.sizeLabel}>{spessore}px</span>
-          <select value={sfondo} onChange={(e)=>setSfondo(e.target.value)} style={{ padding:'6px 8px', borderRadius:8 }}>
-            <option value="bianco">Bianco</option>
-            <option value="nero">Nero</option>
-            <option value="righe">Righe</option>
-            <option value="quadretti">Quadretti</option>
-            <option value="punti">Punti</option>
-          </select>
-          {/* Zoom slider rimosso: lo zoom si controlla con CTRL + rotella */}
+          {/* Gomma */}
+          <button
+            type="button"
+            style={iconBtn(strumento === 'gomma')}
+            onClick={() => { setStrumento('gomma'); setShowPenPopover(false); setShowMoreMenu(false); }}
+            title="Gomma"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M16 3l5 5-9 9H7L2 12l9-9 5 0z" fill={strumento==='gomma'? '#fff':'#20489a'} /></svg>
+          </button>
+          {/* forme e penna magica: implementazione rimandata (segnaposto) */}
+          {/* More */}
+          <div style={{ position:'relative' }}>
+            <button type="button" style={iconBtn(false)} onClick={()=> { setShowMoreMenu(v=>!v); setShowPenPopover(false); }} title="Altro">⋯</button>
+            {showMoreMenu && (
+              <div style={st.popover}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                  <label style={{ fontSize:12, color:'#20489a', fontWeight:600 }}>Sfondo</label>
+                  <select value={sfondo} onChange={(e)=>setSfondo(e.target.value)} style={{ padding:'6px 8px', borderRadius:8 }}>
+                    <option value="bianco">Bianco</option>
+                    <option value="nero">Nero</option>
+                    <option value="righe">Righe</option>
+                    <option value="quadretti">Quadretti</option>
+                    <option value="punti">Punti</option>
+                  </select>
+                </div>
+                {isAdmin && (
+                  <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={handlePulisciLavagna}>Pulisci lavagna</button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {salvando && <span style={st.saving}>Salvataggio…</span>}
       </div>
@@ -843,7 +1040,10 @@ export default function LavagnaCanvas({
       salvando,
       gommaPuntuale,
       sfondo,
-      zoom
+      zoom,
+      showPenPopover,
+      showMoreMenu,
+      isAdmin
     ]
   );
 
@@ -881,6 +1081,8 @@ export default function LavagnaCanvas({
             ...st.canvas,
             cursor: strumento === 'gomma'
               ? `url(${st.eraserCursor}) 4 20, auto`
+              : strumento === 'mano'
+              ? (panningRef.current.active ? 'grabbing' : 'grab')
               : `url(${st.penCursor}) 0 24, crosshair`
           }}
         />
@@ -906,6 +1108,35 @@ const st = {
     border: "1px solid #dbe6f5",
     boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
     zIndex: 2
+  },
+  bottomToolbarDock: {
+    position: "absolute",
+    left: "50%",
+    bottom: 18,
+    transform: "translateX(-50%)",
+    zIndex: 2
+  },
+  toolbarPill: {
+    display: 'flex',
+    gap: 6,
+    alignItems: 'center',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 14,
+    padding: '6px 8px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.08)'
+  },
+  popover: {
+    position: 'absolute',
+    bottom: '110%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+    borderRadius: 12,
+    padding: 12,
+    minWidth: 220
   },
   toolbarToggle: {
     border: "none",
@@ -1016,6 +1247,19 @@ const btn = (active) => ({
   fontSize: 13,
   padding: "6px 12px",
   cursor: "pointer"
+});
+
+const iconBtn = (active) => ({
+  width: 32,
+  height: 32,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 8,
+  border: '1px solid #dbe6f5',
+  background: active ? '#1cb0f6' : '#f8fbff',
+  color: active ? '#fff' : '#20489a',
+  cursor: 'pointer'
 });
 
 const overlayBlock = {
