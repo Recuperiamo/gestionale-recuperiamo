@@ -6,8 +6,20 @@ const _channelReady = new Map(); // name -> Promise<void>
 export function getAblyClient() {
   if (typeof window === 'undefined') return null;
   if (_client) return _client;
-  const { Realtime } = require('ably');
-  _client = new Realtime({ authUrl: '/api/ably/token', echoMessages: false, tls: true });
+  let Realtime;
+  try {
+    ({ Realtime } = require('ably'));
+  } catch (err) {
+    console.warn('[Ably] client load failed, realtime features disabled', err?.message || err);
+    return null;
+  }
+  try {
+    _client = new Realtime({ authUrl: '/api/ably/token', echoMessages: false, tls: true });
+  } catch (err) {
+    console.warn('[Ably] init failed, realtime features disabled', err?.message || err);
+    _client = null;
+    return null;
+  }
   try {
     _client.connection.on((stateChange) => {
       if (process.env.NODE_ENV !== 'production') {

@@ -109,7 +109,7 @@ export default function PaginaLavagna() {
         {isAdmin && (
           <div style={{ marginBottom: 20 }}>
             <label>
-              <span style={{ fontWeight: 600, marginRight: 10 }}>Cliente: </span>
+              <span style={{ fontWeight: 600, marginRight: 10 }}>Studente: </span>
               <select
                 value={clienteId}
                 onChange={e => {
@@ -125,7 +125,7 @@ export default function PaginaLavagna() {
                   minWidth: 190,
                 }}
               >
-                <option value="">Seleziona cliente…</option>
+                <option value="">Seleziona studente…</option>
                 {clienti.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.nomeReferente || c.email} (ID: {c.id})
