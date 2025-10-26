@@ -71,6 +71,11 @@ model VerificationToken {
 /**
  * ====================== CLIENTI / PACCHETTI ======================
  */
+enum ClientType {
+  REFERENTE
+  STUDENTE
+}
+
 model Client {
   id                Int                 @id @default(autoincrement())
   nomeReferente     String
@@ -80,11 +85,17 @@ model Client {
   codiceFiscale     String?             @unique
   partitaIva        String?             @unique
   note              String?
+  materie           String[]            @default([])
+  tipo              ClientType          @default(REFERENTE)
+  referenteId       Int?
+  referente         Client?             @relation("ReferenteStudenti", fields: [referenteId], references: [id], onDelete: SetNull)
+  studenti          Client[]            @relation("ReferenteStudenti")
   pacchetti         PacchettoOre[]
   attivita          Attivita[]
   richiesteModifica RichiestaModifica[]
 
   @@index([email])
+  @@index([referenteId])
 }
 
 model PacchettoOre {

@@ -24,7 +24,7 @@ export default function Navbar() {
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/calendario", label: "Calendario" },
     { href: "/lavagna", label: "Lavagna" },
-    { href: "/materiale", label: "Materiale" }
+    { href: "/aule", label: "Aule" }
   ];
 
   // Client links (niente "Storico")
@@ -32,7 +32,7 @@ export default function Navbar() {
     { href: "/profilo", label: "Profilo" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/lavagna", label: "Lavagna" },
-    { href: "/materiale", label: "Materiale" }
+    { href: "/aula", label: "Aula" }
   ];
 
   // Costruzione finale dei link: "Storico" SOLO per admin
@@ -40,6 +40,7 @@ export default function Navbar() {
 
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
+    if (href === "/aula") return pathname === "/aula" || pathname?.startsWith("/aula/");
     return pathname === href;
   };
 

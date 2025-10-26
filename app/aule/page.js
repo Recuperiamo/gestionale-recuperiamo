@@ -1,0 +1,262 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import AuthGuard from "../components/AuthGuard";
+import AdminOnly from "../components/auth/AdminOnly";
+import Navbar from "../components/Navbar";
+
+export default function AulePage() {
+  const [referenti, setReferenti] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    async function load() {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch("/api/clienti?tipo=REFERENTE&includeStudenti=1");
+        if (!res.ok) throw new Error("Errore caricamento referenti");
+        const data = await res.json();
+        if (isMounted) {
+          setReferenti(Array.isArray(data) ? data : []);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setError(e.message || "Errore di rete");
+          setReferenti([]);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredReferenti = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return referenti;
+    return referenti.filter(ref => {
+      const refName = `${ref.nomeReferente || ""} ${ref.email || ""}`.toLowerCase();
+      if (refName.includes(query)) return true;
+      if (Array.isArray(ref.studenti)) {
+        return ref.studenti.some(stud =>
+          `${stud.nomeReferente || ""} ${stud.email || ""}`.toLowerCase().includes(query)
+        );
+      }
+      return false;
+    });
+  }, [referenti, search]);
+
+  const totalStudenti = useMemo(() => {
+    return referenti.reduce((acc, ref) => acc + (Array.isArray(ref.studenti) ? ref.studenti.length : 0), 0);
+  }, [referenti]);
+
+  return (
+    <AuthGuard>
+      <AdminOnly redirectTo="/profilo">
+        <Navbar />
+        <main style={mainStyle}>
+          <header style={headerBox}>
+            <div>
+              <h1 style={title}>Aule studenti</h1>
+              <p style={subtitle}>Seleziona lo studente per aprire lo spazio Aula e gestire i materiali condivisi.</p>
+            </div>
+            <div style={statsBox}>
+              <span style={statsNumber}>{totalStudenti}</span>
+              <span style={statsLabel}>Studenti attivi</span>
+            </div>
+          </header>
+
+          <section style={filtersRow}>
+            <input
+              type="search"
+              placeholder="Cerca per studente o referente..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={searchInputStyle}
+            />
+          </section>
+
+          {loading && <div style={infoBox}>Caricamento dati…</div>}
+          {error && !loading && <div style={{ ...infoBox, background: "#fee2e2", color: "#7f1d1d" }}>{error}</div>}
+
+          {!loading && !error && filteredReferenti.length === 0 && (
+            <div style={infoBox}>Nessun referente con studenti trovato.</div>
+          )}
+
+          <div style={cardsGrid}>
+            {filteredReferenti.map(ref => (
+              <article key={ref.id} style={card}>
+                <div style={cardHeader}>
+                  <div>
+                    <div style={cardReferente}>{ref.nomeReferente || ref.email || `Referente #${ref.id}`}</div>
+                    <div style={cardEmail}>{ref.email}</div>
+                  </div>
+                  <div style={badge}>{Array.isArray(ref.studenti) ? ref.studenti.length : 0} studenti</div>
+                </div>
+                <div style={studentsList}>
+                  {Array.isArray(ref.studenti) && ref.studenti.length > 0 ? (
+                    ref.studenti.map(stud => (
+                      <div key={stud.id} style={studentRow}>
+                        <div>
+                          <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
+                          <div style={studentEmail}>{stud.email}</div>
+                            {Array.isArray(stud.materie) && stud.materie.length > 0 && (
+                              <div style={studentSubjects}>Materie: {stud.materie.join(", ")}</div>
+                            )}
+                        </div>
+                        <Link href={`/aula/${stud.id}`} style={enterButton}>Apri Aula</Link>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={emptyStudent}>Nessuno studente associato.</div>
+                  )}
+const studentSubjects = { fontSize: "12px", color: "#1e3a8a", marginTop: "4px" };
+                </div>
+              </article>
+            ))}
+          </div>
+        </main>
+      </AdminOnly>
+    </AuthGuard>
+  );
+}
+
+const mainStyle = {
+  maxWidth: "1100px",
+  margin: "40px auto 60px",
+  padding: "0 24px 60px",
+  fontFamily: "'Inter','Segoe UI',Arial,sans-serif",
+  color: "#20489a"
+};
+
+const headerBox = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: "24px",
+  background: "#20489a",
+  color: "#fff",
+  padding: "24px",
+  borderRadius: "24px",
+  boxShadow: "0 12px 32px rgba(32,72,154,0.35)"
+};
+
+const title = { margin: 0, fontSize: "28px", fontWeight: 800 };
+const subtitle = { margin: "8px 0 0", fontSize: "15px", opacity: 0.85 };
+
+const statsBox = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end"
+};
+
+const statsNumber = { fontSize: "36px", fontWeight: 800 };
+const statsLabel = { fontSize: "13px", opacity: 0.85 };
+
+const filtersRow = {
+  marginTop: "30px",
+  marginBottom: "24px"
+};
+
+const searchInputStyle = {
+  width: "100%",
+  padding: "12px 16px",
+  borderRadius: "12px",
+  border: "1.5px solid #4268b3",
+  fontSize: "15px",
+  color: "#20489a",
+  boxShadow: "0 4px 18px rgba(32,72,154,0.10)"
+};
+
+const infoBox = {
+  background: "#e3eefe",
+  border: "1px dashed #9bb4e8",
+  padding: "16px",
+  borderRadius: "14px",
+  fontWeight: 600,
+  color: "#20489a",
+  textAlign: "center",
+  marginTop: "18px"
+};
+
+const cardsGrid = {
+  display: "grid",
+  gap: "22px",
+  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))"
+};
+
+const card = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "20px",
+  boxShadow: "0 12px 28px rgba(32,72,154,0.12)",
+  border: "1px solid #e2e8f0",
+  display: "flex",
+  flexDirection: "column",
+  gap: "16px"
+};
+
+const cardHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "12px"
+};
+
+const cardReferente = { fontWeight: 700, fontSize: "15px" };
+const cardEmail = { fontSize: "13px", color: "#5a6d90" };
+
+const badge = {
+  background: "#1cb0f6",
+  color: "#fff",
+  padding: "6px 12px",
+  borderRadius: "999px",
+  fontWeight: 700,
+  fontSize: "13px"
+};
+
+const studentsList = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "12px"
+};
+
+const studentRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  background: "#f5f8ff",
+  padding: "12px 14px",
+  borderRadius: "12px",
+  border: "1px solid #d8e3fb"
+};
+
+const studentName = { fontWeight: 600, fontSize: "14px" };
+const studentEmail = { fontSize: "12px", color: "#5a6d90" };
+const studentSubjects = { fontSize: "12px", color: "#1e3a8a", marginTop: "4px" };
+
+const enterButton = {
+  background: "#20489a",
+  color: "#fff",
+  padding: "8px 14px",
+  borderRadius: "10px",
+  fontWeight: 600,
+  fontSize: "13px",
+  textDecoration: "none"
+};
+
+const emptyStudent = {
+  fontSize: "13px",
+  color: "#5a6d90",
+  textAlign: "center"
+};

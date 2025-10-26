@@ -5,6 +5,10 @@ function hasAtLeastOneNote(clienti) {
   return clienti.some(c => c.note && c.note.trim() !== "");
 }
 
+function hasMaterie(clienti) {
+  return clienti.some(c => Array.isArray(c.materie) && c.materie.length > 0);
+}
+
 function sortByNome(clienti, direction) {
   // Ordinamento case-insensitive, fallback se vuoto
   return [...clienti].sort((a, b) => {
@@ -16,8 +20,20 @@ function sortByNome(clienti, direction) {
   });
 }
 
+function formatTipo(tipo) {
+  if (tipo === "STUDENTE") return "Studente";
+  if (tipo === "REFERENTE") return "Referente";
+  return tipo || "-";
+}
+
+function formatReferente(cliente) {
+  if (!cliente?.referente) return "-";
+  return cliente.referente.nomeReferente || cliente.referente.email || `ID ${cliente.referente.id}`;
+}
+
 export default function ClientiTable({ clienti, onEdit, onDelete, onViewDetails, dettaglioCliente }) {
   const showNote = hasAtLeastOneNote(clienti);
+  const showMaterie = hasMaterie(clienti);
 
   // Stato ordinamento: null = nessun ordinamento, altrimenti {direction: "asc"|"desc"}
   const [nomeSort, setNomeSort] = useState(null);
@@ -55,7 +71,10 @@ export default function ClientiTable({ clienti, onEdit, onDelete, onViewDetails,
             Nome referente
             {renderSortIcon()}
           </th>
+          <th className="px-2 py-2 border">Tipo</th>
+          <th className="px-2 py-2 border">Referente</th>
           <th className="px-2 py-2 border">Email</th>
+          {showMaterie && <th className="px-2 py-2 border">Materie</th>}
           {showNote && <th className="px-2 py-2 border">Note</th>}
           <th className="px-2 py-2 border">Azioni</th>
         </tr>
@@ -63,7 +82,7 @@ export default function ClientiTable({ clienti, onEdit, onDelete, onViewDetails,
       <tbody>
         {clientiOrdinati.length === 0 ? (
           <tr>
-            <td colSpan={showNote ? 5 : 4} className="text-center py-4">
+            <td colSpan={6 + (showMaterie ? 1 : 0) + (showNote ? 1 : 0)} className="text-center py-4">
               Nessun cliente presente
             </td>
           </tr>
@@ -72,7 +91,14 @@ export default function ClientiTable({ clienti, onEdit, onDelete, onViewDetails,
             <tr key={c.id} className="align-top">
               <td className="border px-2 py-3">{c.id}</td>
               <td className="border px-2 py-3">{c.nomeReferente || c.nome || ""}</td>
+              <td className="border px-2 py-3">{formatTipo(c.tipo)}</td>
+              <td className="border px-2 py-3">{formatReferente(c)}</td>
               <td className="border px-2 py-3">{c.email}</td>
+              {showMaterie && (
+                <td className="border px-2 py-3">
+                  {Array.isArray(c.materie) && c.materie.length > 0 ? c.materie.join(", ") : "-"}
+                </td>
+              )}
               {showNote && (
                 <td className="border px-2 py-3">
                   {c.note && c.note.trim() !== "" ? c.note : ""}

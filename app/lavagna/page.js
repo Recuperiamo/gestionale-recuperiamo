@@ -18,7 +18,7 @@ export default function PaginaLavagna() {
   // Carica clienti solo per admin
   useEffect(() => {
     if (status === "authenticated" && isAdmin) {
-      fetch("/api/clienti")
+      fetch("/api/clienti?tipo=STUDENTE")
         .then(r => r.json())
         .then(data => {
           // DEBUG: logga la risposta dei clienti per capire cosa arriva
@@ -129,6 +129,7 @@ export default function PaginaLavagna() {
                 {clienti.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.nomeReferente || c.email} (ID: {c.id})
+                    {c.referente ? ` – Ref. ${c.referente.nomeReferente || c.referente.email || c.referente.id}` : ""}
                   </option>
                 ))}
               </select>

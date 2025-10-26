@@ -18,7 +18,7 @@ export default function PacchettoForm({ onClose, onSuccess, clienteId: propClien
   useEffect(() => {
     async function fetchClienti() {
       try {
-        const res = await fetch("/api/clienti");
+        const res = await fetch("/api/clienti?tipo=STUDENTE");
         if (!res.ok) throw new Error("Errore caricamento clienti");
         const data = await res.json();
         setClienti(Array.isArray(data) ? data : []);
@@ -113,6 +113,7 @@ export default function PacchettoForm({ onClose, onSuccess, clienteId: propClien
               {cl.nomeReferente
                 ? `${cl.nomeReferente} (${cl.email || cl.id})`
                 : cl.email || cl.id}
+              {cl.referente ? ` – Ref. ${cl.referente.nomeReferente || cl.referente.email || cl.referente.id}` : ""}
             </option>
           ))}
         </select>

@@ -1,6 +1,32 @@
 import { PrismaClient } from '@prisma/client';
+import { MATERIE_AULA } from '../../../lib/materie';
 
 const prisma = new PrismaClient();
+
+const CLIENT_TYPES = ["REFERENTE", "STUDENTE"];
+
+function normalizeClientType(value) {
+  const normalized = (value || "").toString().trim().toUpperCase();
+  return CLIENT_TYPES.includes(normalized) ? normalized : "REFERENTE";
+}
+
+const VALID_MATERIE = new Set(MATERIE_AULA);
+
+function sanitizeMaterie(input) {
+  if (!Array.isArray(input)) return [];
+  const unique = [];
+  const seen = new Set();
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue;
+    const value = raw.trim();
+    if (!value) continue;
+    if (!VALID_MATERIE.has(value)) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    unique.push(value);
+  }
+  return unique;
+}
 
 // --- Validazioni helper ---
 function isValidEmail(email) {
@@ -24,6 +50,10 @@ export async function POST(req) {
     console.log('EMAIL RICEVUTA DAL CLIENT:', JSON.stringify(body.email));
     console.log('EMAIL DOPO TRIM:', JSON.stringify(body.email?.trim()));
     console.log('EMAIL DOPO TRIM/LOWER:', JSON.stringify(body.email?.trim().toLowerCase()));
+
+    const tipo = normalizeClientType(body.tipo);
+    let referenteId = body.referenteId ? Number(body.referenteId) : null;
+    let materieSelezionate = sanitizeMaterie(body.materie);
 
     // Validazione obbligatorietà e formato
     if (!body.nomeReferente || !body.nomeReferente.trim()) {
@@ -59,6 +89,39 @@ export async function POST(req) {
       );
     }
 
+    if (tipo === "STUDENTE") {
+      if (materieSelezionate.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Seleziona almeno una materia in cui lo studente è seguito.' }),
+          { status: 400 }
+        );
+      }
+    }
+
+    if (tipo === "STUDENTE" && referenteId) {
+      const referente = await prisma.client.findUnique({
+        where: { id: referenteId },
+        select: { id: true, tipo: true }
+      });
+      if (!referente) {
+        return new Response(
+          JSON.stringify({ error: 'Referente selezionato inesistente' }),
+          { status: 400 }
+        );
+      }
+      if (referente.tipo !== "REFERENTE") {
+        return new Response(
+          JSON.stringify({ error: 'Il referente associato deve avere tipo REFERENTE' }),
+          { status: 400 }
+        );
+      }
+    }
+
+    if (tipo === "REFERENTE") {
+      referenteId = null;
+      materieSelezionate = [];
+    }
+
     // Creazione cliente
     const nuovoCliente = await prisma.client.create({
       data: {
@@ -69,7 +132,20 @@ export async function POST(req) {
         codiceFiscale: body.codiceFiscale?.trim() || null,
         partitaIva: body.partitaIva?.trim() || null,
         note: body.note?.trim() || null,
+        tipo,
+        referenteId,
+        materie: materieSelezionate,
       },
+      include: {
+        referente: {
+          select: {
+            id: true,
+            nomeReferente: true,
+            email: true,
+            tipo: true
+          }
+        }
+      }
     });
 
     return new Response(JSON.stringify(nuovoCliente), { status: 201 });
@@ -92,20 +168,42 @@ export async function POST(req) {
 
 // --- CRUD AGGIUNTIVO ---
 
-export async function GET() {
+export async function GET(req) {
   try {
+    const url = new URL(req.url);
+    const tipoParam = url.searchParams.get('tipo');
+    const includeStudenti = url.searchParams.get('includeStudenti') === '1';
+    const where = {};
+    if (tipoParam) {
+      const normalizedTipo = normalizeClientType(tipoParam);
+      where.tipo = normalizedTipo;
+    }
+
     // Restituisci tutti i campi necessari per la tabella clienti (UI) e per la select (PacchettoForm)
     const clienti = await prisma.client.findMany({
       orderBy: { id: 'desc' },
-      select: {
-        id: true,
-        nomeReferente: true,  // campo per la tabella clienti
-        email: true,          // campo per la tabella clienti
-        telefono: true,
-        indirizzo: true,
-        codiceFiscale: true,
-        partitaIva: true,
-        note: true,
+      where,
+      include: {
+        referente: {
+          select: {
+            id: true,
+            nomeReferente: true,
+            email: true,
+            tipo: true,
+            materie: true
+          }
+        },
+        studenti: includeStudenti
+          ? {
+              select: {
+                id: true,
+                nomeReferente: true,
+                email: true,
+                tipo: true,
+                materie: true
+              }
+            }
+          : undefined,
       }
     });
     return new Response(JSON.stringify(clienti), { status: 200 });
@@ -140,6 +238,17 @@ export async function PUT(req) {
     if (!id) {
       return new Response(JSON.stringify({ error: 'ID cliente mancante' }), { status: 400 });
     }
+    const tipo = normalizeClientType(body.tipo);
+    let referenteId = body.referenteId ? Number(body.referenteId) : null;
+    let materieSelezionate = sanitizeMaterie(body.materie);
+
+    if (referenteId && Number(referenteId) === Number(id)) {
+      return new Response(
+        JSON.stringify({ error: 'Uno studente non può essere referente di sé stesso' }),
+        { status: 400 }
+      );
+    }
+
     // Validazioni come in POST
     if (!body.nomeReferente || !body.nomeReferente.trim()) {
       return new Response(
@@ -174,6 +283,39 @@ export async function PUT(req) {
       );
     }
 
+    if (tipo === "STUDENTE") {
+      if (materieSelezionate.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Seleziona almeno una materia in cui lo studente è seguito.' }),
+          { status: 400 }
+        );
+      }
+    }
+
+    if (tipo === "STUDENTE" && referenteId) {
+      const referente = await prisma.client.findUnique({
+        where: { id: referenteId },
+        select: { id: true, tipo: true }
+      });
+      if (!referente) {
+        return new Response(
+          JSON.stringify({ error: 'Referente selezionato inesistente' }),
+          { status: 400 }
+        );
+      }
+      if (referente.tipo !== "REFERENTE") {
+        return new Response(
+          JSON.stringify({ error: 'Il referente associato deve avere tipo REFERENTE' }),
+          { status: 400 }
+        );
+      }
+    }
+
+    if (tipo === "REFERENTE") {
+      referenteId = null;
+      materieSelezionate = [];
+    }
+
     const cliente = await prisma.client.update({
       where: { id: Number(id) },
       data: {
@@ -184,6 +326,19 @@ export async function PUT(req) {
         codiceFiscale: body.codiceFiscale?.trim() || null,
         partitaIva: body.partitaIva?.trim() || null,
         note: body.note?.trim() || null,
+        tipo,
+        referenteId,
+        materie: materieSelezionate,
+      },
+      include: {
+        referente: {
+          select: {
+            id: true,
+            nomeReferente: true,
+            email: true,
+            tipo: true
+          }
+        }
       }
     });
     return new Response(JSON.stringify(cliente), { status: 200 });

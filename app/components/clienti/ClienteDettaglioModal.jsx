@@ -6,6 +6,10 @@ export default function ClienteDettaglioModal({ cliente, onClose }) {
 
   const nomeCliente = cliente?.nome || cliente?.nomeReferente || cliente?.ragioneSociale || "-";
   const emailCliente = cliente?.email || "-";
+  const tipoLabel = cliente?.tipo === "STUDENTE" ? "Studente" : "Referente";
+  const referenteLabel = cliente?.referente?.nomeReferente || cliente?.referente?.email || null;
+  const studentiAssociati = Array.isArray(cliente?.studenti) ? cliente.studenti : [];
+  const materieStudente = Array.isArray(cliente?.materie) ? cliente.materie : [];
 
   return (
     <div className="cliente-modal-overlay">
@@ -17,6 +21,31 @@ export default function ClienteDettaglioModal({ cliente, onClose }) {
         <div className="info">
           <div><b>Nome:</b> {nomeCliente}</div>
           <div><b>Email:</b> {emailCliente}</div>
+          <div><b>Tipo:</b> {tipoLabel}</div>
+          {cliente?.tipo === "STUDENTE" && (
+            <div><b>Referente:</b> {referenteLabel || "-"}</div>
+          )}
+          {cliente?.tipo === "STUDENTE" && (
+            <div>
+              <b>Materie seguite:</b> {materieStudente.length > 0 ? materieStudente.join(", ") : "-"}
+            </div>
+          )}
+          {cliente?.tipo === "REFERENTE" && (
+            <div>
+              <b>Studenti collegati:</b>{" "}
+              {studentiAssociati.length === 0 ? (
+                <span>-</span>
+              ) : (
+                <ul style={{ marginTop: 6, marginBottom: 0, paddingLeft: 18 }}>
+                  {studentiAssociati.map((stud) => (
+                    <li key={stud.id}>
+                      {stud.nomeReferente || stud.email || `Studente #${stud.id}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
         <div style={{ margin: "12px 0" }}>
           <a

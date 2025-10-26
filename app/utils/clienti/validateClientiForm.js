@@ -1,10 +1,38 @@
+import { MATERIE_AULA } from "../../../lib/materie";
+
+const VALID_MATERIE = new Set(MATERIE_AULA);
+
 // Validazione robusta client-side per il form clienti
 export function validateClientiForm(form) {
   const errors = [];
 
   // Nome referente obbligatorio e almeno 2 caratteri
   if (!form.nome || form.nome.trim().length < 2) {
-    errors.push("Il nome referente è obbligatorio (almeno 2 caratteri).");
+    errors.push("Il nome è obbligatorio (almeno 2 caratteri).");
+  }
+
+  const tipo = (form.tipo || "").toString().toUpperCase();
+  if (!["REFERENTE", "STUDENTE"].includes(tipo)) {
+    errors.push("Seleziona un tipo valido (Referente o Studente).");
+  }
+
+  if (tipo === "STUDENTE" && form.referenteId) {
+    const refId = Number(form.referenteId);
+    if (!Number.isInteger(refId) || refId <= 0) {
+      errors.push("Il referente selezionato non è valido.");
+    }
+  }
+
+  if (tipo === "STUDENTE") {
+    const materie = Array.isArray(form.materie) ? form.materie : [];
+    if (materie.length === 0) {
+      errors.push("Seleziona almeno una materia per lo studente.");
+    } else {
+      const invalid = materie.some((m) => !VALID_MATERIE.has(m));
+      if (invalid) {
+        errors.push("Sono state selezionate materie non valide.");
+      }
+    }
   }
 
   // Email: regex robusta, blacklist domini, blocco email troppo semplici

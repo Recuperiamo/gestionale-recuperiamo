@@ -1,15 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { validateClientiForm } from "../../utils/clienti/validateClientiForm";
+import { MATERIE_AULA } from "../../../lib/materie";
 
-export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, loading, setAlert }) {
+export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, loading, setAlert, clienti = [] }) {
   const [errors, setErrors] = useState([]);
 
   useEffect(() => {
     setErrors([]);
   }, [form, editId]);
 
+  const referenti = useMemo(
+    () => clienti.filter(c => c.tipo === 'REFERENTE'),
+    [clienti]
+  );
+
   const handleChange = e => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'tipo' && value === 'REFERENTE'
+        ? { referenteId: '', materie: [] }
+        : {})
+    }));
+  };
+
+  const handleMateriaToggle = (materia) => {
+    setForm(prev => {
+      const current = Array.isArray(prev.materie) ? prev.materie : [];
+      const exists = current.includes(materia);
+      const updated = exists ? current.filter(m => m !== materia) : [...current, materia];
+      return { ...prev, materie: updated };
+    });
   };
 
   const handleSubmit = e => {
@@ -32,7 +54,10 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
         indirizzo: "",
         cf: "",
         piva: "",
-        note: ""
+        note: "",
+        tipo: "REFERENTE",
+        referenteId: "",
+        materie: []
       });
     }
   };
@@ -46,11 +71,16 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
       indirizzo: "",
       cf: "",
       piva: "",
-      note: ""
+      note: "",
+      tipo: "REFERENTE",
+      referenteId: "",
+      materie: []
     });
     setErrors([]);
     if (setAlert) setAlert({ type: "", message: "" });
   };
+
+  const nomeLabel = form.tipo === 'STUDENTE' ? 'Nome studente *' : 'Nome referente *';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-lg mx-auto my-8">
@@ -64,9 +94,64 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
         </div>
       )}
       <div>
-        <label className="block font-bold">Nome referente *</label>
+        <label className="block font-bold">Tipo*</label>
+        <select
+          name="tipo"
+          value={form.tipo}
+          onChange={handleChange}
+          className="border px-2 py-1 rounded w-full"
+          disabled={loading}
+        >
+          <option value="REFERENTE">Referente</option>
+          <option value="STUDENTE">Studente</option>
+        </select>
+      </div>
+      <div>
+        <label className="block font-bold">{nomeLabel}</label>
         <input name="nome" value={form.nome} onChange={handleChange} required className="border px-2 py-1 rounded w-full" disabled={loading} />
       </div>
+      {form.tipo === 'STUDENTE' && (
+        <div>
+          <label className="block font-bold">Referente (opzionale)</label>
+          <select
+            name="referenteId"
+            value={form.referenteId}
+            onChange={handleChange}
+            className="border px-2 py-1 rounded w-full"
+            disabled={loading}
+          >
+            <option value="">-- Nessun referente --</option>
+            {referenti
+              .filter(ref => !editId || String(ref.id) !== String(editId))
+              .map(ref => (
+                <option key={ref.id} value={ref.id}>
+                  {ref.nomeReferente || ref.email || `ID ${ref.id}`}
+                </option>
+              ))}
+          </select>
+        </div>
+      )}
+      {form.tipo === 'STUDENTE' && (
+        <div>
+          <span className="block font-bold mb-1">Materie seguite *</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {MATERIE_AULA.map((materia) => {
+              const checked = Array.isArray(form.materie) && form.materie.includes(materia);
+              return (
+                <label key={materia} className="flex items-center gap-2 text-sm bg-blue-50 border border-blue-100 rounded px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => handleMateriaToggle(materia)}
+                    className="accent-blue-600"
+                  />
+                  <span>{materia}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div>
         <label className="block font-bold">Email *</label>
         <input name="email" value={form.email} onChange={handleChange} required className="border px-2 py-1 rounded w-full" disabled={loading} />

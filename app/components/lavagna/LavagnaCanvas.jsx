@@ -652,6 +652,12 @@ export default function LavagnaCanvas({
   useEffect(() => {
     const ch = getAblyChannel(channelName);
     ablyRef.current.ch = ch;
+
+    if (!ch) {
+      console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
+      return () => {};
+    }
+
     whenChannelAttached(channelName).catch((err) => {
       console.warn('[LavagnaCanvas] channel attach failed', err?.message);
     });
@@ -714,7 +720,6 @@ export default function LavagnaCanvas({
       setRedoStack([]);
       drawAll();
     };
-
     ch.subscribe('stroke:start', onStart);
     ch.subscribe('stroke:points', onPoints);
     ch.subscribe('stroke:done', onDone);

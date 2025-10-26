@@ -17,7 +17,10 @@ export default function ClientiPage() {
     indirizzo: '',
     cf: '',
     piva: '',
-    note: ''
+    note: '',
+    tipo: 'REFERENTE',
+    referenteId: '',
+    materie: []
   });
   const [alert, setAlert] = useState({ message: '', type: 'error' });
   const [loading, setLoading] = useState(false);
@@ -34,7 +37,7 @@ export default function ClientiPage() {
 
   const fetchClienti = async () => {
     try {
-      const res = await fetch('/api/clienti');
+      const res = await fetch('/api/clienti?includeStudenti=1');
       const data = await res.json();
       setClienti(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -42,15 +45,24 @@ export default function ClientiPage() {
     }
   };
 
-  const mapFormToApi = (formData) => ({
-    nomeReferente: formData.nome,
-    email: formData.email,
-    telefono: formData.telefono,
-    indirizzo: formData.indirizzo,
-    codiceFiscale: formData.cf,
-    partitaIva: formData.piva,
-    note: formData.note
-  });
+  const mapFormToApi = (formData) => {
+    const tipo = (formData.tipo || 'REFERENTE').toUpperCase();
+    return {
+      nomeReferente: formData.nome,
+      email: formData.email,
+      telefono: formData.telefono,
+      indirizzo: formData.indirizzo,
+      codiceFiscale: formData.cf,
+      partitaIva: formData.piva,
+      note: formData.note,
+      tipo,
+      referenteId:
+        tipo === 'STUDENTE' && formData.referenteId
+          ? Number(formData.referenteId)
+          : null,
+      materie: tipo === 'STUDENTE' ? (formData.materie || []) : []
+    };
+  };
 
   const handleAdd = async (formData) => {
     setAlert({ message: '', type: 'error' });
@@ -85,6 +97,9 @@ export default function ClientiPage() {
       cf: cliente.codiceFiscale || cliente.cf || '',
       piva: cliente.partitaIva || cliente.piva || '',
       note: cliente.note || '',
+      tipo: (cliente.tipo || 'REFERENTE').toUpperCase(),
+      referenteId: cliente.referenteId ? String(cliente.referenteId) : '',
+      materie: Array.isArray(cliente.materie) ? cliente.materie : []
     });
     setEditId(cliente.id);
     setDettaglioCliente(null);
@@ -107,9 +122,9 @@ export default function ClientiPage() {
         setLoading(false);
         return;
       }
-      setAlert({ message: 'Cliente aggiornato con successo!', type: 'success' });
-      setEditId(null);
-      setForm({ nome: '', email: '', telefono: '', indirizzo: '', cf: '', piva: '', note: '' });
+    setAlert({ message: 'Cliente aggiornato con successo!', type: 'success' });
+    setEditId(null);
+    setForm({ nome: '', email: '', telefono: '', indirizzo: '', cf: '', piva: '', note: '', tipo: 'REFERENTE', referenteId: '', materie: [] });
       fetchClienti();
     } catch (e) {
       setAlert({ message: 'Errore di rete', type: 'error' });
@@ -184,6 +199,7 @@ export default function ClientiPage() {
                 setEditId={setEditId}
                 loading={loading}
                 setAlert={setAlert}
+                clienti={clienti}
               />
             )}
           </div>
