@@ -63,24 +63,11 @@ export default function LavagnaCanvas({
   const backgroundRequestedRef = useRef(false);
   const backgroundRequestKeyRef = useRef(null);
   const [zoom, setZoom] = useState(1); // 1 = 100%
-  const palette = [
+  const penPalette = useMemo(() => [
+    "#111827",
     "#2563eb",
-    "#fb7185",
-    "#10b981",
-    "#f59e0b",
-    "#8b5cf6",
-    "#fff200",
-    "#ff00cc",
-    "#00fff7",
-    "#ff8000",
-    "#00ff00",
-    "#ff0000",
-    "#0000ff",
-    "#ffffff",
-    "#000000",
-    "linear-gradient(90deg, #ff0080, #7928ca)",
-    "repeating-linear-gradient(45deg, #fff, #fff 2px, #ffd700 2px, #ffd700 4px)"
-  ];
+    "#ef4444"
+  ], []);
   const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
@@ -112,6 +99,8 @@ export default function LavagnaCanvas({
   }, [attivitaId, lavagnaId]);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
+  const spectatorRosterRef = useRef(new Set());
+  const [spectatorCount, setSpectatorCount] = useState(0);
 
   // Shapes and selection
   const [forme, setForme] = useState([]); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
@@ -512,6 +501,31 @@ export default function LavagnaCanvas({
     }
   }, [spectatorMode, isAdmin, strumento]);
 
+  useEffect(() => {
+    if (!utenteId) return;
+    emitOrPublish('spectator:toggle', {
+      lavagnaId,
+      attivitaId,
+      userId: utenteId,
+      ruolo,
+      active: spectatorMode,
+      ts: Date.now()
+    });
+  }, [spectatorMode, emitOrPublish, lavagnaId, attivitaId, utenteId, ruolo]);
+
+  useEffect(() => () => {
+    if (!utenteId) return;
+    if (!spectatorModeRef.current) return;
+    emitOrPublish('spectator:toggle', {
+      lavagnaId,
+      attivitaId,
+      userId: utenteId,
+      ruolo,
+      active: false,
+      ts: Date.now()
+    });
+  }, [emitOrPublish, lavagnaId, attivitaId, utenteId, ruolo]);
+
 
   // Stream remoti in tempo reale (non persistiti finché non "done")
   const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
@@ -578,6 +592,12 @@ export default function LavagnaCanvas({
     backgroundRequestedRef.current = true;
     emitOrPublish('background:request', { lavagnaId, attivitaId });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (!utenteId) return;
+    emitOrPublish('spectator:request', { lavagnaId, attivitaId, requesterId: utenteId, ts: Date.now() });
+  }, [isAdmin, emitOrPublish, lavagnaId, attivitaId, utenteId]);
 
   const flushOutgoing = useCallback(() => {
     if (!currentStreamId.current) {
@@ -774,6 +794,30 @@ export default function LavagnaCanvas({
         ts: Date.now()
       });
     };
+    const onSpectatorToggle = (msg) => {
+      const { data } = msg || {};
+      const { userId, active } = data || {};
+      if (!userId) return;
+      const roster = spectatorRosterRef.current;
+      if (active) {
+        roster.add(userId);
+      } else {
+        roster.delete(userId);
+      }
+      setSpectatorCount(roster.size);
+    };
+    const onSpectatorRequest = () => {
+      if (isAdmin) return;
+      if (!spectatorModeRef.current) return;
+      emitOrPublish('spectator:toggle', {
+        lavagnaId,
+        attivitaId,
+        userId: utenteId,
+        ruolo,
+        active: true,
+        ts: Date.now()
+      });
+    };
     ch.subscribe('shape:create', onShapeCreate);
     ch.subscribe('shape:update', onShapeUpdate);
     ch.subscribe('shape:delete', onShapeDelete);
@@ -781,6 +825,8 @@ export default function LavagnaCanvas({
     ch.subscribe('background:request', onBackgroundRequest);
     ch.subscribe('viewport:update', onViewportUpdate);
     ch.subscribe('viewport:request', onViewportRequest);
+    ch.subscribe('spectator:toggle', onSpectatorToggle);
+    ch.subscribe('spectator:request', onSpectatorRequest);
     ch.subscribe('clear-lavagna', onClear);
 
     return () => {
@@ -797,9 +843,11 @@ export default function LavagnaCanvas({
         ch.unsubscribe('background:request', onBackgroundRequest);
         ch.unsubscribe('viewport:update', onViewportUpdate);
         ch.unsubscribe('viewport:request', onViewportRequest);
+        ch.unsubscribe('spectator:toggle', onSpectatorToggle);
+        ch.unsubscribe('spectator:request', onSpectatorRequest);
       } catch (_) {}
     };
-  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId]);
+  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId, ruolo]);
 
   // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());
@@ -1990,147 +2038,56 @@ export default function LavagnaCanvas({
 
 
   // Toolbar in basso al centro
-  const toolbar = useMemo(
-    () => {
-      const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento);
-      const shapeButtonActive = shapeActive || showShapesPopover;
-      return (
+  const toolbar = useMemo(() => {
+    if (!showTools) return null;
+    if (!isAdmin && spectatorMode) return null;
+    const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento);
+    const shapeButtonActive = shapeActive || showShapesPopover;
+    return (
       <div style={st.bottomToolbarDock}>
         <div style={st.toolbarPill}>
-          {/* Lazzo (freccia selezione) */}
           <button
             type="button"
             style={iconBtn(strumento === 'lazzo')}
             onClick={() => { setStrumento('lazzo'); setShowPenPopover(false); setShowMoreMenu(false); setShowShapesPopover(false); }}
-            title="Seleziona/sposta/duplica"
+            title="Seleziona"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 9-7 2-2 7-9-18z" fill={strumento==='lazzo'? '#fff':'#20489a'}/></svg>
           </button>
-          {/* Forme / Penna magica */}
-          <div style={{ position:'relative' }}>
-            <button
-              type="button"
-              style={iconBtn(shapeButtonActive)}
-              onClick={() => {
-                setShowShapesPopover((v) => !v);
-                setShowPenPopover(false);
-                setShowMoreMenu(false);
-              }}
-              title="Forme e gomma magica"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="11" width="10" height="10" rx="2" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
-                <circle cx="16.5" cy="7.5" r="4" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
-                <path d="M4 4l6 6" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
-            {showShapesPopover && (
-              <div style={st.popover}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:8 }}>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'rettangolo')}
-                    onClick={() => { setStrumento('rettangolo'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Rettangolo"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke={strumento==='rettangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'cerchio')}
-                    onClick={() => { setStrumento('cerchio'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Cerchio / Ellisse"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke={strumento==='cerchio'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'linea')}
-                    onClick={() => { setStrumento('linea'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Linea"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'triangolo')}
-                    onClick={() => { setStrumento('triangolo'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Triangolo"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5l8 14H4L12 5z" stroke={strumento==='triangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'rombo')}
-                    onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Rombo"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'freccia')}
-                    onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Freccia"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    style={iconBtn(strumento === 'magicpen')}
-                    onClick={() => { setStrumento('magicpen'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
-                    title="Gomma magica (auto-figure)"
-                  >
-                    <span style={{fontSize:18}}>✨</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Mano / Pan */}
           <button
             type="button"
             style={iconBtn(strumento === 'mano')}
             onClick={() => { setStrumento('mano'); setShowPenPopover(false); setShowMoreMenu(false); setShowShapesPopover(false); }}
-            title="Sposta lavagna (mano)"
+            title="Sposta"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
             </svg>
           </button>
-          {/* Penna con popover */}
           <div style={{ position:'relative' }}>
             <button
               type="button"
-              style={iconBtn(strumento === 'penna')}
-              onClick={() => { setStrumento('penna'); setShowPenPopover(v=>!v); setShowMoreMenu(false); setShowShapesPopover(false); }}
+              style={iconBtn(strumento === 'penna' || showPenPopover)}
+              onClick={() => { setStrumento('penna'); setShowPenPopover((v) => !v); setShowShapesPopover(false); setShowMoreMenu(false); }}
               title="Penna"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 21l3-1 11-11-2-2L4 18l-1 3z" fill={strumento==='penna'? '#fff':'#20489a'}/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 21l3-1 11-11-2-2L4 18l-1 3z" fill={strumento==='penna'||showPenPopover? '#fff':'#20489a'}/></svg>
             </button>
             {showPenPopover && (
               <div style={st.popover}>
-                <div style={st.paletteGrid}>
-                  {palette.map((c, i) => {
+                <div style={st.penColorsRow}>
+                  {penPalette.map((c) => {
                     const isSelected = c === colore;
-                    const isGradient = typeof c === 'string' && c.includes('gradient');
                     return (
                       <button
-                        key={i}
+                        key={c}
                         onClick={() => setColore(c)}
-                        title={isGradient ? 'Palette' : c}
+                        title={c}
                         style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 8,
+                          ...st.penColorButton,
                           border: isSelected ? '2.5px solid #20489a' : '1.5px solid #dbe6f5',
-                          background: isGradient ? undefined : c,
-                          backgroundImage: isGradient ? c : undefined,
                           boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #20489a' : '0 1px 2px rgba(32,72,154,0.25)',
-                          cursor: 'pointer',
-                          transition: 'box-shadow .15s',
-                          outline: 'none',
-                          margin: 2
+                          background: c
                         }}
                       />
                     );
@@ -2145,7 +2102,7 @@ export default function LavagnaCanvas({
                   <button
                     type="button"
                     onClick={()=>colorInputRef.current?.click()}
-                    title="Altri colori"
+                    title="Altro"
                     style={st.colorWheelBtn}
                   >
                     🎨
@@ -2158,7 +2115,6 @@ export default function LavagnaCanvas({
               </div>
             )}
           </div>
-          {/* Gomma */}
           <button
             type="button"
             style={iconBtn(strumento === 'gomma')}
@@ -2167,10 +2123,53 @@ export default function LavagnaCanvas({
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M16 3l5 5-9 9H7L2 12l9-9 5 0z" fill={strumento==='gomma'? '#fff':'#20489a'} /></svg>
           </button>
-          {/* forme e penna magica: implementazione rimandata (segnaposto) */}
-          {/* More */}
           <div style={{ position:'relative' }}>
-            <button type="button" style={iconBtn(false)} onClick={()=> { setShowMoreMenu(v=>!v); setShowPenPopover(false); setShowShapesPopover(false); }} title="Altro">⋯</button>
+            <button
+              type="button"
+              style={iconBtn(shapeButtonActive)}
+              onClick={() => {
+                setShowShapesPopover((v) => !v);
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+              }}
+              title="Forme"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="11" width="10" height="10" rx="2" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
+                <circle cx="16.5" cy="7.5" r="4" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
+                <path d="M4 4l6 6" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+            {showShapesPopover && (
+              <div style={st.popover}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:8 }}>
+                  <button type="button" style={iconBtn(strumento === 'rettangolo')} onClick={() => { setStrumento('rettangolo'); setShowShapesPopover(false); }} title="Rettangolo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke={strumento==='rettangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                  </button>
+                  <button type="button" style={iconBtn(strumento === 'cerchio')} onClick={() => { setStrumento('cerchio'); setShowShapesPopover(false); }} title="Cerchio / Ellisse">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke={strumento==='cerchio'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                  </button>
+                  <button type="button" style={iconBtn(strumento === 'linea')} onClick={() => { setStrumento('linea'); setShowShapesPopover(false); }} title="Linea">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
+                  </button>
+                  <button type="button" style={iconBtn(strumento === 'triangolo')} onClick={() => { setStrumento('triangolo'); setShowShapesPopover(false); }} title="Triangolo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5l8 14H4L12 5z" stroke={strumento==='triangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                  </button>
+                  <button type="button" style={iconBtn(strumento === 'rombo')} onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); }} title="Rombo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                  </button>
+                  <button type="button" style={iconBtn(strumento === 'freccia')} onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); }} title="Freccia">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button type="button" style={iconBtn(strumento === 'magicpen')} onClick={() => { setStrumento('magicpen'); setShowShapesPopover(false); }} title="Magic pen">
+                    <span style={{fontSize:18}}>✨</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ position:'relative' }}>
+            <button type="button" style={iconBtn(showMoreMenu)} onClick={()=> { setShowMoreMenu(v=>!v); setShowPenPopover(false); setShowShapesPopover(false); }} title="Altro">⋯</button>
             {showMoreMenu && (
               <div style={st.popover}>
                 {isAdmin ? (
@@ -2220,29 +2219,26 @@ export default function LavagnaCanvas({
           </div>
         </div>
         {salvando && <span style={st.saving}>Salvataggio…</span>}
-        {!isAdmin && spectatorMode && <span style={st.spectatorBadge}>Spettatore</span>}
       </div>
     );
-    },
-    [
-      strumento,
-      colore,
-      spessore,
-      undoStack.length,
-      redoStack.length,
-      salvando,
-      gommaPuntuale,
-      sfondo,
-      zoom,
-      showPenPopover,
-      showShapesPopover,
-      showMoreMenu,
-      isAdmin,
-      handleChangeSfondo,
-      spectatorMode,
-      spectatorToggleId
-    ]
-  );
+  }, [
+    showTools,
+    isAdmin,
+    spectatorMode,
+    strumento,
+    showShapesPopover,
+    showPenPopover,
+    showMoreMenu,
+    penPalette,
+    colore,
+    spessore,
+    gommaPuntuale,
+    sfondo,
+    sfondoLabels,
+    salvando,
+    handleChangeSfondo,
+    spectatorToggleId
+  ]);
 
   const canvasCursor = useMemo(() => {
     if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
@@ -2251,23 +2247,47 @@ export default function LavagnaCanvas({
     return `url(${st.penCursor}) 0 24, crosshair`;
   }, [contextPanning, strumento, isPanning]);
 
+  const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
+  const spectatorIndicatorTitle = isAdmin
+    ? (spectatorCount > 0 ? `Modalità spettatore attiva (${spectatorCount})` : '')
+    : 'Modalità spettatore attiva';
+
   // == RENDER ==
   return (
     <div style={st.wrapper}>
       {/* Azioni in alto a destra all'esterno della lavagna */}
       <div style={st.topRightActionsOuter}>
-        <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
-        <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
-        <button style={btn(false)} onClick={exportPNG} type="button">Export PNG</button>
-        <button style={btn(false)} onClick={exportPDF} type="button">Export PDF</button>
-        {openInNewWindow && attivitaId && (
-          <button
-            style={btn(false)}
-            onClick={() => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")}
-            type="button"
+        {(!spectatorMode || isAdmin) && (
+          <div style={st.topRightActions}>
+            <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
+            <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
+            <button style={btn(false)} onClick={exportPNG} type="button">Export PNG</button>
+            <button style={btn(false)} onClick={exportPDF} type="button">Export PDF</button>
+            {openInNewWindow && attivitaId && (
+              <button
+                style={btn(false)}
+                onClick={() => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")}
+                type="button"
+              >
+                Apri in un'altra finestra
+              </button>
+            )}
+          </div>
+        )}
+        {spectatorIndicatorVisible && (
+          <div
+            style={{
+              ...st.eyeBadge,
+              cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
+            }}
+            onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
+            title={spectatorIndicatorTitle}
           >
-            Apri in un'altra finestra
-          </button>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
+            </svg>
+            {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
+          </div>
         )}
       </div>
       <div style={st.canvasBox}>
@@ -2359,8 +2379,9 @@ const st = {
   topRightActionsOuter: {
     position: "relative",
     display: "flex",
-    gap: 8,
+    gap: 12,
     justifyContent: "flex-end",
+    alignItems: "center",
     marginBottom: 8
   },
   group: {
@@ -2372,13 +2393,21 @@ const st = {
     borderRadius: 12,
     border: "1px solid #dbe6f5"
   },
-  paletteGrid: {
+  penColorsRow: {
     position: 'relative',
     display: 'flex',
-    flexWrap: 'wrap',
-    gap: 4,
-    maxWidth: 200,
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 10
+  },
+  penColorButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    border: '1.5px solid #dbe6f5',
+    cursor: 'pointer',
+    outline: 'none',
+    transition: 'box-shadow .15s'
   },
   colorWheelBtn: {
     width: 28,
@@ -2402,7 +2431,22 @@ const st = {
   },
   sizeLabel: { fontSize: 12, fontWeight: 600, color: "#20489a" },
   saving: { fontSize: 12, fontWeight: 600, color: "#8C7800" },
-  spectatorBadge: { fontSize: 12, fontWeight: 600, color: "#2563eb", marginLeft: 12 },
+  eyeBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: 'rgba(32,72,154,0.12)',
+    border: '1px solid rgba(32,72,154,0.2)',
+    color: '#20489a',
+    fontSize: 12,
+    fontWeight: 600
+  },
+  eyeCount: {
+    fontSize: 12,
+    fontWeight: 600
+  },
   canvasBox: {
     position: "relative",
     border: "1px solid #dbe6f5",
