@@ -118,7 +118,6 @@ export default function AulePage() {
                   ) : (
                     <div style={emptyStudent}>Nessuno studente associato.</div>
                   )}
-const studentSubjects = { fontSize: "12px", color: "#1e3a8a", marginTop: "4px" };
                 </div>
               </article>
             ))}
