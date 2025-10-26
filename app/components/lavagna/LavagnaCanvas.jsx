@@ -63,6 +63,25 @@ export default function LavagnaCanvas({
   const backgroundRequestedRef = useRef(false);
   const backgroundRequestKeyRef = useRef(null);
   const [zoom, setZoom] = useState(1); // 1 = 100%
+  const palette = [
+    "#2563eb",
+    "#fb7185",
+    "#10b981",
+    "#f59e0b",
+    "#8b5cf6",
+    "#fff200",
+    "#ff00cc",
+    "#00fff7",
+    "#ff8000",
+    "#00ff00",
+    "#ff0000",
+    "#0000ff",
+    "#ffffff",
+    "#000000",
+    "linear-gradient(90deg, #ff0080, #7928ca)",
+    "repeating-linear-gradient(45deg, #fff, #fff 2px, #ffd700 2px, #ffd700 4px)"
+  ];
+  const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
     nero: "Nero",
@@ -78,6 +97,21 @@ export default function LavagnaCanvas({
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
+  const [spectatorMode, setSpectatorMode] = useState(false);
+  const spectatorModeRef = useRef(false);
+  const latestAdminViewportRef = useRef(null);
+  const viewportBroadcastRef = useRef({ rafId: null, payload: null });
+  const spectatorStorageKey = useMemo(() => {
+    const keySource = attivitaId ?? lavagnaId;
+    if (!keySource || !utenteId) return null;
+    return `lavagna:spectator:${keySource}:${utenteId}`;
+  }, [attivitaId, lavagnaId, utenteId]);
+  const spectatorToggleId = useMemo(() => {
+    const base = String(attivitaId ?? lavagnaId ?? 'lavagna');
+    return `spectator-toggle-${base.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  }, [attivitaId, lavagnaId]);
+  const panRef = useRef(pan);
+  const zoomRef = useRef(zoom);
 
   // Shapes and selection
   const [forme, setForme] = useState([]); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
@@ -104,6 +138,8 @@ export default function LavagnaCanvas({
     // pulisci
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     // applichiamo pan e zoom per TUTTO (sfondo + contenuto) così si scala coerentemente
     const dpr = window.devicePixelRatio || 1;
@@ -114,43 +150,38 @@ export default function LavagnaCanvas({
     ctx.translate(-pan.x, -pan.y);
     ctx.scale(zoom, zoom);
 
-    // sfondo (dentro lo scale per coerenza visiva)
-    if (sfondo === 'nero') {
-      ctx.fillStyle = '#000';
-    } else {
-      ctx.fillStyle = '#fff';
-    }
-    // dimensioni viewport in unità mondo
     const viewW = W / zoom;
     const viewH = H / zoom;
-    ctx.fillRect(pan.x, pan.y, viewW, viewH);
-
+    // sfondo pattern (dentro lo scale per coerenza visiva)
     if (sfondo === 'righe' || sfondo === 'quadretti' || sfondo === 'punti') {
       const step = 32; // unità canvas
+      const margin = step * 6;
       ctx.strokeStyle = sfondo === 'righe' ? '#e5e7eb' : '#e2e8f0';
       ctx.fillStyle = '#e5e7eb';
       ctx.lineWidth = 1;
-      const startY = Math.floor(pan.y / step) * step;
-      const startX = Math.floor(pan.x / step) * step;
+      const startY = Math.floor((pan.y - margin) / step) * step;
+      const startX = Math.floor((pan.x - margin) / step) * step;
+      const endY = pan.y + viewH + margin;
+      const endX = pan.x + viewW + margin;
       if (sfondo === 'righe' || sfondo === 'quadretti') {
-        for (let y = startY; y < pan.y + viewH; y += step) {
+        for (let y = startY; y < endY; y += step) {
           ctx.beginPath();
-          ctx.moveTo(pan.x, y);
-          ctx.lineTo(pan.x + viewW, y);
+          ctx.moveTo(pan.x - margin, y);
+          ctx.lineTo(pan.x + viewW + margin, y);
           ctx.stroke();
         }
       }
       if (sfondo === 'quadretti') {
-        for (let x = startX; x < pan.x + viewW; x += step) {
+        for (let x = startX; x < endX; x += step) {
           ctx.beginPath();
-          ctx.moveTo(x, pan.y);
-          ctx.lineTo(x, pan.y + viewH);
+          ctx.moveTo(x, pan.y - margin);
+          ctx.lineTo(x, pan.y + viewH + margin);
           ctx.stroke();
         }
       }
       if (sfondo === 'punti') {
-        for (let y = startY; y < pan.y + viewH; y += step) {
-          for (let x = startX; x < pan.x + viewW; x += step) {
+        for (let y = startY; y < endY; y += step) {
+          for (let x = startX; x < endX; x += step) {
             ctx.beginPath();
             ctx.arc(x, y, 1, 0, Math.PI * 2);
             ctx.fill();
@@ -166,30 +197,97 @@ export default function LavagnaCanvas({
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = f.colore || '#20489a';
       ctx.lineWidth = f.spessore || 3;
-      if (f.kind === 'rettangolo') {
-        ctx.strokeRect(f.x, f.y, f.w, f.h);
-      } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
-        const cx = f.x + f.w / 2;
-        const cy = f.y + f.h / 2;
-        const rx = Math.abs(f.w) / 2;
-        const ry = Math.abs(f.h) / 2;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (f.kind === 'linea') {
-        ctx.beginPath();
-        ctx.moveTo(f.x, f.y);
-        ctx.lineTo(f.x2, f.y2);
-        ctx.stroke();
+      switch (f.kind) {
+        case 'rettangolo':
+        case 'quadrato':
+          ctx.strokeRect(f.x, f.y, f.w, f.h);
+          break;
+        case 'cerchio':
+        case 'ellisse': {
+          const cx = f.x + (f.w || 0) / 2;
+          const cy = f.y + (f.h || 0) / 2;
+          const rx = Math.abs(f.w || 0) / 2;
+          const ry = Math.abs(f.h || 0) / 2;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'linea':
+        case 'segmento':
+        case 'freccia': {
+          const x1 = f.x1 ?? f.x ?? 0;
+          const y1 = f.y1 ?? f.y ?? 0;
+          const x2 = f.x2 ?? x1;
+          const y2 = f.y2 ?? y1;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          if (f.kind === 'freccia') {
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const headLength = Math.max(10, (f.spessore || 3) * 3.2);
+            const headWidth = headLength * 0.8;
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(
+              x2 - headLength * Math.cos(angle) + headWidth * Math.sin(angle),
+              y2 - headLength * Math.sin(angle) - headWidth * Math.cos(angle)
+            );
+            ctx.lineTo(
+              x2 - headLength * Math.cos(angle) - headWidth * Math.sin(angle),
+              y2 - headLength * Math.sin(angle) + headWidth * Math.cos(angle)
+            );
+            ctx.closePath();
+            ctx.fillStyle = f.colore || '#20489a';
+            ctx.fill();
+          }
+          break;
+        }
+        case 'triangolo': {
+          const x = f.x;
+          const y = f.y;
+          const w = f.w;
+          const h = f.h;
+          ctx.beginPath();
+          ctx.moveTo(x + w / 2, y);
+          ctx.lineTo(x, y + h);
+          ctx.lineTo(x + w, y + h);
+          ctx.closePath();
+          ctx.stroke();
+          break;
+        }
+        case 'rombo': {
+          const x = f.x;
+          const y = f.y;
+          const w = f.w;
+          const h = f.h;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          ctx.beginPath();
+          ctx.moveTo(cx, y);
+          ctx.lineTo(x + w, cy);
+          ctx.lineTo(cx, y + h);
+          ctx.lineTo(x, cy);
+          ctx.closePath();
+          ctx.stroke();
+          break;
+        }
+        default:
+          break;
       }
       // Se selezionata, evidenzia
       if (selectedItems.forme.includes(f.id)) {
-        ctx.strokeStyle = '#2563eb';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6,4]);
-        if (f.kind === 'linea') ctx.strokeRect(Math.min(f.x,f.x2)-6, Math.min(f.y,f.y2)-6, Math.abs(f.x2-f.x)+12, Math.abs(f.y2-f.y)+12);
-        else ctx.strokeRect(f.x-6, f.y-6, f.w+12, f.h+12);
-        ctx.setLineDash([]);
+        const bounds = f._bb ?? getShapeBounds(f);
+        if (bounds) {
+          ctx.strokeStyle = '#2563eb';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6,4]);
+          const width = bounds.maxX - bounds.minX;
+          const height = bounds.maxY - bounds.minY;
+          ctx.strokeRect(bounds.minX - 6, bounds.minY - 6, width + 12, height + 12);
+          ctx.setLineDash([]);
+        }
       }
       ctx.restore();
     }
@@ -232,21 +330,78 @@ export default function LavagnaCanvas({
         ctx.strokeStyle = ps.colore || '#20489a';
         ctx.lineWidth = ps.spessore || 2;
         ctx.setLineDash([6,4]);
-        if (ps.kind === 'rettangolo') {
-          const x = Math.min(ps.x, ps.x2);
-          const y = Math.min(ps.y, ps.y2);
-          const w = Math.abs(ps.x2 - ps.x);
-          const h = Math.abs(ps.y2 - ps.y);
-          ctx.strokeRect(x, y, w, h);
-        } else if (ps.kind === 'cerchio' || ps.kind === 'ellisse') {
-          const x = Math.min(ps.x, ps.x2);
-          const y = Math.min(ps.y, ps.y2);
-          const w = Math.abs(ps.x2 - ps.x);
-          const h = Math.abs(ps.y2 - ps.y);
-          const cx = x + w/2; const cy = y + h/2;
-          ctx.beginPath(); ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2); ctx.stroke();
-        } else if (ps.kind === 'linea') {
-          ctx.beginPath(); ctx.moveTo(ps.x, ps.y); ctx.lineTo(ps.x2, ps.y2); ctx.stroke();
+        const startX = ps.xStart ?? ps.x;
+        const startY = ps.yStart ?? ps.y;
+        const endX = ps.x2;
+        const endY = ps.y2;
+        const minX = Math.min(startX, endX);
+        const minY = Math.min(startY, endY);
+        const w = Math.abs(endX - startX);
+        const h = Math.abs(endY - startY);
+        switch (ps.kind) {
+          case 'rettangolo':
+          case 'quadrato':
+            ctx.strokeRect(minX, minY, w, h);
+            break;
+          case 'cerchio':
+          case 'ellisse': {
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            break;
+          }
+          case 'linea':
+          case 'freccia': {
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            if (ps.kind === 'freccia') {
+              const angle = Math.atan2(endY - startY, endX - startX);
+              const headLength = Math.max(10, (ps.spessore || 2) * 3);
+              const headWidth = headLength * 0.8;
+              ctx.setLineDash([]);
+              ctx.beginPath();
+              ctx.moveTo(endX, endY);
+              ctx.lineTo(
+                endX - headLength * Math.cos(angle) + headWidth * Math.sin(angle),
+                endY - headLength * Math.sin(angle) - headWidth * Math.cos(angle)
+              );
+              ctx.lineTo(
+                endX - headLength * Math.cos(angle) - headWidth * Math.sin(angle),
+                endY - headLength * Math.sin(angle) + headWidth * Math.cos(angle)
+              );
+              ctx.closePath();
+              ctx.stroke();
+              ctx.setLineDash([6,4]);
+            }
+            break;
+          }
+          case 'triangolo': {
+            ctx.beginPath();
+            ctx.moveTo(minX + w / 2, minY);
+            ctx.lineTo(minX, minY + h);
+            ctx.lineTo(minX + w, minY + h);
+            ctx.closePath();
+            ctx.stroke();
+            break;
+          }
+          case 'rombo': {
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(minX + w, cy);
+            ctx.lineTo(cx, minY + h);
+            ctx.lineTo(minX, cy);
+            ctx.closePath();
+            ctx.stroke();
+            break;
+          }
+          default:
+            break;
         }
         ctx.setLineDash([]);
         ctx.restore();
@@ -287,6 +442,18 @@ export default function LavagnaCanvas({
   }, [sfondo]);
 
   useEffect(() => {
+    spectatorModeRef.current = spectatorMode;
+  }, [spectatorMode]);
+
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
     if (backgroundHydratedRef.current) return;
     if (!backgroundStorageKey) return;
     if (typeof window === 'undefined') return;
@@ -307,6 +474,43 @@ export default function LavagnaCanvas({
       window.localStorage.setItem(backgroundStorageKey, sfondo);
     } catch (_) {}
   }, [backgroundStorageKey, sfondo]);
+
+  useEffect(() => {
+    if (!spectatorStorageKey) return;
+    if (typeof window === 'undefined') return;
+    if (isAdmin) return;
+    try {
+      const stored = window.localStorage.getItem(spectatorStorageKey);
+      if (stored === '1') {
+        setSpectatorMode(true);
+      }
+    } catch (_) {}
+  }, [spectatorStorageKey, isAdmin]);
+
+  useEffect(() => {
+    if (!spectatorStorageKey) return;
+    if (typeof window === 'undefined') return;
+    try {
+      if (spectatorMode) {
+        window.localStorage.setItem(spectatorStorageKey, '1');
+      } else {
+        window.localStorage.removeItem(spectatorStorageKey);
+      }
+    } catch (_) {}
+  }, [spectatorMode, spectatorStorageKey]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (!spectatorMode) return;
+    setSpectatorMode(false);
+  }, [isAdmin, spectatorMode]);
+
+  useEffect(() => {
+    if (!spectatorMode || isAdmin) return;
+    if (strumento === 'mano') {
+      setStrumento('penna');
+    }
+  }, [spectatorMode, isAdmin, strumento]);
 
 
   // Stream remoti in tempo reale (non persistiti finché non "done")
@@ -333,6 +537,30 @@ export default function LavagnaCanvas({
     },
     [channelName]
   );
+
+  const applyViewport = useCallback((view) => {
+    if (!view) return;
+    const { pan: remotePan, zoom: remoteZoom } = view;
+    if (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number') {
+      setPan((prev) => {
+        if (prev.x === remotePan.x && prev.y === remotePan.y) return prev;
+        return { x: remotePan.x, y: remotePan.y };
+      });
+    }
+    if (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom)) {
+      setZoom((prev) => (prev === remoteZoom ? prev : remoteZoom));
+    }
+  }, [setPan, setZoom]);
+
+  useEffect(() => {
+    if (!spectatorMode || isAdmin) return;
+    const latest = latestAdminViewportRef.current;
+    if (latest) {
+      applyViewport(latest);
+    } else {
+      emitOrPublish('viewport:request', { lavagnaId, attivitaId, requesterId: utenteId });
+    }
+  }, [spectatorMode, isAdmin, applyViewport, emitOrPublish, lavagnaId, attivitaId, utenteId]);
 
   useEffect(() => {
     const key = attivitaId ?? lavagnaId;
@@ -372,6 +600,34 @@ export default function LavagnaCanvas({
       outgoingRAFRef.current = null;
     }
   }, [emitOrPublish, disegnando]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    viewportBroadcastRef.current.payload = {
+      lavagnaId,
+      attivitaId,
+      senderId: utenteId,
+      pan: { x: pan.x, y: pan.y },
+      zoom,
+      ts: Date.now()
+    };
+    if (!viewportBroadcastRef.current.rafId) {
+      viewportBroadcastRef.current.rafId = requestAnimationFrame(() => {
+        const pending = viewportBroadcastRef.current.payload;
+        viewportBroadcastRef.current.rafId = null;
+        if (pending) {
+          emitOrPublish('viewport:update', pending);
+        }
+      });
+    }
+  }, [pan, zoom, isAdmin, emitOrPublish, lavagnaId, attivitaId, utenteId]);
+
+  useEffect(() => () => {
+    if (viewportBroadcastRef.current.rafId) {
+      cancelAnimationFrame(viewportBroadcastRef.current.rafId);
+      viewportBroadcastRef.current.rafId = null;
+    }
+  }, []);
 
   useEffect(() => {
     const ch = getAblyChannel(channelName);
@@ -447,17 +703,20 @@ export default function LavagnaCanvas({
     const onShapeCreate = (msg) => {
       const { data } = msg || {};
       if (!data) return;
+      const normalized = normalizeShape(data);
+      if (!normalized) return;
       setForme((prev) => {
-        // avoid duplicate
-        if (prev.find((f) => f.id === data.id)) return prev;
-        return [...prev, data];
+        if (prev.find((f) => f.id === normalized.id)) return prev;
+        return [...prev, normalized];
       });
       drawAll();
     };
     const onShapeUpdate = (msg) => {
       const { data } = msg || {};
       if (!data || !data.id) return;
-      setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...data } : f)));
+      const normalized = normalizeShape(data);
+      if (!normalized) return;
+      setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
       drawAll();
     };
     const onShapeDelete = (msg) => {
@@ -483,11 +742,45 @@ export default function LavagnaCanvas({
       if (!isAdmin) return;
       emitOrPublish('background:change', { lavagnaId, attivitaId, sfondo: sfondoRef.current });
     };
+    const onViewportUpdate = (msg) => {
+      const { data } = msg || {};
+      if (!data) return;
+      if (data.senderId && data.senderId === utenteId) return;
+      const remotePan = data.pan;
+      const remoteZoom = data.zoom;
+      if (!remotePan && typeof remoteZoom !== 'number') return;
+      const snapshot = {
+        pan: (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number')
+          ? { x: remotePan.x, y: remotePan.y }
+          : (latestAdminViewportRef.current?.pan ?? panRef.current),
+        zoom: (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom))
+          ? remoteZoom
+          : (latestAdminViewportRef.current?.zoom ?? zoomRef.current),
+        ts: data.ts || Date.now()
+      };
+      latestAdminViewportRef.current = snapshot;
+      if (!isAdmin && spectatorModeRef.current) {
+        applyViewport(snapshot);
+      }
+    };
+    const onViewportRequest = () => {
+      if (!isAdmin) return;
+      emitOrPublish('viewport:update', {
+        lavagnaId,
+        attivitaId,
+        senderId: utenteId,
+        pan: { x: panRef.current.x, y: panRef.current.y },
+        zoom: zoomRef.current,
+        ts: Date.now()
+      });
+    };
     ch.subscribe('shape:create', onShapeCreate);
     ch.subscribe('shape:update', onShapeUpdate);
     ch.subscribe('shape:delete', onShapeDelete);
     ch.subscribe('background:change', onBackgroundChange);
     ch.subscribe('background:request', onBackgroundRequest);
+    ch.subscribe('viewport:update', onViewportUpdate);
+    ch.subscribe('viewport:request', onViewportRequest);
     ch.subscribe('clear-lavagna', onClear);
 
     return () => {
@@ -502,9 +795,11 @@ export default function LavagnaCanvas({
         ch.unsubscribe('shape:delete', onShapeDelete);
         ch.unsubscribe('background:change', onBackgroundChange);
         ch.unsubscribe('background:request', onBackgroundRequest);
+        ch.unsubscribe('viewport:update', onViewportUpdate);
+        ch.unsubscribe('viewport:request', onViewportRequest);
       } catch (_) {}
     };
-  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId]);
+  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId]);
 
   // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());
@@ -522,31 +817,45 @@ export default function LavagnaCanvas({
   }, [lavagnaId]);
 
   const createShapeLocal = useCallback((shape, emit = true) => {
-    setForme((prev) => [...prev, shape]);
-    if (emit) emitOrPublish('shape:create', { ...shape, lavagnaId });
+    const normalized = normalizeShape(shape);
+    if (!normalized) return;
+    setForme((prev) => [...prev, normalized]);
+    if (emit) emitOrPublish('shape:create', { ...normalized, lavagnaId });
     // try persist async (best-effort)
-    persistShape(shape).then((s) => {
+    persistShape(normalized).then((s) => {
       if (s && s.id) {
-        setForme((prev) => prev.map((f) => (f.id === shape.id ? { ...f, dbId: s.id } : f)));
+        setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
       }
     });
   }, [emitOrPublish, lavagnaId, persistShape]);
 
   const updateShapeLocal = useCallback((shape, emit = true) => {
-    setForme((prev) => prev.map((f) => (f.id === shape.id ? { ...f, ...shape } : f)));
-    if (emit) emitOrPublish('shape:update', { ...shape, lavagnaId });
+    const normalized = normalizeShape(shape);
+    if (!normalized) return;
+    setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, ...normalized } : f)));
+    if (emit) emitOrPublish('shape:update', { ...normalized, lavagnaId });
     fetch(`/api/lavagna/shape/${shape.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(shape)
+      body: JSON.stringify(normalized)
     }).catch(() => {});
   }, [emitOrPublish, lavagnaId]);
 
-  const deleteShapeLocal = useCallback((id, emit = true) => {
-    setForme((prev) => prev.filter((f) => f.id !== id));
+  const deleteShapeLocal = useCallback((id, emit = true, force = false) => {
+    let removedShape = null;
+    setForme((prev) => {
+      const target = prev.find((f) => f.id === id);
+      if (!target) return prev;
+      if (!force && !isAdmin && target.autoreUserId && target.autoreUserId !== utenteId) {
+        return prev;
+      }
+      removedShape = target;
+      return prev.filter((f) => f.id !== id);
+    });
+    if (!removedShape) return;
     if (emit) emitOrPublish('shape:delete', { id, lavagnaId });
     fetch(`/api/lavagna/shape/${id}`, { method: 'DELETE' }).catch(() => {});
-  }, [emitOrPublish, lavagnaId]);
+  }, [emitOrPublish, lavagnaId, isAdmin, utenteId]);
 
   // Clipboard for cut/copy/paste
   const clipboardRef = useRef({ tratti: [], forme: [] });
@@ -574,12 +883,16 @@ export default function LavagnaCanvas({
     const cb = clipboardRef.current;
     if (!cb) return;
     const offset = atPoint || { x: pan.x + 50 / zoom, y: pan.y + 50 / zoom };
-    const newShapes = (cb.forme || []).map(s => {
-      const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-      const nx = (s.x || 0) + 20; const ny = (s.y || 0) + 20;
-      const ns = { ...s, id, x: nx, y: ny };
-      createShapeLocal(ns, true);
-      return ns;
+    const newShapes = (cb.forme || []).map((shape) => {
+      const base = {
+        ...shape,
+        id: `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        autoreUserId: utenteId
+      };
+      const normalized = normalizeShape(base);
+      const translated = translateShape(normalized, 20, 20);
+      createShapeLocal(translated, true);
+      return translated;
     });
     const newStrokes = (cb.tratti || []).map(st => {
       const id = `${utenteId}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
@@ -604,15 +917,18 @@ export default function LavagnaCanvas({
   // Move selected items by dx,dy
   function moveSelectionBy(dx, dy, emit = true) {
     if (!selectedItems) return;
-    // Move shapes
-    setForme(prev => prev.map(f => selectedItems.forme.includes(f.id) ? ({ ...f, x: f.x + dx, y: f.y + dy }) : f));
+    const updatedShapes = [];
+    setForme(prev => prev.map(f => {
+      if (!selectedItems.forme.includes(f.id)) return f;
+      const moved = translateShape(f, dx, dy);
+      updatedShapes.push(moved);
+      return moved;
+    }));
     // Move strokes (shift points)
     setTratti(prev => prev.map((t, idx) => selectedItems.tratti.includes(idx) ? ({ ...t, punti: t.punti.map(p => ({ x: p.x + dx, y: p.y + dy })) }) : t));
     if (emit) {
-      // emit shape updates
-      selectedItems.forme.forEach(id => {
-        const f = (forme.find(s => s.id === id) || {});
-        if (f) emitOrPublish('shape:update', { ...f, x: f.x + dx, y: f.y + dy, lavagnaId });
+      updatedShapes.forEach((shape) => {
+        emitOrPublish('shape:update', { ...shape, lavagnaId });
       });
     }
     drawAll();
@@ -649,22 +965,55 @@ export default function LavagnaCanvas({
     // check closed path
     const distEndStart = Math.hypot(points[0].x - points[points.length-1].x, points[0].y - points[points.length-1].y);
     const bboxArea = w*h;
-    // circle/ellipse: closed and points roughly at similar radius from center
-    if (distEndStart < Math.min(w,h)*0.25) {
+    const closed = distEndStart < Math.max(12, Math.min(w, h) * 0.35);
+    if (closed) {
       const cx = minX + w/2, cy = minY + h/2;
-      let varR = 0, meanR = 0;
       const rs = points.map(p=>Math.hypot(p.x-cx,p.y-cy));
-      meanR = rs.reduce((a,b)=>a+b,0)/rs.length;
-      varR = rs.reduce((a,b)=>a+(b-meanR)*(b-meanR),0)/rs.length;
+      const meanR = rs.reduce((a,b)=>a+b,0)/rs.length;
+      const varR = rs.reduce((a,b)=>a+(b-meanR)*(b-meanR),0)/rs.length;
       if (Math.sqrt(varR) < Math.max(w,h)*0.15) {
         return { kind: w/h>1.2? 'ellisse' : 'cerchio', x:minX,y:minY,w,h };
       }
-      // rectangle: many points near bbox edges
+      const tolerance = Math.max(6, Math.min(w, h) * 0.12);
+      let simplified = simplifyStroke(points, tolerance);
+      if (simplified.length > 2) {
+        const first = simplified[0];
+        const last = simplified[simplified.length - 1];
+        if (Math.hypot(first.x - last.x, first.y - last.y) < tolerance) {
+          simplified = simplified.slice(0, -1);
+        }
+      }
+      if (simplified.length === 3) {
+        return { kind: 'triangolo', x: minX, y: minY, w, h };
+      }
+      if (simplified.length === 4) {
+        const angles = [];
+        for (let i = 0; i < simplified.length; i++) {
+          const prev = simplified[(i - 1 + simplified.length) % simplified.length];
+          const curr = simplified[i];
+          const next = simplified[(i + 1) % simplified.length];
+          const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
+          const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+          const len1 = Math.hypot(v1.x, v1.y);
+          const len2 = Math.hypot(v2.x, v2.y);
+          if (len1 === 0 || len2 === 0) continue;
+          const cos = (v1.x * v2.x + v1.y * v2.y) / (len1 * len2);
+          angles.push(Math.acos(Math.max(-1, Math.min(1, cos))));
+        }
+        const rightAngles = angles.filter((a) => Math.abs(a - Math.PI / 2) < 0.45).length;
+        if (rightAngles >= 3) {
+          return { kind: 'rettangolo', x: minX, y: minY, w, h };
+        }
+        if (angles.length === 4) {
+          return { kind: 'rombo', x: minX, y: minY, w, h };
+        }
+      }
+      // fallback: many points near edges
       let nearEdges=0;
       for (const p of points) {
         if (Math.abs(p.x-minX)<Math.max(4, w*0.08) || Math.abs(p.x-maxX)<Math.max(4, w*0.08) || Math.abs(p.y-minY)<Math.max(4, h*0.08) || Math.abs(p.y-maxY)<Math.max(4, h*0.08)) nearEdges++;
       }
-      if (nearEdges / points.length > 0.6) return { kind: 'rettangolo', x:minX,y:minY,w,h };
+      if (nearEdges / points.length > 0.5) return { kind: 'rettangolo', x:minX,y:minY,w,h };
     }
     // line: points close to best-fit line
     // fit line via endpoints
@@ -740,28 +1089,103 @@ export default function LavagnaCanvas({
     return false;
   }
 
+  function simplifyStroke(points, tolerance = 4) {
+    if (!points || points.length < 3) return points ? points.slice() : [];
+    const sqTolerance = tolerance * tolerance;
+
+    function perpendicularDistanceSq(p, a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      if (dx === 0 && dy === 0) {
+        const ddx = p.x - a.x;
+        const ddy = p.y - a.y;
+        return ddx * ddx + ddy * ddy;
+      }
+      const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy);
+      const clamped = Math.max(0, Math.min(1, t));
+      const cx = a.x + clamped * dx;
+      const cy = a.y + clamped * dy;
+      const ddx = p.x - cx;
+      const ddy = p.y - cy;
+      return ddx * ddx + ddy * ddy;
+    }
+
+    function rdp(points, first, last, sqTol, out) {
+      let maxSqDist = sqTol;
+      let index = -1;
+      for (let i = first + 1; i < last; i++) {
+        const sqDist = perpendicularDistanceSq(points[i], points[first], points[last]);
+        if (sqDist > maxSqDist) {
+          index = i;
+          maxSqDist = sqDist;
+        }
+      }
+      if (index !== -1) {
+        if (index - first > 1) rdp(points, first, index, sqTol, out);
+        out.push(points[index]);
+        if (last - index > 1) rdp(points, index, last, sqTol, out);
+      }
+    }
+
+    const simplified = [points[0]];
+    rdp(points, 0, points.length - 1, sqTolerance, simplified);
+    simplified.push(points[points.length - 1]);
+    return simplified;
+  }
+
   function getShapeBounds(shape) {
     if (!shape) return null;
-    if (shape.kind === 'linea') {
-      const minX = Math.min(shape.x, shape.x2);
-      const maxX = Math.max(shape.x, shape.x2);
-      const minY = Math.min(shape.y, shape.y2);
-      const maxY = Math.max(shape.y, shape.y2);
-      return { minX, minY, maxX, maxY };
+    const kind = shape.kind;
+    if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
+      const x1 = Number(shape.x1 ?? shape.x ?? 0);
+      const y1 = Number(shape.y1 ?? shape.y ?? 0);
+      const x2 = Number(shape.x2 ?? shape.x1 ?? x1);
+      const y2 = Number(shape.y2 ?? shape.y1 ?? y1);
+      return {
+        minX: Math.min(x1, x2),
+        maxX: Math.max(x1, x2),
+        minY: Math.min(y1, y2),
+        maxY: Math.max(y1, y2)
+      };
     }
-    const w = shape.w ?? (shape.x2 - shape.x);
-    const h = shape.h ?? (shape.y2 - shape.y);
-    const minX = Math.min(shape.x, shape.x + w);
-    const maxX = Math.max(shape.x, shape.x + w);
-    const minY = Math.min(shape.y, shape.y + h);
-    const maxY = Math.max(shape.y, shape.y + h);
+    const baseX = Number(shape.x ?? 0);
+    const baseY = Number(shape.y ?? 0);
+    const width = Number(shape.w ?? (shape.x2 != null ? shape.x2 - baseX : 0));
+    const height = Number(shape.h ?? (shape.y2 != null ? shape.y2 - baseY : 0));
+    const minX = Math.min(baseX, baseX + width);
+    const maxX = Math.max(baseX, baseX + width);
+    const minY = Math.min(baseY, baseY + height);
+    const maxY = Math.max(baseY, baseY + height);
     return { minX, minY, maxX, maxY };
   }
 
   function hitTestShape(shape, x, y, tolerance = 12) {
     if (!shape) return false;
-    if (shape.kind === 'linea') {
-      return distPointToSegment(x, y, shape.x, shape.y, shape.x2, shape.y2) <= tolerance;
+    const kind = shape.kind;
+    if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
+      const x1 = shape.x1 ?? shape.x ?? 0;
+      const y1 = shape.y1 ?? shape.y ?? 0;
+      const x2 = shape.x2 ?? shape.x1 ?? x1;
+      const y2 = shape.y2 ?? shape.y1 ?? y1;
+      if (distPointToSegment(x, y, x1, y1, x2, y2) <= tolerance) return true;
+      if (kind === 'freccia') {
+        // Arrow head triangle hit test
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLength = Math.max(12, tolerance * 1.2);
+        const headWidth = headLength * 0.8;
+        const hx = x2;
+        const hy = y2;
+        const left = {
+          x: hx - headLength * Math.cos(angle) + headWidth * Math.sin(angle),
+          y: hy - headLength * Math.sin(angle) - headWidth * Math.cos(angle)
+        };
+        const right = {
+          x: hx - headLength * Math.cos(angle) - headWidth * Math.sin(angle),
+          y: hy - headLength * Math.sin(angle) + headWidth * Math.cos(angle)
+        };
+        if (pointInTriangle({ x, y }, { x: hx, y: hy }, left, right)) return true;
+      }
+      return false;
     }
     const bounds = getShapeBounds(shape);
     if (!bounds) return false;
@@ -769,10 +1193,10 @@ export default function LavagnaCanvas({
     const withinX = x >= minX - tolerance && x <= maxX + tolerance;
     const withinY = y >= minY - tolerance && y <= maxY + tolerance;
     if (!withinX || !withinY) return false;
-    if (shape.kind === 'rettangolo') {
+    if (kind === 'rettangolo' || kind === 'quadrato') {
       return true;
     }
-    if (shape.kind === 'cerchio' || shape.kind === 'ellisse') {
+    if (kind === 'cerchio' || kind === 'ellisse') {
       const cx = (minX + maxX) / 2;
       const cy = (minY + maxY) / 2;
       const rx = (maxX - minX) / 2;
@@ -781,7 +1205,132 @@ export default function LavagnaCanvas({
       const norm = ((x - cx) * (x - cx)) / ((rx + tolerance) * (rx + tolerance)) + ((y - cy) * (y - cy)) / ((ry + tolerance) * (ry + tolerance));
       return norm <= 1;
     }
+    if (kind === 'triangolo') {
+      const top = { x: (minX + maxX) / 2, y: minY };
+      const left = { x: minX, y: maxY };
+      const right = { x: maxX, y: maxY };
+      if (pointInTriangle({ x, y }, top, left, right)) return true;
+      // allow tolerance by expanding bounding triangle slightly
+      return pointInTriangle({ x, y },
+        { x: top.x, y: top.y - tolerance },
+        { x: left.x - tolerance, y: left.y + tolerance },
+        { x: right.x + tolerance, y: right.y + tolerance });
+    }
+    if (kind === 'rombo') {
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const top = { x: cx, y: minY };
+      const bottom = { x: cx, y: maxY };
+      const left = { x: minX, y: cy };
+      const right = { x: maxX, y: cy };
+      return (
+        pointInTriangle({ x, y }, top, left, right) ||
+        pointInTriangle({ x, y }, bottom, left, right)
+      );
+    }
     return false;
+  }
+
+  function pointInTriangle(p, a, b, c) {
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    if (area === 0) return false;
+    const s = ((a.y - c.y) * (p.x - c.x) + (c.x - a.x) * (p.y - c.y)) / area;
+    const t = ((c.y - b.y) * (p.x - c.x) + (b.x - c.x) * (p.y - c.y)) / area;
+    const u = 1 - s - t;
+    return s >= 0 && t >= 0 && u >= 0;
+  }
+
+  function normalizeShape(rawShape) {
+    if (!rawShape) return null;
+    const shape = { ...rawShape };
+    const kind = shape.kind;
+    if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
+      const startX = Number(shape.x1 ?? shape.x ?? shape.startX ?? 0);
+      const startY = Number(shape.y1 ?? shape.y ?? shape.startY ?? 0);
+      const endX = Number(shape.x2 ?? shape.endX ?? startX);
+      const endY = Number(shape.y2 ?? shape.endY ?? startY);
+      shape.x1 = startX;
+      shape.y1 = startY;
+      shape.x2 = endX;
+      shape.y2 = endY;
+      delete shape.x;
+      delete shape.y;
+      delete shape.w;
+      delete shape.h;
+    } else {
+      const startX = Number(shape.x ?? shape.x1 ?? shape.startX ?? 0);
+      const startY = Number(shape.y ?? shape.y1 ?? shape.startY ?? 0);
+      let width = Number(shape.w ?? (shape.x2 != null ? shape.x2 - startX : 0));
+      let height = Number(shape.h ?? (shape.y2 != null ? shape.y2 - startY : 0));
+      let x = startX;
+      let y = startY;
+      if (width < 0) {
+        x = startX + width;
+        width = Math.abs(width);
+      }
+      if (height < 0) {
+        y = startY + height;
+        height = Math.abs(height);
+      }
+      shape.x = x;
+      shape.y = y;
+      shape.w = width;
+      shape.h = height;
+    }
+    shape._bb = getShapeBounds(shape);
+    return shape;
+  }
+
+  function translateShape(shape, dx, dy) {
+    if (!shape) return shape;
+    const next = { ...shape };
+    if (typeof next.x === 'number') next.x += dx;
+    if (typeof next.y === 'number') next.y += dy;
+    if (typeof next.x1 === 'number') next.x1 += dx;
+    if (typeof next.y1 === 'number') next.y1 += dy;
+    if (typeof next.x2 === 'number') next.x2 += dx;
+    if (typeof next.y2 === 'number') next.y2 += dy;
+    if (next._bb) {
+      next._bb = {
+        minX: next._bb.minX + dx,
+        maxX: next._bb.maxX + dx,
+        minY: next._bb.minY + dy,
+        maxY: next._bb.maxY + dy
+      };
+    } else {
+      next._bb = getShapeBounds(next);
+    }
+    return next;
+  }
+
+  function shapeFromPreview(ps) {
+    if (!ps) return null;
+    const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const startX = ps.xStart ?? ps.x ?? 0;
+    const startY = ps.yStart ?? ps.y ?? 0;
+    const endX = ps.x2 ?? startX;
+    const endY = ps.y2 ?? startY;
+    const base = {
+      id,
+      kind: ps.kind,
+      colore: ps.colore,
+      spessore: ps.spessore,
+      autoreUserId: ps.autoreUserId ?? utenteId
+    };
+    if (ps.kind === 'linea' || ps.kind === 'freccia') {
+      return normalizeShape({ ...base, x1: startX, y1: startY, x2: endX, y2: endY });
+    }
+    if (ps.kind === 'triangolo' || ps.kind === 'rombo' || ps.kind === 'rettangolo' || ps.kind === 'cerchio' || ps.kind === 'ellisse') {
+      const kind = ps.kind === 'cerchio' && Math.abs(endX - startX) !== Math.abs(endY - startY)
+        ? 'ellisse'
+        : ps.kind;
+      const x = Math.min(startX, endX);
+      const y = Math.min(startY, endY);
+      const w = Math.max(1, Math.abs(endX - startX));
+      const h = Math.max(1, Math.abs(endY - startY));
+      return normalizeShape({ ...base, kind, x, y, w, h });
+    }
+    return normalizeShape({ ...base, x: Math.min(startX, endX), y: Math.min(startY, endY), w: Math.abs(endX - startX), h: Math.abs(endY - startY) });
   }
 
   // Coordinate helper considerando lo zoom
@@ -827,6 +1376,10 @@ export default function LavagnaCanvas({
   // Zoom via rotella mouse
   const onWheel = useCallback((e) => {
     // Zoom solo sulla lavagna, sempre con rotella, ancorato al cursore
+    if (spectatorModeRef.current && !isAdmin) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -843,7 +1396,7 @@ export default function LavagnaCanvas({
     setPan(newPan);
     // Aggiorna subito la lavagna per feedback immediato
     setTimeout(drawAll, 0);
-  }, [zoom, pan.x, pan.y, drawAll]);
+  }, [zoom, pan.x, pan.y, drawAll, isAdmin]);
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
@@ -852,6 +1405,7 @@ export default function LavagnaCanvas({
       for (let i = tratti.length - 1; i >= 0; i--) {
         const st = tratti[i];
         if (eraseSessionRef.current.strokeIds.has(st.id)) continue;
+        if (!isAdmin && st.autoreUserId && st.autoreUserId !== utenteId) continue;
         if (hitTestStroke(x, y, st)) {
           removed = true;
           setTratti((prev) => prev.filter((_, idx) => idx !== i));
@@ -870,7 +1424,7 @@ export default function LavagnaCanvas({
       }
       return removed;
     },
-    [tratti, drawAll, attivitaId, emitOrPublish]
+    [tratti, drawAll, attivitaId, emitOrPublish, isAdmin, utenteId]
   );
 
   const eraseShapesAt = useCallback(
@@ -880,7 +1434,9 @@ export default function LavagnaCanvas({
       for (const shape of forme) {
         if (eraseSessionRef.current.shapeIds.has(shape.id)) continue;
         if (hitTestShape(shape, x, y, tolerance)) {
-          toDelete.push(shape.id);
+          if (isAdmin || !shape.autoreUserId || shape.autoreUserId === utenteId) {
+            toDelete.push(shape.id);
+          }
         }
       }
       if (!toDelete.length) return false;
@@ -891,7 +1447,7 @@ export default function LavagnaCanvas({
       drawAll();
       return true;
     },
-    [forme, zoom, deleteShapeLocal, drawAll]
+    [forme, zoom, deleteShapeLocal, drawAll, isAdmin, utenteId]
   );
 
   // == POINTER EVENTS ==
@@ -900,9 +1456,13 @@ export default function LavagnaCanvas({
     const btn = native?.button;
     const pointerId = native?.pointerId;
     const canvas = canvasRef.current;
+    const spectatorLocked = spectatorModeRef.current && !isAdmin;
 
     if (btn === 2) {
       e.preventDefault();
+      if (spectatorLocked) {
+        return;
+      }
       try {
         canvas?.setPointerCapture?.(pointerId);
       } catch (_) {}
@@ -919,9 +1479,20 @@ export default function LavagnaCanvas({
       touchesRef.current.set(pointerId, { x: native.clientX, y: native.clientY });
     }
 
-    if (['rettangolo', 'cerchio', 'linea'].includes(strumento)) {
+    if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'freccia', 'rombo'].includes(strumento)) {
       const p = getPoint(e);
-      previewShapeRef.current = { kind: strumento, x: p.x, y: p.y, x2: p.x, y2: p.y, colore, spessore };
+      previewShapeRef.current = {
+        kind: strumento,
+        x: p.x,
+        y: p.y,
+        xStart: p.x,
+        yStart: p.y,
+        x2: p.x,
+        y2: p.y,
+        colore,
+        spessore,
+        autoreUserId: utenteId
+      };
       drawingShapeRef.current = true;
       try {
         canvas?.setPointerCapture?.(pointerId);
@@ -956,6 +1527,9 @@ export default function LavagnaCanvas({
     }
 
     if (strumento === 'mano') {
+      if (spectatorLocked) {
+        return;
+      }
       try {
         canvas?.setPointerCapture?.(pointerId);
       } catch (_) {}
@@ -991,8 +1565,15 @@ export default function LavagnaCanvas({
   }
 
   function pointerMove(e) {
+    const spectatorLocked = spectatorModeRef.current && !isAdmin;
     // If panning active (hand) update pan
     if (panningRef.current.active) {
+      if (spectatorLocked) {
+        panningRef.current.active = false;
+        setIsPanning(false);
+        setContextPanning(false);
+        return;
+      }
       const dx = e.nativeEvent.clientX - panningRef.current.lastX;
       const dy = e.nativeEvent.clientY - panningRef.current.lastY;
       panningRef.current.lastX = e.nativeEvent.clientX;
@@ -1017,6 +1598,9 @@ export default function LavagnaCanvas({
     // Multitouch pan/zoom
     if (e.nativeEvent.pointerType === 'touch') {
       touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
+      if (spectatorLocked) {
+        return;
+      }
       if (touchesRef.current.size === 2) {
         const pts = Array.from(touchesRef.current.values());
         const dx = pts[1].x - pts[0].x;
@@ -1097,12 +1681,10 @@ export default function LavagnaCanvas({
     // If currently drawing a shape, finalize it
     if (drawingShapeRef.current && previewShapeRef.current) {
       const ps = previewShapeRef.current;
-      const x = Math.min(ps.x, ps.x2); const y = Math.min(ps.y, ps.y2);
-      const w = Math.abs(ps.x2 - ps.x); const h = Math.abs(ps.y2 - ps.y);
-      const id = `shape-${Date.now()}`;
-      const kind = ps.kind === 'cerchio' && h !== w ? 'ellisse' : ps.kind;
-      const shapeObj = { id, kind, x, y, w, h, x2:ps.x2, y2:ps.y2, colore: ps.colore, spessore: ps.spessore };
-      createShapeLocal(shapeObj, true);
+      const shapeObj = shapeFromPreview(ps);
+      if (shapeObj) {
+        createShapeLocal(shapeObj, true);
+      }
       previewShapeRef.current = null; drawingShapeRef.current = false;
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
@@ -1119,7 +1701,12 @@ export default function LavagnaCanvas({
         const x1 = Math.min(sb.x1,sb.x2), x2 = Math.max(sb.x1,sb.x2);
         const y1 = Math.min(sb.y1,sb.y2), y2 = Math.max(sb.y1,sb.y2);
         const selTratti = tratti.map((t,i)=> (t._bb && t._bb.minX>=x1 && t._bb.maxX<=x2 && t._bb.minY>=y1 && t._bb.maxY<=y2) ? i : null).filter(i=>i!==null);
-        const selForme = forme.map((f)=> (f.x>=x1 && f.x+f.w<=x2 && f.y>=y1 && f.y+f.h<=y2) ? f.id : null).filter(i=>i!==null);
+        const selForme = forme.map((f)=> {
+          const bounds = f._bb ?? getShapeBounds(f);
+          if (!bounds) return null;
+          if (bounds.minX >= x1 && bounds.maxX <= x2 && bounds.minY >= y1 && bounds.maxY <= y2) return f.id;
+          return null;
+        }).filter(i=>i!==null);
         setSelectedItems({ tratti: selTratti, forme: selForme });
       }
       setSelectionBox(null);
@@ -1154,7 +1741,13 @@ export default function LavagnaCanvas({
         const detected = detectShapeFromStroke(puntiFinali);
         if (detected) {
           const id = `shape-${Date.now()}`;
-          const shapeObj = { id, ...detected, colore, spessore };
+          const shapeObj = {
+            id,
+            ...detected,
+            colore,
+            spessore,
+            autoreUserId: utenteId
+          };
           createShapeLocal(shapeObj, true);
         } else {
           // fallback to stroke
@@ -1399,7 +1992,7 @@ export default function LavagnaCanvas({
   // Toolbar in basso al centro
   const toolbar = useMemo(
     () => {
-      const shapeActive = ['rettangolo','cerchio','linea','magicpen'].includes(strumento);
+      const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento);
       const shapeButtonActive = shapeActive || showShapesPopover;
       return (
       <div style={st.bottomToolbarDock}>
@@ -1433,7 +2026,7 @@ export default function LavagnaCanvas({
             </button>
             {showShapesPopover && (
               <div style={st.popover}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0,1fr))', gap:8 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:8 }}>
                   <button
                     type="button"
                     style={iconBtn(strumento === 'rettangolo')}
@@ -1457,6 +2050,30 @@ export default function LavagnaCanvas({
                     title="Linea"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    style={iconBtn(strumento === 'triangolo')}
+                    onClick={() => { setStrumento('triangolo'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
+                    title="Triangolo"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5l8 14H4L12 5z" stroke={strumento==='triangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    style={iconBtn(strumento === 'rombo')}
+                    onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
+                    title="Rombo"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    style={iconBtn(strumento === 'freccia')}
+                    onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); setShowPenPopover(false); setShowMoreMenu(false); }}
+                    title="Freccia"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button
                     type="button"
@@ -1493,14 +2110,46 @@ export default function LavagnaCanvas({
             </button>
             {showPenPopover && (
               <div style={st.popover}>
-                <div style={st.colorPickerBlock}>
-                  <label style={st.colorLabel}>Colore</label>
+                <div style={st.paletteGrid}>
+                  {palette.map((c, i) => {
+                    const isSelected = c === colore;
+                    const isGradient = typeof c === 'string' && c.includes('gradient');
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setColore(c)}
+                        title={isGradient ? 'Palette' : c}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          border: isSelected ? '2.5px solid #20489a' : '1.5px solid #dbe6f5',
+                          background: isGradient ? undefined : c,
+                          backgroundImage: isGradient ? c : undefined,
+                          boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #20489a' : '0 1px 2px rgba(32,72,154,0.25)',
+                          cursor: 'pointer',
+                          transition: 'box-shadow .15s',
+                          outline: 'none',
+                          margin: 2
+                        }}
+                      />
+                    );
+                  })}
                   <input
+                    ref={colorInputRef}
                     type="color"
                     value={colore}
                     onChange={(e)=>setColore(e.target.value)}
-                    style={st.colorInput}
+                    style={{ position:'absolute', width:1, height:1, opacity:0 }}
                   />
+                  <button
+                    type="button"
+                    onClick={()=>colorInputRef.current?.click()}
+                    title="Altri colori"
+                    style={st.colorWheelBtn}
+                  >
+                    🎨
+                  </button>
                 </div>
                 <div style={st.penOptionsRow}>
                   <span style={st.sizeLabel}>{spessore}px</span>
@@ -1551,6 +2200,18 @@ export default function LavagnaCanvas({
                   />
                   <label htmlFor="gomma-puntuale-toggle" style={st.toggleLbl}>Gomma puntuale</label>
                 </div>
+                {!isAdmin && (
+                  <div style={{ ...st.toggleWrap, marginBottom:8 }}>
+                    <input
+                      id={spectatorToggleId}
+                      type="checkbox"
+                      checked={spectatorMode}
+                      onChange={(e)=>setSpectatorMode(e.target.checked)}
+                      style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
+                    />
+                    <label htmlFor={spectatorToggleId} style={st.toggleLbl}>Modalità spettatore</label>
+                  </div>
+                )}
                 {isAdmin && (
                   <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={handlePulisciLavagna}>Pulisci lavagna</button>
                 )}
@@ -1559,6 +2220,7 @@ export default function LavagnaCanvas({
           </div>
         </div>
         {salvando && <span style={st.saving}>Salvataggio…</span>}
+        {!isAdmin && spectatorMode && <span style={st.spectatorBadge}>Spettatore</span>}
       </div>
     );
     },
@@ -1576,7 +2238,9 @@ export default function LavagnaCanvas({
       showShapesPopover,
       showMoreMenu,
       isAdmin,
-      handleChangeSfondo
+      handleChangeSfondo,
+      spectatorMode,
+      spectatorToggleId
     ]
   );
 
@@ -1708,23 +2372,27 @@ const st = {
     borderRadius: 12,
     border: "1px solid #dbe6f5"
   },
-  colorPickerBlock: {
+  paletteGrid: {
+    position: 'relative',
     display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    alignItems: 'flex-start'
+    flexWrap: 'wrap',
+    gap: 4,
+    maxWidth: 200,
+    marginBottom: 10
   },
-  colorLabel: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: '#20489a'
-  },
-  colorInput: {
-    width: 180,
-    height: 120,
-    border: 'none',
-    padding: 0,
-    cursor: 'pointer'
+  colorWheelBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    border: '1.5px solid #dbe6f5',
+    background: '#fff',
+    backgroundImage: 'conic-gradient(red, orange, yellow, green, blue, violet, red)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 18,
+    cursor: 'pointer',
+    margin: 2
   },
   penOptionsRow: {
     display: 'flex',
@@ -1734,6 +2402,7 @@ const st = {
   },
   sizeLabel: { fontSize: 12, fontWeight: 600, color: "#20489a" },
   saving: { fontSize: 12, fontWeight: 600, color: "#8C7800" },
+  spectatorBadge: { fontSize: 12, fontWeight: 600, color: "#2563eb", marginLeft: 12 },
   canvasBox: {
     position: "relative",
     border: "1px solid #dbe6f5",
