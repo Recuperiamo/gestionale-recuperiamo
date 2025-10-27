@@ -192,7 +192,9 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         const payload = {
           descrizione,
           durataOre: Number(durataOreSingola),
-          orario: orarioISO.toISOString()
+          orario: orarioISO.toISOString(),
+          // include client timezone so server can preserve wall-clock time if needed
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
 
         if (!isEdit) {
@@ -223,12 +225,15 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
             descrizione,
             clienteId: Number(clienteId),
             pacchettoId: Number(pacchettoId),
+            // send client's timezone so server can interpret wall-clock times correctly
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ricorrenza: {
               giorni: selectedDays,
               orarioInizio,
               durata: Number(durata),
               dataInizio: dataInizioRic,
-              dataFine: dataFineRic
+              dataFine: dataFineRic,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
             }
           })
         });

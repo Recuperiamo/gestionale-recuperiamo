@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
 import { prisma } from '../../lib/prisma'
+import { zonedTimeToUtc } from 'date-fns-tz'
 import { logPacchettoChange } from '../utils/pacchettoChangelog'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/authOptions'
@@ -12,6 +13,11 @@ function toPositiveNumber(value) {
   if (value === null || value === undefined) return null
   const n = Number(value)
   return Number.isFinite(n) && n > 0 ? n : null
+}
+
+// simple zero-pad helper
+function pad2(n) {
+  return String(n).padStart(2, '0')
 }
 
 const DAY_STR_TO_NUM = {
@@ -111,6 +117,7 @@ export async function POST(request) {
     durataOre,
     durata,
     orario,
+    timeZone,
     giorni,
     dataInizio,
     dataFine,
@@ -128,6 +135,8 @@ export async function POST(request) {
     if (!dataFine && r.dataFine) dataFine = r.dataFine
     if (!durataOre && !oreConsumate && !durata && r.durata) durata = r.durata
     if (!oraInizio && r.orarioInizio) oraInizio = r.orarioInizio
+    // timezone from nested ricorrenza preferred
+    if (!timeZone && r.timeZone) timeZone = r.timeZone
   }
 
   // Normalizzazione durata
@@ -180,11 +189,21 @@ export async function POST(request) {
     const cur = new Date(start)
     const [hh, mm] = (oraInizio || '15:00').split(':')
 
+    // default timezone fallback
+    const tz = timeZone || 'Europe/Rome'
+
     while (cur <= end) {
       if (giorniNorm.includes(cur.getDay())) {
-        const dt = new Date(cur.getTime())
-        dt.setHours(Number(hh) || 0, Number(mm) || 0, 0, 0)
-        occorrenze.push(dt)
+        // Build a local date string for the target day (YYYY-MM-DD) using cur's Y/M/D
+        // then convert the desired wall-clock time in Europe/Rome to a UTC instant.
+        const y = cur.getFullYear()
+        const m = pad2(cur.getMonth() + 1)
+        const d = pad2(cur.getDate())
+        const hhStr = pad2(Number(hh) || 0)
+        const mmStr = pad2(Number(mm) || 0)
+        const dateStr = `${y}-${m}-${d}T${hhStr}:${mmStr}:00`
+        const utcInstant = zonedTimeToUtc(dateStr, tz)
+        occorrenze.push(utcInstant)
       }
       cur.setDate(cur.getDate() + 1)
     }
