@@ -9,6 +9,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
   const [showCreate, setShowCreate] = useState(false);
   const [attivitaList, setAttivitaList] = useState([]);
   const [selectedAttivita, setSelectedAttivita] = useState("");
+  const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
 
   const isAdmin = sessionUser && /^(admin|operatore)$/i.test(sessionUser.role || "");
@@ -169,14 +170,24 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
   async function handleCreateLavagna(e) {
     e.preventDefault();
-    if (!selectedAttivita) return;
+    if (!selectedAttivita && !clienteId) {
+      alert("Seleziona uno studente o specifica un cliente.");
+      return;
+    }
     setCreating(true);
     try {
       // POST per creare lavagna
+      let body = {};
+      if (selectedAttivita === "ad-hoc" || !selectedAttivita) {
+        // create ad-hoc lavagna/attivita for cliente
+        body = { clienteId: Number(clienteId), titolo: newTitle || undefined };
+      } else {
+        body = { attivitaId: Number(selectedAttivita), titolo: newTitle || undefined };
+      }
       const res = await fetch("/api/lavagna", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attivitaId: Number(selectedAttivita) })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
         const js = await res.json();
@@ -198,6 +209,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
         }
         setShowCreate(false);
         setSelectedAttivita("");
+        setNewTitle("");
       } else {
         alert("Errore nella creazione lavagna");
       }
@@ -238,22 +250,33 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
         <form onSubmit={handleCreateLavagna} style={{
           background: "#e3eefe", padding: 16, borderRadius: 12, marginBottom: 14
         }}>
-          <label>
-            Seleziona lezione/attività:
-            <select
-              value={selectedAttivita}
-              onChange={e => setSelectedAttivita(e.target.value)}
-              required
-              style={{ marginLeft: 8, padding: 4, fontSize: 15 }}
-            >
-              <option value="">-- scegli --</option>
-              {attivitaList.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.descrizione || "Lezione"} ({a.id}) {a.orario ? `- ${new Date(a.orario).toLocaleString("it-IT")}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label style={{ display: 'block', marginBottom: 8 }}>
+                Seleziona lezione/attività:
+                <select
+                  value={selectedAttivita}
+                  onChange={e => setSelectedAttivita(e.target.value)}
+                  style={{ marginLeft: 8, padding: 4, fontSize: 15 }}
+                >
+                  <option value="">-- scegli --</option>
+                  {attivitaList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.descrizione || "Lezione"} ({a.id}) {a.orario ? `- ${new Date(a.orario).toLocaleString("it-IT")}` : ""}
+                    </option>
+                  ))}
+                  <option value="ad-hoc">Crea nuova lezione ad-hoc per questo studente</option>
+                </select>
+              </label>
+
+              <label style={{ display: 'block', marginBottom: 8 }}>
+                Titolo lavagna (opzionale):
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  placeholder="Es. Spiegazione algebra"
+                  style={{ marginLeft: 8, padding: 6, fontSize: 15, minWidth: 260 }}
+                />
+              </label>
           <button
             type="submit"
             disabled={!selectedAttivita || creating}
