@@ -1,0 +1,231 @@
+[
+  {
+    "type": "verbose",
+    "text": "[DOM] Input elements should have autocomplete attributes (suggested: \"current-password\"): (More info: https://goo.gl/9p2vKq) %o",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/signin",
+      "lineNumber": 0,
+      "columnNumber": 0
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime] install global listeners",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 393
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] calling /api/auth/session {init: Object}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 716
+    }
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 404 ()",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/favicon.ico",
+      "lineNumber": 0,
+      "columnNumber": 0
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] response /api/auth/session {status: 200, ok: true}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 857
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] calling /api/auth/session {init: Object}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 716
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] response /api/auth/session {status: 200, ok: true}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 857
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime] install global listeners",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 393
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] calling /api/auth/session {init: Object}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 716
+    }
+  },
+  {
+    "type": "error",
+    "text": "[DebugClientRuntime][fetch][error] /api/auth/session Failed to fetch TypeError: Failed to fetch\n    at window.fetch (https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js:1:785)\n    at https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:2048\n    at https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:13952\n    at Generator.<anonymous> (https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:23720)\n    at Generator.next (https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:15019)\n    at t (https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:21036)\n    at s (https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:21246)\n    at https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:21305\n    at new Promise (<anonymous>)\n    at https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js:1:21187",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 1036
+    }
+  },
+  {
+    "type": "error",
+    "text": "[next-auth][error][CLIENT_FETCH_ERROR] \nhttps://next-auth.js.org/errors#client_fetch_error Failed to fetch {error: Object, url: /api/auth/session, message: Failed to fetch}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/2108-17aede3e8aad3233.js",
+      "lineNumber": 0,
+      "columnNumber": 18145
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime] install global listeners",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 393
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] calling /api/auth/session {init: Object}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 716
+    }
+  },
+  {
+    "type": "log",
+    "text": "[DebugClientRuntime][fetch] response /api/auth/session {status: 200, ok: true}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 857
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG session.user: {name: VCopilot, email: vcopilot@vercel.com, id: 4, role: cliente, clienteId: 3}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9869
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG clienteId passato a LavagneList: ",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9911
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG session.user: {name: VCopilot, email: vcopilot@vercel.com, id: 4, role: cliente, clienteId: 3}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9869
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG clienteId passato a LavagneList: 3",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9911
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG session.user: {name: VCopilot, email: vcopilot@vercel.com, id: 4, role: cliente, clienteId: 3}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9869
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG clienteId passato a LavagneList: 3",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9911
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG session.user: {name: VCopilot, email: vcopilot@vercel.com, id: 4, role: cliente, clienteId: 3}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9869
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG clienteId passato a LavagneList: 3",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9911
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG session.user: {name: VCopilot, email: vcopilot@vercel.com, id: 4, role: cliente, clienteId: 3}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9869
+    }
+  },
+  {
+    "type": "log",
+    "text": "DEBUG clienteId passato a LavagneList: 3",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/lavagna/page-30a9e72c6a98d884.js",
+      "lineNumber": 0,
+      "columnNumber": 9911
+    }
+  },
+  {
+    "type": "error",
+    "text": "[DebugClientRuntime][error] {message: Uncaught ReferenceError: Cannot access 'eV' before initialization, source: undefined, lineno: undefined, colno: undefined, stack: undefined}",
+    "location": {
+      "url": "https://recuperiamo.vercel.app/_next/static/chunks/app/layout-55d3d9ba10ccf35f.js",
+      "lineNumber": 0,
+      "columnNumber": 1395
+    }
+  },
+  {
+    "type": "pageerror",
+    "text": "Cannot access 'eV' before initialization"
+  }
+]

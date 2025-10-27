@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "../lib/auth/hooks";
 import Navbar from "../components/Navbar";
 import LavagnaCanvas from "../components/lavagna/LavagnaCanvas";
 import LavagneList from "../components/lavagna/LavagneList";
