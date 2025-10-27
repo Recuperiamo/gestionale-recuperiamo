@@ -315,8 +315,9 @@ export async function PATCH(request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
     const body = await request.json()
-    const { id, descrizione } = body
+    const { id, descrizione, durataOre, oreConsumate, orario } = body
     if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
 
     const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
@@ -324,11 +325,114 @@ export async function PATCH(request) {
     if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId))
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const upd = await prisma.attivita.update({
-      where: { id: Number(id) },
-      data: { descrizione: typeof descrizione === 'string' ? descrizione : att.descrizione }
-    })
-    return NextResponse.json({ attivita: upd })
+    const updateData = {}
+
+    if (typeof descrizione === 'string') {
+      updateData.descrizione = descrizione.trim()
+    }
+
+    const durataInput = durataOre ?? oreConsumate
+    let nuovaDurata = null
+    if (durataInput !== undefined && durataInput !== null) {
+      const durataVal = Number(durataInput)
+      if (!Number.isFinite(durataVal) || durataVal <= 0) {
+        return NextResponse.json({ error: 'Durata non valida' }, { status: 400 })
+      }
+      nuovaDurata = durataVal
+      updateData.durataOre = durataVal
+      updateData.oreConsumate = durataVal
+    }
+
+    let nuovoOrarioDate = null
+    if (orario) {
+      const dt = new Date(orario)
+      if (Number.isNaN(dt.getTime())) {
+        return NextResponse.json({ error: 'Orario non valido' }, { status: 400 })
+      }
+      nuovoOrarioDate = dt
+      updateData.orario = dt
+      if (att.orario && !att.orarioOriginale && att.orario.getTime() !== dt.getTime()) {
+        updateData.orarioOriginale = att.orario
+      } else if (att.orarioOriginale && dt.getTime() === att.orarioOriginale.getTime()) {
+        updateData.orarioOriginale = null
+      }
+    }
+
+    const durataAttuale = att.oreConsumate ?? att.durataOre ?? 0
+    const deltaOre = nuovaDurata != null ? nuovaDurata - durataAttuale : 0
+
+    if (!Object.keys(updateData).length && deltaOre === 0) {
+      return NextResponse.json({ attivita: att })
+    }
+
+    try {
+      const result = await prisma.$transaction(async tx => {
+        let pacchettoBefore = null
+        let pacchettoAfter = null
+
+        if (att.pacchettoId) {
+          pacchettoBefore = await tx.pacchettoOre.findUnique({ where: { id: att.pacchettoId } })
+          if (!pacchettoBefore) {
+            const err = new Error('PACCHETTO_NON_TROVATO')
+            err.code = 'PACCHETTO_NON_TROVATO'
+            throw err
+          }
+
+          if (deltaOre !== 0) {
+            const nuovoResiduo = pacchettoBefore.oreResidue - deltaOre
+            if (deltaOre > 0 && nuovoResiduo < 0) {
+              const err = new Error('ORE_INSUFFICIENTI')
+              err.code = 'ORE_INSUFFICIENTI'
+              throw err
+            }
+            pacchettoAfter = await tx.pacchettoOre.update({
+              where: { id: pacchettoBefore.id },
+              data: {
+                oreResidue: nuovoResiduo,
+                stato: nuovoResiduo <= 0 ? 'esaurito' : 'attivo'
+              }
+            })
+          } else {
+            pacchettoAfter = pacchettoBefore
+          }
+        }
+
+        const updated = await tx.attivita.update({
+          where: { id: att.id },
+          data: updateData
+        })
+
+        return { updated, pacchettoBefore, pacchettoAfter }
+      })
+
+      if (
+        deltaOre !== 0 &&
+        result.pacchettoBefore &&
+        result.pacchettoAfter &&
+        att.pacchettoId
+      ) {
+        await logPacchettoChange({
+          pacchettoId: att.pacchettoId,
+          tipoOperazione: 'modifica-attivita',
+          orePrima: result.pacchettoBefore.oreResidue,
+          oreDopo: result.pacchettoAfter.oreResidue,
+          attivitaId: att.id,
+          utente: session.user?.email || 'admin',
+          motivazione: updateData.descrizione ?? att.descrizione ?? '',
+          pacchettoDescrizione: result.pacchettoBefore.descrizione
+        })
+      }
+
+      return NextResponse.json({ attivita: result.updated, pacchetto: result.pacchettoAfter ?? null })
+    } catch (errTx) {
+      if (errTx?.code === 'ORE_INSUFFICIENTI') {
+        return NextResponse.json({ error: 'Ore residue insufficienti per questa modifica' }, { status: 400 })
+      }
+      if (errTx?.code === 'PACCHETTO_NON_TROVATO') {
+        return NextResponse.json({ error: 'Pacchetto collegato non trovato' }, { status: 404 })
+      }
+      throw errTx
+    }
   } catch (err) {
     console.error('Errore PATCH /api/attivita:', err)
     return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
@@ -352,29 +456,53 @@ export async function DELETE(request) {
     const pacchetto = await prisma.pacchettoOre.findUnique({ where: { id: att.pacchettoId } })
     if (!pacchetto) return NextResponse.json({ error: 'Pacchetto non trovato (collegato)' }, { status: 404 })
 
-    const [deleted, pacchettoUpd] = await prisma.$transaction([
-      prisma.attivita.delete({ where: { id: att.id } }),
-      prisma.pacchettoOre.update({
-        where: { id: att.pacchettoId },
-        data: {
-          oreResidue: { increment: att.oreConsumate },
-          stato: 'attivo'
-        }
-      })
-    ])
-
-    await logPacchettoChange({
-      pacchettoId: att.pacchettoId,
-      tipoOperazione: 'eliminazione-attivita',
-      orePrima: pacchetto.oreResidue,
-      oreDopo: pacchetto.oreResidue + att.oreConsumate,
-      attivitaId: att.id,
-      utente: session.user?.email || 'admin',
-      motivazione: att.descrizione,
-      pacchettoDescrizione: pacchetto.descrizione
+    const lavagna = await prisma.lavagna.findUnique({
+      where: { attivitaId: att.id },
+      select: { id: true }
     })
 
-    return NextResponse.json({ deleted, pacchetto: pacchettoUpd })
+    const result = await prisma.$transaction(async tx => {
+      await tx.richiestaModifica.deleteMany({ where: { attivitaId: att.id } })
+
+      if (lavagna) {
+        await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: lavagna.id } })
+        await tx.lavagna.delete({ where: { id: lavagna.id } })
+      }
+
+      const pacchettoBefore = await tx.pacchettoOre.findUnique({
+        where: { id: att.pacchettoId },
+        select: { id: true, oreResidue: true, descrizione: true }
+      })
+
+      const pacchettoAggiornato = pacchettoBefore
+        ? await tx.pacchettoOre.update({
+            where: { id: pacchettoBefore.id },
+            data: {
+              oreResidue: pacchettoBefore.oreResidue + att.oreConsumate,
+              stato: pacchettoBefore.oreResidue + att.oreConsumate > 0 ? 'attivo' : 'esaurito'
+            }
+          })
+        : null
+
+      const deleted = await tx.attivita.delete({ where: { id: att.id } })
+
+      return { deleted, pacchettoBefore, pacchettoAggiornato }
+    })
+
+    if (result.pacchettoBefore && result.pacchettoAggiornato) {
+      await logPacchettoChange({
+        pacchettoId: result.pacchettoBefore.id,
+        tipoOperazione: 'eliminazione-attivita',
+        orePrima: result.pacchettoBefore.oreResidue,
+        oreDopo: result.pacchettoAggiornato.oreResidue,
+        attivitaId: att.id,
+        utente: session.user?.email || 'admin',
+        motivazione: att.descrizione,
+        pacchettoDescrizione: result.pacchettoBefore.descrizione
+      })
+    }
+
+    return NextResponse.json({ deleted: result.deleted, pacchetto: result.pacchettoAggiornato })
   } catch (err) {
     console.error('Errore DELETE /api/attivita:', err)
     return NextResponse.json({ error: 'Errore interno' }, { status: 500 })

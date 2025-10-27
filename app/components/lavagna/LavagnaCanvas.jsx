@@ -26,7 +26,9 @@ export default function LavagnaCanvas({
   ruolo,
   altezza = 600,
   openInNewWindow = false,
-  isNewLavagna = false
+  isNewLavagna = false,
+  topRightPlacement = "in-canvas",
+  onActionsChange
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -107,6 +109,25 @@ export default function LavagnaCanvas({
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
+
+  const penCursor = useMemo(() => {
+    if (strumento !== "penna") return null;
+    const diameter = Math.max(12, Math.min(spessore * 4, 48));
+    const size = Math.round(diameter);
+    const radius = size / 2;
+    const strokeWidth = Math.max(2, Math.round(size * 0.18));
+    const innerRadius = Math.max(radius - strokeWidth / 2, 1);
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${radius}" cy="${radius}" r="${radius}" fill="${colore}" />
+        <circle cx="${radius}" cy="${radius}" r="${innerRadius}" fill="${colore}" stroke="white" stroke-width="${strokeWidth}" opacity="0.85" />
+      </svg>
+    `;
+    return {
+      url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
+      hotspot: radius
+    };
+  }, [strumento, colore, spessore]);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -496,6 +517,12 @@ export default function LavagnaCanvas({
       setShowExportMenu(false);
     }
   }, [showTools]);
+
+  useEffect(() => {
+    if (topRightPlacement !== "in-canvas") {
+      setShowExportMenu(false);
+    }
+  }, [topRightPlacement]);
 
   useEffect(() => {
     panRef.current = pan;
@@ -1537,19 +1564,19 @@ export default function LavagnaCanvas({
   }, [tratti, altezza]);
 
   // Zoom via rotella mouse
-  const onWheel = useCallback((e) => {
-    // Zoom solo sulla lavagna, sempre con rotella, ancorato al cursore
+  const handleWheel = useCallback((event) => {
     if (spectatorModeRef.current && !isAdmin) {
-      e.preventDefault();
+      event.preventDefault();
       return;
     }
-    e.preventDefault();
     const canvas = canvasRef.current;
+    if (!canvas) return;
+    event.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    const offX = e.clientX - rect.left;
-    const offY = e.clientY - rect.top;
+    const offX = event.clientX - rect.left;
+    const offY = event.clientY - rect.top;
     const worldBefore = { x: pan.x + offX / zoom, y: pan.y + offY / zoom };
-    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    const factor = event.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(2, Math.max(0.5, Math.round((zoom * factor) * 100) / 100));
     const newPan = {
       x: worldBefore.x - offX / newZoom,
@@ -1559,9 +1586,17 @@ export default function LavagnaCanvas({
     setPan(newPan);
     zoomRef.current = newZoom;
     panRef.current = newPan;
-    // Aggiorna subito la lavagna per feedback immediato
     setTimeout(drawAll, 0);
-  }, [zoom, pan.x, pan.y, drawAll, isAdmin]);
+  }, [isAdmin, pan.x, pan.y, zoom, drawAll]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleWheel]);
 
   const applyZoomAt = useCallback((factor, pivot) => {
     if (spectatorModeRef.current && !isAdmin) return;
@@ -2128,7 +2163,7 @@ export default function LavagnaCanvas({
   }
 
   // == EXPORT ==
-  function esportaPNG() {
+  const esportaPNG = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
@@ -2136,9 +2171,9 @@ export default function LavagnaCanvas({
     link.href = url;
     link.download = `lavagna-${lavagnaId}.png`;
     link.click();
-  }
+  }, [lavagnaId]);
 
-  async function esportaPDF() {
+  const esportaPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf");
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -2158,7 +2193,7 @@ export default function LavagnaCanvas({
       canvas.height
     );
     pdf.save(`lavagna-${lavagnaId || attivitaId}.pdf`);
-  }
+  }, [lavagnaId, attivitaId]);
 
   // == CLEAR ==
   const pulisciLavagna = useCallback(() => {
@@ -2504,109 +2539,137 @@ export default function LavagnaCanvas({
     if (['lazzo','rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
       return 'crosshair';
     }
-    return `url(${st.penCursor}) 12 32, crosshair`;
-  }, [contextPanning, strumento, isPanning]);
+    if (!penCursor) return 'crosshair';
+    const hotspot = Math.round(penCursor.hotspot);
+    return `url(${penCursor.url}) ${hotspot} ${hotspot}, auto`;
+  }, [contextPanning, strumento, isPanning, penCursor]);
 
   const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
   const spectatorIndicatorTitle = isAdmin
     ? (spectatorCount > 0 ? `Modalità spettatore attiva (${spectatorCount})` : '')
     : 'Modalità spettatore attiva';
+  const showInCanvasActions = topRightPlacement === 'in-canvas' && (!spectatorMode || isAdmin);
+  const showTopRightBar = showInCanvasActions || spectatorIndicatorVisible;
   const zoomDisabled = spectatorMode && !isAdmin;
   const canZoomOut = zoom > 0.51;
   const canZoomIn = zoom < 1.99;
   const canResetView = zoom < 0.99 || zoom > 1.01 || Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5;
   const zoomLabel = `${Math.round(zoom * 100)}%`;
 
+  useEffect(() => {
+    if (topRightPlacement !== "external" || !onActionsChange) return;
+    const openNewWindowHandler = openInNewWindow && attivitaId
+      ? () => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")
+      : null;
+    onActionsChange({
+      esportaPNG,
+      esportaPDF,
+      openNewWindow: openNewWindowHandler
+    });
+    return () => {
+      onActionsChange?.(null);
+    };
+  }, [
+    topRightPlacement,
+    onActionsChange,
+    esportaPNG,
+    esportaPDF,
+    openInNewWindow,
+    attivitaId
+  ]);
+
   // == RENDER ==
   return (
     <div style={st.wrapper}>
       {/* Azioni in alto a destra all'esterno della lavagna */}
-      <div style={st.topRightActionsOuter}>
-        {(!spectatorMode || isAdmin) && (
-          <div style={st.topRightActions}>
-            <div ref={exportMenuRef} style={st.exportWrapper}>
-              <button
-                type="button"
-                style={st.exportButton}
-                onClick={() => {
-                  setShowPenPopover(false);
-                  setShowMoreMenu(false);
-                  setShowShapesPopover(false);
-                  setShowExportMenu((v) => !v);
-                }}
-                aria-expanded={showExportMenu}
-                aria-haspopup="menu"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M5 5h14M5 12h14M5 19h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>Esporta</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              {showExportMenu && (
-                <div style={st.exportMenu} role="menu">
-                  <button
-                    type="button"
-                    style={st.exportMenuItem}
-                    role="menuitem"
-                    onClick={() => {
-                      setShowExportMenu(false);
-                      esportaPNG();
-                    }}
-                  >
-                    Scarica PNG
-                  </button>
-                  <button
-                    type="button"
-                    style={st.exportMenuItem}
-                    role="menuitem"
-                    onClick={() => {
-                      setShowExportMenu(false);
-                      esportaPDF();
-                    }}
-                  >
-                    Scarica PDF
-                  </button>
-                </div>
+      {showTopRightBar && (
+        <div style={st.topRightActionsOuter}>
+          {showInCanvasActions && (
+            <div style={st.topRightActions}>
+              <div ref={exportMenuRef} style={st.exportWrapper}>
+                <button
+                  type="button"
+                  style={st.exportButton}
+                  onClick={() => {
+                    setShowPenPopover(false);
+                    setShowMoreMenu(false);
+                    setShowShapesPopover(false);
+                    setShowExportMenu((v) => !v);
+                  }}
+                  aria-expanded={showExportMenu}
+                  aria-haspopup="menu"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M5 5h14M5 12h14M5 19h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Esporta</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {showExportMenu && (
+                  <div style={st.exportMenu} role="menu">
+                    <button
+                      type="button"
+                      style={st.exportMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setShowExportMenu(false);
+                        esportaPNG();
+                      }}
+                    >
+                      Scarica PNG
+                    </button>
+                    <button
+                      type="button"
+                      style={st.exportMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setShowExportMenu(false);
+                        esportaPDF();
+                      }}
+                    >
+                      Scarica PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+              {openInNewWindow && attivitaId && (
+                <button
+                  type="button"
+                  style={st.secondaryButton}
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank");
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M14 3h7v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M10 14l11-11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M21 13v5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Nuova finestra</span>
+                </button>
               )}
             </div>
-            {openInNewWindow && attivitaId && (
-              <button
-                type="button"
-                style={st.secondaryButton}
-                onClick={() => {
-                  setShowExportMenu(false);
-                  window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank");
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M14 3h7v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M10 14l11-11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M21 13v5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>Nuova finestra</span>
-              </button>
-            )}
-          </div>
-        )}
-        {spectatorIndicatorVisible && (
-          <div
-            style={{
-              ...st.eyeBadge,
-              cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
-            }}
-            onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
-            title={spectatorIndicatorTitle}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
-            </svg>
-            {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
-          </div>
-        )}
-      </div>
+          )}
+          {spectatorIndicatorVisible && (
+            <div
+              style={{
+                ...st.eyeBadge,
+                cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
+              }}
+              onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
+              title={spectatorIndicatorTitle}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
+              </svg>
+              {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
+            </div>
+          )}
+        </div>
+      )}
       <div style={st.canvasBox}>
         {toolbar}
         <div style={st.zoomControls}>
@@ -2649,7 +2712,6 @@ export default function LavagnaCanvas({
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
           onPointerCancel={pointerCancel}
-          onWheel={onWheel}
           onContextMenu={(e) => e.preventDefault()}
           style={{
             ...st.canvas,
@@ -2940,15 +3002,6 @@ const st = {
     textTransform: 'uppercase'
   },
   // cursori SVG embedded (data URL)
-  penCursor:
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
-        <path fill="#163d8c" d="M7 31l5-1.2L29.2 12.6 24.6 8 7 25.6z"/>
-        <path fill="#6fb1ff" d="M22.4 8.4L26 4.8l6 6-3.6 3.6z"/>
-        <path fill="#f8fbff" d="M7 31l11-2.4-8.6-8.6z"/>
-      </svg>
-    `),
   eraserCursor:
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(`

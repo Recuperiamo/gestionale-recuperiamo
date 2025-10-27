@@ -55,6 +55,15 @@ export async function DELETE(req) {
         })
       : [];
 
+    const attivitaIds = attivita.map(a => a.id);
+    const lavagnaRecords = attivitaIds.length
+      ? await prisma.lavagna.findMany({
+          where: { attivitaId: { in: attivitaIds } },
+          select: { id: true }
+        })
+      : [];
+    const lavagnaIds = lavagnaRecords.map(l => l.id);
+
     // 3. Transazione: elimina richieste, (opzionale) reset pacchetti, elimina attività
     await prisma.$transaction(async tx => {
       // 3.1 Richieste di modifica collegate
@@ -65,6 +74,11 @@ export async function DELETE(req) {
       } catch (e) {
         // Se il modello non esiste semplicemente logga (non bloccare il purge)
         console.warn("richiestaModifica.deleteMany skipped:", e.message);
+      }
+
+      if (lavagnaIds.length) {
+        await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: { in: lavagnaIds } } });
+        await tx.lavagna.deleteMany({ where: { id: { in: lavagnaIds } } });
       }
 
       // 3.2 Reset pacchetti (se non disabilitato)

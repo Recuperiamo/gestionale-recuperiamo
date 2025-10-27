@@ -1,9 +1,16 @@
 import React from 'react';
 
-function formatDate(dateString) {
+function formatDateTime(dateString) {
   if (!dateString) return "";
   const d = new Date(dateString);
-  return d.toLocaleDateString('it-IT');
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 export default function AttivitaList({ attivita, onDettaglio }) {
@@ -17,7 +24,7 @@ export default function AttivitaList({ attivita, onDettaglio }) {
             <th style={{ textAlign: "right", padding: "12px 10px", fontWeight: 700 }}>Ore</th>
             <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Pacchetto</th>
             <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Cliente</th>
-            <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Data</th>
+            <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Orario</th>
             <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Azioni</th>
           </tr>
         </thead>
@@ -42,7 +49,9 @@ export default function AttivitaList({ attivita, onDettaglio }) {
               <td style={{ padding: "10px", textAlign: "right" }}>{a.oreConsumate}</td>
               <td style={{ padding: "10px" }}>{a.pacchetto?.descrizione || ""}</td>
               <td style={{ padding: "10px" }}>{a.pacchetto?.cliente?.nomeReferente || a.pacchetto?.cliente?.ragione_sociale || a.pacchetto?.cliente?.nome || a.pacchetto?.cliente?.email || ""}</td>
-              <td style={{ padding: "10px", textAlign: "center" }}>{formatDate(a.createdAt)}</td>
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {formatDateTime(a.orario || a.createdAt)}
+              </td>
               <td style={{ padding: "10px", textAlign: "center" }}>
                 <button
                   style={{

@@ -49,6 +49,7 @@ export default function CalendarioAttivita({
   const [loading, setLoading] = useState(true);
   const [errore, setErrore] = useState(null);
   const [attivita, setAttivita] = useState([]);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   const [hiddenDays, setHiddenDays] = useState([]);
   const [slotMinTime, setSlotMinTime] = useState("14:00:00");
@@ -84,6 +85,7 @@ export default function CalendarioAttivita({
   // Stato per form creazione attività
   const [showCreate, setShowCreate] = useState(false);
   const [createInitialData, setCreateInitialData] = useState(null);
+  const [editData, setEditData] = useState(null);
 
   // Ref per evitare troppi pre-create consecutivi
   const lastPrecreateRef = useRef(0);
@@ -111,7 +113,7 @@ export default function CalendarioAttivita({
     return () => {
       abort = true;
     };
-  }, [effectiveClienteId, showCreate]); // showCreate per refresh su nuova attività
+  }, [effectiveClienteId, showCreate, refreshCounter]);
 
   /* Mapping eventi */
   const { events } = useMemo(() => mapAttivita(attivita), [attivita]);
@@ -318,8 +320,14 @@ export default function CalendarioAttivita({
   const handleSuccessCreate = () => {
     setShowCreate(false);
     setCreateInitialData(null);
-    setLoading(true);
-    setTimeout(() => setLoading(false), 250);
+    setRefreshCounter(c => c + 1);
+    refetchRichieste && refetchRichieste();
+  };
+
+  const handleSuccessEdit = () => {
+    setEditData(null);
+    setRefreshCounter(c => c + 1);
+    refetchRichieste && refetchRichieste();
   };
 
   if (loading) return <div style={styles.loadingBox}>Caricamento calendario…</div>;
@@ -395,7 +403,7 @@ export default function CalendarioAttivita({
           return cls;
         }}
         eventClick={info => {
-            const attIdNum = Number(info.event.id);
+          const attIdNum = Number(info.event.id);
 
           // Scorciatoia ALT+click => apri lavagna
           if (info.jsEvent && info.jsEvent.altKey) {
@@ -419,6 +427,14 @@ export default function CalendarioAttivita({
                 ...r,
                 attivita: fullAtt || { id: attIdNum, descrizione: info.event.title }
               });
+              return;
+            }
+          }
+
+          if (isAdmin) {
+            const fullAtt = attivita.find(a => a.id === attIdNum);
+            if (fullAtt) {
+              setEditData(fullAtt);
               return;
             }
           }
@@ -474,6 +490,14 @@ export default function CalendarioAttivita({
             setShowCreate(false);
             setCreateInitialData(null);
           }}
+        />
+      )}
+
+      {isAdmin && editData && (
+        <AttivitaForm
+          initialData={editData}
+          onSuccess={handleSuccessEdit}
+          onClose={() => setEditData(null)}
         />
       )}
 

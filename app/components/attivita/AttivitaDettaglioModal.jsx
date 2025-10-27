@@ -24,6 +24,9 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
     }
   }
 
+  const orarioLezione = attivita.orario ? formatDate(attivita.orario) : formatDate(attivita.createdAt);
+  const dataCreazione = attivita.createdAt ? formatDate(attivita.createdAt) : "";
+
   return (
     <div className="modal-overlay" style={{ zIndex: 40 }}>
       <div className="modal" style={{ maxWidth: 470 }}>
@@ -72,8 +75,13 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
           <b>Ore:</b> {attivita.oreConsumate}
         </div>
         <div style={{ marginBottom: 8 }}>
-          <b>Data:</b> {formatDate(attivita.createdAt)}
+          <b>Orario lezione:</b> {orarioLezione}
         </div>
+        {dataCreazione && (
+          <div style={{ marginBottom: 8 }}>
+            <b>Creato il:</b> {dataCreazione}
+          </div>
+        )}
         <div style={{ marginBottom: 8 }}>
           <b>Pacchetto:</b> {pacchettoLabel}
         </div>
