@@ -1823,18 +1823,18 @@ export default function LavagnaCanvas({
       const ov = overlayRef.current;
       const canvas = canvasRef.current;
       if (ov && canvas && strumento === 'penna') {
-        const rect = canvas.getBoundingClientRect();
-        const cx = e.nativeEvent.clientX - rect.left;
-        const cy = e.nativeEvent.clientY - rect.top;
+        const clientX = e.nativeEvent.clientX;
+        const clientY = e.nativeEvent.clientY;
         ov.style.display = 'block';
-        ov.style.left = `${rect.left + cx}px`;
-        ov.style.top = `${rect.top + cy}px`;
+        ov.style.left = `${clientX}px`;
+        ov.style.top = `${clientY}px`;
         ov.style.width = `${overlaySize}px`;
         ov.style.height = `${overlaySize}px`;
         ov.style.borderRadius = '50%';
         ov.style.background = colore;
         ov.style.opacity = '0.95';
         ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+        ov.style.transform = 'translate(-50%, -50%)';
       }
     } catch (_) {}
   }
@@ -1911,22 +1911,18 @@ export default function LavagnaCanvas({
     try {
       const ov = overlayRef.current;
       if (ov && strumento === 'penna') {
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const rect = canvas.getBoundingClientRect();
-          const cx = e.nativeEvent.clientX - rect.left;
-          const cy = e.nativeEvent.clientY - rect.top;
-          ov.style.display = 'block';
-          ov.style.left = `${rect.left + cx}px`;
-          ov.style.top = `${rect.top + cy}px`;
-          ov.style.width = `${overlaySize}px`;
-          ov.style.height = `${overlaySize}px`;
-          ov.style.borderRadius = '50%';
-          ov.style.background = colore;
-          ov.style.opacity = '0.95';
-          ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-          ov.style.transform = 'translate(-50%, -50%)';
-        }
+        const clientX = e.nativeEvent.clientX;
+        const clientY = e.nativeEvent.clientY;
+        ov.style.display = 'block';
+        ov.style.left = `${clientX}px`;
+        ov.style.top = `${clientY}px`;
+        ov.style.width = `${overlaySize}px`;
+        ov.style.height = `${overlaySize}px`;
+        ov.style.borderRadius = '50%';
+        ov.style.background = colore;
+        ov.style.opacity = '0.95';
+        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+        ov.style.transform = 'translate(-50%, -50%)';
       }
     } catch (_) {}
 
@@ -2024,7 +2020,8 @@ export default function LavagnaCanvas({
       try {
         const ov = overlayRef.current;
         if (ov) {
-          ov.style.display = strumento === 'penna' ? 'block' : 'none';
+            // keep overlay visible only while pen tool active and pointer is present
+            ov.style.display = strumento === 'penna' ? 'block' : 'none';
         }
       } catch (_) {}
       return;
@@ -2138,6 +2135,8 @@ export default function LavagnaCanvas({
       setSelectionBox(null);
       setTimeout(drawAll, 0);
     }
+    // hide overlay on cancel
+    try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
   }
 
   // == SALVATAGGIO STROKE ==
@@ -2773,13 +2772,13 @@ export default function LavagnaCanvas({
         <div
           ref={overlayRef}
           style={{
-            position: 'absolute',
+            position: 'fixed',
             left: 0,
             top: 0,
             width: 0,
             height: 0,
             pointerEvents: 'none',
-            zIndex: 6,
+            zIndex: 9999,
             display: 'none',
             transform: 'translate(-50%, -50%)'
           }}
