@@ -93,6 +93,7 @@ export default function LavagnaCanvas({
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
+  const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
   const latestAdminViewportRef = useRef(null);
@@ -210,41 +211,58 @@ export default function LavagnaCanvas({
 
     const viewW = W / zoom;
     const viewH = H / zoom;
-    // sfondo pattern (dentro lo scale per coerenza visiva)
+    // sfondo pattern (disegniamo un pattern ripetuto di grandi dimensioni
+    // così da avere uno sfondo "infinito" che continua quando si pan/zoom)
     if (sfondo === 'righe' || sfondo === 'quadretti' || sfondo === 'punti') {
-      const step = 32; // unità canvas
-      const margin = step * 6;
-      ctx.strokeStyle = sfondo === 'righe' ? '#e5e7eb' : '#e2e8f0';
-      ctx.fillStyle = '#e5e7eb';
-      ctx.lineWidth = 1;
-      const startY = Math.floor((pan.y - margin) / step) * step;
-      const startX = Math.floor((pan.x - margin) / step) * step;
-      const endY = pan.y + viewH + margin;
-      const endX = pan.x + viewW + margin;
-      if (sfondo === 'righe' || sfondo === 'quadretti') {
-        for (let y = startY; y < endY; y += step) {
-          ctx.beginPath();
-          ctx.moveTo(pan.x - margin, y);
-          ctx.lineTo(pan.x + viewW + margin, y);
-          ctx.stroke();
-        }
-      }
-      if (sfondo === 'quadretti') {
-        for (let x = startX; x < endX; x += step) {
-          ctx.beginPath();
-          ctx.moveTo(x, pan.y - margin);
-          ctx.lineTo(x, pan.y + viewH + margin);
-          ctx.stroke();
-        }
-      }
-      if (sfondo === 'punti') {
-        for (let y = startY; y < endY; y += step) {
-          for (let x = startX; x < endX; x += step) {
-            ctx.beginPath();
-            ctx.arc(x, y, 1, 0, Math.PI * 2);
-            ctx.fill();
+      try {
+        // cache a small tile per tipo per evitare ricreazioni ogni frame
+        if (!drawAll._patternCache) drawAll._patternCache = {};
+        const key = sfondo;
+        let pattern = drawAll._patternCache[key];
+        const step = 32;
+        if (!pattern) {
+          const tile = document.createElement('canvas');
+          tile.width = step;
+          tile.height = step;
+          const tctx = tile.getContext('2d');
+          tctx.clearRect(0,0,step,step);
+          if (sfondo === 'righe') {
+            tctx.strokeStyle = '#e5e7eb';
+            tctx.lineWidth = 1;
+            tctx.beginPath();
+            tctx.moveTo(0, 0.5);
+            tctx.lineTo(step, 0.5);
+            tctx.stroke();
+          } else if (sfondo === 'quadretti') {
+            tctx.strokeStyle = '#e2e8f0';
+            tctx.lineWidth = 1;
+            tctx.beginPath();
+            tctx.moveTo(0, 0.5);
+            tctx.lineTo(step, 0.5);
+            tctx.moveTo(0.5, 0);
+            tctx.lineTo(0.5, step);
+            tctx.stroke();
+          } else if (sfondo === 'punti') {
+            tctx.fillStyle = '#e5e7eb';
+            tctx.beginPath();
+            tctx.arc(step/2, step/2, 1, 0, Math.PI*2);
+            tctx.fill();
           }
+          pattern = ctx.createPattern(tile, 'repeat');
+          drawAll._patternCache[key] = pattern;
         }
+        ctx.save();
+        ctx.fillStyle = pattern;
+        // estendi molto oltre la vista corrente per dare effetto di sfondo infinito
+        const big = Math.max(viewW, viewH) * 4 + 2000;
+        const rx = pan.x - big;
+        const ry = pan.y - big;
+        const rw = viewW + big * 2;
+        const rh = viewH + big * 2;
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.restore();
+      } catch (err) {
+        // fallback: niente sfondo pattern se il canvas non supporta createPattern
       }
     }
 
@@ -329,6 +347,27 @@ export default function LavagnaCanvas({
           ctx.lineTo(x, cy);
           ctx.closePath();
           ctx.stroke();
+          break;
+        }
+        case 'immagine': {
+          // disegna immagini incollate o aggiunte come forme
+          try {
+            const imgSrc = f.src;
+            if (imgSrc) {
+              let imgEl = imageCacheRef.current.get(imgSrc);
+              if (!imgEl) {
+                imgEl = new Image();
+                imgEl.onload = () => { imageCacheRef.current.set(imgSrc, imgEl); drawAll(); };
+                imgEl.src = imgSrc;
+                imageCacheRef.current.set(imgSrc, imgEl);
+              }
+              if (imgEl && imgEl.complete) {
+                const w = f.w || imgEl.naturalWidth / (window.devicePixelRatio || 1);
+                const h = f.h || imgEl.naturalHeight / (window.devicePixelRatio || 1);
+                ctx.drawImage(imgEl, f.x, f.y, w, h);
+              }
+            }
+          } catch (_) {}
           break;
         }
         default:
@@ -1159,7 +1198,64 @@ export default function LavagnaCanvas({
       if (mod && e.key === 'd') { duplicateSelection(); e.preventDefault(); }
     }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Paste from system clipboard (images)
+    function onPaste(e) {
+      try {
+        const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
+        for (const it of items) {
+          if (!it) continue;
+          if (it.type && it.type.indexOf('image') === 0) {
+            const file = it.getAsFile();
+            if (file) {
+              const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+              const src = URL.createObjectURL(file);
+              // place roughly at center of current viewport (in world units)
+              const canvas = canvasRef.current;
+              const rect = canvas.getBoundingClientRect();
+              const viewW = rect.width / (zoom || 1);
+              const viewH = rect.height / (zoom || 1);
+              const x = pan.x + viewW / 2 - (200 / (zoom || 1));
+              const y = pan.y + viewH / 2 - (150 / (zoom || 1));
+              const shape = {
+                id,
+                kind: 'immagine',
+                src,
+                x,
+                y,
+                w: 400 / (zoom || 1),
+                h: 300 / (zoom || 1),
+                autoreUserId: utenteId
+              };
+              // preload image to adjust size
+              const img = new Image();
+              img.onload = () => {
+                const aspect = img.naturalWidth / img.naturalHeight || 1;
+                const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
+                const desiredH = desiredW / aspect;
+                shape.w = desiredW;
+                shape.h = desiredH;
+                setForme(prev => [...prev, shape]);
+                drawAll();
+              };
+              img.onerror = () => {
+                // still add with default size
+                setForme(prev => [...prev, shape]);
+                drawAll();
+              };
+              img.src = src;
+              // stop processing other items
+              e.preventDefault();
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('paste', onPaste);
+    };
   }, [selectedItems, tratti, forme, deleteShapeLocal]);
 
   // Simple magic-pen heuristic: try to detect line/rect/circle from stroke points
