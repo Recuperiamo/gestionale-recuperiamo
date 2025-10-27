@@ -101,6 +101,29 @@ export default function LavagnaCanvas({
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
 
+  const channelName = useMemo(
+    () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
+    [attivitaId, lavagnaId]
+  );
+
+  const emitOrPublish = useCallback(
+    (name, data) => {
+      whenChannelAttachedAsync(channelName)
+        .then(() => {
+          const ch = ablyRef.current.ch;
+          if (ch) {
+            try {
+              ch.publish(name, data);
+            } catch (e) {
+              // Ignore realtime publish failures
+            }
+          }
+        })
+        .catch(() => {});
+    },
+    [channelName]
+  );
+
   // Shapes and selection
   const [forme, setForme] = useState([]); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
   const previewShapeRef = useRef(null);
@@ -535,26 +558,6 @@ export default function LavagnaCanvas({
   const outgoingRAFRef = useRef(null);
 
   // Setup Ably helpers and subscriptions
-  const channelName = useMemo(
-    () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
-    [attivitaId, lavagnaId]
-  );
-
-  const emitOrPublish = useCallback(
-    (name, data) => {
-      // Use the async attachment helper; only publish if channel is available
-      whenChannelAttachedAsync(channelName)
-        .then(() => {
-          const ch = ablyRef.current.ch;
-          if (ch) {
-            try { ch.publish(name, data); } catch (e) {}
-          }
-        })
-        .catch(() => {});
-    },
-    [channelName]
-  );
-
   const applyViewport = useCallback((view) => {
     if (!view) return;
     const { pan: remotePan, zoom: remoteZoom } = view;
