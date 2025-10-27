@@ -9,7 +9,7 @@ import React, {
 import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from "../../lib/realtime/ablyClient";
 
 /**
- * LavagnaCanvas – LIVE con Socket.IO su /api/socketio
+ * LavagnaCanvas - LIVE con Socket.IO su /api/socketio
  * - Penna, gomma (puntuale/intero tratto)
  * - Undo/redo, export PNG
  * - Sincronizzazione live stroke:start/points/done/delete e clear-lavagna
@@ -49,7 +49,6 @@ export default function LavagnaCanvas({
   );
   const [disegnando, setDisegnando] = useState(false);
   const puntiCorrentiRef = useRef([]);
-  // Use a ref for background save activity to avoid re-renders that can cause UI lag
   const salvandoRef = useRef(false);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -89,7 +88,6 @@ export default function LavagnaCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [contextPanning, setContextPanning] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  // undoMode removed: we show separate Undo / Redo buttons
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
@@ -98,6 +96,7 @@ export default function LavagnaCanvas({
   const spectatorModeRef = useRef(false);
   const latestAdminViewportRef = useRef(null);
   const viewportBroadcastRef = useRef({ rafId: null, payload: null });
+  const pointerWorldRef = useRef(null);
   const spectatorStorageKey = useMemo(() => {
     const keySource = attivitaId ?? lavagnaId;
     if (!keySource || !utenteId) return null;
@@ -180,6 +179,7 @@ export default function LavagnaCanvas({
     pointerTool: null,
     pointerId: null,
     primaryShapeId: null,
+    primaryStrokeIndex: null,
     selectionSnapshot: null
   });
   const selectionClickRef = useRef(null);
@@ -1154,58 +1154,153 @@ export default function LavagnaCanvas({
   // Clipboard for cut/copy/paste
   const clipboardRef = useRef({ tratti: [], forme: [] });
 
+  const computeClipboardBounds = useCallback((cb) => {
+    if (!cb) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const includeBounds = (bb) => {
+      if (!bb) return;
+      minX = Math.min(minX, bb.minX);
+      minY = Math.min(minY, bb.minY);
+      maxX = Math.max(maxX, bb.maxX);
+      maxY = Math.max(maxY, bb.maxY);
+    };
+    (cb.forme || []).forEach((shape) => {
+      if (!shape) return;
+      const normalized = normalizeShape({ ...shape });
+      includeBounds(normalized?._bb || getShapeBounds(normalized));
+    });
+    (cb.tratti || []).forEach((stroke) => {
+      if (!stroke) return;
+      const prepared = prepareStroke({ ...stroke });
+      includeBounds(prepared._bb);
+    });
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2
+    };
+  }, []);
+
+  function getWorldCenter() {
+    const canvas = canvasRef.current;
+    const currentPan = panRef.current || { x: 0, y: 0 };
+    const currentZoom = zoomRef.current || 1;
+    if (!canvas) {
+      return { x: currentPan.x, y: currentPan.y };
+    }
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: currentPan.x + (rect.width / 2) / currentZoom,
+      y: currentPan.y + (rect.height / 2) / currentZoom
+    };
+  }
+
   function copySelection() {
     const sel = selectedItems;
+    const selectedShapes = sel.forme
+      .map((id) => forme.find((f) => f.id === id))
+      .filter(Boolean)
+      .map((shape) => JSON.parse(JSON.stringify(shape)));
+    const selectedStrokes = sel.tratti
+      .map((idx) => tratti[idx])
+      .filter(Boolean)
+      .map((stroke) => JSON.parse(JSON.stringify(stroke)));
     clipboardRef.current = {
-      tratti: sel.tratti.map(i => JSON.parse(JSON.stringify(tratti[i]))),
-      forme: sel.forme.map(id => JSON.parse(JSON.stringify(forme.find(f=>f.id===id))))
+      forme: selectedShapes,
+      tratti: selectedStrokes
     };
   }
 
   function cutSelection() {
     copySelection();
-    // remove selected tratti
-    setTratti(prev => prev.filter((_, idx) => !selectedItems.tratti.includes(idx)));
-    // remove shapes
-    setForme(prev => prev.filter(f => !selectedItems.forme.includes(f.id)));
+    setTratti((prev) => prev.filter((_, idx) => !selectedItems.tratti.includes(idx)));
+    setForme((prev) => prev.filter((f) => !selectedItems.forme.includes(f.id)));
     setSelectedItems({ tratti: [], forme: [] });
-    // emit deletions
-    clipboardRef.current.forme.forEach(s => emitOrPublish('shape:delete', { id: s.id, lavagnaId }));
+    clipboardRef.current.forme.forEach((shape) => {
+      if (!shape?.id) return;
+      emitOrPublish('shape:delete', { id: shape.id, lavagnaId });
+    });
   }
 
-  function pasteClipboard(atPoint) {
+  function pasteClipboard(targetPoint) {
     const cb = clipboardRef.current;
     if (!cb) return;
-    const offset = atPoint || { x: pan.x + 50 / zoom, y: pan.y + 50 / zoom };
-    const newShapes = (cb.forme || []).map((shape) => {
-      const base = {
-        ...shape,
-        id: `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        autoreUserId: utenteId
-      };
-      const normalized = normalizeShape(base);
-      const translated = translateShape(normalized, 20, 20);
+    const hasContent = (cb.forme && cb.forme.length) || (cb.tratti && cb.tratti.length);
+    if (!hasContent) return;
+    const bounds = computeClipboardBounds(cb);
+    const fallback = pointerWorldRef.current || getWorldCenter();
+    const anchor = targetPoint || fallback;
+    const sourceCx = bounds ? bounds.cx : fallback.x;
+    const sourceCy = bounds ? bounds.cy : fallback.y;
+    const dx = anchor.x - sourceCx;
+    const dy = anchor.y - sourceCy;
+
+    const newShapeIds = [];
+    (cb.forme || []).forEach((rawShape) => {
+      if (!rawShape) return;
+      const sanitized = { ...rawShape };
+      delete sanitized.dbId;
+      const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const normalized = normalizeShape({ ...sanitized, id, autoreUserId: utenteId });
+      const translated = translateShape(normalized, dx, dy);
+      translated.autoreUserId = utenteId;
+      delete translated.dbId;
+      newShapeIds.push(translated.id);
       createShapeLocal(translated, true);
-      return translated;
     });
-    const newStrokes = (cb.tratti || []).map(st => {
-      const id = `${utenteId}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-      const np = (st.punti || []).map(p => ({ x: p.x + 20, y: p.y + 20 }));
-      const nt = { ...st, id, punti: np };
-      setTratti(prev => [...prev, prepareStroke(nt)]);
-      // persist
-      salvaTratto(nt);
-      emitOrPublish('stroke:done', { streamId: id });
-      return nt;
-    });
+
+    const strokeTemplates = (cb.tratti || [])
+      .filter(Boolean)
+      .map((stroke) => {
+        const id = `${utenteId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const punti = (stroke.punti || []).map((p) => ({ x: p.x + dx, y: p.y + dy }));
+        return {
+          ...stroke,
+          id,
+          dbId: undefined,
+          autoreUserId: utenteId,
+          punti
+        };
+      });
+
+    const newStrokeIndexes = [];
+    const preparedStrokes = [];
+    if (strokeTemplates.length) {
+      setTratti((prev) => {
+        const startIndex = prev.length;
+        const prepared = strokeTemplates.map((st, idx) => {
+          const preparedStroke = prepareStroke({ ...st });
+          preparedStrokes.push(preparedStroke);
+          newStrokeIndexes.push(startIndex + idx);
+          return preparedStroke;
+        });
+        return [...prev, ...prepared];
+      });
+      setUndoStack((prev) => [...prev, ...preparedStrokes.map((st) => ({ type: 'add', stroke: st }))]);
+      setRedoStack([]);
+      preparedStrokes.forEach((st) => {
+        salvaTratto(st);
+        emitOrPublish('stroke:done', { streamId: st.id });
+      });
+    }
+
+    if (newShapeIds.length || newStrokeIndexes.length) {
+      setSelectedItems({ forme: newShapeIds, tratti: newStrokeIndexes });
+    }
     drawAll();
   }
 
-  // Duplicate selection in-place
   function duplicateSelection() {
-    const sel = selectedItems;
-    const atPoint = null;
-    pasteClipboard(atPoint);
+    pasteClipboard(pointerWorldRef.current || getWorldCenter());
   }
 
   // Move selected items by dx,dy
@@ -1244,16 +1339,12 @@ export default function LavagnaCanvas({
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (mod && e.key === 'c') { copySelection(); e.preventDefault(); }
       if (mod && e.key === 'x') { cutSelection(); e.preventDefault(); }
-      // Only intercept Ctrl+V when our internal clipboard has content; otherwise allow native paste to occur
       if (mod && e.key === 'v') {
         const cb = clipboardRef.current;
-        const hasInternal = cb && ((cb.forme && cb.forme.length) || (cb.tratti && cb.tratti.length));
-        if (hasInternal) {
-          pasteClipboard();
-          e.preventDefault();
-        } else {
-          // allow native paste event to fire so onPaste handles system clipboard images/text
+        if (cb && ((cb.forme && cb.forme.length) || (cb.tratti && cb.tratti.length))) {
+          pasteClipboard(pointerWorldRef.current);
         }
+        // do not prevent default so images/links from system clipboard still arrive in onPaste
       }
       if (e.key === 'Delete') { // delete selection
         selectedItems.forme.forEach(id => deleteShapeLocal(id, true));
@@ -1267,6 +1358,7 @@ export default function LavagnaCanvas({
     // Paste from system clipboard (images)
     function onPaste(e) {
       try {
+        const anchor = pointerWorldRef.current || getWorldCenter();
         const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
         // try to detect text URL if no image items
         for (const it of items) {
@@ -1295,14 +1387,10 @@ export default function LavagnaCanvas({
                   }
                   const mat = js.materiale;
                   const serverSrc = `/api/materiale?fileId=${mat.id}`;
-
-                  // compute placement in world coords (center of viewport)
-                  const canvas = canvasRef.current;
-                  const rect = canvas.getBoundingClientRect();
-                  const viewW = rect.width / (zoom || 1);
-                  const viewH = rect.height / (zoom || 1);
-                  const x = pan.x + viewW / 2 - (200 / (zoom || 1));
-                  const y = pan.y + viewH / 2 - (150 / (zoom || 1));
+                  const baseWidth = 400 / (zoom || 1);
+                  const baseHeight = 300 / (zoom || 1);
+                  const baseX = anchor.x - baseWidth / 2;
+                  const baseY = anchor.y - baseHeight / 2;
 
                   const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
                   const shape = {
@@ -1311,10 +1399,10 @@ export default function LavagnaCanvas({
                     src: serverSrc,
                     materialeId: mat.id,
                     nomeOriginale: mat.nomeOriginale,
-                    x,
-                    y,
-                    w: 400 / (zoom || 1),
-                    h: 300 / (zoom || 1),
+                    x: baseX,
+                    y: baseY,
+                    w: baseWidth,
+                    h: baseHeight,
                     autoreUserId: utenteId
                   };
 
@@ -1326,8 +1414,10 @@ export default function LavagnaCanvas({
                     const desiredH = desiredW / aspect;
                     shape.w = desiredW;
                     shape.h = desiredH;
+                    shape.x = anchor.x - desiredW / 2;
+                    shape.y = anchor.y - desiredH / 2;
                     // update temp preview in-place to point to server URL
-                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h } : f));
+                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h, x: shape.x, y: shape.y } : f));
                     // emit creation for realtime consumers and persist shape on server
                     try {
                       const normalized = normalizeShape({ ...shape, id: tempId });
@@ -1374,18 +1464,17 @@ export default function LavagnaCanvas({
             const urlRe = /^https?:\/\//i;
             if (urlRe.test(t)) {
               // create a link shape at center of view
-              const canvas = canvasRef.current;
-              const rect = canvas.getBoundingClientRect();
-              const viewW = rect.width / (zoom || 1);
-              const viewH = rect.height / (zoom || 1);
-              const x = pan.x + viewW / 2 - 40 / (zoom || 1);
-              const y = pan.y + viewH / 2 - 12 / (zoom || 1);
+              const baseW = 160 / (zoom || 1);
+              const baseH = 28 / (zoom || 1);
               const shape = {
                 id: `link-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
                 kind: 'link',
                 url: t,
                 titolo: t,
-                x, y, w: 160 / (zoom || 1), h: 28 / (zoom || 1),
+                x: anchor.x - baseW / 2,
+                y: anchor.y - baseH / 2,
+                w: baseW,
+                h: baseH,
                 autoreUserId: utenteId
               };
               createShapeLocal(shape, true);
@@ -1400,20 +1489,17 @@ export default function LavagnaCanvas({
     function insertLocalPastedImage(src) {
       try {
         const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        const viewW = rect.width / (zoom || 1);
-        const viewH = rect.height / (zoom || 1);
-        const x = pan.x + viewW / 2 - (200 / (zoom || 1));
-        const y = pan.y + viewH / 2 - (150 / (zoom || 1));
+        const anchor = pointerWorldRef.current || getWorldCenter();
+        const baseWidth = 400 / (zoom || 1);
+        const baseHeight = 300 / (zoom || 1);
         const shape = {
           id,
           kind: 'immagine',
           src,
-          x,
-          y,
-          w: 400 / (zoom || 1),
-          h: 300 / (zoom || 1),
+          x: anchor.x - baseWidth / 2,
+          y: anchor.y - baseHeight / 2,
+          w: baseWidth,
+          h: baseHeight,
           autoreUserId: utenteId
         };
         const img = new Image();
@@ -1423,6 +1509,8 @@ export default function LavagnaCanvas({
           const desiredH = desiredW / aspect;
           shape.w = desiredW;
           shape.h = desiredH;
+          shape.x = anchor.x - desiredW / 2;
+          shape.y = anchor.y - desiredH / 2;
           setForme(prev => [...prev, shape]);
           drawAll();
         };
@@ -1436,74 +1524,115 @@ export default function LavagnaCanvas({
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('paste', onPaste);
     };
-  }, [selectedItems, tratti, forme, deleteShapeLocal]);
+  }, [selectedItems, tratti, forme, deleteShapeLocal, pasteClipboard, copySelection, cutSelection]);
 
   // Simple magic-pen heuristic: try to detect line/rect/circle from stroke points
   function detectShapeFromStroke(points) {
     if (!points || points.length < 6) return null;
-    // compute bounding box
-    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    for (const p of points) { if (p.x<minX)minX=p.x; if (p.y<minY)minY=p.y; if (p.x>maxX)maxX=p.x; if (p.y>maxY)maxY=p.y; }
-    const w = maxX-minX, h = maxY-minY;
-    // check closed path
-    const distEndStart = Math.hypot(points[0].x - points[points.length-1].x, points[0].y - points[points.length-1].y);
-    const bboxArea = w*h;
-    const closed = distEndStart < Math.max(12, Math.min(w, h) * 0.35);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of points) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const w = maxX - minX;
+    const h = maxY - minY;
+    const bboxDiag = Math.hypot(w, h);
+    const endDistance = Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y);
+    const closed = endDistance < Math.max(12, bboxDiag * 0.25);
+
+    const tolerance = Math.max(6, Math.min(w, h) * 0.18);
+
     if (closed) {
-      const cx = minX + w/2, cy = minY + h/2;
-      const rs = points.map(p=>Math.hypot(p.x-cx,p.y-cy));
-      const meanR = rs.reduce((a,b)=>a+b,0)/rs.length;
-      const varR = rs.reduce((a,b)=>a+(b-meanR)*(b-meanR),0)/rs.length;
-      if (Math.sqrt(varR) < Math.max(w,h)*0.15) {
-        return { kind: w/h>1.2? 'ellisse' : 'cerchio', x:minX,y:minY,w,h };
+      const cx = minX + w / 2;
+      const cy = minY + h / 2;
+      const radii = points.map((p) => Math.hypot(p.x - cx, p.y - cy));
+      const meanR = radii.reduce((a, b) => a + b, 0) / radii.length;
+      const variance = radii.reduce((a, b) => a + (b - meanR) * (b - meanR), 0) / radii.length;
+      if (Math.sqrt(variance) < Math.max(w, h) * 0.12) {
+        return { kind: w / h > 1.2 ? 'ellisse' : 'cerchio', x: minX, y: minY, w, h };
       }
-      const tolerance = Math.max(6, Math.min(w, h) * 0.12);
+
       let simplified = simplifyStroke(points, tolerance);
-      if (simplified.length > 2) {
-        const first = simplified[0];
-        const last = simplified[simplified.length - 1];
-        if (Math.hypot(first.x - last.x, first.y - last.y) < tolerance) {
-          simplified = simplified.slice(0, -1);
+      const dedupeThreshold = tolerance * 0.75;
+      const unique = [];
+      for (const pt of simplified) {
+        const last = unique[unique.length - 1];
+        if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > dedupeThreshold) {
+          unique.push(pt);
         }
       }
-      if (simplified.length === 3) {
+      if (unique.length >= 3) {
+        const first = unique[0];
+        const last = unique[unique.length - 1];
+        if (Math.hypot(first.x - last.x, first.y - last.y) < dedupeThreshold) {
+          unique[unique.length - 1] = first;
+        }
+      }
+
+      const cornerCount = unique.length;
+      if (cornerCount === 3) {
         return { kind: 'triangolo', x: minX, y: minY, w, h };
       }
-      if (simplified.length === 4) {
+      if (cornerCount === 4) {
         const angles = [];
-        for (let i = 0; i < simplified.length; i++) {
-          const prev = simplified[(i - 1 + simplified.length) % simplified.length];
-          const curr = simplified[i];
-          const next = simplified[(i + 1) % simplified.length];
+        const sideLengths = [];
+        for (let i = 0; i < unique.length; i++) {
+          const prev = unique[(i - 1 + unique.length) % unique.length];
+          const curr = unique[i];
+          const next = unique[(i + 1) % unique.length];
           const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
           const v2 = { x: next.x - curr.x, y: next.y - curr.y };
           const len1 = Math.hypot(v1.x, v1.y);
           const len2 = Math.hypot(v2.x, v2.y);
-          if (len1 === 0 || len2 === 0) continue;
-          const cos = (v1.x * v2.x + v1.y * v2.y) / (len1 * len2);
-          angles.push(Math.acos(Math.max(-1, Math.min(1, cos))));
+          if (len1 > 0 && len2 > 0) {
+            const cos = (v1.x * v2.x + v1.y * v2.y) / (len1 * len2);
+            angles.push(Math.acos(Math.max(-1, Math.min(1, cos))));
+            sideLengths.push(len1);
+          }
         }
-        const rightAngles = angles.filter((a) => Math.abs(a - Math.PI / 2) < 0.45).length;
+        const rightAngles = angles.filter((a) => Math.abs(a - Math.PI / 2) < 0.55).length;
         if (rightAngles >= 3) {
           return { kind: 'rettangolo', x: minX, y: minY, w, h };
         }
-        if (angles.length === 4) {
-          return { kind: 'rombo', x: minX, y: minY, w, h };
+        if (angles.length) {
+          const meanLen = sideLengths.reduce((a, b) => a + b, 0) / sideLengths.length;
+          const maxDev = Math.max(...sideLengths.map((len) => Math.abs(len - meanLen)));
+          if (maxDev <= meanLen * 0.28) {
+            return { kind: 'rombo', x: minX, y: minY, w, h };
+          }
+        }
+        return { kind: 'rettangolo', x: minX, y: minY, w, h };
+      }
+
+      if (cornerCount > 4) {
+        const perimeter = unique.reduce((acc, curr, idx) => {
+          const next = unique[(idx + 1) % unique.length];
+          return acc + Math.hypot(next.x - curr.x, next.y - curr.y);
+        }, 0);
+        const projectedRect = 2 * (w + h);
+        if (perimeter / projectedRect < 1.6) {
+          return { kind: 'rettangolo', x: minX, y: minY, w, h };
         }
       }
-      // fallback: many points near edges
-      let nearEdges=0;
-      for (const p of points) {
-        if (Math.abs(p.x-minX)<Math.max(4, w*0.08) || Math.abs(p.x-maxX)<Math.max(4, w*0.08) || Math.abs(p.y-minY)<Math.max(4, h*0.08) || Math.abs(p.y-maxY)<Math.max(4, h*0.08)) nearEdges++;
-      }
-      if (nearEdges / points.length > 0.5) return { kind: 'rettangolo', x:minX,y:minY,w,h };
     }
-    // line: points close to best-fit line
-    // fit line via endpoints
-    const x1 = points[0].x, y1 = points[0].y, x2 = points[points.length-1].x, y2 = points[points.length-1].y;
-    let maxDist=0, total=0;
-    for (const p of points) { const d = distPointToSegment(p.x,p.y,x1,y1,x2,y2); if (d>maxDist) maxDist=d; total+=d; }
-    if (maxDist < Math.max(8, Math.min(w,h)*0.12)) return { kind: 'linea', x:x1,y:y1,x2:x2,y2:y2 };
+
+    const x1 = points[0].x;
+    const y1 = points[0].y;
+    const x2 = points[points.length - 1].x;
+    const y2 = points[points.length - 1].y;
+    let maxDist = 0;
+    for (const p of points) {
+      const d = distPointToSegment(p.x, p.y, x1, y1, x2, y2);
+      if (d > maxDist) maxDist = d;
+    }
+    if (maxDist < Math.max(8, Math.min(w, h) * 0.15)) {
+      return { kind: 'linea', x: x1, y: y1, x2, y2 };
+    }
     return null;
   }
 
@@ -2053,6 +2182,15 @@ export default function LavagnaCanvas({
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
     selectionClickRef.current = null;
 
+    let cachedPoint = null;
+    const getPointerWorld = () => {
+      if (!cachedPoint) {
+        cachedPoint = getPoint(e);
+      }
+      pointerWorldRef.current = cachedPoint;
+      return cachedPoint;
+    };
+
     if (btn === 2) {
       e.preventDefault();
       if (spectatorLocked) {
@@ -2091,7 +2229,7 @@ export default function LavagnaCanvas({
     } catch (_) {}
 
     if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'freccia', 'rombo'].includes(strumento)) {
-      const p = getPoint(e);
+      const p = getPointerWorld();
       previewShapeRef.current = {
         kind: strumento,
         x: p.x,
@@ -2115,7 +2253,7 @@ export default function LavagnaCanvas({
     if (strumento === 'gomma') {
       eraseSessionRef.current.strokeIds.clear();
       eraseSessionRef.current.shapeIds.clear();
-      const p = getPoint(e);
+      const p = getPointerWorld();
       eraseShapesAt(p.x, p.y);
       if (!gommaPuntuale) {
         eraseStrokeAt(p.x, p.y);
@@ -2128,28 +2266,34 @@ export default function LavagnaCanvas({
     }
 
     if (strumento === 'selezione') {
-      const p = getPoint(e);
+      const p = getPointerWorld();
+      if (!p) {
+        return;
+      }
       const pointerTool = strumento;
+      const additive = !!(native?.shiftKey || native?.metaKey || native?.ctrlKey);
       try {
         const shapes = (forme || []).slice().reverse();
-        let clicked = null;
+        let clickedShape = null;
         for (const f of shapes) {
-          if (hitTestShape(f, p.x, p.y, 12)) { clicked = f; break; }
+          if (hitTestShape(f, p.x, p.y, 12)) {
+            clickedShape = f;
+            break;
+          }
         }
-        if (clicked) {
-          const additive = !!(native?.shiftKey || native?.metaKey || native?.ctrlKey);
+        if (clickedShape) {
           let nextForme;
           let nextTratti;
           if (additive) {
-            const already = selectedItems.forme.includes(clicked.id);
+            const already = selectedItems.forme.includes(clickedShape.id);
             if (already) {
-              nextForme = selectedItems.forme.filter((id) => id !== clicked.id);
+              nextForme = selectedItems.forme.filter((id) => id !== clickedShape.id);
             } else {
-              nextForme = [...selectedItems.forme, clicked.id];
+              nextForme = [...selectedItems.forme, clickedShape.id];
             }
             nextTratti = selectedItems.tratti.slice();
           } else {
-            nextForme = [clicked.id];
+            nextForme = [clickedShape.id];
             nextTratti = [];
           }
 
@@ -2163,6 +2307,7 @@ export default function LavagnaCanvas({
               pointerTool: null,
               pointerId: null,
               primaryShapeId: null,
+              primaryStrokeIndex: null,
               selectionSnapshot: null
             };
             selectionClickRef.current = null;
@@ -2175,43 +2320,111 @@ export default function LavagnaCanvas({
             moved: false,
             pointerTool,
             pointerId,
-            primaryShapeId: clicked.id,
-            selectionSnapshot: { tratti: nextTratti, forme: nextForme }
+            primaryShapeId: clickedShape.id,
+            primaryStrokeIndex: null,
+            selectionSnapshot: { tratti: nextTratti.slice(), forme: nextForme.slice() }
           };
 
           selectionClickRef.current = {
             pointerId,
-            shapeId: clicked.id,
+            shapeId: clickedShape.id,
+            strokeIndex: null,
             pointerTool,
-            openCandidate: clicked.kind === 'link',
+            openCandidate: clickedShape.kind === 'link',
             aborted: false,
             metaClick: !!(native?.metaKey || native?.ctrlKey || native?.altKey),
             doubleTap: native?.detail >= 2
           };
 
-          if (pointerTool === 'selezione' && clicked.kind === 'link') {
-            if (selectionClickRef.current.metaClick || selectionClickRef.current.doubleTap) {
-              openLinkShape(clicked);
-              selectionClickRef.current = null;
-              draggingSelectionRef.current = {
-                active: false,
-                lastWorld: null,
-                moved: false,
-                pointerTool: null,
-                pointerId: null,
-                primaryShapeId: null,
-                selectionSnapshot: null
-              };
-              return;
-            }
+          if (selectionClickRef.current.openCandidate && (selectionClickRef.current.metaClick || selectionClickRef.current.doubleTap)) {
+            openLinkShape(clickedShape);
+            selectionClickRef.current = null;
+            draggingSelectionRef.current = {
+              active: false,
+              lastWorld: null,
+              moved: false,
+              pointerTool: null,
+              pointerId: null,
+              primaryShapeId: null,
+              primaryStrokeIndex: null,
+              selectionSnapshot: null
+            };
+            return;
           }
 
           try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
           return;
         }
-  } catch (_) {}
 
-  if (pointerTool === 'selezione' && !native?.shiftKey && !native?.metaKey && !native?.ctrlKey) {
+        const strokeList = tratti || [];
+        let clickedStrokeIndex = null;
+        for (let i = strokeList.length - 1; i >= 0; i--) {
+          const stroke = strokeList[i];
+          if (!stroke) continue;
+          if (hitTestStroke(p.x, p.y, stroke)) {
+            clickedStrokeIndex = i;
+            break;
+          }
+        }
+        if (clickedStrokeIndex !== null) {
+          let nextTratti;
+          let nextForme = additive ? selectedItems.forme.slice() : [];
+          if (additive) {
+            const alreadyStroke = selectedItems.tratti.includes(clickedStrokeIndex);
+            if (alreadyStroke) {
+              nextTratti = selectedItems.tratti.filter((idx) => idx !== clickedStrokeIndex);
+            } else {
+              nextTratti = [...selectedItems.tratti, clickedStrokeIndex];
+            }
+          } else {
+            nextTratti = [clickedStrokeIndex];
+          }
+
+          setSelectedItems({ tratti: nextTratti, forme: nextForme });
+
+          if (nextTratti.length === 0 && nextForme.length === 0) {
+            draggingSelectionRef.current = {
+              active: false,
+              lastWorld: null,
+              moved: false,
+              pointerTool: null,
+              pointerId: null,
+              primaryShapeId: null,
+              primaryStrokeIndex: null,
+              selectionSnapshot: null
+            };
+            selectionClickRef.current = null;
+            return;
+          }
+
+          draggingSelectionRef.current = {
+            active: true,
+            lastWorld: p,
+            moved: false,
+            pointerTool,
+            pointerId,
+            primaryShapeId: null,
+            primaryStrokeIndex: clickedStrokeIndex,
+            selectionSnapshot: { tratti: nextTratti.slice(), forme: nextForme.slice() }
+          };
+
+          selectionClickRef.current = {
+            pointerId,
+            shapeId: null,
+            strokeIndex: clickedStrokeIndex,
+            pointerTool,
+            openCandidate: false,
+            aborted: false,
+            metaClick: false,
+            doubleTap: native?.detail >= 2
+          };
+
+          try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
+          return;
+        }
+      } catch (_) {}
+
+      if (!additive) {
         setSelectedItems({ tratti: [], forme: [] });
       }
       selectingRef.current = { active: true, start: p };
@@ -2226,6 +2439,7 @@ export default function LavagnaCanvas({
       if (spectatorLocked) {
         return;
       }
+      getPointerWorld();
       try {
         canvas?.setPointerCapture?.(pointerId);
       } catch (_) {}
@@ -2239,7 +2453,7 @@ export default function LavagnaCanvas({
     }
 
     setDisegnando(true);
-    const punto = getPoint(e);
+    const punto = getPointerWorld();
     if (strumento === 'gomma' && gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
     }
@@ -2331,6 +2545,7 @@ export default function LavagnaCanvas({
     if (draggingSelectionRef.current && draggingSelectionRef.current.active) {
       try {
         const p = getPoint(e);
+        pointerWorldRef.current = p;
         const dragInfo = draggingSelectionRef.current;
         if (p && dragInfo.lastWorld) {
           const last = dragInfo.lastWorld;
@@ -2359,6 +2574,7 @@ export default function LavagnaCanvas({
     // Continuous erase while dragging in intero-tratto mode
     if (erasingRef.current) {
       const p = getPoint(e);
+      pointerWorldRef.current = p;
       eraseShapesAt(p.x, p.y);
       eraseStrokeAt(p.x, p.y);
       return;
@@ -2388,6 +2604,7 @@ export default function LavagnaCanvas({
     // Update shape preview if drawing a shape
     if (drawingShapeRef.current && previewShapeRef.current) {
       const p = getPoint(e);
+      pointerWorldRef.current = p;
       previewShapeRef.current.x2 = p.x; previewShapeRef.current.y2 = p.y;
       drawAll();
       return;
@@ -2396,6 +2613,7 @@ export default function LavagnaCanvas({
   // Update selection box when the selection tool is dragging
     if (selectingRef.current.active) {
       const p = getPoint(e);
+      pointerWorldRef.current = p;
       setSelectionBox({ x1: selectingRef.current.start.x, y1: selectingRef.current.start.y, x2: p.x, y2: p.y });
       return;
     }
@@ -2406,6 +2624,7 @@ export default function LavagnaCanvas({
     const ensurePoint = () => {
       if (memoPoint) return memoPoint;
       memoPoint = getPoint(e);
+      pointerWorldRef.current = memoPoint;
       return memoPoint;
     };
     try {
@@ -2497,6 +2716,7 @@ export default function LavagnaCanvas({
       dragInfo.pointerTool = null;
       dragInfo.pointerId = null;
       dragInfo.primaryShapeId = null;
+  dragInfo.primaryStrokeIndex = null;
       dragInfo.selectionSnapshot = null;
       selectionClickRef.current = null;
       drawAll();
@@ -2686,6 +2906,7 @@ export default function LavagnaCanvas({
       draggingSelectionRef.current.pointerTool = null;
       draggingSelectionRef.current.pointerId = null;
       draggingSelectionRef.current.primaryShapeId = null;
+      draggingSelectionRef.current.primaryStrokeIndex = null;
       draggingSelectionRef.current.selectionSnapshot = null;
     }
     selectionClickRef.current = null;
