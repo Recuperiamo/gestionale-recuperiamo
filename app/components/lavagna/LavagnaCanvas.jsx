@@ -65,7 +65,11 @@ export default function LavagnaCanvas({
   const penPalette = useMemo(() => [
     "#111827",
     "#2563eb",
-    "#ef4444"
+    "#ef4444",
+    "#16a34a",
+    "#f97316",
+    "#facc15",
+    "#a855f7"
   ], []);
   const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
@@ -80,6 +84,8 @@ export default function LavagnaCanvas({
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
   const [isPanning, setIsPanning] = useState(false);
   const [contextPanning, setContextPanning] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [undoMode, setUndoMode] = useState('undo');
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
@@ -100,6 +106,7 @@ export default function LavagnaCanvas({
   const zoomRef = useRef(zoom);
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
+  const exportMenuRef = useRef(null);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -455,6 +462,40 @@ export default function LavagnaCanvas({
   useEffect(() => {
     spectatorModeRef.current = spectatorMode;
   }, [spectatorMode]);
+
+  useEffect(() => {
+    setUndoMode(redoStack.length > 0 ? 'redo' : 'undo');
+  }, [redoStack.length]);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function handleClickOutside(e) {
+      if (!exportMenuRef.current) return;
+      if (!exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    }
+    function handleEscape(e) {
+      if (e.key === 'Escape') {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showExportMenu]);
+
+  useEffect(() => {
+    if (!showTools) {
+      setShowPenPopover(false);
+      setShowMoreMenu(false);
+      setShowShapesPopover(false);
+      setShowExportMenu(false);
+    }
+  }, [showTools]);
 
   useEffect(() => {
     panRef.current = pan;
@@ -1516,9 +1557,51 @@ export default function LavagnaCanvas({
     };
     setZoom(newZoom);
     setPan(newPan);
+    zoomRef.current = newZoom;
+    panRef.current = newPan;
     // Aggiorna subito la lavagna per feedback immediato
     setTimeout(drawAll, 0);
   }, [zoom, pan.x, pan.y, drawAll, isAdmin]);
+
+  const applyZoomAt = useCallback((factor, pivot) => {
+    if (spectatorModeRef.current && !isAdmin) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const offX = pivot?.x ?? rect.width / 2;
+    const offY = pivot?.y ?? rect.height / 2;
+    const currentZoom = zoomRef.current;
+    const currentPan = panRef.current;
+    const worldBefore = {
+      x: currentPan.x + offX / currentZoom,
+      y: currentPan.y + offY / currentZoom
+    };
+    const candidate = Math.round((currentZoom * factor) * 100) / 100;
+    const newZoom = Math.min(2, Math.max(0.5, candidate));
+    if (Math.abs(newZoom - currentZoom) < 0.001) return;
+    const newPan = {
+      x: worldBefore.x - offX / newZoom,
+      y: worldBefore.y - offY / newZoom
+    };
+    zoomRef.current = newZoom;
+    panRef.current = newPan;
+    setZoom(newZoom);
+    setPan(newPan);
+    setTimeout(drawAll, 0);
+  }, [drawAll, isAdmin]);
+
+  const handleZoomIn = useCallback(() => applyZoomAt(1.1), [applyZoomAt]);
+  const handleZoomOut = useCallback(() => applyZoomAt(0.9), [applyZoomAt]);
+
+  const handleResetZoom = useCallback(() => {
+    if (spectatorModeRef.current && !isAdmin) return;
+    const nextPan = { x: 0, y: 0 };
+    panRef.current = nextPan;
+    zoomRef.current = 1;
+    setPan(nextPan);
+    setZoom(1);
+    setTimeout(drawAll, 0);
+  }, [drawAll, isAdmin]);
 
   // == CANCELLAZIONE INTERO TRATTO ==
   const eraseStrokeAt = useCallback(
@@ -2117,182 +2200,276 @@ export default function LavagnaCanvas({
     if (!isAdmin && spectatorMode) return null;
     const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
+    const undoDisabled = undoMode === 'undo' ? !undoStack.length : !redoStack.length;
+    const handleUndoRedoClick = () => {
+      if (undoDisabled) return;
+      if (undoMode === 'undo') {
+        undo();
+      } else {
+        redo();
+      }
+    };
+
     return (
       <div style={st.bottomToolbarDock}>
-        <div style={st.toolbarPill}>
+        <div style={st.commandBar}>
           <button
             type="button"
-            style={iconBtn(strumento === 'lazzo')}
-            onClick={() => { setStrumento('lazzo'); setShowPenPopover(false); setShowMoreMenu(false); setShowShapesPopover(false); }}
-            title="Seleziona"
+            style={undoButtonStyle(undoDisabled, undoMode)}
+            onClick={handleUndoRedoClick}
+            disabled={undoDisabled}
+            title={undoMode === 'undo' ? 'Annulla' : 'Ripristina'}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 3l18 9-7 2-2 7-9-18z" fill={strumento==='lazzo'? '#fff':'#20489a'}/></svg>
-          </button>
-          <button
-            type="button"
-            style={iconBtn(strumento === 'mano')}
-            onClick={() => { setStrumento('mano'); setShowPenPopover(false); setShowMoreMenu(false); setShowShapesPopover(false); }}
-            title="Sposta"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-            </svg>
-          </button>
-          <div style={{ position:'relative' }}>
-            <button
-              type="button"
-              style={iconBtn(strumento === 'penna' || showPenPopover)}
-              onClick={() => { setStrumento('penna'); setShowPenPopover((v) => !v); setShowShapesPopover(false); setShowMoreMenu(false); }}
-              title="Penna"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 21l3-1 11-11-2-2L4 18l-1 3z" fill={strumento==='penna'||showPenPopover? '#fff':'#20489a'}/></svg>
-            </button>
-            {showPenPopover && (
-              <div style={st.popover}>
-                <div style={st.penColorsRow}>
-                  {penPalette.map((c) => {
-                    const isSelected = c === colore;
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => setColore(c)}
-                        title={c}
-                        style={{
-                          ...st.penColorButton,
-                          border: isSelected ? '2.5px solid #20489a' : '1.5px solid #dbe6f5',
-                          boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #20489a' : '0 1px 2px rgba(32,72,154,0.25)',
-                          background: c
-                        }}
-                      />
-                    );
-                  })}
-                  <input
-                    ref={colorInputRef}
-                    type="color"
-                    value={colore}
-                    onChange={(e)=>setColore(e.target.value)}
-                    style={{ position:'absolute', width:1, height:1, opacity:0 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={()=>colorInputRef.current?.click()}
-                    title="Altro"
-                    style={st.colorWheelBtn}
-                  >
-                    🎨
-                  </button>
-                </div>
-                <div style={st.penOptionsRow}>
-                  <span style={st.sizeLabel}>{spessore}px</span>
-                  <input type="range" min={1} max={25} value={spessore} onChange={(e)=>setSpessore(Number(e.target.value))} />
-                </div>
-              </div>
+            {undoMode === 'undo' ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M7.5 8.5l-4 4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 12.5h6.5c3.59 0 6.5 2.91 6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M16.5 8.5l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M17 12.5H10.5C6.91 12.5 4 9.59 4 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
             )}
-          </div>
-          <button
-            type="button"
-            style={iconBtn(strumento === 'gomma')}
-            onClick={() => { setStrumento('gomma'); setShowPenPopover(false); setShowMoreMenu(false); setShowShapesPopover(false); }}
-            title="Gomma"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M16 3l5 5-9 9H7L2 12l9-9 5 0z" fill={strumento==='gomma'? '#fff':'#20489a'} /></svg>
+            <span style={st.undoLabel}>{undoMode === 'undo' ? 'Undo' : 'Redo'}</span>
           </button>
-          <div style={{ position:'relative' }}>
+
+          <span style={st.commandDivider} aria-hidden />
+
+          <div style={st.toolGroup}>
             <button
               type="button"
-              style={iconBtn(shapeButtonActive)}
+              style={iconBtn(strumento === 'lazzo')}
               onClick={() => {
-                setShowShapesPopover((v) => !v);
+                setStrumento('lazzo');
                 setShowPenPopover(false);
                 setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
               }}
-              title="Forme"
+              title="Seleziona"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="11" width="10" height="10" rx="2" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
-                <circle cx="16.5" cy="7.5" r="4" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
-                <path d="M4 4l6 6" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" />
+                <path
+                  d="M7.2 10.2c0-3.1 2.8-5.7 6.2-5.7 3.4 0 6.1 2.1 6.1 5 0 3-2.7 5.1-5.6 5.1-2.8 0-4.4 1.5-4.4 3.5 0 1.2.9 2.3 2.2 2.3"
+                  stroke={strumento==='lazzo' ? '#fff':'#20489a'}
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle
+                  cx="6.4"
+                  cy="10"
+                  r="1.2"
+                  stroke={strumento==='lazzo' ? '#fff':'#20489a'}
+                  strokeWidth="1.4"
+                  fill="none"
+                />
               </svg>
             </button>
-            {showShapesPopover && (
-              <div style={st.popover}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:8 }}>
-                  <button type="button" style={iconBtn(strumento === 'rettangolo')} onClick={() => { setStrumento('rettangolo'); setShowShapesPopover(false); }} title="Rettangolo">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke={strumento==='rettangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button type="button" style={iconBtn(strumento === 'cerchio')} onClick={() => { setStrumento('cerchio'); setShowShapesPopover(false); }} title="Cerchio / Ellisse">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke={strumento==='cerchio'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button type="button" style={iconBtn(strumento === 'linea')} onClick={() => { setStrumento('linea'); setShowShapesPopover(false); }} title="Linea">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
-                  </button>
-                  <button type="button" style={iconBtn(strumento === 'triangolo')} onClick={() => { setStrumento('triangolo'); setShowShapesPopover(false); }} title="Triangolo">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5l8 14H4L12 5z" stroke={strumento==='triangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button type="button" style={iconBtn(strumento === 'rombo')} onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); }} title="Rombo">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                  </button>
-                  <button type="button" style={iconBtn(strumento === 'freccia')} onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); }} title="Freccia">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                  <button type="button" style={iconBtn(strumento === 'magicpen')} onClick={() => { setStrumento('magicpen'); setShowShapesPopover(false); }} title="Magic pen">
-                    <span style={{fontSize:18}}>✨</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div style={{ position:'relative' }}>
-            <button type="button" style={iconBtn(showMoreMenu)} onClick={()=> { setShowMoreMenu(v=>!v); setShowPenPopover(false); setShowShapesPopover(false); }} title="Altro">⋯</button>
-            {showMoreMenu && (
-              <div style={st.popover}>
-                {isAdmin ? (
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                    <label style={{ fontSize:12, color:'#20489a', fontWeight:600 }}>Sfondo</label>
-                    <select value={sfondo} onChange={(e)=>handleChangeSfondo(e.target.value)} style={{ padding:'6px 8px', borderRadius:8 }}>
-                      <option value="bianco">Bianco</option>
-                      <option value="nero">Nero</option>
-                      <option value="righe">Righe</option>
-                      <option value="quadretti">Quadretti</option>
-                      <option value="punti">Punti</option>
-                    </select>
+            <button
+              type="button"
+              style={iconBtn(strumento === 'mano')}
+              onClick={() => {
+                setStrumento('mano');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Sposta"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              </svg>
+            </button>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(strumento === 'penna' || showPenPopover)}
+                onClick={() => {
+                  setStrumento('penna');
+                  setShowPenPopover((v) => !v);
+                  setShowShapesPopover(false);
+                  setShowMoreMenu(false);
+                  setShowExportMenu(false);
+                }}
+                title="Penna"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 20l3.2-.8 10-10-2.4-2.4-10 10L4 20z" fill={strumento==='penna'||showPenPopover? '#fff':'#20489a'} />
+                  <path d="M14 4.2l2.6-2.6 3.4 3.4-2.6 2.6" stroke={strumento==='penna'||showPenPopover? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </button>
+              {showPenPopover && (
+                <div style={st.popover}>
+                  <div style={st.penColorsRow}>
+                    {penPalette.map((c) => {
+                      const isSelected = c === colore;
+                      return (
+                        <button
+                          key={c}
+                          onClick={() => setColore(c)}
+                          title={c}
+                          style={{
+                            ...st.penColorButton,
+                            border: isSelected ? '2px solid #20489a' : '1.5px solid #dbe6f5',
+                            boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #20489a' : '0 1px 2px rgba(32,72,154,0.25)',
+                            background: c
+                          }}
+                        />
+                      );
+                    })}
+                    <input
+                      ref={colorInputRef}
+                      type="color"
+                      value={colore}
+                      onChange={(e)=>setColore(e.target.value)}
+                      style={{ position:'absolute', width:1, height:1, opacity:0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={()=>colorInputRef.current?.click()}
+                      title="Altro"
+                      style={st.colorWheelBtn}
+                    >
+                      🎨
+                    </button>
                   </div>
-                ) : (
-                  <div style={st.readOnlyRow}>
-                    <span style={st.toggleLbl}>Sfondo</span>
-                    <span style={st.readOnlyValue}>{sfondoLabels[sfondo] || sfondo}</span>
+                  <div style={st.penOptionsRow}>
+                    <span style={st.sizeLabel}>{spessore}px</span>
+                    <input type="range" min={1} max={25} value={spessore} onChange={(e)=>setSpessore(Number(e.target.value))} />
                   </div>
-                )}
-                <div style={{ ...st.toggleWrap, marginBottom:8 }}>
-                  <input
-                    id="gomma-puntuale-toggle"
-                    type="checkbox"
-                    checked={gommaPuntuale}
-                    onChange={(e)=>setGommaPuntuale(e.target.checked)}
-                    style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
-                  />
-                  <label htmlFor="gomma-puntuale-toggle" style={st.toggleLbl}>Gomma puntuale</label>
                 </div>
-                {!isAdmin && (
+              )}
+            </div>
+            <button
+              type="button"
+              style={iconBtn(strumento === 'gomma')}
+              onClick={() => {
+                setStrumento('gomma');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Gomma"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M15.5 4l5 5-8.5 8.5H7L2 12l8.5-8.5 5.5.5z" fill={strumento==='gomma'? '#fff':'#20489a'} />
+              </svg>
+            </button>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(shapeButtonActive)}
+                onClick={() => {
+                  setShowShapesPopover((v) => !v);
+                  setShowPenPopover(false);
+                  setShowMoreMenu(false);
+                  setShowExportMenu(false);
+                }}
+                title="Forme"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="10" height="10" rx="2" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
+                  <circle cx="16.5" cy="7.5" r="4" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
+                  <path d="M4 4l6 6" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              {showShapesPopover && (
+                <div style={st.popover}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:8 }}>
+                    <button type="button" style={iconBtn(strumento === 'rettangolo')} onClick={() => { setStrumento('rettangolo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Rettangolo">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke={strumento==='rettangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'cerchio')} onClick={() => { setStrumento('cerchio'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Cerchio / Ellisse">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke={strumento==='cerchio'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'linea')} onClick={() => { setStrumento('linea'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Linea">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'triangolo')} onClick={() => { setStrumento('triangolo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Triangolo">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5l8 14H4L12 5z" stroke={strumento==='triangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'rombo')} onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Rombo">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'freccia')} onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Freccia">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'magicpen')} onClick={() => { setStrumento('magicpen'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Magic pen">
+                      <span style={{fontSize:18}}>✨</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(showMoreMenu)}
+                onClick={()=> {
+                  setShowMoreMenu(v=>!v);
+                  setShowPenPopover(false);
+                  setShowShapesPopover(false);
+                  setShowExportMenu(false);
+                }}
+                title="Altro"
+              >
+                ...
+              </button>
+              {showMoreMenu && (
+                <div style={st.popover}>
+                  {isAdmin ? (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <label style={{ fontSize:12, color:'#20489a', fontWeight:600 }}>Sfondo</label>
+                      <select value={sfondo} onChange={(e)=>handleChangeSfondo(e.target.value)} style={{ padding:'6px 8px', borderRadius:8 }}>
+                        <option value="bianco">Bianco</option>
+                        <option value="nero">Nero</option>
+                        <option value="righe">Righe</option>
+                        <option value="quadretti">Quadretti</option>
+                        <option value="punti">Punti</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div style={st.readOnlyRow}>
+                      <span style={st.toggleLbl}>Sfondo</span>
+                      <span style={st.readOnlyValue}>{sfondoLabels[sfondo] || sfondo}</span>
+                    </div>
+                  )}
                   <div style={{ ...st.toggleWrap, marginBottom:8 }}>
                     <input
-                      id={spectatorToggleId}
+                      id="gomma-puntuale-toggle"
                       type="checkbox"
-                      checked={spectatorMode}
-                      onChange={(e)=>setSpectatorMode(e.target.checked)}
+                      checked={gommaPuntuale}
+                      onChange={(e)=>setGommaPuntuale(e.target.checked)}
                       style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
                     />
-                    <label htmlFor={spectatorToggleId} style={st.toggleLbl}>Modalità spettatore</label>
+                    <label htmlFor="gomma-puntuale-toggle" style={st.toggleLbl}>Gomma puntuale</label>
                   </div>
-                )}
-                {isAdmin && (
-                  <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
-                )}
-              </div>
-            )}
+                  {!isAdmin && (
+                    <div style={{ ...st.toggleWrap, marginBottom:8 }}>
+                      <input
+                        id={spectatorToggleId}
+                        type="checkbox"
+                        checked={spectatorMode}
+                        onChange={(e)=>setSpectatorMode(e.target.checked)}
+                        style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
+                      />
+                      <label htmlFor={spectatorToggleId} style={st.toggleLbl}>Modalità spettatore</label>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+
+          {salvando && <span style={st.saving}>Salvataggio…</span>}
         </div>
-        {salvando && <span style={st.saving}>Salvataggio…</span>}
       </div>
     );
   }, [
@@ -2312,20 +2489,33 @@ export default function LavagnaCanvas({
     salvando,
     handleChangeSfondo,
     spectatorToggleId,
-    pulisciLavagna
+    pulisciLavagna,
+    undoMode,
+    undoStack,
+    redoStack,
+    undo,
+    redo
   ]);
 
   const canvasCursor = useMemo(() => {
     if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
     if (strumento === 'mano') return 'grab';
-    if (strumento === 'gomma') return `url(${st.eraserCursor}) 4 20, auto`;
-    return `url(${st.penCursor}) 0 24, crosshair`;
+    if (strumento === 'gomma') return `url(${st.eraserCursor}) 14 20, auto`;
+    if (['lazzo','rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
+      return 'crosshair';
+    }
+    return `url(${st.penCursor}) 12 32, crosshair`;
   }, [contextPanning, strumento, isPanning]);
 
   const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
   const spectatorIndicatorTitle = isAdmin
     ? (spectatorCount > 0 ? `Modalità spettatore attiva (${spectatorCount})` : '')
     : 'Modalità spettatore attiva';
+  const zoomDisabled = spectatorMode && !isAdmin;
+  const canZoomOut = zoom > 0.51;
+  const canZoomIn = zoom < 1.99;
+  const canResetView = zoom < 0.99 || zoom > 1.01 || Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5;
+  const zoomLabel = `${Math.round(zoom * 100)}%`;
 
   // == RENDER ==
   return (
@@ -2334,17 +2524,69 @@ export default function LavagnaCanvas({
       <div style={st.topRightActionsOuter}>
         {(!spectatorMode || isAdmin) && (
           <div style={st.topRightActions}>
-            <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
-            <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
-            <button style={btn(false)} onClick={esportaPNG} type="button">Export PNG</button>
-            <button style={btn(false)} onClick={esportaPDF} type="button">Export PDF</button>
+            <div ref={exportMenuRef} style={st.exportWrapper}>
+              <button
+                type="button"
+                style={st.exportButton}
+                onClick={() => {
+                  setShowPenPopover(false);
+                  setShowMoreMenu(false);
+                  setShowShapesPopover(false);
+                  setShowExportMenu((v) => !v);
+                }}
+                aria-expanded={showExportMenu}
+                aria-haspopup="menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 5h14M5 12h14M5 19h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Esporta</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {showExportMenu && (
+                <div style={st.exportMenu} role="menu">
+                  <button
+                    type="button"
+                    style={st.exportMenuItem}
+                    role="menuitem"
+                    onClick={() => {
+                      setShowExportMenu(false);
+                      esportaPNG();
+                    }}
+                  >
+                    Scarica PNG
+                  </button>
+                  <button
+                    type="button"
+                    style={st.exportMenuItem}
+                    role="menuitem"
+                    onClick={() => {
+                      setShowExportMenu(false);
+                      esportaPDF();
+                    }}
+                  >
+                    Scarica PDF
+                  </button>
+                </div>
+              )}
+            </div>
             {openInNewWindow && attivitaId && (
               <button
-                style={btn(false)}
-                onClick={() => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")}
                 type="button"
+                style={st.secondaryButton}
+                onClick={() => {
+                  setShowExportMenu(false);
+                  window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank");
+                }}
               >
-                Apri in un'altra finestra
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M14 3h7v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M10 14l11-11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M21 13v5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Nuova finestra</span>
               </button>
             )}
           </div>
@@ -2367,6 +2609,39 @@ export default function LavagnaCanvas({
       </div>
       <div style={st.canvasBox}>
         {toolbar}
+        <div style={st.zoomControls}>
+          <button
+            type="button"
+            style={zoomButtonStyle(zoomDisabled || !canZoomOut)}
+            onClick={handleZoomOut}
+            disabled={zoomDisabled || !canZoomOut}
+            title="Riduci zoom"
+          >
+            -
+          </button>
+          <span style={st.zoomValue}>{zoomLabel}</span>
+          <button
+            type="button"
+            style={zoomButtonStyle(zoomDisabled || !canZoomIn)}
+            onClick={handleZoomIn}
+            disabled={zoomDisabled || !canZoomIn}
+            title="Aumenta zoom"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            style={zoomResetStyle(zoomDisabled || !canResetView)}
+            onClick={handleResetZoom}
+            disabled={zoomDisabled || !canResetView}
+            title="Reimposta vista"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 5V3l-4 4 4 4V9c2.76 0 5 2.24 5 5a5 5 0 0 1-2.53 4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 19v2l4-4-4-4v2a5 5 0 0 0-5 5 5 5 0 0 0 2.37 4.23" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
@@ -2389,37 +2664,36 @@ export default function LavagnaCanvas({
 // == STYLES ==
 const st = {
   wrapper: { width: "100%", userSelect: "none" },
-  bottomToolbar: {
-    position: "absolute",
-    left: "50%",
-    bottom: 18,
-    transform: "translateX(-50%)",
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    background: "rgba(248,251,255,0.95)",
-    padding: "8px 10px",
-    borderRadius: 12,
-    border: "1px solid #dbe6f5",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
-    zIndex: 2
-  },
   bottomToolbarDock: {
     position: "absolute",
     left: "50%",
     bottom: 18,
     transform: "translateX(-50%)",
-    zIndex: 2
+    zIndex: 3
   },
-  toolbarPill: {
+  commandBar: {
     display: 'flex',
-    gap: 6,
     alignItems: 'center',
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 14,
-    padding: '6px 8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.08)'
+    gap: 10,
+    padding: '10px 14px',
+    borderRadius: 16,
+    background: 'rgba(255,255,255,0.92)',
+    border: '1px solid #d4dff6',
+    boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
+    backdropFilter: 'blur(8px)',
+    userSelect: 'none'
+  },
+  toolGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '0 4px'
+  },
+  commandDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    background: 'rgba(212,223,246,0.9)',
+    margin: '0 12px'
   },
   popover: {
     position: 'absolute',
@@ -2427,11 +2701,12 @@ const st = {
     left: '50%',
     transform: 'translateX(-50%)',
     background: '#fff',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 220
+    border: '1px solid #dbe6f5',
+    boxShadow: '0 18px 34px rgba(15,36,92,0.18)',
+    borderRadius: 14,
+    padding: 14,
+    minWidth: 220,
+    zIndex: 5
   },
   toolbarToggle: {
     border: "none",
@@ -2448,8 +2723,8 @@ const st = {
     right: 12,
     top: 12,
     display: "flex",
-    gap: 8,
-    zIndex: 2
+    gap: 12,
+    zIndex: 3
   },
   topRightActionsOuter: {
     position: "relative",
@@ -2458,6 +2733,67 @@ const st = {
     justifyContent: "flex-end",
     alignItems: "center",
     marginBottom: 8
+  },
+  exportWrapper: {
+    position: 'relative'
+  },
+  exportButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '9px 14px',
+    borderRadius: 12,
+    border: '1px solid #d4dff6',
+    background: 'rgba(255,255,255,0.92)',
+    color: '#1a3d8f',
+    fontWeight: 600,
+    fontSize: 13,
+    boxShadow: '0 10px 24px rgba(16,42,105,0.12)',
+    cursor: 'pointer',
+    transition: 'box-shadow .2s ease, transform .15s ease'
+  },
+  exportMenu: {
+    position: 'absolute',
+    top: 'calc(100% + 6px)',
+    right: 0,
+    minWidth: 160,
+    background: '#fff',
+    borderRadius: 12,
+    border: '1px solid #dbe6f5',
+    boxShadow: '0 18px 34px rgba(15,36,92,0.18)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    zIndex: 10,
+    padding: 4,
+    gap: 4
+  },
+  exportMenuItem: {
+    padding: '10px 14px',
+    background: 'rgba(248,251,255,0.95)',
+    border: 'none',
+    textAlign: 'left',
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#1a3d8f',
+    cursor: 'pointer',
+    borderRadius: 10,
+    width: '100%'
+  },
+  secondaryButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    border: '1px solid rgba(28,176,246,0.35)',
+    background: 'rgba(28,176,246,0.12)',
+    color: '#0f609b',
+    fontWeight: 600,
+    fontSize: 13,
+    padding: '9px 14px',
+    cursor: 'pointer',
+    boxShadow: '0 10px 20px rgba(15,97,175,0.15)',
+    transition: 'box-shadow .2s ease, transform .15s ease'
   },
   group: {
     display: "flex",
@@ -2473,11 +2809,12 @@ const st = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10
+    marginBottom: 10,
+    flexWrap: 'wrap'
   },
   penColorButton: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     border: '1.5px solid #dbe6f5',
     cursor: 'pointer',
@@ -2485,8 +2822,8 @@ const st = {
     transition: 'box-shadow .15s'
   },
   colorWheelBtn: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     border: '1.5px solid #dbe6f5',
     background: '#fff',
@@ -2505,7 +2842,15 @@ const st = {
     marginTop: 10
   },
   sizeLabel: { fontSize: 12, fontWeight: 600, color: "#20489a" },
-  saving: { fontSize: 12, fontWeight: 600, color: "#8C7800" },
+  saving: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#15357a",
+    marginLeft: 12,
+    padding: '4px 10px',
+    background: 'rgba(255,255,255,0.65)',
+    borderRadius: 999
+  },
   eyeBadge: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -2566,24 +2911,74 @@ const st = {
     color: "#20489a",
     letterSpacing: ".3px"
   },
+  zoomControls: {
+    position: 'absolute',
+    right: 18,
+    bottom: 18,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 8px 8px 10px',
+    borderRadius: 14,
+    background: 'rgba(14, 44, 115, 0.82)',
+    backdropFilter: 'blur(6px)',
+    boxShadow: '0 14px 32px rgba(10,26,70,0.35)',
+    color: '#fff',
+    zIndex: 3,
+    transition: 'box-shadow .2s ease'
+  },
+  zoomValue: {
+    minWidth: 52,
+    textAlign: 'center',
+    fontWeight: 700,
+    fontSize: 13
+  },
+  undoLabel: {
+    fontSize: 9,
+    fontWeight: 700,
+    letterSpacing: '0.4px',
+    textTransform: 'uppercase'
+  },
   // cursori SVG embedded (data URL)
   penCursor:
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-        <path d="M3 21l3-1 11-11-2-2L4 18l-1 3z" fill="#20489a"/>
-        <path d="M14 5l2 2 2-2-2-2-2 2z" fill="#1cb0f6"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+        <path fill="#163d8c" d="M7 31l5-1.2L29.2 12.6 24.6 8 7 25.6z"/>
+        <path fill="#6fb1ff" d="M22.4 8.4L26 4.8l6 6-3.6 3.6z"/>
+        <path fill="#f8fbff" d="M7 31l11-2.4-8.6-8.6z"/>
       </svg>
     `),
   eraserCursor:
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-        <path d="M3 16l7-7 8 8-3 3H6z" fill="#ff6464"/>
-        <path d="M10 9l2-2 8 8-2 2z" fill="#ffd1d1"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+        <path fill="#f87171" d="M11 27l13-13 6 6-13 13h-6z"/>
+        <path fill="#fee2e2" d="M17 11l5-5 10 10-5 5z"/>
       </svg>
     `)
 };
+
+const undoButtonStyle = (disabled, mode) => ({
+  width: 44,
+  height: 44,
+  borderRadius: 14,
+  border: 'none',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexDirection: 'column',
+  gap: 2,
+  background: disabled
+    ? 'rgba(212,223,246,0.6)'
+    : mode === 'undo'
+      ? 'linear-gradient(135deg, #edf2ff 0%, #dbe5ff 100%)'
+      : 'linear-gradient(135deg, #dff6ff 0%, #bce8ff 100%)',
+  color: disabled ? '#9ca9c5' : mode === 'undo' ? '#15357a' : '#0c5a8a',
+  boxShadow: disabled ? 'none' : '0 12px 26px rgba(20,53,120,0.18)',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  transition: 'transform .15s ease, box-shadow .2s ease'
+});
 
 const btn = (active) => ({
   background: active ? "#1cb0f6" : "#e3eefe",
@@ -2597,16 +2992,47 @@ const btn = (active) => ({
 });
 
 const iconBtn = (active) => ({
-  width: 32,
-  height: 32,
+  width: 36,
+  height: 36,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 8,
-  border: '1px solid #dbe6f5',
-  background: active ? '#1cb0f6' : '#f8fbff',
+  borderRadius: 12,
+  border: active ? '1px solid rgba(27,102,220,0.2)' : '1px solid rgba(212,223,246,0.9)',
+  background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(248,251,255,0.96)',
   color: active ? '#fff' : '#20489a',
-  cursor: 'pointer'
+  boxShadow: active ? '0 14px 26px rgba(28,125,247,0.28)' : '0 8px 20px rgba(15,42,105,0.15)',
+  cursor: 'pointer',
+  transition: 'transform .15s ease, box-shadow .2s ease',
+  fontWeight: 700,
+  fontSize: 18
+});
+
+const zoomButtonStyle = (disabled) => ({
+  width: 34,
+  height: 34,
+  margin: 0,
+  borderRadius: 10,
+  border: 'none',
+  background: disabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.95)',
+  color: disabled ? 'rgba(255,255,255,0.5)' : '#163d8c',
+  fontWeight: 700,
+  fontSize: 18,
+  lineHeight: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  boxShadow: disabled ? 'none' : '0 8px 20px rgba(12,28,72,0.28)',
+  transition: 'transform .15s ease, box-shadow .2s ease'
+});
+
+const zoomResetStyle = (disabled) => ({
+  ...zoomButtonStyle(disabled),
+  width: 38,
+  background: disabled ? 'rgba(255,255,255,0.2)' : 'linear-gradient(135deg,#1cb0f6 0%,#36d4ff 100%)',
+  color: disabled ? 'rgba(255,255,255,0.55)' : '#fff',
+  boxShadow: disabled ? 'none' : '0 12px 30px rgba(19,160,240,0.35)'
 });
 
 const overlayBlock = {
