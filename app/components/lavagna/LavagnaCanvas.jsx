@@ -7,7 +7,6 @@ import React, {
   useMemo
 } from "react";
 import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from "../../lib/realtime/ablyClient";
-import { jsPDF } from "jspdf";
 
 /**
  * LavagnaCanvas – LIVE con Socket.IO su /api/socketio
@@ -1668,7 +1667,7 @@ export default function LavagnaCanvas({
       eraseShapesAt(punto.x, punto.y);
     }
     puntiCorrentiRef.current = [punto];
-    animationFrameId.current = requestAnimationFrame(renderLoop);
+       animationFrameId.current = requestAnimationFrame(renderLoop);
     const streamId = `${utenteId}-${Date.now()}`;
     currentStreamId.current = streamId;
     const strokeColor = strumento === 'gomma' ? '#ffffff' : colore;
@@ -2043,35 +2042,40 @@ export default function LavagnaCanvas({
   }
 
   // == EXPORT ==
-  function exportPNG() {
+  function esportaPNG() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `lavagna-${lavagnaId}.png`;
-    a.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `lavagna-${lavagnaId}.png`;
+    link.click();
   }
 
-  function exportPDF() {
+  async function esportaPDF() {
+    const { jsPDF } = await import("jspdf");
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const img = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    // Fit image preserving aspect
-    const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
-    const w = canvas.width * ratio;
-    const h = canvas.height * ratio;
-    const x = (pageW - w) / 2;
-    const y = (pageH - h) / 2;
-    pdf.addImage(img, 'PNG', x, y, w, h);
-    pdf.save(`lavagna-${lavagnaId}.pdf`);
+
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "px",
+      format: [canvas.width, canvas.height],
+    });
+
+    pdf.addImage(
+      canvas.toDataURL("image/png"),
+      "PNG",
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+    pdf.save(`lavagna-${lavagnaId || attivitaId}.pdf`);
   }
 
-  // == PULISCI LAVAGNA (solo admin) ==
-  const handlePulisciLavagna = useCallback(() => {
+  // == CLEAR ==
+  const pulisciLavagna = useCallback(() => {
     if (!isAdmin) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
     
@@ -2105,11 +2109,6 @@ export default function LavagnaCanvas({
   }, [isAdmin, lavagnaId, attivitaId, emitOrPublish, drawAll]);
 
   // == TOOLBAR ==
-  // == LAZO: selezione, sposta, duplica ==
-  // == LAZO: selezione, sposta, duplica ==
-
-
-  // Toolbar in basso al centro
   const toolbar = useMemo(() => {
     if (!showTools) return null;
     if (!isAdmin && spectatorMode) return null;
@@ -2284,7 +2283,7 @@ export default function LavagnaCanvas({
                   </div>
                 )}
                 {isAdmin && (
-                  <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={handlePulisciLavagna}>Pulisci lavagna</button>
+                  <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
                 )}
               </div>
             )}
@@ -2309,7 +2308,8 @@ export default function LavagnaCanvas({
     sfondoLabels,
     salvando,
     handleChangeSfondo,
-    spectatorToggleId
+    spectatorToggleId,
+    pulisciLavagna
   ]);
 
   const canvasCursor = useMemo(() => {
@@ -2333,8 +2333,8 @@ export default function LavagnaCanvas({
           <div style={st.topRightActions}>
             <button style={btn(false)} onClick={undo} disabled={!undoStack.length} type="button">Undo</button>
             <button style={btn(false)} onClick={redo} disabled={!redoStack.length} type="button">Redo</button>
-            <button style={btn(false)} onClick={exportPNG} type="button">Export PNG</button>
-            <button style={btn(false)} onClick={exportPDF} type="button">Export PDF</button>
+            <button style={btn(false)} onClick={esportaPNG} type="button">Export PNG</button>
+            <button style={btn(false)} onClick={esportaPDF} type="button">Export PDF</button>
             {openInNewWindow && attivitaId && (
               <button
                 style={btn(false)}
