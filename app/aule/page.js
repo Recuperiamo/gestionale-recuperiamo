@@ -18,12 +18,45 @@ export default function AulePage() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("/api/clienti?tipo=REFERENTE&includeStudenti=1");
-        if (!res.ok) throw new Error("Errore caricamento referenti");
-        const data = await res.json();
-        if (isMounted) {
-          setReferenti(Array.isArray(data) ? data : []);
+        // Fetch referenti with their studenti
+        const refRes = await fetch("/api/clienti?tipo=REFERENTE&includeStudenti=1");
+        if (!refRes.ok) throw new Error("Errore caricamento referenti");
+        const refData = await refRes.json();
+
+        // Also fetch students so we can include orphan students (no referente)
+        const studRes = await fetch("/api/clienti?tipo=STUDENTE");
+        const studData = studRes.ok ? await studRes.json() : [];
+
+        // Normalize arrays
+        const referentiArr = Array.isArray(refData) ? refData : [];
+        const studentiArr = Array.isArray(studData) ? studData : [];
+
+        // Map referenti by id for quick lookup
+        const refMap = new Map(referentiArr.map(r => [String(r.id), { ...r, studenti: Array.isArray(r.studenti) ? r.studenti.slice() : [] }]));
+
+        const orphanStudents = [];
+        for (const stud of studentiArr) {
+          const rid = stud.referenteId ? String(stud.referenteId) : null;
+          if (rid && refMap.has(rid)) {
+            const entry = refMap.get(rid);
+            // avoid duplicates
+            if (!entry.studenti.some(s => String(s.id) === String(stud.id))) entry.studenti.push(stud);
+          } else if (rid) {
+            // Referente record not returned in referentiArr, create a minimal placeholder
+            const placeholder = { id: Number(rid), nomeReferente: "Referente non registrato", email: "", studenti: [stud] };
+            refMap.set(String(rid), placeholder);
+          } else {
+            orphanStudents.push(stud);
+          }
         }
+
+        // Compose final list: existing referenti plus a synthetic "Senza referente" group if needed
+        const finalReferenti = Array.from(refMap.values());
+        if (orphanStudents.length > 0) {
+          finalReferenti.push({ id: "_orphan", nomeReferente: "Senza referente", email: "", studenti: orphanStudents });
+        }
+
+        if (isMounted) setReferenti(finalReferenti);
       } catch (e) {
         if (isMounted) {
           setError(e.message || "Errore di rete");

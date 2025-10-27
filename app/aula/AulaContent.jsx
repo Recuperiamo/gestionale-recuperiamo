@@ -55,15 +55,28 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId }) {
       return;
     }
     setLoading(true);
-    await Promise.all(files.map(async (file) => {
-      const titolo = nome.trim() ? nome.trim() : getDatalogString();
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("titolo", titolo);
-      if (materia) formData.append("materia", materia);
-      formData.append("clienteId", clienteId);
-      await fetch("/api/materiale", { method: "POST", body: formData });
-    }));
+    const errors = [];
+    for (const file of files) {
+      try {
+        const titolo = nome.trim() ? nome.trim() : getDatalogString();
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("titolo", titolo);
+        if (materia) formData.append("materia", materia);
+        formData.append("clienteId", clienteId);
+        const res = await fetch("/api/materiale", { method: "POST", body: formData });
+        if (!res.ok) {
+          let msg = `Errore caricamento ${file.name}`;
+          try { const js = await res.json(); if (js && js.error) msg += `: ${js.error}`; } catch {}
+          errors.push(msg);
+        }
+      } catch (err) {
+        errors.push(`Errore caricamento ${file.name}: ${err.message}`);
+      }
+    }
+    if (errors.length > 0) {
+      alert("Alcuni file non sono stati caricati:\n" + errors.join("\n"));
+    }
     resetForm();
     onUploaded && onUploaded();
     onClose && onClose();
