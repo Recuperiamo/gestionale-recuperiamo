@@ -242,7 +242,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [commenti, addCommento] = useCommenti(items);
 
   // --- FETCH LISTA REALE ---
-  async function fetchMateriali(clienteIdToFetch) {
+  async function fetchMateriali(clienteIdToFetch, attempt = 1) {
     setLoading(true);
     try {
       let url = "/api/materiale";
@@ -251,8 +251,15 @@ export default function AulaContent({ initialClienteId = null }) {
       }
       const res = await fetch(url);
       const data = await res.json();
-      setItems(Array.isArray(data) ? data : []);
-    } catch {
+      const list = Array.isArray(data) ? data : [];
+      setItems(list);
+
+      // quick retry once in case of transient empty result (reduces need for multiple F5)
+      if (attempt === 1 && clienteIdToFetch && list.length === 0) {
+        setTimeout(() => fetchMateriali(clienteIdToFetch, 2), 700);
+      }
+    } catch (err) {
+      console.warn('[AulaContent] fetchMateriali error', err);
       setItems([]);
     } finally {
       setLoading(false);

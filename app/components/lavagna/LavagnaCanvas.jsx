@@ -1207,7 +1207,11 @@ export default function LavagnaCanvas({
           if (it.type && it.type.indexOf('image') === 0) {
             const file = it.getAsFile();
             if (file) {
-              // upload file to /api/materiale and then create a persisted shape referencing it
+              // Insert an immediate temporary preview using an object URL so user sees feedback
+              const tempSrc = URL.createObjectURL(file);
+              const tempId = insertLocalPastedImage(tempSrc);
+
+              // Upload in background; when done, replace temp shape with persisted one
               (async () => {
                 try {
                   const fd = new FormData();
@@ -1218,13 +1222,13 @@ export default function LavagnaCanvas({
                   const res = await fetch('/api/materiale', { method: 'POST', body: fd });
                   const js = await res.json().catch(()=>null);
                   if (!res.ok || !js || !js.materiale) {
-                    // fallback: insert as local-only image using object URL
-                    const src = URL.createObjectURL(file);
-                    insertLocalPastedImage(src);
+                    // leave temp preview and notify console
+                    console.warn('[lavagna] upload pasted image failed, kept local preview');
                     return;
                   }
                   const mat = js.materiale;
-                  const src = `/api/materiale?fileId=${mat.id}`;
+                  const serverSrc = `/api/materiale?fileId=${mat.id}`;
+
                   // compute placement in world coords (center of viewport)
                   const canvas = canvasRef.current;
                   const rect = canvas.getBoundingClientRect();
@@ -1232,11 +1236,12 @@ export default function LavagnaCanvas({
                   const viewH = rect.height / (zoom || 1);
                   const x = pan.x + viewW / 2 - (200 / (zoom || 1));
                   const y = pan.y + viewH / 2 - (150 / (zoom || 1));
+
                   const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
                   const shape = {
                     id,
                     kind: 'immagine',
-                    src,
+                    src: serverSrc,
                     materialeId: mat.id,
                     nomeOriginale: mat.nomeOriginale,
                     x,
@@ -1245,7 +1250,8 @@ export default function LavagnaCanvas({
                     h: 300 / (zoom || 1),
                     autoreUserId: utenteId
                   };
-                  // preload to get natural size
+
+                  // preload to adjust size then create persisted shape and remove temp
                   const img = new Image();
                   img.onload = () => {
                     const aspect = img.naturalWidth / img.naturalHeight || 1;
@@ -1253,20 +1259,23 @@ export default function LavagnaCanvas({
                     const desiredH = desiredW / aspect;
                     shape.w = desiredW;
                     shape.h = desiredH;
+                    // remove temp preview
+                    setForme(prev => prev.filter(f => f.id !== tempId));
+                    // create persisted shape (will emit and persist)
                     createShapeLocal(shape, true);
+                    // revoke temp URL
+                    try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                     drawAll();
                   };
                   img.onerror = () => {
+                    setForme(prev => prev.filter(f => f.id !== tempId));
                     createShapeLocal(shape, true);
+                    try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                     drawAll();
                   };
-                  img.src = src;
+                  img.src = serverSrc;
                 } catch (err) {
-                  // if upload fails, fallback to local insert
-                  try {
-                    const file2 = it.getAsFile();
-                    if (file2) insertLocalPastedImage(URL.createObjectURL(file2));
-                  } catch (_) {}
+                  console.warn('[lavagna] error uploading pasted image', err);
                 }
               })();
               e.preventDefault();
@@ -1308,7 +1317,8 @@ export default function LavagnaCanvas({
         };
         img.onerror = () => { setForme(prev => [...prev, shape]); drawAll(); };
         img.src = src;
-      } catch (_) {}
+        return id;
+      } catch (_) { return null; }
     }
     window.addEventListener('paste', onPaste);
     return () => {
@@ -1700,8 +1710,11 @@ export default function LavagnaCanvas({
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     // support both synthetic/native events: prefer nativeEvent when present
-    const clientX = (e && e.nativeEvent && typeof e.nativeEvent.clientX === 'number') ? e.nativeEvent.clientX : (e.clientX ?? 0);
-    const clientY = (e && e.nativeEvent && typeof e.nativeEvent.clientY === 'number') ? e.nativeEvent.clientY : (e.clientY ?? 0);
+    let clientX = (e && e.nativeEvent && typeof e.nativeEvent.clientX === 'number') ? e.nativeEvent.clientX : (e.clientX ?? 0);
+    let clientY = (e && e.nativeEvent && typeof e.nativeEvent.clientY === 'number') ? e.nativeEvent.clientY : (e.clientY ?? 0);
+    // round to nearest CSS pixel to avoid fractional-device-pixel drift
+    clientX = Math.round(clientX);
+    clientY = Math.round(clientY);
     const offX = clientX - rect.left;
     const offY = clientY - rect.top;
     const x = pan.x + offX / zoom;
@@ -1995,8 +2008,10 @@ export default function LavagnaCanvas({
       const ov = overlayRef.current;
       const canvas = canvasRef.current;
       if (ov && canvas && strumento === 'penna') {
-        const clientX = e.nativeEvent.clientX;
-        const clientY = e.nativeEvent.clientY;
+        // Align overlay to world->screen computed position (avoids drift with zoom/pan)
+        const expected = screenFromWorld(punto) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+        const clientX = expected.clientX;
+        const clientY = expected.clientY;
         ov.style.display = 'block';
         ov.style.left = `${clientX}px`;
         ov.style.top = `${clientY}px`;
@@ -2098,8 +2113,11 @@ export default function LavagnaCanvas({
     try {
       const ov = overlayRef.current;
       if (ov && strumento === 'penna') {
-        const clientX = e.nativeEvent.clientX;
-        const clientY = e.nativeEvent.clientY;
+        // Prefer mapping last world point to screen coords to avoid cursor drift
+        const lastPoint = (puntiCorrentiRef.current && puntiCorrentiRef.current.length) ? puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1] : null;
+        const expected = screenFromWorld(lastPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+        const clientX = expected.clientX;
+        const clientY = expected.clientY;
         ov.style.display = 'block';
         ov.style.left = `${clientX}px`;
         ov.style.top = `${clientY}px`;
