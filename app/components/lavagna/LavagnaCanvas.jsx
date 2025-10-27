@@ -35,7 +35,7 @@ export default function LavagnaCanvas({
   const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
-  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano
+  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|lazzo|shape-tools
   const [colore, setColore] = useState("#20489a");
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
@@ -173,7 +173,16 @@ export default function LavagnaCanvas({
   const selectingRef = useRef({ active: false, start: null });
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
   const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
-  const draggingSelectionRef = useRef({ active: false, startWorld: null, offsets: null });
+  const draggingSelectionRef = useRef({
+    active: false,
+    lastWorld: null,
+    moved: false,
+    pointerTool: null,
+    pointerId: null,
+    primaryShapeId: null,
+    selectionSnapshot: null
+  });
+  const selectionClickRef = useRef(null);
   const [showShapesPopover, setShowShapesPopover] = useState(false);
 
   const isAdmin = String(ruolo || "").toLowerCase() === "admin";
@@ -187,30 +196,28 @@ export default function LavagnaCanvas({
   const drawAll = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
-    // Clear device pixels, then work in CSS-pixel coordinate space (scale by devicePixelRatio)
     const canvas = ctx.canvas;
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.width / dpr;
     const cssH = canvas.height / dpr;
 
-    // Reset to identity and clear the entire backing buffer (device pixels)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Now scale so 1 unit = 1 CSS pixel (we operate in CSS pixels thereafter)
+    // Base fill in screen space
     ctx.save();
     ctx.scale(dpr, dpr);
     ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
     ctx.fillRect(0, 0, cssW, cssH);
+    ctx.restore();
 
-    // Trasformazione world->screen in CSS pixels: prima trasla, poi scala
-    const W = cssW;
-    const H = cssH;
-    ctx.translate(-pan.x, -pan.y);
-    ctx.scale(zoom, zoom);
-
-    const viewW = W / zoom;
-    const viewH = H / zoom;
+    // World transform (pan/zoom + DPR in a single matrix)
+  const safeZoom = Math.max(zoom, 0.0001);
+  const worldScale = safeZoom * dpr;
+  ctx.save();
+  ctx.setTransform(worldScale, 0, 0, worldScale, (-pan.x) * worldScale, (-pan.y) * worldScale);
+  const viewW = cssW / safeZoom;
+  const viewH = cssH / safeZoom;
     // sfondo pattern (disegniamo un pattern ripetuto di grandi dimensioni
     // così da avere uno sfondo "infinito" che continua quando si pan/zoom)
     if (sfondo === 'righe' || sfondo === 'quadretti' || sfondo === 'punti') {
@@ -400,12 +407,13 @@ export default function LavagnaCanvas({
       if (selectedItems.forme.includes(f.id)) {
         const bounds = f._bb ?? getShapeBounds(f);
         if (bounds) {
+          const padding = 6 / safeZoom;
           ctx.strokeStyle = '#2563eb';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([6,4]);
+          ctx.lineWidth = 2 / safeZoom;
+          ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
           const width = bounds.maxX - bounds.minX;
           const height = bounds.maxY - bounds.minY;
-          ctx.strokeRect(bounds.minX - 6, bounds.minY - 6, width + 12, height + 12);
+          ctx.strokeRect(bounds.minX - padding, bounds.minY - padding, width + padding * 2, height + padding * 2);
           ctx.setLineDash([]);
         }
       }
@@ -447,9 +455,9 @@ export default function LavagnaCanvas({
       const ps = previewShapeRef.current;
       if (ps) {
         ctx.save();
-        ctx.strokeStyle = ps.colore || '#20489a';
-        ctx.lineWidth = ps.spessore || 2;
-        ctx.setLineDash([6,4]);
+  ctx.strokeStyle = ps.colore || '#20489a';
+  ctx.lineWidth = (ps.spessore || 2) / safeZoom;
+  ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
         const startX = ps.xStart ?? ps.x;
         const startY = ps.yStart ?? ps.y;
         const endX = ps.x2;
@@ -495,7 +503,7 @@ export default function LavagnaCanvas({
               );
               ctx.closePath();
               ctx.stroke();
-              ctx.setLineDash([6,4]);
+              ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
             }
             break;
           }
@@ -530,16 +538,14 @@ export default function LavagnaCanvas({
       // Selection box overlay (world coords)
       if (selectionBox) {
         ctx.save();
-        ctx.setTransform(1,0,0,1,0,0);
-        // transform world->screen
-        const sx = (selectionBox.x1 - pan.x) * zoom;
-        const sy = (selectionBox.y1 - pan.y) * zoom;
-        const sx2 = (selectionBox.x2 - pan.x) * zoom;
-        const sy2 = (selectionBox.y2 - pan.y) * zoom;
-        const rx = Math.min(sx, sx2); const ry = Math.min(sy, sy2);
-        const rw = Math.abs(sx2 - sx); const rh = Math.abs(sy2 - sy);
-        ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
-        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 2 / safeZoom;
+        ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+        const x1 = Math.min(selectionBox.x1, selectionBox.x2);
+        const y1 = Math.min(selectionBox.y1, selectionBox.y2);
+        const w = Math.abs(selectionBox.x2 - selectionBox.x1);
+        const h = Math.abs(selectionBox.y2 - selectionBox.y1);
+        ctx.strokeRect(x1, y1, w, h);
         ctx.restore();
       }
 
@@ -694,7 +700,6 @@ export default function LavagnaCanvas({
       ts: Date.now()
     });
   }, [emitOrPublish, lavagnaId, attivitaId, utenteId, ruolo]);
-
 
   // Stream remoti in tempo reale (non persistiti finché non "done")
   const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
@@ -1204,17 +1209,18 @@ export default function LavagnaCanvas({
   }
 
   // Move selected items by dx,dy
-  function moveSelectionBy(dx, dy, emit = true) {
-    if (!selectedItems) return;
+  function moveSelectionBy(dx, dy, emit = true, selectionOverride = null) {
+    const selection = selectionOverride || selectedItems;
+    if (!selection) return;
     const updatedShapes = [];
     setForme(prev => prev.map(f => {
-      if (!selectedItems.forme.includes(f.id)) return f;
+      if (!selection.forme.includes(f.id)) return f;
       const moved = translateShape(f, dx, dy);
       updatedShapes.push(moved);
       return moved;
     }));
     // Move strokes (shift points)
-    setTratti(prev => prev.map((t, idx) => selectedItems.tratti.includes(idx) ? ({ ...t, punti: t.punti.map(p => ({ x: p.x + dx, y: p.y + dy })) }) : t));
+    setTratti(prev => prev.map((t, idx) => selection.tratti.includes(idx) ? ({ ...t, punti: t.punti.map(p => ({ x: p.x + dx, y: p.y + dy })) }) : t));
     if (emit) {
       updatedShapes.forEach((shape) => {
         emitOrPublish('shape:update', { ...shape, lavagnaId });
@@ -1222,6 +1228,13 @@ export default function LavagnaCanvas({
     }
     drawAll();
   }
+
+  const openLinkShape = useCallback((shape) => {
+    if (!shape || shape.kind !== 'link' || !shape.url) return;
+    try {
+      window.open(shape.url, '_blank', 'noopener');
+    } catch (_) {}
+  }, []);
 
   // Keyboard shortcuts for copy/cut/paste/delete/duplicate
   useEffect(() => {
@@ -1840,19 +1853,26 @@ export default function LavagnaCanvas({
   // Coordinate helper considerando lo zoom
   const getPoint = useCallback((e) => {
     const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    // support both synthetic/native events: prefer nativeEvent when present
-    let clientX = (e && e.nativeEvent && typeof e.nativeEvent.clientX === 'number') ? e.nativeEvent.clientX : (e.clientX ?? 0);
-    let clientY = (e && e.nativeEvent && typeof e.nativeEvent.clientY === 'number') ? e.nativeEvent.clientY : (e.clientY ?? 0);
-    // round to nearest CSS pixel to avoid fractional-device-pixel drift
-    clientX = Math.round(clientX);
-    clientY = Math.round(clientY);
+    const native = e?.nativeEvent;
+    let clientX;
+    let clientY;
+    if (native && typeof native.clientX === 'number' && typeof native.clientY === 'number') {
+      clientX = native.clientX;
+      clientY = native.clientY;
+    } else {
+      clientX = typeof e?.clientX === 'number' ? e.clientX : 0;
+      clientY = typeof e?.clientY === 'number' ? e.clientY : 0;
+    }
     const offX = clientX - rect.left;
     const offY = clientY - rect.top;
-    const x = pan.x + offX / zoom;
-    const y = pan.y + offY / zoom;
+    const currentPan = panRef.current || { x: 0, y: 0 };
+    const currentZoom = zoomRef.current || 1;
+    const x = currentPan.x + offX / currentZoom;
+    const y = currentPan.y + offY / currentZoom;
     return { x, y };
-  }, [zoom, pan.x, pan.y]);
+  }, []);
 
   // Helper: given a world point, compute expected client (viewport) coords
   const screenFromWorld = useCallback((point) => {
@@ -1860,14 +1880,15 @@ export default function LavagnaCanvas({
       const canvas = canvasRef.current;
       if (!canvas || !point) return null;
       const rect = canvas.getBoundingClientRect();
-      // world->screen in CSS pixels: (point - pan) * zoom
-      const sx = (point.x - pan.x) * zoom + rect.left;
-      const sy = (point.y - pan.y) * zoom + rect.top;
+      const currentPan = panRef.current || { x: 0, y: 0 };
+      const currentZoom = zoomRef.current || 1;
+      const sx = (point.x - currentPan.x) * currentZoom + rect.left;
+      const sy = (point.y - currentPan.y) * currentZoom + rect.top;
       return { clientX: sx, clientY: sy, rect };
     } catch (err) {
       return null;
     }
-  }, [pan.x, pan.y, zoom]);
+  }, []);
 
   // == RESIZE & REDRAW ==
   useEffect(() => {
@@ -2030,6 +2051,7 @@ export default function LavagnaCanvas({
     const pointerId = native?.pointerId;
     const canvas = canvasRef.current;
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
+    selectionClickRef.current = null;
 
     if (btn === 2) {
       e.preventDefault();
@@ -2060,7 +2082,7 @@ export default function LavagnaCanvas({
           for (const f of (forme || [])) {
             if (f.kind !== 'link') continue;
             if (hitTestShape(f, p.x, p.y, 12)) {
-              try { window.open(f.url, '_blank'); } catch (_) {}
+              openLinkShape(f);
               return;
             }
           }
@@ -2105,26 +2127,93 @@ export default function LavagnaCanvas({
       }
     }
 
-    if (strumento === 'lazzo') {
+    if (strumento === 'lazzo' || strumento === 'selezione') {
       const p = getPoint(e);
-      // If the user clicked directly on a shape, select it and start a drag operation
+      const pointerTool = strumento;
       try {
-        // prefer top-most shape: iterate in reverse drawing order
         const shapes = (forme || []).slice().reverse();
         let clicked = null;
         for (const f of shapes) {
           if (hitTestShape(f, p.x, p.y, 12)) { clicked = f; break; }
         }
         if (clicked) {
-          // select the clicked shape and prepare incremental dragging
-          setSelectedItems({ tratti: [], forme: [clicked.id] });
-          draggingSelectionRef.current = { active: true, lastWorld: p };
-          try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+          const additive = !!(native?.shiftKey || native?.metaKey || native?.ctrlKey);
+          let nextForme;
+          let nextTratti;
+          if (additive) {
+            const already = selectedItems.forme.includes(clicked.id);
+            if (already) {
+              nextForme = selectedItems.forme.filter((id) => id !== clicked.id);
+            } else {
+              nextForme = [...selectedItems.forme, clicked.id];
+            }
+            nextTratti = selectedItems.tratti.slice();
+          } else {
+            nextForme = [clicked.id];
+            nextTratti = [];
+          }
+
+          setSelectedItems({ tratti: nextTratti, forme: nextForme });
+
+          if (nextForme.length === 0 && nextTratti.length === 0) {
+            draggingSelectionRef.current = {
+              active: false,
+              lastWorld: null,
+              moved: false,
+              pointerTool: null,
+              pointerId: null,
+              primaryShapeId: null,
+              selectionSnapshot: null
+            };
+            selectionClickRef.current = null;
+            return;
+          }
+
+          draggingSelectionRef.current = {
+            active: true,
+            lastWorld: p,
+            moved: false,
+            pointerTool,
+            pointerId,
+            primaryShapeId: clicked.id,
+            selectionSnapshot: { tratti: nextTratti, forme: nextForme }
+          };
+
+          selectionClickRef.current = {
+            pointerId,
+            shapeId: clicked.id,
+            pointerTool,
+            openCandidate: clicked.kind === 'link',
+            aborted: false,
+            metaClick: !!(native?.metaKey || native?.ctrlKey || native?.altKey),
+            doubleTap: native?.detail >= 2
+          };
+
+          if (pointerTool === 'selezione' && clicked.kind === 'link') {
+            if (selectionClickRef.current.metaClick || selectionClickRef.current.doubleTap) {
+              openLinkShape(clicked);
+              selectionClickRef.current = null;
+              draggingSelectionRef.current = {
+                active: false,
+                lastWorld: null,
+                moved: false,
+                pointerTool: null,
+                pointerId: null,
+                primaryShapeId: null,
+                selectionSnapshot: null
+              };
+              return;
+            }
+          }
+
+          try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
           return;
         }
       } catch (_) {}
 
-      // otherwise start a lazo selection box
+      if (pointerTool === 'selezione' && !native?.shiftKey && !native?.metaKey && !native?.ctrlKey) {
+        setSelectedItems({ tratti: [], forme: [] });
+      }
       selectingRef.current = { active: true, start: p };
       setSelectionBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
       try {
@@ -2200,8 +2289,16 @@ export default function LavagnaCanvas({
         const dy = Math.abs(expected.clientY - (e.nativeEvent.clientY));
         const dist = Math.hypot(dx, dy);
         if (dist > 8) {
-          // If mismatch present, log for debugging (user can paste log)
-          console.warn('[lavagna][diag] pointerDown mismatch px=', Math.round(dist), { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY, expected, pan: { ...pan }, zoom });
+          // If mismatch present, log rich details for debugging
+          console.warn('[lavagna][diag] pointerDown mismatch', {
+            distPx: Math.round(dist * 10) / 10,
+            dx: Math.round(dx * 10) / 10,
+            dy: Math.round(dy * 10) / 10,
+            client: { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY },
+            expected: { x: expected.clientX, y: expected.clientY },
+            pan: { ...pan },
+            zoom
+          });
         }
       }
     } catch (_) {}
@@ -2234,13 +2331,24 @@ export default function LavagnaCanvas({
     if (draggingSelectionRef.current && draggingSelectionRef.current.active) {
       try {
         const p = getPoint(e);
-        if (p && draggingSelectionRef.current.lastWorld) {
-          const last = draggingSelectionRef.current.lastWorld;
+        const dragInfo = draggingSelectionRef.current;
+        if (p && dragInfo.lastWorld) {
+          const last = dragInfo.lastWorld;
           const dx = p.x - last.x;
           const dy = p.y - last.y;
           if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-            moveSelectionBy(dx, dy, true);
-            draggingSelectionRef.current.lastWorld = p;
+            const selectionSnapshot = dragInfo.selectionSnapshot || selectedItems;
+            moveSelectionBy(dx, dy, true, selectionSnapshot);
+            dragInfo.lastWorld = p;
+            if (!dragInfo.moved) {
+              const delta = Math.max(Math.abs(dx), Math.abs(dy));
+              if (delta > 0.35) {
+                dragInfo.moved = true;
+              }
+            }
+            if (selectionClickRef.current && selectionClickRef.current.pointerId === dragInfo.pointerId) {
+              selectionClickRef.current.aborted = true;
+            }
             drawAll();
           }
         }
@@ -2294,12 +2402,17 @@ export default function LavagnaCanvas({
 
     // If not drawing stroke, nothing to do
     // update overlay cursor position even when not drawing
+    let memoPoint = null;
+    const ensurePoint = () => {
+      if (memoPoint) return memoPoint;
+      memoPoint = getPoint(e);
+      return memoPoint;
+    };
     try {
       const ov = overlayRef.current;
       if (ov && strumento === 'penna') {
-        // Prefer mapping last world point to screen coords to avoid cursor drift
-        const lastPoint = (puntiCorrentiRef.current && puntiCorrentiRef.current.length) ? puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1] : null;
-        const expected = screenFromWorld(lastPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+        const worldPoint = ensurePoint();
+        const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
         const clientX = expected.clientX;
         const clientY = expected.clientY;
         ov.style.display = 'block';
@@ -2317,15 +2430,23 @@ export default function LavagnaCanvas({
 
     // Occasional diagnostic: compare expected screen position for the last point
     try {
-      if (disegnando && puntiCorrentiRef.current && puntiCorrentiRef.current.length) {
-        const last = puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1];
-        const expected = screenFromWorld(last);
+      if (disegnando) {
+        const currentWorld = ensurePoint();
+        const expected = screenFromWorld(currentWorld);
         if (expected) {
-          const dx = Math.abs(expected.clientX - (e.nativeEvent.clientX));
-          const dy = Math.abs(expected.clientY - (e.nativeEvent.clientY));
+          const dx = expected.clientX - e.nativeEvent.clientX;
+          const dy = expected.clientY - e.nativeEvent.clientY;
           const dist = Math.hypot(dx, dy);
           if (dist > 8) {
-            console.warn('[lavagna][diag] pointerMove mismatch px=', Math.round(dist), { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY, expected, pan: { ...pan }, zoom });
+            console.warn('[lavagna][diag] pointerMove mismatch', {
+              distPx: Math.round(dist * 10) / 10,
+              dx: Math.round(dx * 10) / 10,
+              dy: Math.round(dy * 10) / 10,
+              client: { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY },
+              expected: { x: expected.clientX, y: expected.clientY },
+              pan: { ...pan },
+              zoom
+            });
           }
         }
       }
@@ -2333,7 +2454,7 @@ export default function LavagnaCanvas({
 
     if (!disegnando) return;
 
-    const punto = getPoint(e);
+    const punto = ensurePoint();
     if (strumento === 'gomma' && !gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
       eraseStrokeAt(punto.x, punto.y);
@@ -2353,12 +2474,35 @@ export default function LavagnaCanvas({
 
   function pointerUp(e) {
     const pointerId = e?.nativeEvent?.pointerId;
+    const pendingClick = selectionClickRef.current;
+    const dragInfo = draggingSelectionRef.current;
     // finalize any selection drag
-    if (draggingSelectionRef.current && draggingSelectionRef.current.active) {
+    if (dragInfo && dragInfo.active) {
       try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
-      draggingSelectionRef.current.active = false;
-      draggingSelectionRef.current.lastWorld = null;
+      const shouldOpenLink = (() => {
+        if (!pendingClick) return false;
+        if (dragInfo.pointerTool !== 'selezione') return false;
+        if (pendingClick.pointerId !== pointerId) return false;
+        if (pendingClick.aborted) return false;
+        if (dragInfo.moved) return false;
+        if (!pendingClick.openCandidate) return false;
+        return pendingClick.doubleTap || pendingClick.metaClick;
+      })();
+      const shapeToOpen = shouldOpenLink
+        ? (forme || []).find((f) => f.id === pendingClick.shapeId)
+        : null;
+      dragInfo.active = false;
+      dragInfo.lastWorld = null;
+      dragInfo.moved = false;
+      dragInfo.pointerTool = null;
+      dragInfo.pointerId = null;
+      dragInfo.primaryShapeId = null;
+      dragInfo.selectionSnapshot = null;
+      selectionClickRef.current = null;
       drawAll();
+      if (shapeToOpen) {
+        openLinkShape(shapeToOpen);
+      }
       return;
     }
     if (panningRef.current.active) {
@@ -2417,6 +2561,7 @@ export default function LavagnaCanvas({
         setSelectedItems({ tratti: selTratti, forme: selForme });
       }
       setSelectionBox(null);
+      selectionClickRef.current = null;
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}
@@ -2534,6 +2679,16 @@ export default function LavagnaCanvas({
         gestureRef.current.mode = 'none';
       }
     }
+    if (draggingSelectionRef.current) {
+      draggingSelectionRef.current.active = false;
+      draggingSelectionRef.current.lastWorld = null;
+      draggingSelectionRef.current.moved = false;
+      draggingSelectionRef.current.pointerTool = null;
+      draggingSelectionRef.current.pointerId = null;
+      draggingSelectionRef.current.primaryShapeId = null;
+      draggingSelectionRef.current.selectionSnapshot = null;
+    }
+    selectionClickRef.current = null;
     erasingRef.current = false;
     eraseSessionRef.current.strokeIds.clear();
     eraseSessionRef.current.shapeIds.clear();
@@ -2796,6 +2951,22 @@ export default function LavagnaCanvas({
           <div style={st.toolGroup}>
             <button
               type="button"
+              style={iconBtn(strumento === 'selezione')}
+              onClick={() => {
+                setStrumento('selezione');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Selezione"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3l6.8 6.4 3-3.4 3.7 11.8-11.8-3.7 3.4-3-6.4-6.8z" stroke={strumento==='selezione' ? '#fff' : '#20489a'} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" fill={strumento==='selezione' ? '#fff' : 'none'} />
+              </svg>
+            </button>
+            <button
+              type="button"
               style={iconBtn(strumento === 'lazzo')}
               onClick={() => {
                 setStrumento('lazzo');
@@ -2804,7 +2975,7 @@ export default function LavagnaCanvas({
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
               }}
-              title="Seleziona"
+              title="Lazo"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path
@@ -3055,6 +3226,7 @@ export default function LavagnaCanvas({
     if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
     if (strumento === 'mano') return 'grab';
     if (strumento === 'gomma') return `url(${st.eraserCursor}) 14 20, auto`;
+    if (strumento === 'selezione') return 'default';
     if (['lazzo','rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
       return 'crosshair';
     }
@@ -3255,7 +3427,7 @@ export default function LavagnaCanvas({
               for (const f of (forme || [])) {
                 if (f.kind !== 'link') continue;
                 if (hitTestShape(f, p.x, p.y, 12)) {
-                  try { window.open(f.url, '_blank'); } catch(_) {}
+                  openLinkShape(f);
                   return;
                 }
               }
