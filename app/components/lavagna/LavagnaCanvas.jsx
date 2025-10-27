@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useMemo
 } from "react";
-import { getAblyChannel, whenChannelAttached } from "../../lib/realtime/ablyClient";
+import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from "../../lib/realtime/ablyClient";
 import { jsPDF } from "jspdf";
 
 /**
@@ -543,10 +543,14 @@ export default function LavagnaCanvas({
 
   const emitOrPublish = useCallback(
     (name, data) => {
-      const ch = ablyRef.current.ch;
-      if (!ch) return;
-      whenChannelAttached(channelName)
-        .then(() => ch.publish(name, data))
+      // Use the async attachment helper; only publish if channel is available
+      whenChannelAttachedAsync(channelName)
+        .then(() => {
+          const ch = ablyRef.current.ch;
+          if (ch) {
+            try { ch.publish(name, data); } catch (e) {}
+          }
+        })
         .catch(() => {});
     },
     [channelName]
@@ -650,17 +654,217 @@ export default function LavagnaCanvas({
   }, []);
 
   useEffect(() => {
-    const ch = getAblyChannel(channelName);
-    ablyRef.current.ch = ch;
+    let cleanup = () => {};
+    (async () => {
+      try {
+        const ch = await getAblyChannelAsync(channelName);
+        ablyRef.current.ch = ch;
+        if (!ch) {
+          console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
+          return;
+        }
+        whenChannelAttachedAsync(channelName).catch((err) => {
+          console.warn('[LavagnaCanvas] channel attach failed', err?.message);
+        });
 
-    if (!ch) {
-      console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
-      return () => {};
-    }
+        const onStart = (msg) => {
+          const { data } = msg || {};
+          const { streamId, strumento, colore, spessore, start } = data || {};
+          if (!streamId || !start) return;
+          remoteStreams.current.set(streamId, {
+            strumento,
+            colore,
+            spessore,
+            punti: [start]
+          });
+          drawAll();
+        };
 
-    whenChannelAttached(channelName).catch((err) => {
-      console.warn('[LavagnaCanvas] channel attach failed', err?.message);
-    });
+        const onPoints = (msg) => {
+          const { data } = msg || {};
+          const { streamId, points } = data || {};
+          if (!streamId || !Array.isArray(points) || points.length === 0) return;
+          const st = remoteStreams.current.get(streamId);
+          if (!st) return;
+          st.punti.push(...points);
+          drawAll();
+        };
+
+        const onDone = (msg) => {
+          const { data } = msg || {};
+          const { streamId } = data || {};
+          const st = remoteStreams.current.get(streamId);
+          if (st && st.punti.length >= 2) {
+            if (st.strumento !== 'magicpen') {
+              const definitivo = prepareStroke({
+                id: streamId,
+                strumento: st.strumento,
+                colore: st.colore,
+                spessore: st.spessore,
+                punti: st.punti,
+                autoreUserId: 'remote'
+              });
+              setTratti((prev) => [...prev, definitivo]);
+            }
+          }
+          remoteStreams.current.delete(streamId);
+          drawAll();
+        };
+
+        const onDelete = (msg) => {
+          const { data } = msg || {};
+          const { strokeId } = data || {};
+          if (!strokeId) return;
+          setTratti((prev) => prev.filter((t) => String(t.id) !== String(strokeId)));
+          drawAll();
+        };
+
+        const onClear = () => {
+          setTratti([]);
+          setUndoStack([]);
+          setRedoStack([]);
+          drawAll();
+        };
+
+        ch.subscribe('stroke:start', onStart);
+        ch.subscribe('stroke:points', onPoints);
+        ch.subscribe('stroke:done', onDone);
+        ch.subscribe('stroke:delete', onDelete);
+        ch.subscribe('clear-lavagna', onClear);
+
+        // other subscriptions (shapes, background, viewport, spectator) – keep original names
+        const onShapeCreate = (msg) => {
+          const { data } = msg || {};
+          if (!data) return;
+          const normalized = normalizeShape(data);
+          if (!normalized) return;
+          setForme((prev) => {
+            if (prev.find((f) => f.id === normalized.id)) return prev;
+            return [...prev, normalized];
+          });
+          drawAll();
+        };
+        const onShapeUpdate = (msg) => {
+          const { data } = msg || {};
+          if (!data || !data.id) return;
+          const normalized = normalizeShape(data);
+          if (!normalized) return;
+          setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
+          drawAll();
+        };
+        const onShapeDelete = (msg) => {
+          const { data } = msg || {};
+          if (!data || !data.id) return;
+          setForme((prev) => prev.filter((f) => f.id !== data.id));
+          drawAll();
+        };
+        const onBackgroundChange = (msg) => {
+          const { data } = msg || {};
+          if (!data || !data.sfondo) return;
+          let changed = false;
+          setSfondo((prev) => {
+            if (prev === data.sfondo) return prev;
+            changed = true;
+            return data.sfondo;
+          });
+          if (changed) {
+            setTimeout(drawAll, 0);
+          }
+        };
+        const onBackgroundRequest = () => {
+          if (!isAdmin) return;
+          emitOrPublish('background:change', { lavagnaId, attivitaId, sfondo: sfondoRef.current });
+        };
+        const onViewportUpdate = (msg) => {
+          const { data } = msg || {};
+          if (!data) return;
+          if (data.senderId && data.senderId === utenteId) return;
+          const remotePan = data.pan;
+          const remoteZoom = data.zoom;
+          if (!remotePan && typeof remoteZoom !== 'number') return;
+          const snapshot = {
+            pan: (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number')
+              ? { x: remotePan.x, y: remotePan.y }
+              : (latestAdminViewportRef.current?.pan ?? panRef.current),
+            zoom: (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom))
+              ? remoteZoom
+              : (latestAdminViewportRef.current?.zoom ?? zoomRef.current),
+            ts: data.ts || Date.now()
+          };
+          latestAdminViewportRef.current = snapshot;
+          if (!isAdmin && spectatorModeRef.current) {
+            applyViewport(snapshot);
+          }
+        };
+        const onViewportRequest = () => {
+          if (!isAdmin) return;
+          emitOrPublish('viewport:update', {
+            lavagnaId,
+            attivitaId,
+            senderId: utenteId,
+            pan: { x: panRef.current.x, y: panRef.current.y },
+            zoom: zoomRef.current,
+            ts: Date.now()
+          });
+        };
+        const onSpectatorToggle = (msg) => {
+          const { data } = msg || {};
+          const { userId, active } = data || {};
+          if (!userId) return;
+          const roster = spectatorRosterRef.current;
+          if (active) {
+            roster.add(userId);
+          } else {
+            roster.delete(userId);
+          }
+          setSpectatorCount(roster.size);
+        };
+        const onSpectatorRequest = () => {
+          if (isAdmin) return;
+          if (!spectatorModeRef.current) return;
+          emitOrPublish('spectator:toggle', {
+            lavagnaId,
+            attivitaId,
+            userId: utenteId,
+            ruolo,
+            active: true,
+            ts: Date.now()
+          });
+        };
+
+        ch.subscribe('shape:create', onShapeCreate);
+        ch.subscribe('shape:update', onShapeUpdate);
+        ch.subscribe('shape:delete', onShapeDelete);
+        ch.subscribe('background:change', onBackgroundChange);
+        ch.subscribe('background:request', onBackgroundRequest);
+        ch.subscribe('viewport:update', onViewportUpdate);
+        ch.subscribe('viewport:request', onViewportRequest);
+        ch.subscribe('spectator:toggle', onSpectatorToggle);
+        ch.subscribe('spectator:request', onSpectatorRequest);
+
+        cleanup = () => {
+          try {
+            ch.unsubscribe('stroke:start', onStart);
+            ch.unsubscribe('stroke:points', onPoints);
+            ch.unsubscribe('stroke:done', onDone);
+            ch.unsubscribe('stroke:delete', onDelete);
+            ch.unsubscribe('clear-lavagna', onClear);
+            ch.unsubscribe('shape:create', onShapeCreate);
+            ch.unsubscribe('shape:update', onShapeUpdate);
+            ch.unsubscribe('shape:delete', onShapeDelete);
+            ch.unsubscribe('background:change', onBackgroundChange);
+            ch.unsubscribe('background:request', onBackgroundRequest);
+            ch.unsubscribe('viewport:update', onViewportUpdate);
+            ch.unsubscribe('viewport:request', onViewportRequest);
+            ch.unsubscribe('spectator:toggle', onSpectatorToggle);
+            ch.unsubscribe('spectator:request', onSpectatorRequest);
+          } catch (_) {}
+        };
+      } catch (e) {
+        // If something went wrong loading ably, we simply won't attach realtime handlers.
+        ablyRef.current.ch = null;
+      }
+    })();
 
     const onStart = (msg) => {
       const { data } = msg || {};
@@ -834,24 +1038,7 @@ export default function LavagnaCanvas({
     ch.subscribe('spectator:request', onSpectatorRequest);
     ch.subscribe('clear-lavagna', onClear);
 
-    return () => {
-      try {
-        ch.unsubscribe('stroke:start', onStart);
-        ch.unsubscribe('stroke:points', onPoints);
-        ch.unsubscribe('stroke:done', onDone);
-        ch.unsubscribe('stroke:delete', onDelete);
-        ch.unsubscribe('clear-lavagna', onClear);
-        ch.unsubscribe('shape:create', onShapeCreate);
-        ch.unsubscribe('shape:update', onShapeUpdate);
-        ch.unsubscribe('shape:delete', onShapeDelete);
-        ch.unsubscribe('background:change', onBackgroundChange);
-        ch.unsubscribe('background:request', onBackgroundRequest);
-        ch.unsubscribe('viewport:update', onViewportUpdate);
-        ch.unsubscribe('viewport:request', onViewportRequest);
-        ch.unsubscribe('spectator:toggle', onSpectatorToggle);
-        ch.unsubscribe('spectator:request', onSpectatorRequest);
-      } catch (_) {}
-    };
+    return () => { try { cleanup(); } catch (_) {} };
   }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId, ruolo]);
 
   // Remote shapes ref (for in-flight updates)

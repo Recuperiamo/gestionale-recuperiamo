@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { getAblyChannel } from "../../lib/realtime/ablyClient";
+import { getAblyChannel, getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
 export default function LavagneList({ clienteId, onSelect, sessionUser }) {
   const [lavagne, setLavagne] = useState([]);
@@ -32,55 +32,68 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
   useEffect(() => {
     if (!clienteId) return;
-    const ch = getAblyChannel(`lavagne:${clienteId}`);
-    if (ch) {
-      if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] Ably channel attached lavagne:' + clienteId);
-      const onNew = ({ data }) => {
-        if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received new-lavagna', data);
-        const { lavagna } = data || {};
-        if (!lavagna) return;
+    let socket;
+    let cleanupAbly = () => {};
+
+    (async () => {
+      try {
+        const ch = await getAblyChannelAsync(`lavagne:${clienteId}`);
+        if (ch) {
+          if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] Ably channel attached lavagne:' + clienteId);
+          const onNew = ({ data }) => {
+            if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received new-lavagna', data);
+            const { lavagna } = data || {};
+            if (!lavagna) return;
+            setLavagne((prev) => prev.some((l) => l.id === lavagna.id) ? prev : [...prev, lavagna]);
+          };
+          const onDel = ({ data }) => {
+            if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received delete-lavagna', data);
+            const { lavagnaId } = data || {};
+            if (!lavagnaId) return;
+            setLavagne((prev) => prev.filter((l) => l.id !== lavagnaId));
+          };
+          const onDelAll = () => {
+            if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received delete-all-lavagne');
+            setLavagne([]);
+          };
+
+          ch.subscribe('new-lavagna', onNew);
+          ch.subscribe('delete-lavagna', onDel);
+          ch.subscribe('delete-all-lavagne', onDelAll);
+          cleanupAbly = () => {
+            try {
+              ch.unsubscribe("new-lavagna", onNew);
+              ch.unsubscribe("delete-lavagna", onDel);
+              ch.unsubscribe("delete-all-lavagne", onDelAll);
+              ch.detach?.();
+            } catch {}
+          };
+          return;
+        }
+      } catch (err) {
+        // fall through to socket fallback
+      }
+
+      const base = process.env.NEXT_PUBLIC_SOCKET_URL;
+      const socketPath = base ? undefined : "/api/socketio";
+      const url = base || undefined; // undefined = stesso origin
+      if (!base) fetch("/api/socketio").catch(() => {});
+      socket = io(url, { path: socketPath, transports: ["websocket", "polling"] });
+      socket.emit("join:lavagne", { clienteId });
+
+      socket.on("new-lavagna", ({ lavagna }) => {
         setLavagne((prev) => prev.some((l) => l.id === lavagna.id) ? prev : [...prev, lavagna]);
-      };
-      const onDel = ({ data }) => {
-        if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received delete-lavagna', data);
-        const { lavagnaId } = data || {};
-        if (!lavagnaId) return;
+      });
+      socket.on("delete-lavagna", ({ lavagnaId }) => {
         setLavagne((prev) => prev.filter((l) => l.id !== lavagnaId));
-      };
-      const onDelAll = () => {
-        if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received delete-all-lavagne');
-        setLavagne([]);
-      };
+      });
+      socket.on("delete-all-lavagne", () => setLavagne([]));
+    })();
 
-      ch.subscribe('new-lavagna', onNew);
-      ch.subscribe('delete-lavagna', onDel);
-      ch.subscribe('delete-all-lavagne', onDelAll);
-      return () => {
-        try {
-          ch.unsubscribe("new-lavagna", onNew);
-          ch.unsubscribe("delete-lavagna", onDel);
-          ch.unsubscribe("delete-all-lavagne", onDelAll);
-          ch.detach?.();
-        } catch {}
-      };
-    }
-
-    const base = process.env.NEXT_PUBLIC_SOCKET_URL;
-    const socketPath = base ? undefined : "/api/socketio";
-    const url = base || undefined; // undefined = stesso origin
-    if (!base) fetch("/api/socketio").catch(() => {});
-    const socket = io(url, { path: socketPath, transports: ["websocket", "polling"] });
-    socket.emit("join:lavagne", { clienteId });
-
-    socket.on("new-lavagna", ({ lavagna }) => {
-      setLavagne((prev) => prev.some((l) => l.id === lavagna.id) ? prev : [...prev, lavagna]);
-    });
-    socket.on("delete-lavagna", ({ lavagnaId }) => {
-      setLavagne((prev) => prev.filter((l) => l.id !== lavagnaId));
-    });
-    socket.on("delete-all-lavagne", () => setLavagne([]));
-
-    return () => { socket.disconnect(); };
+    return () => {
+      try { cleanupAbly(); } catch {}
+      try { socket?.disconnect(); } catch {}
+    };
   }, [clienteId]);
 
   async function handleDeleteLavagna(lavagnaId) {
