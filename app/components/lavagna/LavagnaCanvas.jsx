@@ -87,7 +87,7 @@ export default function LavagnaCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [contextPanning, setContextPanning] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [undoMode, setUndoMode] = useState('undo');
+  // undoMode removed: we show separate Undo / Redo buttons
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
@@ -112,7 +112,9 @@ export default function LavagnaCanvas({
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
-    const diameter = Math.max(12, Math.min(spessore * 4, 48));
+    // Scale cursor to reflect visible stroke size under current zoom
+    const effectiveSize = spessore * 4 * (zoom || 1);
+    const diameter = Math.max(12, Math.min(effectiveSize, 48));
     const size = Math.round(diameter);
     const radius = size / 2;
     const strokeWidth = Math.max(2, Math.round(size * 0.18));
@@ -127,7 +129,7 @@ export default function LavagnaCanvas({
       url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
       hotspot: radius
     };
-  }, [strumento, colore, spessore]);
+  }, [strumento, colore, spessore, zoom]);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -491,9 +493,7 @@ export default function LavagnaCanvas({
     spectatorModeRef.current = spectatorMode;
   }, [spectatorMode]);
 
-  useEffect(() => {
-    setUndoMode(redoStack.length > 0 ? 'redo' : 'undo');
-  }, [redoStack.length]);
+  // removed undoMode toggling effect
 
   useEffect(() => {
     if (!showExportMenu) return;
@@ -2242,39 +2242,40 @@ export default function LavagnaCanvas({
     if (!isAdmin && spectatorMode) return null;
     const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
-    const undoDisabled = undoMode === 'undo' ? !undoStack.length : !redoStack.length;
-    const handleUndoRedoClick = () => {
-      if (undoDisabled) return;
-      if (undoMode === 'undo') {
-        undo();
-      } else {
-        redo();
-      }
-    };
+    const undoDisabled = !undoStack.length;
+    const redoAvailable = redoStack.length > 0;
 
     return (
       <div style={st.bottomToolbarDock}>
         <div style={st.commandBar}>
           <button
             type="button"
-            style={undoButtonStyle(undoDisabled, undoMode)}
-            onClick={handleUndoRedoClick}
+            style={undoButtonStyle(undoDisabled, 'undo')}
+            onClick={() => { if (!undoDisabled) undo(); }}
             disabled={undoDisabled}
-            title={undoMode === 'undo' ? 'Annulla' : 'Ripristina'}
+            title={'Annulla'}
           >
-            {undoMode === 'undo' ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M7.5 8.5l-4 4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7 12.5h6.5c3.59 0 6.5 2.91 6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M7.5 8.5l-4 4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 12.5h6.5c3.59 0 6.5 2.91 6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <span style={st.undoLabel}>Undo</span>
+          </button>
+
+          {redoAvailable && (
+            <button
+              type="button"
+              style={undoButtonStyle(false, 'redo')}
+              onClick={() => { redo(); }}
+              title={'Ripristina'}
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M16.5 8.5l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M17 12.5H10.5C6.91 12.5 4 9.59 4 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
-            )}
-            <span style={st.undoLabel}>{undoMode === 'undo' ? 'Undo' : 'Redo'}</span>
-          </button>
+              <span style={st.undoLabel}>Redo</span>
+            </button>
+          )}
 
           <span style={st.commandDivider} aria-hidden />
 
@@ -2532,7 +2533,6 @@ export default function LavagnaCanvas({
     handleChangeSfondo,
     spectatorToggleId,
     pulisciLavagna,
-    undoMode,
     undoStack,
     redoStack,
     undo,
