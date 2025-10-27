@@ -1089,6 +1089,13 @@ export default function LavagnaCanvas({
     const normalized = normalizeShape(shape);
     if (!normalized) return;
     setForme((prev) => [...prev, normalized]);
+    // register undo entry for local user-created shapes
+    try {
+      if (normalized.autoreUserId && normalized.autoreUserId === utenteId) {
+        setUndoStack((prev) => [...prev, { type: 'add-shape', shape: normalized }]);
+        setRedoStack([]);
+      }
+    } catch (_) {}
     if (emit) emitOrPublish('shape:create', { ...normalized, lavagnaId });
     // try persist async (best-effort)
     persistShape(normalized).then((s) => {
@@ -1122,6 +1129,13 @@ export default function LavagnaCanvas({
       return prev.filter((f) => f.id !== id);
     });
     if (!removedShape) return;
+    // register undo entry for deletions performed by this user
+    try {
+      if (!removedShape.autoreUserId || removedShape.autoreUserId === utenteId || isAdmin) {
+        setUndoStack((prev) => [...prev, { type: 'delete-shape', shape: removedShape }]);
+        setRedoStack([]);
+      }
+    } catch (_) {}
     if (emit) emitOrPublish('shape:delete', { id, lavagnaId });
     // revoke any temporary object URL used by this shape
     try {
@@ -1632,6 +1646,20 @@ export default function LavagnaCanvas({
   function hitTestShape(shape, x, y, tolerance = 12) {
     if (!shape) return false;
     const kind = shape.kind;
+    // Explicit link hit-test: use shape.w/h defaults if needed
+    if (kind === 'link') {
+      const baseX = Number(shape.x ?? 0);
+      const baseY = Number(shape.y ?? 0);
+      const width = Number(shape.w ?? 160);
+      const height = Number(shape.h ?? 28);
+      const minX = Math.min(baseX, baseX + width);
+      const maxX = Math.max(baseX, baseX + width);
+      const minY = Math.min(baseY, baseY + height);
+      const maxY = Math.max(baseY, baseY + height);
+      const withinX = x >= minX - tolerance && x <= maxX + tolerance;
+      const withinY = y >= minY - tolerance && y <= maxY + tolerance;
+      return !!(withinX && withinY);
+    }
     if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
       const x1 = shape.x1 ?? shape.x ?? 0;
       const y1 = shape.y1 ?? shape.y ?? 0;
@@ -1714,6 +1742,12 @@ export default function LavagnaCanvas({
     if (!rawShape) return null;
     const shape = { ...rawShape };
     const kind = shape.kind;
+    // Provide sane defaults for link shapes so hit-testing and lazo selection work
+    if (kind === 'link') {
+      // keep values in world units; if missing, provide a default visible size
+      if (shape.w == null) shape.w = 160;
+      if (shape.h == null) shape.h = 28;
+    }
     if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
       const startX = Number(shape.x1 ?? shape.x ?? shape.startX ?? 0);
       const startY = Number(shape.y1 ?? shape.y ?? shape.startY ?? 0);
@@ -2073,6 +2107,24 @@ export default function LavagnaCanvas({
 
     if (strumento === 'lazzo') {
       const p = getPoint(e);
+      // If the user clicked directly on a shape, select it and start a drag operation
+      try {
+        // prefer top-most shape: iterate in reverse drawing order
+        const shapes = (forme || []).slice().reverse();
+        let clicked = null;
+        for (const f of shapes) {
+          if (hitTestShape(f, p.x, p.y, 12)) { clicked = f; break; }
+        }
+        if (clicked) {
+          // select the clicked shape and prepare incremental dragging
+          setSelectedItems({ tratti: [], forme: [clicked.id] });
+          draggingSelectionRef.current = { active: true, lastWorld: p };
+          try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+          return;
+        }
+      } catch (_) {}
+
+      // otherwise start a lazo selection box
       selectingRef.current = { active: true, start: p };
       setSelectionBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
       try {
@@ -2175,6 +2227,24 @@ export default function LavagnaCanvas({
         return nuovo;
       });
       if (!isPanning) setIsPanning(true);
+      return;
+    }
+
+    // If we're dragging a selected shape(s), move them incrementally
+    if (draggingSelectionRef.current && draggingSelectionRef.current.active) {
+      try {
+        const p = getPoint(e);
+        if (p && draggingSelectionRef.current.lastWorld) {
+          const last = draggingSelectionRef.current.lastWorld;
+          const dx = p.x - last.x;
+          const dy = p.y - last.y;
+          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+            moveSelectionBy(dx, dy, true);
+            draggingSelectionRef.current.lastWorld = p;
+            drawAll();
+          }
+        }
+      } catch (_) {}
       return;
     }
 
@@ -2283,6 +2353,14 @@ export default function LavagnaCanvas({
 
   function pointerUp(e) {
     const pointerId = e?.nativeEvent?.pointerId;
+    // finalize any selection drag
+    if (draggingSelectionRef.current && draggingSelectionRef.current.active) {
+      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
+      draggingSelectionRef.current.active = false;
+      draggingSelectionRef.current.lastWorld = null;
+      drawAll();
+      return;
+    }
     if (panningRef.current.active) {
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
@@ -2541,6 +2619,29 @@ export default function LavagnaCanvas({
     } else if (last.type === "delete") {
       setTratti((prev) => [...prev, last.stroke]);
     }
+    else if (last.type === 'add-shape') {
+      // remove the shape that was added
+      const sid = last.shape.id;
+      setForme((prev) => prev.filter((s) => s.id !== sid));
+      if (last.shape.dbId && (isAdmin || last.shape.autoreUserId === utenteId)) {
+        fetch(`/api/lavagna/shape/${last.shape.dbId}`, { method: 'DELETE' }).catch(() => {});
+      }
+      emitOrPublish('shape:delete', { id: sid, lavagnaId });
+    } else if (last.type === 'delete-shape') {
+      // restore deleted shape
+      const shp = last.shape;
+      setForme((prev) => [...prev, shp]);
+      try {
+        const normalized = normalizeShape(shp);
+        emitOrPublish('shape:create', { ...normalized, lavagnaId });
+        // try persist again
+        persistShape(normalized).then((s) => {
+          if (s && s.id) {
+            setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+          }
+        }).catch(() => {});
+      } catch(_) {}
+    }
     drawAll();
   }
 
@@ -2558,6 +2659,26 @@ export default function LavagnaCanvas({
       const delId = action.stroke.dbId ?? sid;
       fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
       emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
+    }
+    else if (action.type === 'add-shape') {
+      // redo add: re-add shape
+      const shp = action.shape;
+      setForme((prev) => [...prev, shp]);
+      try {
+        const normalized = normalizeShape(shp);
+        emitOrPublish('shape:create', { ...normalized, lavagnaId });
+        persistShape(normalized).then((s) => {
+          if (s && s.id) setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+        }).catch(() => {});
+      } catch(_) {}
+    } else if (action.type === 'delete-shape') {
+      // redo delete: remove shape
+      const id = action.shape.id;
+      setForme((prev) => prev.filter((f) => f.id !== id));
+      emitOrPublish('shape:delete', { id, lavagnaId });
+      if (action.shape.dbId && (isAdmin || action.shape.autoreUserId === utenteId)) {
+        fetch(`/api/lavagna/shape/${action.shape.dbId}`, { method: 'DELETE' }).catch(() => {});
+      }
     }
     drawAll();
   }
