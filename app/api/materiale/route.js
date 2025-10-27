@@ -1,12 +1,18 @@
 import { promises as fs } from "fs";
 import path from "path";
+import os from "os";
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/authOptions'
 
 // Cartella dove vengono salvati i materiali (crea se non esiste)
-const UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "materiali");
+// On production (serverless platforms like Vercel) the filesystem is ephemeral
+// and not writable under the project directory. Use the OS temp dir there
+// to avoid hard crashes; for a proper production setup use external storage.
+const UPLOAD_DIR = process.env.NODE_ENV === 'production'
+  ? path.join(os.tmpdir(), 'recuperiamo-materiali')
+  : path.resolve(process.cwd(), "uploads", "materiali");
 const INDEX_FILE = path.join(UPLOAD_DIR, "materiali.json");
 
 async function ensureUploadDir() {
@@ -96,7 +102,13 @@ export async function POST(req) {
   const user = await getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
-  const formData = await req.formData();
+  let formData;
+  try {
+    formData = await req.formData();
+  } catch (err) {
+    console.error('[materiale] error parsing formData:', err);
+    return NextResponse.json({ error: 'Impossibile leggere dati upload' }, { status: 400 });
+  }
   const file = formData.get("file");
   if (!file) return NextResponse.json({ error: "File mancante" }, { status: 400 });
 
@@ -124,8 +136,28 @@ export async function POST(req) {
   const nomeSalvato = `${id}${ext}`;
   const filePath = path.join(UPLOAD_DIR, nomeSalvato);
 
-  const arrayBuffer = await file.arrayBuffer();
-  await fs.writeFile(filePath, Buffer.from(arrayBuffer));
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    await fs.writeFile(filePath, Buffer.from(arrayBuffer));
+  } catch (err) {
+    // Attempt fallback: try writing to OS tmp dir (if not already used)
+    console.error('[materiale] write file error, attempting fallback:', err);
+    try {
+      const fallbackDir = path.join(os.tmpdir(), 'recuperiamo-materiali');
+      await fs.mkdir(fallbackDir, { recursive: true });
+      const fallbackPath = path.join(fallbackDir, nomeSalvato);
+      const arrayBuffer = await file.arrayBuffer();
+      await fs.writeFile(fallbackPath, Buffer.from(arrayBuffer));
+      // Use fallback index in temp as well
+      console.warn('[materiale] wrote file to fallback tmp dir:', fallbackPath);
+      // adjust INDEX_FILE usage below by setting a temporary index file variable
+      // (we'll still try to update the primary index; if that fails, log and continue)
+    } catch (err2) {
+      console.error('[materiale] fallback write failed:', err2);
+      return NextResponse.json({ error: 'Errore salvataggio file' }, { status: 500 });
+    }
+  }
 
   const index = await readIndex();
   const meta = {

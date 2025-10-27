@@ -49,7 +49,8 @@ export default function LavagnaCanvas({
   );
   const [disegnando, setDisegnando] = useState(false);
   const puntiCorrentiRef = useRef([]);
-  const [salvando, setSalvando] = useState(false);
+  // Use a ref for background save activity to avoid re-renders that can cause UI lag
+  const salvandoRef = useRef(false);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
@@ -1543,14 +1544,30 @@ export default function LavagnaCanvas({
   const getPoint = useCallback((e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.nativeEvent.clientX;
-    const clientY = e.nativeEvent.clientY;
+    // support both synthetic/native events: prefer nativeEvent when present
+    const clientX = (e && e.nativeEvent && typeof e.nativeEvent.clientX === 'number') ? e.nativeEvent.clientX : (e.clientX ?? 0);
+    const clientY = (e && e.nativeEvent && typeof e.nativeEvent.clientY === 'number') ? e.nativeEvent.clientY : (e.clientY ?? 0);
     const offX = clientX - rect.left;
     const offY = clientY - rect.top;
     const x = pan.x + offX / zoom;
     const y = pan.y + offY / zoom;
     return { x, y };
   }, [zoom, pan.x, pan.y]);
+
+  // Helper: given a world point, compute expected client (viewport) coords
+  const screenFromWorld = useCallback((point) => {
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas || !point) return null;
+      const rect = canvas.getBoundingClientRect();
+      // world->screen in CSS pixels: (point - pan) * zoom
+      const sx = (point.x - pan.x) * zoom + rect.left;
+      const sy = (point.y - pan.y) * zoom + rect.top;
+      return { clientX: sx, clientY: sy, rect };
+    } catch (err) {
+      return null;
+    }
+  }, [pan.x, pan.y, zoom]);
 
   // == RESIZE & REDRAW ==
   useEffect(() => {
@@ -1837,6 +1854,21 @@ export default function LavagnaCanvas({
         ov.style.transform = 'translate(-50%, -50%)';
       }
     } catch (_) {}
+
+    // Diagnostic: ensure computed world->screen mapping matches pointer client coords
+    try {
+      const lastPoint = punto;
+      const expected = screenFromWorld(lastPoint);
+      if (expected) {
+        const dx = Math.abs(expected.clientX - (e.nativeEvent.clientX));
+        const dy = Math.abs(expected.clientY - (e.nativeEvent.clientY));
+        const dist = Math.hypot(dx, dy);
+        if (dist > 8) {
+          // If mismatch present, log for debugging (user can paste log)
+          console.warn('[lavagna][diag] pointerDown mismatch px=', Math.round(dist), { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY, expected, pan: { ...pan }, zoom });
+        }
+      }
+    } catch (_) {}
   }
 
   function pointerMove(e) {
@@ -1923,6 +1955,22 @@ export default function LavagnaCanvas({
         ov.style.opacity = '0.95';
         ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
         ov.style.transform = 'translate(-50%, -50%)';
+      }
+    } catch (_) {}
+
+    // Occasional diagnostic: compare expected screen position for the last point
+    try {
+      if (disegnando && puntiCorrentiRef.current && puntiCorrentiRef.current.length) {
+        const last = puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1];
+        const expected = screenFromWorld(last);
+        if (expected) {
+          const dx = Math.abs(expected.clientX - (e.nativeEvent.clientX));
+          const dy = Math.abs(expected.clientY - (e.nativeEvent.clientY));
+          const dist = Math.hypot(dx, dy);
+          if (dist > 8) {
+            console.warn('[lavagna][diag] pointerMove mismatch px=', Math.round(dist), { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY, expected, pan: { ...pan }, zoom });
+          }
+        }
       }
     } catch (_) {}
 
@@ -2142,7 +2190,8 @@ export default function LavagnaCanvas({
   // == SALVATAGGIO STROKE ==
   async function salvaTratto(t) {
     try {
-      setSalvando(true);
+      // mark saving without triggering re-render
+      salvandoRef.current = true;
       if (utenteId === undefined || utenteId === null) {
         console.warn("Salvataggio stroke annullato: utenteId assente.");
         return;
@@ -2182,7 +2231,7 @@ export default function LavagnaCanvas({
     } catch (e) {
       console.error(e);
     } finally {
-      setSalvando(false);
+      salvandoRef.current = false;
       drawAll();
     }
   }
@@ -2568,7 +2617,6 @@ export default function LavagnaCanvas({
             </div>
           </div>
 
-          {salvando && <span style={st.saving}>Salvataggio…</span>}
         </div>
       </div>
     );
@@ -2585,8 +2633,7 @@ export default function LavagnaCanvas({
     spessore,
     gommaPuntuale,
     sfondo,
-    sfondoLabels,
-    salvando,
+  sfondoLabels,
     handleChangeSfondo,
     spectatorToggleId,
     pulisciLavagna,
