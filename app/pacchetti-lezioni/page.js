@@ -459,11 +459,21 @@ export default function PacchettiLezioniPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: a.id })
               });
-              const js = await r.json();
-              if (!r.ok) throw new Error(js?.error || 'Errore');
+              let js = null;
+              try { js = await r.json(); } catch (e) { js = null; }
+              if (!r.ok) {
+                // Try to refresh list anyway — sometimes the backend returns non-OK but the deletion happened
+                await fetchAttivita();
+                setAttivitaSelezionata(null);
+                throw new Error(js?.error || `Errore server (${r.status})`);
+              }
+              // Success
               await fetchAttivita();
               setAttivitaSelezionata(null);
             } catch (err) {
+              // Ensure UI is refreshed even on unexpected failures
+              try { await fetchAttivita(); } catch (_) {}
+              setAttivitaSelezionata(null);
               alert('Impossibile eliminare: ' + (err.message || err));
             }
           }}

@@ -174,18 +174,25 @@ export default function LavagnaCanvas({
   const drawAll = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
-    // pulisci
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    // applichiamo pan e zoom per TUTTO (sfondo + contenuto) così si scala coerentemente
+    // Clear device pixels, then work in CSS-pixel coordinate space (scale by devicePixelRatio)
+    const canvas = ctx.canvas;
     const dpr = window.devicePixelRatio || 1;
-    const W = ctx.canvas.width / dpr;
-    const H = ctx.canvas.height / dpr;
+    const cssW = canvas.width / dpr;
+    const cssH = canvas.height / dpr;
+
+    // Reset to identity and clear the entire backing buffer (device pixels)
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Now scale so 1 unit = 1 CSS pixel (we operate in CSS pixels thereafter)
     ctx.save();
-    // Trasformazione world->screen: prima trasla, poi scala
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    // Trasformazione world->screen in CSS pixels: prima trasla, poi scala
+    const W = cssW;
+    const H = cssH;
     ctx.translate(-pan.x, -pan.y);
     ctx.scale(zoom, zoom);
 
