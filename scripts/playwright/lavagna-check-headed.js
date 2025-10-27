@@ -64,6 +64,30 @@ const path = require('path');
     process.exit(2);
   }
 
+  // Optionally simulate a click on the canvas to reproduce pointer-related bugs
+  if (process.env.DO_CLICK === '1' || process.argv.includes('--click')) {
+    try {
+      console.log('Waiting for canvas and performing click...');
+      await page.waitForSelector('canvas', { timeout: 10000 });
+      const canvasHandle = await page.$('canvas');
+      const box = await canvasHandle.boundingBox();
+      if (box) {
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+        // move mouse and click (pointer events will be generated)
+        await page.mouse.move(cx, cy);
+        await page.mouse.down();
+        await page.waitForTimeout(50);
+        await page.mouse.up();
+        console.log('Click simulated at', cx, cy);
+      } else {
+        console.log('Canvas bounding box not available');
+      }
+    } catch (e) {
+      console.error('Canvas click failed:', e && e.message);
+    }
+  }
+
   console.log('Browser opened in headed mode. You can interact with it now.');
   console.log('The script will keep the browser open for 60 seconds to allow manual reproduction (interact with the window if available).');
 

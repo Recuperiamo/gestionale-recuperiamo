@@ -24,9 +24,51 @@ export default function DebugClientRuntime() {
     }
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onRejection);
+    // Instrument fetch to capture failures to /api/auth/session (NextAuth client fetch errors)
+    try {
+      const origFetch = window.fetch;
+      window.__DEBUG_CLIENT_ORIG_FETCH = origFetch;
+      window.fetch = async function(input, init) {
+        try {
+          const url = (typeof input === 'string') ? input : input?.url;
+          if (url && url.includes('/api/auth/session')) {
+            // eslint-disable-next-line no-console
+            console.log('[DebugClientRuntime][fetch] calling', url, { init });
+          }
+          const res = await origFetch.apply(this, arguments);
+          if (url && url.includes('/api/auth/session')) {
+            // eslint-disable-next-line no-console
+            console.log('[DebugClientRuntime][fetch] response', url, { status: res.status, ok: res.ok });
+          }
+          return res;
+        } catch (err) {
+          try {
+            const url = (typeof input === 'string') ? input : input?.url;
+            if (url && url.includes('/api/auth/session')) {
+              // eslint-disable-next-line no-console
+              console.error('[DebugClientRuntime][fetch][error]', url, err && err.message, err);
+            }
+          } catch (e) {
+            // ignore
+          }
+          throw err;
+        }
+      };
+    } catch (e) {
+      // ignore instrumentation failures
+    }
     return () => {
       window.removeEventListener('error', onError);
       window.removeEventListener('unhandledrejection', onRejection);
+      // restore original fetch if we replaced it
+      try {
+        if (window.__DEBUG_CLIENT_ORIG_FETCH) {
+          window.fetch = window.__DEBUG_CLIENT_ORIG_FETCH;
+          delete window.__DEBUG_CLIENT_ORIG_FETCH;
+        }
+      } catch (e) {
+        // ignore
+      }
     };
   }, []);
   return null;
