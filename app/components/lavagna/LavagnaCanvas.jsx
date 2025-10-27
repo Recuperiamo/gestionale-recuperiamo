@@ -35,7 +35,7 @@ export default function LavagnaCanvas({
   const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
-  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|lazzo|shape-tools
+  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|shape-tools
   const [colore, setColore] = useState("#20489a");
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
@@ -1755,7 +1755,7 @@ export default function LavagnaCanvas({
     if (!rawShape) return null;
     const shape = { ...rawShape };
     const kind = shape.kind;
-    // Provide sane defaults for link shapes so hit-testing and lazo selection work
+  // Provide sane defaults for link shapes so hit-testing and selection work
     if (kind === 'link') {
       // keep values in world units; if missing, provide a default visible size
       if (shape.w == null) shape.w = 160;
@@ -2127,7 +2127,7 @@ export default function LavagnaCanvas({
       }
     }
 
-    if (strumento === 'lazzo' || strumento === 'selezione') {
+    if (strumento === 'selezione') {
       const p = getPoint(e);
       const pointerTool = strumento;
       try {
@@ -2209,9 +2209,9 @@ export default function LavagnaCanvas({
           try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
           return;
         }
-      } catch (_) {}
+  } catch (_) {}
 
-      if (pointerTool === 'selezione' && !native?.shiftKey && !native?.metaKey && !native?.ctrlKey) {
+  if (pointerTool === 'selezione' && !native?.shiftKey && !native?.metaKey && !native?.ctrlKey) {
         setSelectedItems({ tratti: [], forme: [] });
       }
       selectingRef.current = { active: true, start: p };
@@ -2393,7 +2393,7 @@ export default function LavagnaCanvas({
       return;
     }
 
-    // Update selection box if lazo active
+  // Update selection box when the selection tool is dragging
     if (selectingRef.current.active) {
       const p = getPoint(e);
       setSelectionBox({ x1: selectingRef.current.start.x, y1: selectingRef.current.start.y, x2: p.x, y2: p.y });
@@ -2544,7 +2544,7 @@ export default function LavagnaCanvas({
       return;
     }
 
-    // If finishing a lazo selection, compute selected items
+  // If finishing a selection drag, compute selected items
     if (selectingRef.current.active) {
       selectingRef.current.active = false;
       const sb = selectionBox;
@@ -2959,40 +2959,10 @@ export default function LavagnaCanvas({
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
               }}
-              title="Selezione"
+              title="Selezione / Lazo"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M5 3l6.8 6.4 3-3.4 3.7 11.8-11.8-3.7 3.4-3-6.4-6.8z" stroke={strumento==='selezione' ? '#fff' : '#20489a'} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" fill={strumento==='selezione' ? '#fff' : 'none'} />
-              </svg>
-            </button>
-            <button
-              type="button"
-              style={iconBtn(strumento === 'lazzo')}
-              onClick={() => {
-                setStrumento('lazzo');
-                setShowPenPopover(false);
-                setShowMoreMenu(false);
-                setShowShapesPopover(false);
-                setShowExportMenu(false);
-              }}
-              title="Lazo"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M7.2 10.2c0-3.1 2.8-5.7 6.2-5.7 3.4 0 6.1 2.1 6.1 5 0 3-2.7 5.1-5.6 5.1-2.8 0-4.4 1.5-4.4 3.5 0 1.2.9 2.3 2.2 2.3"
-                  stroke={strumento==='lazzo' ? '#fff':'#20489a'}
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle
-                  cx="6.4"
-                  cy="10"
-                  r="1.2"
-                  stroke={strumento==='lazzo' ? '#fff':'#20489a'}
-                  strokeWidth="1.4"
-                  fill="none"
-                />
               </svg>
             </button>
             <button
@@ -3226,8 +3196,8 @@ export default function LavagnaCanvas({
     if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
     if (strumento === 'mano') return 'grab';
     if (strumento === 'gomma') return `url(${st.eraserCursor}) 14 20, auto`;
-    if (strumento === 'selezione') return 'default';
-    if (['lazzo','rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
+  if (strumento === 'selezione') return 'default';
+  if (['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
       return 'crosshair';
     }
     if (!penCursor) return 'crosshair';
@@ -3418,8 +3388,11 @@ export default function LavagnaCanvas({
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
           onPointerCancel={pointerCancel}
-          // allow native context menu so users can right-click -> Paste when needed
-          onContextMenu={(e) => { /* allow default to enable browser paste option */ }}
+          // block native context menu so right-click is reserved for grab/pan
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           onDoubleClick={(e) => {
             try {
               const p = getPoint(e);
