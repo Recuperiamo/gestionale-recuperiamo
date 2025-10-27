@@ -127,8 +127,45 @@ export async function GET(req) {
 // PATCH: CREA LAVAGNA (POST)
 export async function POST(req) {
   try {
-    const { attivitaId } = await req.json();
-    if (!attivitaId) return new Response("attivitaId mancante", { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    let { attivitaId, clienteId, titolo } = body;
+
+    // If attivitaId not provided, attempt to auto-associate to a nearby lesson for the cliente
+    if (!attivitaId) {
+      if (!clienteId) {
+        return new Response("attivitaId o clienteId obbligatorio", { status: 400 });
+      }
+      const now = Date.now();
+      const WINDOW_MS = 15 * 60 * 1000; // 15 minutes window
+      const lower = new Date(now - WINDOW_MS);
+      const upper = new Date(now + WINDOW_MS);
+
+      const found = await prisma.attivita.findFirst({
+        where: {
+          clienteId: Number(clienteId),
+          orario: { gte: lower, lte: upper },
+          NOT: { stato: "cancellata" }
+        },
+        orderBy: { orario: "asc" }
+      });
+
+      if (found) {
+        attivitaId = found.id;
+      } else {
+        // Create a light ad-hoc attivita so lavagna can link to it (no pacchetto consumption)
+        const created = await prisma.attivita.create({
+          data: {
+            descrizione: titolo || `Lavagna ${formatDataOra(new Date())}`,
+            oreConsumate: 0,
+            durataOre: 0,
+            clienteId: Number(clienteId),
+            stato: "svolta",
+            orario: new Date()
+          }
+        });
+        attivitaId = created.id;
+      }
+    }
 
     // Controlla che non esista già una lavagna per quell'attivitaId
     let lavagna = await prisma.lavagna.findUnique({
@@ -139,7 +176,7 @@ export async function POST(req) {
     if (!lavagna) {
       // Recupera la data/orario per il titolo
       const att = await prisma.attivita.findUnique({ where: { id: Number(attivitaId) } });
-      let baseTitolo = att && att.orario ? new Date(att.orario).toLocaleString("it-IT") : "Nuova Lavagna";
+      let baseTitolo = att && att.orario ? formatDataOra(new Date(att.orario)) : (titolo || "Nuova Lavagna");
       lavagna = await prisma.lavagna.create({
         data: { attivitaId: Number(attivitaId), titolo: baseTitolo },
         select: { id: true, attivitaId: true, titolo: true, createdAt: true }
@@ -164,10 +201,22 @@ export async function DELETE(req) {
 }
 
 function formatDataOra(d) {
-  const gg = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${gg}/${mm}/${yyyy} ${hh}:${mi}`;
+  try {
+    return new Date(d).toLocaleString("it-IT", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Europe/Rome"
+    }).replace(/, /, ' ');
+  } catch (err) {
+    const gg = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${gg}/${mm}/${yyyy} ${hh}:${mi}`;
+  }
 }

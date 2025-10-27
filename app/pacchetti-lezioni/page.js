@@ -22,6 +22,7 @@ export default function PacchettiLezioniPage() {
   const [errore, setErrore] = useState(null);
 
   const [attivitaSelezionata, setAttivitaSelezionata] = useState(null);
+  const [editingAttivita, setEditingAttivita] = useState(null);
   const [attivitaPerRichiesta, setAttivitaPerRichiesta] = useState(null);
   const [showRichiesta, setShowRichiesta] = useState(false);
 
@@ -449,6 +450,31 @@ export default function PacchettiLezioniPage() {
           attivita={attivitaSelezionata}
           isCliente={isCliente}
           onClose={() => setAttivitaSelezionata(null)}
+          onEdit={(a) => { setEditingAttivita(a); setAttivitaSelezionata(null); }}
+          onDelete={async (a) => {
+            if (!confirm('Confermi eliminazione lezione?')) return;
+            try {
+              const r = await fetch('/api/attivita', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: a.id })
+              });
+              const js = await r.json();
+              if (!r.ok) throw new Error(js?.error || 'Errore');
+              await fetchAttivita();
+              setAttivitaSelezionata(null);
+            } catch (err) {
+              alert('Impossibile eliminare: ' + (err.message || err));
+            }
+          }}
+        />
+      )}
+
+      {editingAttivita && (
+        <AttivitaForm
+          initialData={editingAttivita}
+          onClose={() => setEditingAttivita(null)}
+          onSuccess={async () => { setEditingAttivita(null); await fetchAttivita(); }}
         />
       )}
 

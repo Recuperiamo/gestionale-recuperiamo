@@ -2,11 +2,39 @@ import { prisma } from "../../../lib/prisma";
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { attivitaId, titolo, clienteId } = body;
-    if (!attivitaId || !clienteId) {
-      return Response.json({ error: "attivitaId e clienteId obbligatori" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    let { attivitaId, titolo, clienteId } = body;
+
+    if (!attivitaId) {
+      if (!clienteId) {
+        return Response.json({ error: "attivitaId o clienteId obbligatorio" }, { status: 400 });
+      }
+      // Try to find a nearby lesson for this cliente (±15min)
+      const now = Date.now();
+      const WINDOW_MS = 15 * 60 * 1000;
+      const lower = new Date(now - WINDOW_MS);
+      const upper = new Date(now + WINDOW_MS);
+      const found = await prisma.attivita.findFirst({
+        where: { clienteId: Number(clienteId), orario: { gte: lower, lte: upper }, NOT: { stato: "cancellata" } },
+        orderBy: { orario: "asc" }
+      });
+      if (found) attivitaId = found.id;
+      else {
+        // create ad-hoc attivita
+        const created = await prisma.attivita.create({
+          data: {
+            descrizione: titolo || `Lavagna ${new Date().toLocaleString('it-IT')}`,
+            oreConsumate: 0,
+            durataOre: 0,
+            clienteId: Number(clienteId),
+            stato: "svolta",
+            orario: new Date()
+          }
+        });
+        attivitaId = created.id;
+      }
     }
+
     // Crea la lavagna se non esiste
     let lavagna = await prisma.lavagna.findUnique({ where: { attivitaId } });
     if (!lavagna) {
@@ -14,9 +42,6 @@ export async function POST(req) {
         data: { attivitaId, titolo: titolo || "Lavagna" }
       });
     }
-    // Emetti evento realtime tramite Socket.IO (se server.js avviato)
-    // NOTA: qui puoi fare una fetch POST verso localhost:3000/socketio-api (o altro endpoint custom) per triggerare l'evento
-    // Oppure, se preferisci, la creazione può essere fatta direttamente da frontend via socket dopo la risposta
     return Response.json({ lavagna });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

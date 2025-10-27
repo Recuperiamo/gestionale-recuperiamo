@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../auth/[...nextauth]/authOptions'
 
 // Cartella dove vengono salvati i materiali (crea se non esiste)
 const UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "materiali");
@@ -27,19 +29,27 @@ async function writeIndex(list) {
   await fs.writeFile(INDEX_FILE, JSON.stringify(list, null, 2), "utf-8");
 }
 
-// Questo esempio presuppone che tu abbia un modo reale per ottenere la sessione utente
-// Sostituiscilo con la tua logica NextAuth!
-function getUserFromRequest(req) {
-  // TODO: rimpiazza con logica auth reale! Esempio:
-  // return { role: "admin", clienteId: 10 };
-  return { role: "admin", clienteId: 1 };
+// Recupera la sessione NextAuth dal server e normalizza le informazioni utente
+async function getUserFromRequest(req) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return null;
+    return {
+      role: session.user?.role || null,
+      clienteId: session.user?.clienteId ?? null,
+      email: session.user?.email || null
+    };
+  } catch (err) {
+    console.error('Errore recupero sessione in materiale route:', err);
+    return null;
+  }
 }
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const fileId = searchParams.get("fileId");
   const filterClienteId = searchParams.get("clienteId");
-  const user = getUserFromRequest(req);
+  const user = await getUserFromRequest(req);
 
   await ensureUploadDir();
   const index = await readIndex();
@@ -83,7 +93,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  const user = getUserFromRequest(req);
+  const user = await getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
 
   const formData = await req.formData();
@@ -143,7 +153,7 @@ export async function DELETE(req) {
   const all = searchParams.get("all") === "true";
   const from = searchParams.get("from");
   const to = searchParams.get("to");
-  const user = getUserFromRequest(req);
+  const user = await getUserFromRequest(req);
 
   if (user?.role !== "admin" && user?.role !== "operatore") {
     return NextResponse.json({ error: "Solo admin/operatori possono cancellare materiale." }, { status: 403 });
