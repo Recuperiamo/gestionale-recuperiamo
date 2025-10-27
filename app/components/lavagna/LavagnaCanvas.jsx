@@ -273,6 +273,29 @@ export default function LavagnaCanvas({
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = f.colore || '#20489a';
       ctx.lineWidth = f.spessore || 3;
+        if (f.kind === 'link') {
+          // draw a small pill with the link text
+          try {
+            const txt = (f.titolo || f.url || '').slice(0, 60);
+            const padding = 8;
+            const fontSize = 14;
+            ctx.font = `${fontSize}px sans-serif`;
+            const measure = ctx.measureText(txt || 'link');
+            const bw = Math.max(80, (measure.width || 80) + padding * 2);
+            const bh = fontSize + padding;
+            const rx = f.x;
+            const ry = f.y;
+            // background
+            ctx.fillStyle = 'rgba(255,250,235,0.95)';
+            roundRect(ctx, rx, ry, bw, bh, 8, true, true);
+            // text
+            ctx.fillStyle = '#0f4aa3';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(txt || f.url || 'link', rx + padding, ry + bh / 2);
+          } catch (_) {}
+          ctx.restore();
+          continue;
+        }
       switch (f.kind) {
         case 'rettangolo':
         case 'quadrato':
@@ -1218,6 +1241,7 @@ export default function LavagnaCanvas({
     function onPaste(e) {
       try {
         const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
+        // try to detect text URL if no image items
         for (const it of items) {
           if (!it) continue;
           if (it.type && it.type.indexOf('image') === 0) {
@@ -1315,6 +1339,34 @@ export default function LavagnaCanvas({
             }
           }
         }
+        // if no image processed, check for text URL
+        try {
+          const text = (e.clipboardData && e.clipboardData.getData) ? e.clipboardData.getData('text/plain') : '';
+          if (text && typeof text === 'string') {
+            const t = text.trim();
+            const urlRe = /^https?:\/\//i;
+            if (urlRe.test(t)) {
+              // create a link shape at center of view
+              const canvas = canvasRef.current;
+              const rect = canvas.getBoundingClientRect();
+              const viewW = rect.width / (zoom || 1);
+              const viewH = rect.height / (zoom || 1);
+              const x = pan.x + viewW / 2 - 40 / (zoom || 1);
+              const y = pan.y + viewH / 2 - 12 / (zoom || 1);
+              const shape = {
+                id: `link-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+                kind: 'link',
+                url: t,
+                titolo: t,
+                x, y, w: 160 / (zoom || 1), h: 28 / (zoom || 1),
+                autoreUserId: utenteId
+              };
+              createShapeLocal(shape, true);
+              e.preventDefault();
+              return;
+            }
+          }
+        } catch (_) {}
       } catch (_) {}
     }
 
@@ -1426,6 +1478,20 @@ export default function LavagnaCanvas({
     for (const p of points) { const d = distPointToSegment(p.x,p.y,x1,y1,x2,y2); if (d>maxDist) maxDist=d; total+=d; }
     if (maxDist < Math.max(8, Math.min(w,h)*0.12)) return { kind: 'linea', x:x1,y:y1,x2:x2,y2:y2 };
     return null;
+  }
+
+  // helper: rounded rect
+  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    if (typeof r === 'undefined') r = 5;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
   }
 
   // == UTILITIES ==
@@ -3045,6 +3111,19 @@ export default function LavagnaCanvas({
           onPointerCancel={pointerCancel}
           // allow native context menu so users can right-click -> Paste when needed
           onContextMenu={(e) => { /* allow default to enable browser paste option */ }}
+          onDoubleClick={(e) => {
+            try {
+              const p = getPoint(e);
+              if (!p) return;
+              for (const f of (forme || [])) {
+                if (f.kind !== 'link') continue;
+                if (hitTestShape(f, p.x, p.y, 12)) {
+                  try { window.open(f.url, '_blank'); } catch(_) {}
+                  return;
+                }
+              }
+            } catch (_) {}
+          }}
           style={{
             ...st.canvas,
             cursor: strumento === 'penna' ? 'none' : canvasCursor
