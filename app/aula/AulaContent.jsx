@@ -450,13 +450,13 @@ export default function AulaContent({ initialClienteId = null }) {
                     <div style={streamCardBody}>
                       {/* Preview immagini */}
                       {["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase()) && (
-                        <a href={`/api/materiale?fileId=${m.id}`} target="_blank" rel="noopener noreferrer">
+                        <div role="button" tabIndex={0} onClick={() => setPreviewItem(m)} onKeyDown={(e)=>{ if(e.key==='Enter') setPreviewItem(m); }} style={{cursor:'pointer'}}>
                           <img
                             src={`/api/materiale?fileId=${m.id}`}
                             alt={m.titolo}
                             style={{maxWidth:"100%",maxHeight:240,borderRadius:12,marginBottom:10,boxShadow:"0 2px 10px #20489a22"}}
                           />
-                        </a>
+                        </div>
                       )}
                       <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
                         {m.materia && <span style={categoria}>{m.materia}</span>}
@@ -469,15 +469,7 @@ export default function AulaContent({ initialClienteId = null }) {
                         Caricato il {formatAggDate(m.updatedAt)}
                       </div>
                       <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                        <a
-                          href={`/api/materiale?fileId=${m.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={btnGhost}
-                          download={m.nomeOriginale}
-                        >
-                          Scarica
-                        </a>
+                        <button type="button" style={btnGhost} onClick={() => setPreviewItem(m)}>Anteprima</button>
                         {isAdmin && (
                           <button
                             style={{...btnOutline, color:"#c33", borderColor:"#ea8484", fontWeight:700}}
@@ -505,6 +497,40 @@ export default function AulaContent({ initialClienteId = null }) {
         </main>
       </div>
       {/* Modale upload */}
+      {/* Modale preview materiale */}
+      {previewItem && (
+        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100}} onClick={() => setPreviewItem(null)}>
+          <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'90%',maxHeight:'90%',width:900,overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:'1px solid #eef3ff'}}>
+              <div style={{fontWeight:700,color:'#20489a'}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
+              <div>
+                <a href={`/api/materiale?fileId=${previewItem.id}`} style={{...btnGhost, marginRight:8}} download={previewItem.nomeOriginale}>Scarica</a>
+                <button type="button" style={btnOutline} onClick={() => setPreviewItem(null)}>Chiudi</button>
+              </div>
+            </div>
+            <div style={{padding:16,display:'flex',alignItems:'center',justifyContent:'center',height:'calc(100% - 64px)'}}>
+              {(() => {
+                const tipo = (previewItem.tipo || '').toLowerCase();
+                if (['jpg','jpeg','png','gif','bmp','webp'].includes(tipo)) {
+                  return <img src={`/api/materiale?fileId=${previewItem.id}`} alt={previewItem.titolo} style={{maxWidth:'100%',maxHeight:'80vh',borderRadius:8}} />;
+                }
+                if (tipo === 'pdf') {
+                  return <iframe title={previewItem.titolo || 'PDF'} src={`/api/materiale?fileId=${previewItem.id}`} style={{width:'100%',height:'80vh',border:0}} />;
+                }
+                // other files: show icon + info
+                return (
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:64,fontWeight:700,color:'#20489a',marginBottom:12}}>{previewItem.tipo ? previewItem.tipo.toUpperCase() : 'FILE'}</div>
+                    <div style={{marginBottom:8,fontWeight:700}}>{previewItem.nomeOriginale || previewItem.titolo}</div>
+                    <div style={{color:'#6b7b9a',marginBottom:12}}>{previewItem.materia}</div>
+                    <a href={`/api/materiale?fileId=${previewItem.id}`} download={previewItem.nomeOriginale} style={btnPrimary}>Scarica file</a>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
       <UploadMaterialeModal
         open={showUpload}
         onClose={() => setShowUpload(false)}
