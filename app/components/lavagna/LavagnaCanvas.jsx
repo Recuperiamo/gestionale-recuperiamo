@@ -1194,7 +1194,17 @@ export default function LavagnaCanvas({
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (mod && e.key === 'c') { copySelection(); e.preventDefault(); }
       if (mod && e.key === 'x') { cutSelection(); e.preventDefault(); }
-      if (mod && e.key === 'v') { pasteClipboard(); e.preventDefault(); }
+      // Only intercept Ctrl+V when our internal clipboard has content; otherwise allow native paste to occur
+      if (mod && e.key === 'v') {
+        const cb = clipboardRef.current;
+        const hasInternal = cb && ((cb.forme && cb.forme.length) || (cb.tratti && cb.tratti.length));
+        if (hasInternal) {
+          pasteClipboard();
+          e.preventDefault();
+        } else {
+          // allow native paste event to fire so onPaste handles system clipboard images/text
+        }
+      }
       if (e.key === 'Delete') { // delete selection
         selectedItems.forme.forEach(id => deleteShapeLocal(id, true));
         setTratti(prev => prev.filter((_, idx) => !selectedItems.tratti.includes(idx)));
@@ -3033,7 +3043,8 @@ export default function LavagnaCanvas({
           onPointerUp={pointerUp}
           onPointerLeave={pointerUp}
           onPointerCancel={pointerCancel}
-          onContextMenu={(e) => e.preventDefault()}
+          // allow native context menu so users can right-click -> Paste when needed
+          onContextMenu={(e) => { /* allow default to enable browser paste option */ }}
           style={{
             ...st.canvas,
             cursor: strumento === 'penna' ? 'none' : canvasCursor
