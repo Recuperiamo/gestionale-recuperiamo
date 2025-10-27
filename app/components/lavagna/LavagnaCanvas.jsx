@@ -2018,6 +2018,22 @@ export default function LavagnaCanvas({
       touchesRef.current.set(pointerId, { x: native.clientX, y: native.clientY });
     }
 
+    // Single-click on link shapes when using the hand tool: open URL and consume event
+    try {
+      if (btn === 0 && strumento === 'mano') {
+        const p = getPoint(e);
+        if (p) {
+          for (const f of (forme || [])) {
+            if (f.kind !== 'link') continue;
+            if (hitTestShape(f, p.x, p.y, 12)) {
+              try { window.open(f.url, '_blank'); } catch (_) {}
+              return;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
     if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'freccia', 'rombo'].includes(strumento)) {
       const p = getPoint(e);
       previewShapeRef.current = {
