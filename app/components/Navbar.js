@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { useSession, signOut } from "../lib/auth/hooks";
+import { useSession } from "../lib/auth/hooks";
+import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
