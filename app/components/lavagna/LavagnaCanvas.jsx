@@ -1207,48 +1207,107 @@ export default function LavagnaCanvas({
           if (it.type && it.type.indexOf('image') === 0) {
             const file = it.getAsFile();
             if (file) {
-              const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-              const src = URL.createObjectURL(file);
-              // place roughly at center of current viewport (in world units)
-              const canvas = canvasRef.current;
-              const rect = canvas.getBoundingClientRect();
-              const viewW = rect.width / (zoom || 1);
-              const viewH = rect.height / (zoom || 1);
-              const x = pan.x + viewW / 2 - (200 / (zoom || 1));
-              const y = pan.y + viewH / 2 - (150 / (zoom || 1));
-              const shape = {
-                id,
-                kind: 'immagine',
-                src,
-                x,
-                y,
-                w: 400 / (zoom || 1),
-                h: 300 / (zoom || 1),
-                autoreUserId: utenteId
-              };
-              // preload image to adjust size
-              const img = new Image();
-              img.onload = () => {
-                const aspect = img.naturalWidth / img.naturalHeight || 1;
-                const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
-                const desiredH = desiredW / aspect;
-                shape.w = desiredW;
-                shape.h = desiredH;
-                setForme(prev => [...prev, shape]);
-                drawAll();
-              };
-              img.onerror = () => {
-                // still add with default size
-                setForme(prev => [...prev, shape]);
-                drawAll();
-              };
-              img.src = src;
-              // stop processing other items
+              // upload file to /api/materiale and then create a persisted shape referencing it
+              (async () => {
+                try {
+                  const fd = new FormData();
+                  const titolo = `incollato_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'_')}`;
+                  fd.append('file', file);
+                  fd.append('titolo', titolo);
+                  if (clienteId) fd.append('clienteId', clienteId);
+                  const res = await fetch('/api/materiale', { method: 'POST', body: fd });
+                  const js = await res.json().catch(()=>null);
+                  if (!res.ok || !js || !js.materiale) {
+                    // fallback: insert as local-only image using object URL
+                    const src = URL.createObjectURL(file);
+                    insertLocalPastedImage(src);
+                    return;
+                  }
+                  const mat = js.materiale;
+                  const src = `/api/materiale?fileId=${mat.id}`;
+                  // compute placement in world coords (center of viewport)
+                  const canvas = canvasRef.current;
+                  const rect = canvas.getBoundingClientRect();
+                  const viewW = rect.width / (zoom || 1);
+                  const viewH = rect.height / (zoom || 1);
+                  const x = pan.x + viewW / 2 - (200 / (zoom || 1));
+                  const y = pan.y + viewH / 2 - (150 / (zoom || 1));
+                  const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+                  const shape = {
+                    id,
+                    kind: 'immagine',
+                    src,
+                    materialeId: mat.id,
+                    nomeOriginale: mat.nomeOriginale,
+                    x,
+                    y,
+                    w: 400 / (zoom || 1),
+                    h: 300 / (zoom || 1),
+                    autoreUserId: utenteId
+                  };
+                  // preload to get natural size
+                  const img = new Image();
+                  img.onload = () => {
+                    const aspect = img.naturalWidth / img.naturalHeight || 1;
+                    const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
+                    const desiredH = desiredW / aspect;
+                    shape.w = desiredW;
+                    shape.h = desiredH;
+                    createShapeLocal(shape, true);
+                    drawAll();
+                  };
+                  img.onerror = () => {
+                    createShapeLocal(shape, true);
+                    drawAll();
+                  };
+                  img.src = src;
+                } catch (err) {
+                  // if upload fails, fallback to local insert
+                  try {
+                    const file2 = it.getAsFile();
+                    if (file2) insertLocalPastedImage(URL.createObjectURL(file2));
+                  } catch (_) {}
+                }
+              })();
               e.preventDefault();
               return;
             }
           }
         }
+      } catch (_) {}
+    }
+
+    function insertLocalPastedImage(src) {
+      try {
+        const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const viewW = rect.width / (zoom || 1);
+        const viewH = rect.height / (zoom || 1);
+        const x = pan.x + viewW / 2 - (200 / (zoom || 1));
+        const y = pan.y + viewH / 2 - (150 / (zoom || 1));
+        const shape = {
+          id,
+          kind: 'immagine',
+          src,
+          x,
+          y,
+          w: 400 / (zoom || 1),
+          h: 300 / (zoom || 1),
+          autoreUserId: utenteId
+        };
+        const img = new Image();
+        img.onload = () => {
+          const aspect = img.naturalWidth / img.naturalHeight || 1;
+          const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
+          const desiredH = desiredW / aspect;
+          shape.w = desiredW;
+          shape.h = desiredH;
+          setForme(prev => [...prev, shape]);
+          drawAll();
+        };
+        img.onerror = () => { setForme(prev => [...prev, shape]); drawAll(); };
+        img.src = src;
       } catch (_) {}
     }
     window.addEventListener('paste', onPaste);

@@ -230,6 +230,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [search, setSearch] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
   const myClienteId = session?.user?.clienteId ? String(session.user.clienteId) : "";
