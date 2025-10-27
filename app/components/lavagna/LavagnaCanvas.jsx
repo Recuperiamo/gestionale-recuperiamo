@@ -32,6 +32,7 @@ export default function LavagnaCanvas({
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
+  const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
   const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano
@@ -130,6 +131,14 @@ export default function LavagnaCanvas({
       hotspot: radius
     };
   }, [strumento, colore, spessore, zoom]);
+
+  // Overlay cursor size in CSS pixels (used when we render our own cursor overlay)
+  const overlaySize = useMemo(() => {
+    // desired visual diameter in CSS pixels (match stroke thickness visually)
+    const desired = Math.max(12, Math.min(spessore * 4 * zoom, 96));
+    // clamp to a reasonable max so overlay doesn't become huge
+    return Math.round(desired);
+  }, [spessore, zoom]);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -1809,6 +1818,25 @@ export default function LavagnaCanvas({
       spessore,
       start: punto,
     });
+    // ensure overlay visible and positioned on pointer down
+    try {
+      const ov = overlayRef.current;
+      const canvas = canvasRef.current;
+      if (ov && canvas && strumento === 'penna') {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.nativeEvent.clientX - rect.left;
+        const cy = e.nativeEvent.clientY - rect.top;
+        ov.style.display = 'block';
+        ov.style.left = `${rect.left + cx}px`;
+        ov.style.top = `${rect.top + cy}px`;
+        ov.style.width = `${overlaySize}px`;
+        ov.style.height = `${overlaySize}px`;
+        ov.style.borderRadius = '50%';
+        ov.style.background = colore;
+        ov.style.opacity = '0.95';
+        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+      }
+    } catch (_) {}
   }
 
   function pointerMove(e) {
@@ -1879,6 +1907,29 @@ export default function LavagnaCanvas({
     }
 
     // If not drawing stroke, nothing to do
+    // update overlay cursor position even when not drawing
+    try {
+      const ov = overlayRef.current;
+      if (ov && strumento === 'penna') {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const cx = e.nativeEvent.clientX - rect.left;
+          const cy = e.nativeEvent.clientY - rect.top;
+          ov.style.display = 'block';
+          ov.style.left = `${rect.left + cx}px`;
+          ov.style.top = `${rect.top + cy}px`;
+          ov.style.width = `${overlaySize}px`;
+          ov.style.height = `${overlaySize}px`;
+          ov.style.borderRadius = '50%';
+          ov.style.background = colore;
+          ov.style.opacity = '0.95';
+          ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+          ov.style.transform = 'translate(-50%, -50%)';
+        }
+      }
+    } catch (_) {}
+
     if (!disegnando) return;
 
     const punto = getPoint(e);
@@ -1969,6 +2020,13 @@ export default function LavagnaCanvas({
       } catch (_) {}
       eraseSessionRef.current.strokeIds.clear();
       eraseSessionRef.current.shapeIds.clear();
+      // hide overlay when pointer released (if not pen tool keep it hidden)
+      try {
+        const ov = overlayRef.current;
+        if (ov) {
+          ov.style.display = strumento === 'penna' ? 'block' : 'none';
+        }
+      } catch (_) {}
       return;
     }
     setDisegnando(false);
@@ -2712,6 +2770,21 @@ export default function LavagnaCanvas({
             </svg>
           </button>
         </div>
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            pointerEvents: 'none',
+            zIndex: 6,
+            display: 'none',
+            transform: 'translate(-50%, -50%)'
+          }}
+        />
+
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
@@ -2722,7 +2795,7 @@ export default function LavagnaCanvas({
           onContextMenu={(e) => e.preventDefault()}
           style={{
             ...st.canvas,
-            cursor: canvasCursor
+            cursor: strumento === 'penna' ? 'none' : canvasCursor
           }}
         />
       </div>
