@@ -1100,6 +1100,12 @@ export default function LavagnaCanvas({
     });
     if (!removedShape) return;
     if (emit) emitOrPublish('shape:delete', { id, lavagnaId });
+    // revoke any temporary object URL used by this shape
+    try {
+      if (removedShape.src && typeof removedShape.src === 'string' && removedShape.src.startsWith('blob:')) {
+        try { URL.revokeObjectURL(removedShape.src); } catch(_) {}
+      }
+    } catch (_) {}
     fetch(`/api/lavagna/shape/${id}`, { method: 'DELETE' }).catch(() => {});
   }, [emitOrPublish, lavagnaId, isAdmin, utenteId]);
 
@@ -1259,17 +1265,33 @@ export default function LavagnaCanvas({
                     const desiredH = desiredW / aspect;
                     shape.w = desiredW;
                     shape.h = desiredH;
-                    // remove temp preview
-                    setForme(prev => prev.filter(f => f.id !== tempId));
-                    // create persisted shape (will emit and persist)
-                    createShapeLocal(shape, true);
+                    // update temp preview in-place to point to server URL
+                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h } : f));
+                    // emit creation for realtime consumers and persist shape on server
+                    try {
+                      const normalized = normalizeShape({ ...shape, id: tempId });
+                      emitOrPublish('shape:create', { ...normalized, lavagnaId });
+                      persistShape(normalized).then((s) => {
+                        if (s && s.id) {
+                          setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
+                        }
+                      }).catch(()=>{});
+                    } catch (_) {}
                     // revoke temp URL
                     try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                     drawAll();
                   };
                   img.onerror = () => {
-                    setForme(prev => prev.filter(f => f.id !== tempId));
-                    createShapeLocal(shape, true);
+                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
+                    try {
+                      const normalized = normalizeShape({ ...shape, id: tempId });
+                      emitOrPublish('shape:create', { ...normalized, lavagnaId });
+                      persistShape(normalized).then((s) => {
+                        if (s && s.id) {
+                          setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
+                        }
+                      }).catch(()=>{});
+                    } catch (_) {}
                     try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                     drawAll();
                   };
