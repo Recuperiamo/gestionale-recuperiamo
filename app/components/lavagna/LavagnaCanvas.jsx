@@ -102,6 +102,7 @@ export default function LavagnaCanvas({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [inToolbar, setInToolbar] = useState(false);
   const toolbarRef = useRef(null);
+  const zoomControlsRef = useRef(null);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
   const [isPanning, setIsPanning] = useState(false);
   const [contextPanning, setContextPanning] = useState(false);
@@ -133,11 +134,11 @@ export default function LavagnaCanvas({
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
-    // Always show a simple colored circular cursor (smaller than before).
-    // Use a slightly smaller scale factor so the visible cursor is compact
-    // and consistent while drawing.
-    const effectiveSize = spessore * 3 * (zoom || 1);
-    const diameter = Math.max(10, Math.min(effectiveSize, 36));
+  // Always show a simple colored circular cursor (even smaller now).
+  // Use a compact scale factor so the visible cursor is minimal and
+  // consistent while drawing.
+  const effectiveSize = spessore * 2 * (zoom || 1);
+  const diameter = Math.max(8, Math.min(effectiveSize, 28));
     const size = Math.round(diameter);
     const radius = size / 2;
     const strokeWidth = Math.max(2, Math.round(size * 0.18));
@@ -176,8 +177,10 @@ export default function LavagnaCanvas({
   // Overlay cursor size in CSS pixels (used when we render our own cursor overlay)
   const overlaySize = useMemo(() => {
     // desired visual diameter in CSS pixels (match stroke thickness visually)
-    // make overlay slightly smaller than before so it matches the new pen cursor
-    const desired = Math.max(10, Math.min(spessore * 3 * zoom, 64));
+  // make overlay slightly smaller than before so it matches the new pen cursor
+  // For pen we will not show the DOM overlay (we rely on CSS cursor). Keep overlay
+  // sizing for eraser only.
+  const desired = Math.max(8, Math.min(spessore * 2 * zoom, 48));
     // For the eraser we want it slightly larger (≈1cm on typical displays)
     const oneCmPx = 38; // approx 1cm in CSS pixels at ~96dpi
     const final = (strumento === 'gomma') ? Math.max(desired, oneCmPx) : desired;
@@ -908,8 +911,9 @@ export default function LavagnaCanvas({
 
   // Hide custom overlay when pointer is over the toolbar area
   useEffect(() => {
-    const el = toolbarRef.current;
-    if (!el) return;
+    // Hide overlay when pointer is over toolbar or zoom/export controls
+    const els = [toolbarRef.current, exportMenuRef.current, zoomControlsRef.current].filter(Boolean);
+    if (!els.length) return;
     function onEnter() {
       setInToolbar(true);
       try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
@@ -919,19 +923,23 @@ export default function LavagnaCanvas({
       try {
         const ov = overlayRef.current;
         if (!ov) return;
-        // restore overlay only if appropriate (pen/eraser active and not panning)
-        if ((strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active) {
+        // Restore overlay only for eraser (we rely on the CSS cursor for the pen)
+        if (strumento === 'gomma' && !panningRef.current.active) {
           ov.style.display = 'block';
         }
       } catch(_) {}
     }
-    el.addEventListener('pointerenter', onEnter);
-    el.addEventListener('pointerleave', onLeave);
+    els.forEach((el) => {
+      el.addEventListener('pointerenter', onEnter);
+      el.addEventListener('pointerleave', onLeave);
+    });
     return () => {
-      el.removeEventListener('pointerenter', onEnter);
-      el.removeEventListener('pointerleave', onLeave);
+      els.forEach((el) => {
+        try { el.removeEventListener('pointerenter', onEnter); } catch(_) {}
+        try { el.removeEventListener('pointerleave', onLeave); } catch(_) {}
+      });
     };
-  }, [toolbarRef, strumento]);
+  }, [toolbarRef, exportMenuRef, zoomControlsRef, strumento]);
 
   useEffect(() => {
     if (!showTools) {
@@ -2734,6 +2742,11 @@ export default function LavagnaCanvas({
     if (strumento === 'gomma' && gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
     }
+    // For non-puntuale eraser (intero-tratto) mark erasing active so the
+    // dedicated erasing branch runs and pointer-up will properly release state.
+    if (strumento === 'gomma' && !gommaPuntuale) {
+      erasingRef.current = true;
+    }
     puntiCorrentiRef.current = [punto];
        animationFrameId.current = requestAnimationFrame(renderLoop);
     const streamId = `${utenteId}-${Date.now()}`;
@@ -2749,11 +2762,11 @@ export default function LavagnaCanvas({
       spessore,
       start: punto,
     });
-    // ensure overlay visible and positioned on pointer down (support pen and eraser)
+    // ensure overlay visible and positioned on pointer down (support eraser only)
     try {
       const ov = overlayRef.current;
       const canvas = canvasRef.current;
-      if (ov && canvas && (strumento === 'penna' || strumento === 'gomma')) {
+      if (ov && canvas && strumento === 'gomma') {
         // Align overlay to world->screen computed position (avoids drift with zoom/pan)
         const expected = screenFromWorld(punto) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
         const clientX = expected.clientX;
@@ -2764,20 +2777,13 @@ export default function LavagnaCanvas({
         ov.style.width = `${overlaySize}px`;
         ov.style.height = `${overlaySize}px`;
         ov.style.borderRadius = '50%';
-        if (strumento === 'gomma') {
-          ov.style.background = colore;
-          ov.style.opacity = '0.95';
-          ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-          ov.style.border = 'none';
-        } else {
-          // Eraser overlay: translucent fill with dashed border
-          ov.style.background = 'rgba(255,255,255,0.06)';
-            try { console.log('[LAVAGNA-STATE] erasingRef = true (gomma intero-tratto)'); } catch(_){}
-          ov.style.opacity = '1';
-          ov.style.boxShadow = 'none';
-          const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
-          ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
-        }
+        // Eraser visual: translucent fill with dashed border
+        ov.style.background = 'rgba(255,255,255,0.06)';
+        try { console.log('[LAVAGNA-STATE] erasingRef = true (gomma intero-tratto)'); } catch(_){ }
+        ov.style.opacity = '1';
+        ov.style.boxShadow = 'none';
+        const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+        ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
         ov.style.transform = 'translate(-50%, -50%)';
       }
     } catch (_) {}
@@ -2875,8 +2881,8 @@ export default function LavagnaCanvas({
           const expected = screenFromWorld(p) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
           const clientX = expected.clientX;
           const clientY = expected.clientY;
-          // Only show overlay if not panning and not over toolbar
-          const shouldShow = (strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+          // Only show overlay for eraser, not pen
+          const shouldShow = (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
           if (shouldShow) {
             ov.style.display = 'block';
             ov.style.left = `${clientX}px`;
@@ -2966,12 +2972,12 @@ export default function LavagnaCanvas({
     };
     try {
       const ov = overlayRef.current;
-      // Only show overlay while actively drawing (avoid persistent overlay after release)
+      // Only show overlay while actively erasing (avoid persistent overlay after release)
       // Show overlay while pointer is over the canvas and the active tool is
-      // pen or eraser. Hide it while panning (mano) or when the pointer is
-      // over the toolbar.
+      // the eraser. Hide it while panning (mano) or when the pointer is
+      // over the toolbar. Pen uses the CSS cursor so we don't render the DOM overlay.
       if (ov) {
-        const shouldShow = (strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+        const shouldShow = (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
         if (shouldShow) {
           const worldPoint = ensurePoint();
           const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
@@ -2983,18 +2989,11 @@ export default function LavagnaCanvas({
           ov.style.width = `${overlaySize}px`;
           ov.style.height = `${overlaySize}px`;
           ov.style.borderRadius = '50%';
-          if (strumento === 'penna') {
-            ov.style.background = colore;
-            ov.style.opacity = '0.95';
-            ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-            ov.style.border = 'none';
-          } else {
-            ov.style.background = 'rgba(255,255,255,0.06)';
-            ov.style.opacity = '1';
-            ov.style.boxShadow = 'none';
-            const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
-            ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
-          }
+          ov.style.background = 'rgba(255,255,255,0.06)';
+          ov.style.opacity = '1';
+          ov.style.boxShadow = 'none';
+          const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+          ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
           ov.style.transform = 'translate(-50%, -50%)';
         } else {
           ov.style.display = 'none';
@@ -3193,7 +3192,7 @@ export default function LavagnaCanvas({
           const cx = e?.nativeEvent?.clientX;
           const cy = e?.nativeEvent?.clientY;
           const inside = typeof cx === 'number' && typeof cy === 'number' && cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom;
-          const shouldShow = inside && (strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+          const shouldShow = inside && (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
           if (shouldShow) {
             // position overlay at pointer location
             ov.style.display = 'block';
@@ -3202,18 +3201,12 @@ export default function LavagnaCanvas({
             ov.style.width = `${overlaySize}px`;
             ov.style.height = `${overlaySize}px`;
             ov.style.borderRadius = '50%';
-            if (strumento === 'penna') {
-              ov.style.background = colore;
-              ov.style.opacity = '0.95';
-              ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-              ov.style.border = 'none';
-            } else {
-              ov.style.background = 'rgba(255,255,255,0.06)';
-              ov.style.opacity = '1';
-              ov.style.boxShadow = 'none';
-              const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
-              ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
-            }
+            // Only eraser styling here (pen uses CSS cursor)
+            ov.style.background = 'rgba(255,255,255,0.06)';
+            ov.style.opacity = '1';
+            ov.style.boxShadow = 'none';
+            const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+            ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
             ov.style.transform = 'translate(-50%, -50%)';
           } else {
             ov.style.display = 'none';
@@ -4054,7 +4047,7 @@ export default function LavagnaCanvas({
       )}
       <div style={st.canvasBox}>
         {toolbar}
-        <div style={st.zoomControls}>
+  <div ref={zoomControlsRef} style={st.zoomControls}>
           <button
             type="button"
             style={zoomButtonStyle(zoomDisabled || !canZoomOut)}
@@ -4130,7 +4123,7 @@ export default function LavagnaCanvas({
           style={{
             ...st.canvas,
             // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
-            cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'penna' || strumento === 'gomma') ? 'none' : canvasCursor))
+            cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'gomma') ? 'none' : canvasCursor))
           }}
         />
       </div>
