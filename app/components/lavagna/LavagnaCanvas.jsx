@@ -1276,8 +1276,10 @@ export default function LavagnaCanvas({
           // If the creator included an inline data URL fallback (srcData), prefer it
           // for immediate rendering on clients that cannot fetch /api/materiale.
           try {
-            if (data.srcData && normalized.kind === 'immagine') {
-              normalized.src = data.srcData;
+            // accept either srcData (older) or srcPreview (preferred small preview)
+            const preview = data.srcPreview || data.srcData;
+            if (preview && normalized.kind === 'immagine') {
+              normalized.src = preview;
             }
           } catch (_) {}
           setForme((prev) => {
@@ -1292,8 +1294,9 @@ export default function LavagnaCanvas({
           const normalized = normalizeShape(data);
           if (!normalized) return;
           try {
-            if (data.srcData && normalized.kind === 'immagine') {
-              normalized.src = data.srcData;
+            const preview = data.srcPreview || data.srcData;
+            if (preview && normalized.kind === 'immagine') {
+              normalized.src = preview;
             }
           } catch (_) {}
           setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
@@ -1815,10 +1818,15 @@ export default function LavagnaCanvas({
                       const normalized = normalizeShape({ ...shape, id: tempId });
                       // create data URL fallback for clients without access to /api/materiale
                       try {
-                        const srcData = await fileToDataURL(file);
-                        emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData });
+                        // Create a small preview thumbnail (JPEG) to include in the
+                        // realtime event. Full data URLs can be very large and may
+                        // be dropped/limited by the realtime transport. A compact
+                        // preview gives remote clients an immediate visual while
+                        // the server-hosted image is available for full-resolution.
+                        const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
+                        emitOrPublish('shape:create', { ...normalized, lavagnaId, srcPreview });
                       } catch (_) {
-                        emitOrPublish('shape:create', { ...normalized, lavagnaId });
+                        try { const srcData = await fileToDataURL(file); emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData }); } catch (_) { emitOrPublish('shape:create', { ...normalized, lavagnaId }); }
                       }
                       persistShape(normalized).then((s) => {
                         if (s && s.id) {
@@ -1835,10 +1843,10 @@ export default function LavagnaCanvas({
                       try {
                         const normalized = normalizeShape({ ...shape, id: tempId });
                         try {
-                          const srcData = await fileToDataURL(file);
-                          emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData });
+                          const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
+                          emitOrPublish('shape:create', { ...normalized, lavagnaId, srcPreview });
                         } catch (_) {
-                          emitOrPublish('shape:create', { ...normalized, lavagnaId });
+                          try { const srcData = await fileToDataURL(file); emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData }); } catch (_) { emitOrPublish('shape:create', { ...normalized, lavagnaId }); }
                         }
                         persistShape(normalized).then((s) => {
                           if (s && s.id) {
@@ -1958,6 +1966,62 @@ export default function LavagnaCanvas({
     }
     s._bb = { minX, maxX, minY, maxY };
     return s;
+  }
+
+  // Helper: convert File/Blob to data URL (Promise)
+  function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+      try {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('fileToDataURL error'));
+        reader.readAsDataURL(file);
+      } catch (err) { reject(err); }
+    });
+  }
+
+  // Create a resized preview data URL (JPEG or original type if small) suitable
+  // for realtime transport. Returns a data URL string.
+  async function createPreviewDataURL(file, opts = { maxDim: 800, quality: 0.7 }) {
+    const maxDim = opts.maxDim || 800;
+    const quality = typeof opts.quality === 'number' ? opts.quality : 0.7;
+    const dataUrl = await fileToDataURL(file);
+    // If file is small (< 256KB) return original data URL to save decoding/encode
+    try {
+      const approxSize = Math.ceil((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
+      if (approxSize < 256 * 1024) return dataUrl;
+    } catch (_) {}
+    return await new Promise((resolve, reject) => {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            let tw = w;
+            let th = h;
+            if (Math.max(w, h) > maxDim) {
+              if (w > h) {
+                tw = maxDim;
+                th = Math.round((maxDim * h) / w);
+              } else {
+                th = maxDim;
+                tw = Math.round((maxDim * w) / h);
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = tw;
+            canvas.height = th;
+            const cctx = canvas.getContext('2d');
+            cctx.drawImage(img, 0, 0, tw, th);
+            const out = canvas.toDataURL('image/jpeg', quality);
+            resolve(out);
+          } catch (err) { resolve(dataUrl); }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      } catch (err) { resolve(dataUrl); }
+    });
   }
   function expandBB(bb, pad) {
     return {
@@ -2084,17 +2148,7 @@ export default function LavagnaCanvas({
       }
     }
 
-    // Helper: convert File/Blob to data URL (Promise)
-    function fileToDataURL(file) {
-      return new Promise((resolve, reject) => {
-        try {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(new Error('fileToDataURL error'));
-          reader.readAsDataURL(file);
-        } catch (err) { reject(err); }
-      });
-    }
+    
     if (dedup.length < 2) return dedup;
     // apply Chaikin smoothing to reduce jitter.
     // Keep iterations moderate — more iterations increase density but also
