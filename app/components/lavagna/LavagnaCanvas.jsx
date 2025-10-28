@@ -133,9 +133,11 @@ export default function LavagnaCanvas({
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
-    // Scale cursor to reflect visible stroke size under current zoom
-    const effectiveSize = spessore * 4 * (zoom || 1);
-    const diameter = Math.max(12, Math.min(effectiveSize, 48));
+    // Always show a simple colored circular cursor (smaller than before).
+    // Use a slightly smaller scale factor so the visible cursor is compact
+    // and consistent while drawing.
+    const effectiveSize = spessore * 3 * (zoom || 1);
+    const diameter = Math.max(10, Math.min(effectiveSize, 36));
     const size = Math.round(diameter);
     const radius = size / 2;
     const strokeWidth = Math.max(2, Math.round(size * 0.18));
@@ -174,7 +176,8 @@ export default function LavagnaCanvas({
   // Overlay cursor size in CSS pixels (used when we render our own cursor overlay)
   const overlaySize = useMemo(() => {
     // desired visual diameter in CSS pixels (match stroke thickness visually)
-    const desired = Math.max(12, Math.min(spessore * 4 * zoom, 96));
+    // make overlay slightly smaller than before so it matches the new pen cursor
+    const desired = Math.max(10, Math.min(spessore * 3 * zoom, 64));
     // For the eraser we want it slightly larger (≈1cm on typical displays)
     const oneCmPx = 38; // approx 1cm in CSS pixels at ~96dpi
     const final = (strumento === 'gomma') ? Math.max(desired, oneCmPx) : desired;
@@ -1998,13 +2001,47 @@ export default function LavagnaCanvas({
     return pts;
   }
 
+  // Resample a polyline to approximately `target` points distributed along
+  // arc-length. Keeps overall shape while capping point-count for performance.
+  function resamplePoints(points, target = 1500) {
+    if (!Array.isArray(points) || points.length < 2) return points || [];
+    if (points.length <= target) return points.slice();
+    // compute cumulative distances
+    const dists = [0];
+    let total = 0;
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i].x - points[i-1].x;
+      const dy = points[i].y - points[i-1].y;
+      const seg = Math.hypot(dx, dy);
+      total += seg;
+      dists.push(total);
+    }
+    if (total === 0) return [points[0]];
+    const out = [];
+    for (let k = 0; k < target; k++) {
+      const t = (k / (target - 1)) * total;
+      // find segment containing t
+      let idx = 0;
+      while (idx < dists.length - 1 && dists[idx+1] < t) idx++;
+      const d0 = dists[idx];
+      const d1 = dists[idx+1] || d0;
+      const p0 = points[idx];
+      const p1 = points[Math.min(idx+1, points.length-1)];
+      const segLen = d1 - d0;
+      const u = segLen <= 0 ? 0 : (t - d0) / segLen;
+      out.push({ x: p0.x + (p1.x - p0.x) * u, y: p0.y + (p1.y - p0.y) * u });
+    }
+    return out;
+  }
+
   function simplifyAndSmooth(rawPoints) {
     if (!Array.isArray(rawPoints) || rawPoints.length < 2) return rawPoints || [];
   const z = zoomRef.current || 1;
-  // Reduce deduplication threshold so we keep more raw samples from tablet
-  // devices; value is in world units and scales with zoom. At zoom=1 we
-  // accept closer points (≈0.25) so final smoothing has more input to work on.
-  const minDist = Math.max(0.12, 0.25 / (z || 1)); // world units (lower => keep more points)
+  // Reduce deduplication threshold strongly so we keep more raw samples from
+  // tablet devices; value is in world units and scales with zoom. At zoom=1
+  // we accept much closer points (≈0.06) so final smoothing has more input
+  // to work on and we avoid losing small/fast letter strokes.
+  const minDist = Math.max(0.02, 0.06 / (z || 1)); // world units (lower => keep more points)
     const dedup = [];
     let last = null;
     for (const p of rawPoints) {
@@ -2016,12 +2053,15 @@ export default function LavagnaCanvas({
       }
     }
     if (dedup.length < 2) return dedup;
-    // apply Chaikin smoothing to reduce jitter
-    // Increase Chaikin iterations to generate more interpolated points
-    // (each iteration roughly doubles the point count). 4 iterations yields
-    // a very dense, smooth curve suitable for tablet handwriting.
+    // apply Chaikin smoothing to reduce jitter.
+    // Keep iterations moderate — more iterations increase density but also
+    // can oversmooth small features. 4 iterations is a good balance.
     const smoothed = chaikinSubdivision(dedup, 4);
-    return smoothed;
+    // If the subdivision produced an extremely large number of points (e.g.
+    // when input was already dense), resample down to a safe cap while
+    // preserving arc-length distribution so we don't lose visual detail.
+    const capped = smoothed.length > 1500 ? resamplePoints(smoothed, 1500) : smoothed;
+    return capped;
   }
 
   function getShapeBounds(shape) {
