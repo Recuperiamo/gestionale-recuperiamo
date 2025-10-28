@@ -111,6 +111,31 @@ const playwright = require('playwright');
       console.log('Error while creating Assi (2)', e);
     }
 
+    // Switch to selection tool and attempt to select and drag the recently
+    // created shape (center) to validate dragging behavior.
+    try {
+      const selBtn = await page.$('button[title="Selezione / Lazo"]');
+      if (selBtn) {
+        await selBtn.click();
+        await page.waitForTimeout(200);
+        // click+drag from center of canvas
+        const cbox = await canvasEl.boundingBox();
+        const cx = cbox.x + cbox.width / 2;
+        const cy = cbox.y + cbox.height / 2;
+        await page.mouse.move(cx, cy);
+        await page.mouse.down({ button: 'left' });
+        await page.mouse.move(cx + 80, cy + 40, { steps: 12 });
+        await page.waitForTimeout(200);
+        await page.mouse.up({ button: 'left' });
+        await page.waitForTimeout(300);
+        try { await page.screenshot({ path: 'tests/output/after-select-drag.png' }); } catch(_){}
+      } else {
+        console.log('Selection button not found');
+      }
+    } catch (err) {
+      console.log('Selection/drag test error', err);
+    }
+
     await page.evaluate(() => { try { window.__stopLavagnaDbg?.(); } catch(_){} });
 
     console.log('Done. Closing in 1s');

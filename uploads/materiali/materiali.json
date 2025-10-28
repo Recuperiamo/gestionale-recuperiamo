@@ -1,1 +1,35 @@
-[]
+[
+  {
+    "id": "18de1466-6294-44ba-9de3-340d85b38b48",
+    "nomeSalvato": "18de1466-6294-44ba-9de3-340d85b38b48.png",
+    "nomeOriginale": "immagine.png",
+    "titolo": "incollato_2025_10_28_15_06_25",
+    "materia": "",
+    "clienteId": "sandbox-cliente",
+    "tipo": "png",
+    "updatedAt": "2025-10-28T15:06:27.698Z",
+    "mime": "image/png"
+  },
+  {
+    "id": "2e05a831-bfb7-4426-9280-cf8356350a0c",
+    "nomeSalvato": "2e05a831-bfb7-4426-9280-cf8356350a0c.png",
+    "nomeOriginale": "immagine.png",
+    "titolo": "incollato_2025_10_28_15_08_06",
+    "materia": "",
+    "clienteId": "sandbox-cliente",
+    "tipo": "png",
+    "updatedAt": "2025-10-28T15:08:06.444Z",
+    "mime": "image/png"
+  },
+  {
+    "id": "79aa2d93-0d80-491c-bcfb-555b3ec61a2e",
+    "nomeSalvato": "79aa2d93-0d80-491c-bcfb-555b3ec61a2e.png",
+    "nomeOriginale": "immagine.png",
+    "titolo": "incollato_2025_10_28_15_18_38",
+    "materia": "",
+    "clienteId": "sandbox-cliente",
+    "tipo": "png",
+    "updatedAt": "2025-10-28T15:18:39.315Z",
+    "mime": "image/png"
+  }
+]

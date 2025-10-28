@@ -211,6 +211,7 @@ export default function LavagnaCanvas({
   const drawingShapeRef = useRef(false);
   const erasingRef = useRef(false);
   const selectingRef = useRef({ active: false, start: null });
+  const rotatingRef = useRef({ active: false, center: null, startAngle: 0, originals: {} });
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
   const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
   const draggingSelectionRef = useRef({
@@ -321,6 +322,23 @@ export default function LavagnaCanvas({
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = f.colore || '#20489a';
       ctx.lineWidth = f.spessore || 3;
+        // If the shape carries a rotation, apply a world-space transform so
+        // rendering rotates around the shape's center. We keep this minimal
+        // (rotation only affects visual rendering), bounding boxes/hit-tests
+        // remain axis-aligned for now to avoid larger geometry changes.
+        try {
+          const rot = Number(f.rotation) || 0;
+          if (rot && isFinite(rot)) {
+            const bb = f._bb ?? getShapeBounds(f) ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+            // rotate around the top-left corner of the shape's bounding box
+            const px = bb.minX;
+            const py = bb.minY;
+            ctx.translate(px, py);
+            ctx.rotate(rot);
+            ctx.translate(-px, -py);
+          }
+        } catch(_) {}
+
         if (f.kind === 'link') {
           // draw a small pill with the link text
           try {
@@ -543,16 +561,19 @@ export default function LavagnaCanvas({
           ctx.closePath();
           ctx.fill();
 
-          // diagonal extra axis (down-right) with arrow at outer end
+          // diagonal extra axis: draw it so it intersects the center and
+          // points to the southwest (down-left). Ensure the shaft touches
+          // the center (no gap) so axes appear connected.
           const dx1 = cx;
           const dy1 = cy;
-          const dx2 = cx + hw;
-          const dy2 = cy + hh;
+          const dx2 = cx - hw; // go left for southwest
+          const dy2 = cy + hh; // go down
           const angleDR = Math.atan2(dy2 - dy1, dx2 - dx1);
           const uxDR = Math.cos(angleDR);
           const uyDR = Math.sin(angleDR);
           ctx.beginPath();
-          ctx.moveTo(dx1 + headLength * uxDR, dy1 + headLength * uyDR);
+          // start exactly at center so it intersects the other axes
+          ctx.moveTo(dx1, dy1);
           ctx.lineTo(dx2 - headLength * uxDR, dy2 - headLength * uyDR);
           ctx.stroke();
           ctx.beginPath();
@@ -765,6 +786,77 @@ export default function LavagnaCanvas({
         ctx.strokeRect(x1, y1, w, h);
         ctx.restore();
       }
+
+      // Draw rotation handle for current selection (top-center) so users
+      // can discover the rotate affordance. This is drawn in world units.
+      try {
+        const selIds = (selectedItems && selectedItems.forme) || [];
+        if (selIds && selIds.length) {
+          const selBounds = getSelectionBoundsForIds(selIds);
+          if (selBounds) {
+              // Draw small corner rotation affordances. When the pointer is
+              // hovering one of the corners, show a circular-arrow icon to
+              // indicate that clicking there will start rotation around the
+              // selection center.
+              const corners = [
+                { x: selBounds.minX, y: selBounds.minY },
+                { x: selBounds.maxX, y: selBounds.minY },
+                { x: selBounds.minX, y: selBounds.maxY },
+                { x: selBounds.maxX, y: selBounds.maxY }
+              ];
+              const pw = pointerWorldRef.current;
+              const cornerHitRadius = Math.max(10, 12 / safeZoom);
+              let hoveredCornerIndex = -1;
+              if (pw) {
+                for (let i = 0; i < corners.length; i++) {
+                  const c = corners[i];
+                  const dx = pw.x - c.x;
+                  const dy = pw.y - c.y;
+                  if (Math.hypot(dx, dy) <= cornerHitRadius) { hoveredCornerIndex = i; break; }
+                }
+              }
+              // Draw each corner indicator
+              for (let i = 0; i < corners.length; i++) {
+                const c = corners[i];
+                ctx.save();
+                // Draw a circular-arrow icon at each corner. When hovered it is
+                // highlighted (thicker & with arrow head); otherwise drawn subtly.
+                const arcR = (i === hoveredCornerIndex) ? Math.max(14, 18 / safeZoom) : Math.max(9, 12 / safeZoom);
+                const arcCx = c.x;
+                const arcCy = c.y;
+                const startA = Math.PI * 0.25;
+                const endA = Math.PI * 2.25;
+                if (i === hoveredCornerIndex) {
+                  ctx.strokeStyle = '#2563eb';
+                  ctx.fillStyle = '#2563eb';
+                  ctx.lineWidth = 2 / safeZoom;
+                  ctx.beginPath(); ctx.arc(arcCx, arcCy, arcR, startA, endA, false); ctx.stroke();
+                  // arrowhead
+                  const ex = arcCx + arcR * Math.cos(endA);
+                  const ey = arcCy + arcR * Math.sin(endA);
+                  const headLen = Math.max(8, 10 / safeZoom);
+                  const ang = Math.atan2(ey - arcCy, ex - arcCx);
+                  const left = { x: ex - headLen * Math.cos(ang) + headLen * 0.5 * Math.sin(ang), y: ey - headLen * Math.sin(ang) - headLen * 0.5 * Math.cos(ang) };
+                  const right = { x: ex - headLen * Math.cos(ang) - headLen * 0.5 * Math.sin(ang), y: ey - headLen * Math.sin(ang) + headLen * 0.5 * Math.cos(ang) };
+                  ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(left.x, left.y); ctx.lineTo(right.x, right.y); ctx.closePath(); ctx.fill();
+                  // subtle white halo beneath arrow tip for contrast
+                  try { ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.9; ctx.arc(ex, ey, Math.max(3, 5 / safeZoom), 0, Math.PI * 2); ctx.fill(); } catch(_){}
+                } else {
+                  // subtle stroke-only arc for non-hovered corners
+                  ctx.strokeStyle = 'rgba(37,99,235,0.6)';
+                  ctx.lineWidth = 1 / safeZoom;
+                  ctx.beginPath(); ctx.arc(arcCx, arcCy, arcR, startA, endA, false); ctx.stroke();
+                }
+                ctx.restore();
+              }
+              // If we detected a hovered corner, suggest pointer cursor
+              try {
+                const canvasEl = canvasRef.current;
+                if (canvasEl) canvasEl.style.cursor = (hoveredCornerIndex >= 0 ? 'crosshair' : 'default');
+              } catch(_){}
+            }
+          }
+      } catch (_) {}
 
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
@@ -2050,6 +2142,23 @@ export default function LavagnaCanvas({
     return shape;
   }
 
+  function getSelectionBoundsForIds(ids) {
+    if (!ids || !ids.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of ids) {
+      const f = (forme || []).find(s => s.id === id);
+      if (!f) continue;
+      const b = f._bb ?? getShapeBounds(f);
+      if (!b) continue;
+      if (b.minX < minX) minX = b.minX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.maxY > maxY) maxY = b.maxY;
+    }
+    if (minX === Infinity) return null;
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+  }
+
   function translateShape(shape, dx, dy) {
     if (!shape) return shape;
     const next = { ...shape };
@@ -2368,6 +2477,109 @@ export default function LavagnaCanvas({
       // which was previously inactive.
       if (strumento === 'selezione') {
         const p = getPointerWorld();
+        // If there is no current selection but the user clicked on a shape,
+        // select that shape and begin dragging immediately. We search from
+        // the topmost shape backwards so visual stacking is respected.
+        try {
+          const tolForHit = Math.max(8, 12 / (zoom || 1));
+          let hitShape = null;
+          for (let i = (forme || []).length - 1; i >= 0; i--) {
+            const candidate = forme[i];
+            if (!candidate) continue;
+            if (hitTestShape(candidate, p.x, p.y, tolForHit)) {
+              hitShape = candidate;
+              break;
+            }
+          }
+          if (hitShape && !(selectedItems && selectedItems.forme && selectedItems.forme.includes(hitShape.id))) {
+            // select the hit shape
+            setSelectedItems({ forme: [hitShape.id], tratti: [] });
+            // start dragging the newly selected shape
+            draggingSelectionRef.current.active = true;
+            draggingSelectionRef.current.lastWorld = p;
+            draggingSelectionRef.current.pointerId = pointerId;
+            draggingSelectionRef.current.pointerTool = 'selezione';
+            draggingSelectionRef.current.moved = false;
+            draggingSelectionRef.current.primaryShapeId = hitShape.id;
+            draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify({ forme: [hitShape.id], tratti: [] }));
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select)', hitShape.id); } catch(_) {}
+            return;
+          }
+        } catch (_) {}
+        // If the user clicks inside the current selection (or on any selected
+        // shape), start a drag of the selection instead of starting a new
+        // rectangular selection box. This enables move-by-drag for selected
+        // items.
+        try {
+          // Begin dragging when the user clicks anywhere inside the
+          // current selection bounding box — this keeps dragging
+          // independent from shape rotation and from per-shape hit tests.
+          if (selectedItems && selectedItems.forme && selectedItems.forme.length) {
+            const selBoundsLocal = getSelectionBoundsForIds(selectedItems.forme || []);
+            if (selBoundsLocal) {
+              const pad = Math.max(6 / (zoom || 1), 0);
+              const inside = p.x >= selBoundsLocal.minX - pad && p.x <= selBoundsLocal.maxX + pad && p.y >= selBoundsLocal.minY - pad && p.y <= selBoundsLocal.maxY + pad;
+              if (inside) {
+                draggingSelectionRef.current.active = true;
+                draggingSelectionRef.current.lastWorld = p;
+                draggingSelectionRef.current.pointerId = pointerId;
+                draggingSelectionRef.current.pointerTool = 'selezione';
+                draggingSelectionRef.current.moved = false;
+                draggingSelectionRef.current.primaryShapeId = selectedItems.forme[0];
+                draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
+                try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems.forme[0]); } catch(_) {}
+                selectionClickRef.current = {
+                  pointerId,
+                  pointerTool: 'selezione',
+                  openCandidate: false,
+                  metaClick: !!(native?.ctrlKey || native?.metaKey),
+                  doubleTap: false,
+                  aborted: false,
+                  shapeId: selectedItems.forme[0]
+                };
+                return;
+              }
+            }
+          }
+        } catch (_) {}
+        // If there is already a selection and the pointer is on one of the
+        // selection corners, begin rotation around the SELECTION CENTER.
+        const selBounds = getSelectionBoundsForIds(selectedItems.forme || []);
+        if (selBounds) {
+          const corners = [
+            { x: selBounds.minX, y: selBounds.minY },
+            { x: selBounds.maxX, y: selBounds.minY },
+            { x: selBounds.minX, y: selBounds.maxY },
+            { x: selBounds.maxX, y: selBounds.maxY }
+          ];
+          const tol = Math.max(10, 12 / (zoom || 1));
+          let hitCorner = -1;
+          for (let i = 0; i < corners.length; i++) {
+            const c = corners[i];
+            const dx = p.x - c.x;
+            const dy = p.y - c.y;
+            if (Math.hypot(dx, dy) <= tol) { hitCorner = i; break; }
+          }
+          if (hitCorner >= 0) {
+            // start rotating around selection center
+            rotatingRef.current.active = true;
+            const center = { x: (selBounds.minX + selBounds.maxX) / 2, y: (selBounds.minY + selBounds.maxY) / 2 };
+            rotatingRef.current.center = center;
+            rotatingRef.current.startAngle = Math.atan2(p.y - center.y, p.x - center.x);
+            const originals = {};
+            for (const id of (selectedItems.forme || [])) {
+              const f = (forme || []).find(s => s.id === id);
+              originals[id] = (f && typeof f.rotation === 'number') ? f.rotation : 0;
+            }
+            rotatingRef.current.originals = originals;
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_){}
+            try { console.log('[LAVAGNA-DBG] start-rotation around center', center); } catch(_){}
+            return;
+          }
+        }
+
         selectingRef.current = selectingRef.current || {};
         selectingRef.current.active = true;
         selectingRef.current.start = p;
@@ -2624,7 +2836,28 @@ export default function LavagnaCanvas({
       return;
     }
 
-  // Update selection box when the selection tool is dragging
+    // Rotation in-progress: compute new rotation and apply to selected shapes
+    if (rotatingRef.current.active) {
+      try {
+        const p = getPoint(e);
+        pointerWorldRef.current = p;
+        const center = rotatingRef.current.center;
+        const currentAngle = Math.atan2(p.y - center.y, p.x - center.x);
+        const delta = currentAngle - rotatingRef.current.startAngle;
+        // apply delta to each selected shape starting from its original rotation
+        setForme((prev) => prev.map((f) => {
+          if (!selectedItems.forme.includes(f.id)) return f;
+          const orig = rotatingRef.current.originals[f.id] ?? 0;
+          const next = { ...f, rotation: (orig + delta) };
+          next._bb = getShapeBounds(next);
+          return next;
+        }));
+        drawAll();
+      } catch (_) {}
+      return;
+    }
+
+    // Update selection box when the selection tool is dragging
     if (selectingRef.current.active) {
       const p = getPoint(e);
       pointerWorldRef.current = p;
@@ -2759,6 +2992,16 @@ export default function LavagnaCanvas({
       }
       return;
     }
+    // finalize rotation if active
+    if (rotatingRef.current && rotatingRef.current.active) {
+      rotatingRef.current.active = false;
+      rotatingRef.current.center = null;
+      rotatingRef.current.startAngle = 0;
+      rotatingRef.current.originals = {};
+      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
+      drawAll();
+      return;
+    }
     if (panningRef.current.active) {
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
@@ -2813,20 +3056,27 @@ export default function LavagnaCanvas({
       return;
     }
 
-  // If finishing a selection drag, compute selected items
+    // If finishing a selection drag, compute selected items (INTERSECTION, not full containment)
     if (selectingRef.current.active) {
       selectingRef.current.active = false;
       const sb = selectionBox;
       if (sb) {
-        const x1 = Math.min(sb.x1,sb.x2), x2 = Math.max(sb.x1,sb.x2);
-        const y1 = Math.min(sb.y1,sb.y2), y2 = Math.max(sb.y1,sb.y2);
-        const selTratti = tratti.map((t,i)=> (t._bb && t._bb.minX>=x1 && t._bb.maxX<=x2 && t._bb.minY>=y1 && t._bb.maxY<=y2) ? i : null).filter(i=>i!==null);
-        const selForme = forme.map((f)=> {
+        const x1 = Math.min(sb.x1, sb.x2), x2 = Math.max(sb.x1, sb.x2);
+        const y1 = Math.min(sb.y1, sb.y2), y2 = Math.max(sb.y1, sb.y2);
+        // select strokes whose bbox intersects the selection rect
+        const selTratti = tratti.map((t, i) => {
+          const b = t._bb ?? getShapeBounds(t);
+          if (!b) return null;
+          const intersects = !(b.maxX < x1 || b.minX > x2 || b.maxY < y1 || b.minY > y2);
+          return intersects ? i : null;
+        }).filter(i => i !== null);
+        // select shapes whose bbox intersects the selection rect
+        const selForme = (forme || []).map((f) => {
           const bounds = f._bb ?? getShapeBounds(f);
           if (!bounds) return null;
-          if (bounds.minX >= x1 && bounds.maxX <= x2 && bounds.minY >= y1 && bounds.maxY <= y2) return f.id;
-          return null;
-        }).filter(i=>i!==null);
+          const intersects = !(bounds.maxX < x1 || bounds.minX > x2 || bounds.maxY < y1 || bounds.minY > y2);
+          return intersects ? f.id : null;
+        }).filter(i => i !== null);
         setSelectedItems({ tratti: selTratti, forme: selForme });
       }
       setSelectionBox(null);
@@ -2966,6 +3216,13 @@ export default function LavagnaCanvas({
       draggingSelectionRef.current.primaryShapeId = null;
       draggingSelectionRef.current.primaryStrokeIndex = null;
       draggingSelectionRef.current.selectionSnapshot = null;
+    }
+    // cancel any rotation in progress
+    if (rotatingRef.current && rotatingRef.current.active) {
+      rotatingRef.current.active = false;
+      rotatingRef.current.center = null;
+      rotatingRef.current.startAngle = 0;
+      rotatingRef.current.originals = {};
     }
     selectionClickRef.current = null;
     erasingRef.current = false;
