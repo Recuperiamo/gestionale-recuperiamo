@@ -1974,6 +1974,56 @@ export default function LavagnaCanvas({
     return false;
   }
 
+  // Simple smoothing helper: remove very-close consecutive points and
+  // apply Chaikin subdivision to make handwriting curves smoother. This
+  // reduces jitter from tablet sampling while preserving the general
+  // shape (good for letters like 'S' and 'E').
+  function chaikinSubdivision(points, iterations = 4) {
+    if (!Array.isArray(points) || points.length < 2) return points || [];
+    let pts = points.map(p => ({ x: p.x, y: p.y }));
+    for (let it = 0; it < iterations; it++) {
+      const out = [];
+      out.push(pts[0]);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        const q = { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y };
+        const r = { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y };
+        out.push(q);
+        out.push(r);
+      }
+      out.push(pts[pts.length - 1]);
+      pts = out;
+    }
+    return pts;
+  }
+
+  function simplifyAndSmooth(rawPoints) {
+    if (!Array.isArray(rawPoints) || rawPoints.length < 2) return rawPoints || [];
+  const z = zoomRef.current || 1;
+  // Reduce deduplication threshold so we keep more raw samples from tablet
+  // devices; value is in world units and scales with zoom. At zoom=1 we
+  // accept closer points (≈0.25) so final smoothing has more input to work on.
+  const minDist = Math.max(0.12, 0.25 / (z || 1)); // world units (lower => keep more points)
+    const dedup = [];
+    let last = null;
+    for (const p of rawPoints) {
+      if (!last) { dedup.push(p); last = p; continue; }
+      const dx = p.x - last.x; const dy = p.y - last.y;
+      if (Math.hypot(dx, dy) >= minDist) {
+        dedup.push(p);
+        last = p;
+      }
+    }
+    if (dedup.length < 2) return dedup;
+    // apply Chaikin smoothing to reduce jitter
+    // Increase Chaikin iterations to generate more interpolated points
+    // (each iteration roughly doubles the point count). 4 iterations yields
+    // a very dense, smooth curve suitable for tablet handwriting.
+    const smoothed = chaikinSubdivision(dedup, 4);
+    return smoothed;
+  }
+
   function getShapeBounds(shape) {
     if (!shape) return null;
     const kind = shape.kind;
@@ -3142,7 +3192,10 @@ export default function LavagnaCanvas({
       outgoingBufferRef.current = [];
     }
 
-    const puntiFinali = puntiCorrentiRef.current;
+  // Apply lightweight smoothing to the collected points so handwriting
+  // strokes (S, E, etc.) render more naturally and jitter is reduced.
+  const rawPunti = puntiCorrentiRef.current;
+  const puntiFinali = simplifyAndSmooth(rawPunti);
     if (puntiFinali.length >= 2) {
       if (strumento === 'gomma' && gommaPuntuale) {
         const gommaStroke = prepareStroke({
