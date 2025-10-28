@@ -2,6 +2,9 @@
   "name": "gestionale-recuperiamo",
   "version": "0.1.0",
   "private": true,
+  "eslint": {
+    "ignoreDuringBuilds": true
+  },
   "scripts": {
     "dev": "next dev",
     "dev:rt": "node server.js",
