@@ -10,7 +10,7 @@ import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from ".
 
 /**
  * LavagnaCanvas - LIVE con Socket.IO su /api/socketio
- * - Gomma (puntuale/intero tratto)
+ * - Penna, gomma (puntuale/intero tratto)
  * - Undo/redo, export PNG
  * - Sincronizzazione live stroke:start/points/done/delete e clear-lavagna
  * - Emissione evento "new-lavagna" se la lavagna è nuova (isNewLavagna)
@@ -32,9 +32,10 @@ export default function LavagnaCanvas({
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
+  const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
-  const [strumento, setStrumento] = useState("selezione"); // gomma|mano|selezione|shape-tools
+  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|shape-tools
   const [colore, setColore] = useState("#20489a");
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
@@ -64,6 +65,30 @@ export default function LavagnaCanvas({
   const backgroundRequestedRef = useRef(false);
   const backgroundRequestKeyRef = useRef(null);
   const [zoom, setZoom] = useState(1); // 1 = 100%
+  const penPalette = useMemo(
+    () => [
+      { value: "#111827", label: "Grafite", preview: "#111827" },
+      { value: "#2563eb", label: "Blu", preview: "#2563eb" },
+      { value: "#0ea5e9", label: "Ciano", preview: "#0ea5e9" },
+      { value: "#ef4444", label: "Rosso", preview: "#ef4444" },
+      { value: "#16a34a", label: "Verde", preview: "#16a34a" },
+      { value: "#f59e0b", label: "Ambra", preview: "#f59e0b" },
+      { value: "#f43f5e", label: "Corallo", preview: "#f43f5e" },
+      { value: "#a855f7", label: "Viola", preview: "#a855f7" },
+      { value: "#14b8a6", label: "Acqua", preview: "#14b8a6" },
+      {
+        value: "#ff6ec7",
+        label: "Arcobaleno",
+        preview: "linear-gradient(135deg,#f97316 0%,#f43f5e 35%,#8b5cf6 70%,#0ea5e9 100%)"
+      }
+    ],
+    []
+  );
+  const isCustomPenColor = useMemo(
+    () => penPalette.every((entry) => entry.value !== colore),
+    [penPalette, colore]
+  );
+  const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
     nero: "Nero",
@@ -71,6 +96,7 @@ export default function LavagnaCanvas({
     quadretti: "Quadretti",
     punti: "Punti"
   }), []);
+  const [showPenPopover, setShowPenPopover] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
   const [isPanning, setIsPanning] = useState(false);
@@ -100,6 +126,53 @@ export default function LavagnaCanvas({
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
 
+  const penCursor = useMemo(() => {
+    if (strumento !== "penna") return null;
+    // Scale cursor to reflect visible stroke size under current zoom
+    const effectiveSize = spessore * 4 * (zoom || 1);
+    const diameter = Math.max(12, Math.min(effectiveSize, 48));
+    const size = Math.round(diameter);
+    const radius = size / 2;
+    const strokeWidth = Math.max(2, Math.round(size * 0.18));
+    const innerRadius = Math.max(radius - strokeWidth / 2, 1);
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${radius}" cy="${radius}" r="${radius}" fill="${colore}" />
+        <circle cx="${radius}" cy="${radius}" r="${innerRadius}" fill="${colore}" stroke="white" stroke-width="${strokeWidth}" opacity="0.85" />
+      </svg>
+    `;
+    return {
+      url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
+      hotspot: radius
+    };
+  }, [strumento, colore, spessore, zoom]);
+
+  const eraserCursor = useMemo(() => {
+    if (strumento !== 'gomma') return null;
+    const effectiveSize = spessore * 4 * (zoom || 1);
+    const diameter = Math.max(16, Math.min(effectiveSize, 72));
+    const size = Math.round(diameter);
+    const radius = size / 2;
+    const strokeWidth = Math.max(2, Math.round(size * 0.18));
+    const dash = Math.max(4, Math.round(size * 0.45));
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${radius}" cy="${radius}" r="${radius - strokeWidth / 2}" fill="rgba(28,125,247,0.1)" stroke="#0f1f53" stroke-width="${strokeWidth}" stroke-dasharray="${dash} ${dash}" stroke-linecap="round" />
+      </svg>
+    `;
+    return {
+      url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
+      hotspot: radius
+    };
+  }, [strumento, spessore, zoom]);
+
+  // Overlay cursor size in CSS pixels (used when we render our own cursor overlay)
+  const overlaySize = useMemo(() => {
+    // desired visual diameter in CSS pixels (match stroke thickness visually)
+    const desired = Math.max(12, Math.min(spessore * 4 * zoom, 96));
+    // clamp to a reasonable max so overlay doesn't become huge
+    return Math.round(desired);
+  }, [spessore, zoom]);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -556,6 +629,7 @@ export default function LavagnaCanvas({
 
   useEffect(() => {
     if (!showTools) {
+      setShowPenPopover(false);
       setShowMoreMenu(false);
       setShowShapesPopover(false);
       setShowExportMenu(false);
@@ -631,7 +705,7 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!spectatorMode || isAdmin) return;
     if (strumento === 'mano') {
-      setStrumento('selezione');
+      setStrumento('penna');
     }
   }, [spectatorMode, isAdmin, strumento]);
 
@@ -667,6 +741,45 @@ export default function LavagnaCanvas({
   // buffer per pubblicare punti in batch (meno segmentazione remota)
   const outgoingBufferRef = useRef([]);
   const outgoingRAFRef = useRef(null);
+
+  const clearLavagnaState = useCallback(() => {
+    try {
+      if (animationFrameId.current != null) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+    } catch (_) {}
+    animationFrameId.current = null;
+    try {
+      if (outgoingRAFRef.current != null) {
+        cancelAnimationFrame(outgoingRAFRef.current);
+      }
+    } catch (_) {}
+    outgoingRAFRef.current = null;
+    outgoingBufferRef.current = [];
+    remoteStreams.current.clear();
+    puntiCorrentiRef.current = [];
+    currentStreamId.current = null;
+    eraseSessionRef.current.strokeIds.clear();
+    eraseSessionRef.current.shapeIds.clear();
+    selectingRef.current = { active: false, start: null };
+    previewShapeRef.current = null;
+    drawingShapeRef.current = false;
+    erasingRef.current = false;
+    imageCacheRef.current?.clear?.();
+    setSelectedItems({ tratti: [], forme: [] });
+    setSelectionBox(null);
+    setTratti([]);
+    setForme([]);
+    setUndoStack([]);
+    setRedoStack([]);
+    try {
+      const ov = overlayRef.current;
+      if (ov) {
+        ov.style.display = 'none';
+      }
+    } catch (_) {}
+    drawAll();
+  }, [drawAll]);
 
   // Setup Ably helpers and subscriptions
   const applyViewport = useCallback((view) => {
@@ -808,17 +921,15 @@ export default function LavagnaCanvas({
           const { streamId } = data || {};
           const st = remoteStreams.current.get(streamId);
           if (st && st.punti.length >= 2) {
-            if (st.strumento !== 'magicpen') {
-              const definitivo = prepareStroke({
-                id: streamId,
-                strumento: st.strumento,
-                colore: st.colore,
-                spessore: st.spessore,
-                punti: st.punti,
-                autoreUserId: 'remote'
-              });
-              setTratti((prev) => [...prev, definitivo]);
-            }
+            const definitivo = prepareStroke({
+              id: streamId,
+              strumento: st.strumento,
+              colore: st.colore,
+              spessore: st.spessore,
+              punti: st.punti,
+              autoreUserId: 'remote'
+            });
+            setTratti((prev) => [...prev, definitivo]);
           }
           remoteStreams.current.delete(streamId);
           drawAll();
@@ -833,10 +944,7 @@ export default function LavagnaCanvas({
         };
 
         const onClear = () => {
-          setTratti([]);
-          setUndoStack([]);
-          setRedoStack([]);
-          drawAll();
+          clearLavagnaState();
         };
 
         ch.subscribe('stroke:start', onStart);
@@ -1007,17 +1115,15 @@ export default function LavagnaCanvas({
       const { streamId } = data || {};
       const st = remoteStreams.current.get(streamId);
       if (st && st.punti.length >= 2) {
-        if (st.strumento !== 'magicpen') {
-          const definitivo = prepareStroke({
-            id: streamId,
-            strumento: st.strumento,
-            colore: st.colore,
-            spessore: st.spessore,
-            punti: st.punti,
-            autoreUserId: 'remote'
-          });
-          setTratti((prev) => [...prev, definitivo]);
-        }
+        const definitivo = prepareStroke({
+          id: streamId,
+          strumento: st.strumento,
+          colore: st.colore,
+          spessore: st.spessore,
+          punti: st.punti,
+          autoreUserId: 'remote'
+        });
+        setTratti((prev) => [...prev, definitivo]);
       }
       remoteStreams.current.delete(streamId);
       drawAll();
@@ -1032,7 +1138,7 @@ export default function LavagnaCanvas({
     };
 
     return () => { try { cleanup(); } catch (_) {} };
-  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId, ruolo]);
+  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId, ruolo, clearLavagnaState]);
 
   // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());
@@ -1485,116 +1591,6 @@ export default function LavagnaCanvas({
     };
   }, [selectedItems, tratti, forme, deleteShapeLocal, pasteClipboard, copySelection, cutSelection]);
 
-  // Simple magic-pen heuristic: try to detect line/rect/circle from stroke points
-  function detectShapeFromStroke(points) {
-    if (!points || points.length < 6) return null;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const p of points) {
-      if (p.x < minX) minX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const w = maxX - minX;
-    const h = maxY - minY;
-    const bboxDiag = Math.hypot(w, h);
-    const endDistance = Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y);
-    const closed = endDistance < Math.max(12, bboxDiag * 0.25);
-
-    const tolerance = Math.max(6, Math.min(w, h) * 0.18);
-
-    if (closed) {
-      const cx = minX + w / 2;
-      const cy = minY + h / 2;
-      const radii = points.map((p) => Math.hypot(p.x - cx, p.y - cy));
-      const meanR = radii.reduce((a, b) => a + b, 0) / radii.length;
-      const variance = radii.reduce((a, b) => a + (b - meanR) * (b - meanR), 0) / radii.length;
-      if (Math.sqrt(variance) < Math.max(w, h) * 0.12) {
-        return { kind: w / h > 1.2 ? 'ellisse' : 'cerchio', x: minX, y: minY, w, h };
-      }
-
-      let simplified = simplifyStroke(points, tolerance);
-      const dedupeThreshold = tolerance * 0.75;
-      const unique = [];
-      for (const pt of simplified) {
-        const last = unique[unique.length - 1];
-        if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > dedupeThreshold) {
-          unique.push(pt);
-        }
-      }
-      if (unique.length >= 3) {
-        const first = unique[0];
-        const last = unique[unique.length - 1];
-        if (Math.hypot(first.x - last.x, first.y - last.y) < dedupeThreshold) {
-          unique[unique.length - 1] = first;
-        }
-      }
-
-      const cornerCount = unique.length;
-      if (cornerCount === 3) {
-        return { kind: 'triangolo', x: minX, y: minY, w, h };
-      }
-      if (cornerCount === 4) {
-        const angles = [];
-        const sideLengths = [];
-        for (let i = 0; i < unique.length; i++) {
-          const prev = unique[(i - 1 + unique.length) % unique.length];
-          const curr = unique[i];
-          const next = unique[(i + 1) % unique.length];
-          const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
-          const v2 = { x: next.x - curr.x, y: next.y - curr.y };
-          const len1 = Math.hypot(v1.x, v1.y);
-          const len2 = Math.hypot(v2.x, v2.y);
-          if (len1 > 0 && len2 > 0) {
-            const cos = (v1.x * v2.x + v1.y * v2.y) / (len1 * len2);
-            angles.push(Math.acos(Math.max(-1, Math.min(1, cos))));
-            sideLengths.push(len1);
-          }
-        }
-        const rightAngles = angles.filter((a) => Math.abs(a - Math.PI / 2) < 0.55).length;
-        if (rightAngles >= 3) {
-          return { kind: 'rettangolo', x: minX, y: minY, w, h };
-        }
-        if (angles.length) {
-          const meanLen = sideLengths.reduce((a, b) => a + b, 0) / sideLengths.length;
-          const maxDev = Math.max(...sideLengths.map((len) => Math.abs(len - meanLen)));
-          if (maxDev <= meanLen * 0.28) {
-            return { kind: 'rombo', x: minX, y: minY, w, h };
-          }
-        }
-        return { kind: 'rettangolo', x: minX, y: minY, w, h };
-      }
-
-      if (cornerCount > 4) {
-        const perimeter = unique.reduce((acc, curr, idx) => {
-          const next = unique[(idx + 1) % unique.length];
-          return acc + Math.hypot(next.x - curr.x, next.y - curr.y);
-        }, 0);
-        const projectedRect = 2 * (w + h);
-        if (perimeter / projectedRect < 1.6) {
-          return { kind: 'rettangolo', x: minX, y: minY, w, h };
-        }
-      }
-    }
-
-    const x1 = points[0].x;
-    const y1 = points[0].y;
-    const x2 = points[points.length - 1].x;
-    const y2 = points[points.length - 1].y;
-    let maxDist = 0;
-    for (const p of points) {
-      const d = distPointToSegment(p.x, p.y, x1, y1, x2, y2);
-      if (d > maxDist) maxDist = d;
-    }
-    if (maxDist < Math.max(8, Math.min(w, h) * 0.15)) {
-      return { kind: 'linea', x: x1, y: y1, x2, y2 };
-    }
-    return null;
-  }
-
   // helper: rounded rect
   function roundRect(ctx, x, y, w, h, r, fill, stroke) {
     if (typeof r === 'undefined') r = 5;
@@ -1672,50 +1668,6 @@ export default function LavagnaCanvas({
         return true;
     }
     return false;
-  }
-
-  function simplifyStroke(points, tolerance = 4) {
-    if (!points || points.length < 3) return points ? points.slice() : [];
-    const sqTolerance = tolerance * tolerance;
-
-    function perpendicularDistanceSq(p, a, b) {
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      if (dx === 0 && dy === 0) {
-        const ddx = p.x - a.x;
-        const ddy = p.y - a.y;
-        return ddx * ddx + ddy * ddy;
-      }
-      const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy);
-      const clamped = Math.max(0, Math.min(1, t));
-      const cx = a.x + clamped * dx;
-      const cy = a.y + clamped * dy;
-      const ddx = p.x - cx;
-      const ddy = p.y - cy;
-      return ddx * ddx + ddy * ddy;
-    }
-
-    function rdp(points, first, last, sqTol, out) {
-      let maxSqDist = sqTol;
-      let index = -1;
-      for (let i = first + 1; i < last; i++) {
-        const sqDist = perpendicularDistanceSq(points[i], points[first], points[last]);
-        if (sqDist > maxSqDist) {
-          index = i;
-          maxSqDist = sqDist;
-        }
-      }
-      if (index !== -1) {
-        if (index - first > 1) rdp(points, first, index, sqTol, out);
-        out.push(points[index]);
-        if (last - index > 1) rdp(points, index, last, sqTol, out);
-      }
-    }
-
-    const simplified = [points[0]];
-    rdp(points, 0, points.length - 1, sqTolerance, simplified);
-    simplified.push(points[points.length - 1]);
-    return simplified;
   }
 
   function getShapeBounds(shape) {
@@ -2431,6 +2383,28 @@ export default function LavagnaCanvas({
       spessore,
       start: punto,
     });
+    // ensure overlay visible and positioned on pointer down
+    try {
+      const ov = overlayRef.current;
+      const canvas = canvasRef.current;
+      if (ov && canvas && strumento === 'penna') {
+        // Align overlay to world->screen computed position (avoids drift with zoom/pan)
+        const expected = screenFromWorld(punto) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+        const clientX = expected.clientX;
+        const clientY = expected.clientY;
+        ov.style.display = 'block';
+        ov.style.left = `${clientX}px`;
+        ov.style.top = `${clientY}px`;
+        ov.style.width = `${overlaySize}px`;
+        ov.style.height = `${overlaySize}px`;
+        ov.style.borderRadius = '50%';
+        ov.style.background = colore;
+        ov.style.opacity = '0.95';
+        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+        ov.style.transform = 'translate(-50%, -50%)';
+      }
+    } catch (_) {}
+
     // Diagnostic: ensure computed world->screen mapping matches pointer client coords
     try {
       const lastPoint = punto;
@@ -2556,6 +2530,7 @@ export default function LavagnaCanvas({
     }
 
     // If not drawing stroke, nothing to do
+    // update overlay cursor position even when not drawing
     let memoPoint = null;
     const ensurePoint = () => {
       if (memoPoint) return memoPoint;
@@ -2563,6 +2538,25 @@ export default function LavagnaCanvas({
       pointerWorldRef.current = memoPoint;
       return memoPoint;
     };
+    try {
+      const ov = overlayRef.current;
+      if (ov && strumento === 'penna') {
+        const worldPoint = ensurePoint();
+        const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+        const clientX = expected.clientX;
+        const clientY = expected.clientY;
+        ov.style.display = 'block';
+        ov.style.left = `${clientX}px`;
+        ov.style.top = `${clientY}px`;
+        ov.style.width = `${overlaySize}px`;
+        ov.style.height = `${overlaySize}px`;
+        ov.style.borderRadius = '50%';
+        ov.style.background = colore;
+        ov.style.opacity = '0.95';
+        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+        ov.style.transform = 'translate(-50%, -50%)';
+      }
+    } catch (_) {}
 
     // Occasional diagnostic: compare expected screen position for the last point
     try {
@@ -2711,6 +2705,14 @@ export default function LavagnaCanvas({
       } catch (_) {}
       eraseSessionRef.current.strokeIds.clear();
       eraseSessionRef.current.shapeIds.clear();
+      // hide overlay when pointer released (if not pen tool keep it hidden)
+      try {
+        const ov = overlayRef.current;
+        if (ov) {
+            // keep overlay visible only while pen tool active and pointer is present
+            ov.style.display = strumento === 'penna' ? 'block' : 'none';
+        }
+      } catch (_) {}
       return;
     }
     setDisegnando(false);
@@ -2725,35 +2727,7 @@ export default function LavagnaCanvas({
 
     const puntiFinali = puntiCorrentiRef.current;
     if (puntiFinali.length >= 2) {
-      // If magicpen active, attempt to detect shape
-      if (strumento === 'magicpen') {
-        const detected = detectShapeFromStroke(puntiFinali);
-        if (detected) {
-          const id = `shape-${Date.now()}`;
-          const shapeObj = {
-            id,
-            ...detected,
-            colore,
-            spessore,
-            autoreUserId: utenteId
-          };
-          createShapeLocal(shapeObj, true);
-        } else {
-          // fallback to stroke
-          const nuovoTratto = prepareStroke({
-            id: currentStreamId.current,
-            strumento,
-            colore,
-            spessore,
-            punti: puntiFinali,
-            autoreUserId: utenteId,
-          });
-          setTratti(prev => [...prev, nuovoTratto]);
-          setUndoStack(prev => [...prev, { type: 'add', stroke: nuovoTratto }]);
-          setRedoStack([]);
-          salvaTratto(nuovoTratto);
-        }
-      } else if (strumento === 'gomma' && gommaPuntuale) {
+      if (strumento === 'gomma' && gommaPuntuale) {
         const gommaStroke = prepareStroke({
           id: currentStreamId.current,
           strumento: 'gomma',
@@ -2833,6 +2807,8 @@ export default function LavagnaCanvas({
       setSelectionBox(null);
       setTimeout(drawAll, 0);
     }
+    // hide overlay on cancel
+    try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
   }
 
   // == SALVATAGGIO STROKE ==
@@ -3003,28 +2979,20 @@ export default function LavagnaCanvas({
   const pulisciLavagna = useCallback(() => {
     if (!isAdmin) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
-    
-    // Notifica realtime
-    if (ablyRef.current.ch) {
-      emitOrPublish("clear-lavagna", { lavagnaId, attivitaId });
-    }
 
-    // Persist: soft delete tutti i tratti lato server
+    clearLavagnaState();
+    emitOrPublish('clear-lavagna', { lavagnaId, attivitaId });
+
     fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' })
-      .then(res => {
-        if (res.ok) {
-          // Cancella localmente solo dopo successo API
-          setTratti([]);
-          setUndoStack([]);
-          setRedoStack([]);
-        } else {
-          console.error("[handleClear] Errore API nel pulire la lavagna:", res.statusText);
+      .then((res) => {
+        if (!res.ok) {
+          console.error('[handleClear] Errore API nel pulire la lavagna:', res.statusText);
         }
       })
-      .catch(error => {
-        console.error("[handleClear] Eccezione nella chiamata API per pulire la lavagna:", error);
+      .catch((error) => {
+        console.error('[handleClear] Eccezione nella chiamata API per pulire la lavagna:', error);
       });
-  }, [isAdmin, lavagnaId, attivitaId, emitOrPublish]);
+  }, [isAdmin, clearLavagnaState, emitOrPublish, lavagnaId, attivitaId]);
 
   const handleChangeSfondo = useCallback((next) => {
     if (!isAdmin) return;
@@ -3037,7 +3005,7 @@ export default function LavagnaCanvas({
   const toolbar = useMemo(() => {
     if (!showTools) return null;
     if (!isAdmin && spectatorMode) return null;
-    const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento);
+  const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
     const undoDisabled = !undoStack.length;
     const redoAvailable = redoStack.length > 0;
@@ -3082,6 +3050,7 @@ export default function LavagnaCanvas({
               style={iconBtn(strumento === 'selezione')}
               onClick={() => {
                 setStrumento('selezione');
+                setShowPenPopover(false);
                 setShowMoreMenu(false);
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
@@ -3097,6 +3066,7 @@ export default function LavagnaCanvas({
               style={iconBtn(strumento === 'mano')}
               onClick={() => {
                 setStrumento('mano');
+                setShowPenPopover(false);
                 setShowMoreMenu(false);
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
@@ -3107,19 +3077,123 @@ export default function LavagnaCanvas({
                 <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
               </svg>
             </button>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(strumento === 'penna' || showPenPopover)}
+                onClick={() => {
+                  setStrumento('penna');
+                  setShowPenPopover((v) => !v);
+                  setShowShapesPopover(false);
+                  setShowMoreMenu(false);
+                  setShowExportMenu(false);
+                }}
+                title="Penna"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 20h4.25L20 9.25l-5.25-5.25L4 14.75V19a1 1 0 001 1z" fill={strumento==='penna'||showPenPopover? '#fff':'#e6eeff'} stroke={strumento==='penna'||showPenPopover? '#0f1f53':'#20489a'} strokeWidth="1.4" strokeLinejoin="round"/>
+                  <path d="M13.5 6.5l3 3" stroke="#0f1f53" strokeWidth="1.4" strokeLinecap="round"/>
+                  <path d="M9.75 18.75l-3.5-3.5" stroke="#0f1f53" strokeWidth="1.2" strokeLinecap="round" opacity="0.35"/>
+                  <path d="M13.2 11.6l-4.3 4.3 2.5 2.5 4.3-4.3a1.8 1.8 0 000-2.55l-.25-.25a1.8 1.8 0 00-2.55 0z" fill={colore} opacity="0.9"/>
+                </svg>
+              </button>
+              {showPenPopover && (
+                <div style={st.penPopover}>
+                  <div style={st.penTray}>
+                    {penPalette.map((entry) => {
+                      const selected = entry.value === colore;
+                      return (
+                        <button
+                          key={entry.value}
+                          type="button"
+                          onClick={() => setColore(entry.value)}
+                          title={entry.label}
+                          style={{
+                            ...st.penSwatch,
+                            boxShadow: selected ? '0 0 0 2px #fff, 0 0 0 4px rgba(28,125,247,0.45)' : st.penSwatch.boxShadow,
+                            borderColor: selected ? '#1c7df7' : 'rgba(212,223,246,0.75)'
+                          }}
+                        >
+                          <span
+                            style={{
+                              ...st.penSwatchIcon,
+                              background: entry.preview || entry.value
+                            }}
+                          />
+                        </button>
+                      );
+                    })}
+                    <input
+                      ref={colorInputRef}
+                      type="color"
+                      value={colore}
+                      onChange={(e) => setColore(e.target.value)}
+                      style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => colorInputRef.current?.click()}
+                      title="Selettore colore"
+                      style={{
+                        ...st.penSwatch,
+                        boxShadow: isCustomPenColor ? '0 0 0 2px #fff, 0 0 0 4px rgba(28,125,247,0.45)' : st.penSwatch.boxShadow,
+                        borderColor: isCustomPenColor ? '#1c7df7' : 'rgba(212,223,246,0.75)'
+                      }}
+                    >
+                      <span
+                        style={{
+                          ...st.penSwatchIcon,
+                          background: 'conic-gradient(red,orange,yellow,green,cyan,blue,violet,red)'
+                        }}
+                      />
+                    </button>
+                  </div>
+                  <div style={st.penOptionsRow}>
+                    <span style={st.sizeLabel}>{spessore}px</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={25}
+                      value={spessore}
+                      onChange={(e) => setSpessore(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: '#1c7df7' }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               style={iconBtn(strumento === 'gomma')}
               onClick={() => {
                 setStrumento('gomma');
+                setShowPenPopover(false);
                 setShowMoreMenu(false);
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
               }}
               title="Gomma"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M15.5 4l5 5-8.5 8.5H7L2 12l8.5-8.5 5.5.5z" fill={strumento==='gomma'? '#fff':'#20489a'} />
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4.9 14.1l6.8-6.8a2.4 2.4 0 0 1 3.4 0l3.8 3.8a2.4 2.4 0 0 1 0 3.4l-6.8 6.8H9.5a2.4 2.4 0 0 1-1.7-.7l-2.9-2.9a2.4 2.4 0 0 1 0-3.4z"
+                  fill={strumento==='gomma' ? '#ffffff' : '#fde7ef'}
+                  stroke={strumento==='gomma' ? '#0f1f53' : '#20489a'}
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M10.3 6.2l7.5 7.5-2.6 2.6-7.5-7.5z"
+                  fill={strumento==='gomma' ? '#ffe5ed' : '#fbd1dd'}
+                  opacity="0.85"
+                />
+                <path
+                  d="M4.2 18.9h9.6"
+                  stroke={strumento==='gomma' ? '#0f1f53' : '#20489a'}
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  opacity="0.55"
+                />
               </svg>
             </button>
             <div style={{ position:'relative' }}>
@@ -3128,6 +3202,7 @@ export default function LavagnaCanvas({
                 style={iconBtn(shapeButtonActive)}
                 onClick={() => {
                   setShowShapesPopover((v) => !v);
+                  setShowPenPopover(false);
                   setShowMoreMenu(false);
                   setShowExportMenu(false);
                 }}
@@ -3160,9 +3235,6 @@ export default function LavagnaCanvas({
                     <button type="button" style={iconBtn(strumento === 'freccia')} onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Freccia">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
-                    <button type="button" style={iconBtn(strumento === 'magicpen')} onClick={() => { setStrumento('magicpen'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Magic pen">
-                      <span style={{fontSize:18}}>✨</span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -3173,6 +3245,7 @@ export default function LavagnaCanvas({
                 style={iconBtn(showMoreMenu)}
                 onClick={()=> {
                   setShowMoreMenu(v=>!v);
+                  setShowPenPopover(false);
                   setShowShapesPopover(false);
                   setShowExportMenu(false);
                 }}
@@ -3238,7 +3311,11 @@ export default function LavagnaCanvas({
     spectatorMode,
     strumento,
     showShapesPopover,
+    showPenPopover,
     showMoreMenu,
+    penPalette,
+    colore,
+    spessore,
     gommaPuntuale,
     sfondo,
   sfondoLabels,
@@ -3254,13 +3331,21 @@ export default function LavagnaCanvas({
   const canvasCursor = useMemo(() => {
     if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
     if (strumento === 'mano') return 'grab';
-  if (strumento === 'gomma') return `url(${st.eraserCursor}) 24 24, auto`;
-    if (strumento === 'selezione') return 'default';
-    if (['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
+    if (strumento === 'gomma') {
+      if (eraserCursor) {
+        const hotspot = Math.round(eraserCursor.hotspot);
+        return `url(${eraserCursor.url}) ${hotspot} ${hotspot}, auto`;
+      }
       return 'crosshair';
     }
-    return 'crosshair';
-  }, [contextPanning, strumento, isPanning]);
+  if (strumento === 'selezione') return 'default';
+  if (['rettangolo','cerchio','linea','triangolo','rombo','freccia'].includes(strumento)) {
+      return 'crosshair';
+    }
+    if (!penCursor) return 'crosshair';
+    const hotspot = Math.round(penCursor.hotspot);
+    return `url(${penCursor.url}) ${hotspot} ${hotspot}, auto`;
+  }, [contextPanning, strumento, isPanning, penCursor, eraserCursor]);
 
   const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
   const spectatorIndicatorTitle = isAdmin
@@ -3309,6 +3394,7 @@ export default function LavagnaCanvas({
                   type="button"
                   style={st.exportButton}
                   onClick={() => {
+                    setShowPenPopover(false);
                     setShowMoreMenu(false);
                     setShowShapesPopover(false);
                     setShowExportMenu((v) => !v);
@@ -3422,6 +3508,21 @@ export default function LavagnaCanvas({
             </svg>
           </button>
         </div>
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            pointerEvents: 'none',
+            zIndex: 9999,
+            display: 'none',
+            transform: 'translate(-50%, -50%)'
+          }}
+        />
+
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
@@ -3449,7 +3550,7 @@ export default function LavagnaCanvas({
           }}
           style={{
             ...st.canvas,
-            cursor: canvasCursor
+            cursor: strumento === 'penna' ? 'none' : canvasCursor
           }}
         />
       </div>
@@ -3600,6 +3701,63 @@ const st = {
     borderRadius: 12,
     border: "1px solid #dbe6f5"
   },
+  penPopover: {
+    position: 'absolute',
+    bottom: '110%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'linear-gradient(180deg, #f8fbff 0%, #eef3ff 100%)',
+    border: '1px solid rgba(51,94,168,0.18)',
+    boxShadow: '0 22px 38px rgba(16,42,105,0.16)',
+    borderRadius: 18,
+    padding: '14px 16px',
+    minWidth: 220,
+    zIndex: 6
+  },
+  penTray: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center'
+  },
+  penSwatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    border: '1.5px solid rgba(212,223,246,0.75)',
+    background: '#fff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    padding: 0,
+    boxShadow: '0 1px 2px rgba(17,43,94,0.18)',
+    transition: 'box-shadow .18s ease, border-color .18s ease'
+  },
+  penSwatchIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: '50%',
+    border: '1px solid rgba(255,255,255,0.9)',
+    boxShadow: 'inset 0 1px 1px rgba(15,42,105,0.18)'
+  },
+  penOptionsRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+    width: '100%',
+    padding: '10px 12px 6px',
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.72)'
+  },
+  sizeLabel: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#20489a",
+    minWidth: 48,
+    textAlign: 'right'
+  },
   saving: {
     fontSize: 12,
     fontWeight: 700,
@@ -3696,16 +3854,7 @@ const st = {
     fontWeight: 700,
     letterSpacing: '0.4px',
     textTransform: 'uppercase'
-  },
-  // cursori SVG embedded (data URL)
-  eraserCursor:
-    'data:image/svg+xml;utf8,' +
-    encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-        <circle cx="24" cy="24" r="18" fill="none" stroke="#0f172a" stroke-width="2.4" stroke-dasharray="6 6" stroke-linecap="round" opacity="0.95" />
-        <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" />
-      </svg>
-    `)
+  }
 };
 
 const undoButtonStyle = (disabled, mode) => ({
