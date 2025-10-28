@@ -4,23 +4,39 @@
 # LOG OPERATIVO (reverse order)
 # Timestamp file (presentazione log): 2025-09-29 03:50 UTC+2
 
-## 2025-09-29 03:50 UTC+2
-- Tipo: Update strutturale / feature integrazione
-- Oggetto: Unificazione modale richieste da calendario cliente, gestione rapida pending admin via badge, aggiunte pagine prototipo /lavagna e /materiale, aggiornamento navbar, sincronizzazione calendario unico.
-- File coinvolti:
-  - app/profilo/page.js
-  - app/components/calendario/CalendarioAttivita.jsx
-  - app/pacchetti-lezioni/page.js
-  - app/admin/modifiche/ApprovaRichiestaModal.jsx
-  - app/components/modifiche/RichiestaModificaModal.jsx (riutilizzo come modale unico)
-  - app/lavagna/page.js (NEW, prototipo)
-  - app/materiale/page.js (NEW, prototipo)
-  - app/components/Navbar.js
-  - README.md
-  - STANDARD_OPERATIVO.md
-  - MAPPA_STRUTTURA_PROGETTO.md
-  - elencocompleto.txt (DA AGGIORNARE LOC AL PUSH)
+## 2025-10-28 12:00 UTC+2
+- Tipo: Operazione di pulizia / deprecazione file placeholder
+- Oggetto: Spostamento in archivio `/__deprecated__/` di file placeholder/prototipali per ridurre il rumore nella struttura attiva della repository.
+- File coinvolti (spostati):
+  - app/utils/exportToPdf.js
+  - app/utils/exportToXls.js
+  - app/api/clienti/[id]/route.js
+  - .github/workflows/deploy.yml
+  - placeholder_report.txt (archiviato, versione ridotta)
 - Scenario test eseguito (sintesi):
+  1. Verificata presenza dei file originali nella cartella `/__deprecated__/` dopo la patch.
+  2. Controllo rapido delle API/compilazione: build non eseguita in questa operazione (solo spostamento di placeholder), confermato che le API reali non sono state toccate.
+  3. Aggiunta voce in `README.md`, `STANDARD_OPERATIVO.md`, `MAPPA_STRUTTURA_PROGETTO.md` e append in `elencocompleto.txt` per tracciamento.
+- Esito: OK (file archiviati, documentazione aggiornata). 
+- Note: Per rimozione completa dal versionamento (git rm) eseguire la rimozione locale e push; questa patch sposta i file nel repo e aggiorna la documentazione.
+
+## 2025-09-29 03:50 UTC+2
+ - Tipo: Update strutturale / feature integrazione
+ - Oggetto: Unificazione modale richieste da calendario cliente, gestione rapida pending admin via badge, aggiunte pagine prototipo /lavagna e /materiale, aggiornamento navbar, sincronizzazione calendario unico.
+ - File coinvolti:
+   - app/profilo/page.js
+   - app/components/calendario/CalendarioAttivita.jsx
+   - app/pacchetti-lezioni/page.js
+   - app/admin/modifiche/ApprovaRichiestaModal.jsx
+   - app/components/modifiche/RichiestaModificaModal.jsx (riutilizzo come modale unico)
+   - app/lavagna/page.js (NEW, prototipo)
+   - app/materiale/page.js (NEW, prototipo)
+   - app/components/Navbar.js
+   - README.md
+   - STANDARD_OPERATIVO.md
+   - MAPPA_STRUTTURA_PROGETTO.md
+   - elencocompleto.txt (DA AGGIORNARE LOC AL PUSH)
+ - Scenario test eseguito (sintesi):
   1. Creazione richiesta cambio data da calendario → pending
   2. Approva richiesta → lezione spostata + orarioOriginale
   3. Nuova richiesta cambio orario → archiviazione precedente

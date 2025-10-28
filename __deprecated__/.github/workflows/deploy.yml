@@ -1,0 +1,16 @@
+name: Deploy (moved - placeholder)
+
+# Deploy workflow placeholder moved to __deprecated__ on 2025-10-28
+on:
+  push:
+    branches: [ "release", "main" ]
+  pull_request:
+    branches: [ "release", "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Deploy placeholder moved to __deprecated__ - not active."
+          exit 1

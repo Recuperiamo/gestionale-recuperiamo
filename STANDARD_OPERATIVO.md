@@ -269,3 +269,16 @@ Aggiorna **SEMPRE** insieme quando cambia struttura o flusso core:
 
 ## 15. Ultimo aggiornamento
 2025-09-29 03:50 UTC+2
+
+## Nota operativa aggiuntiva (2025-10-28)
+
+Per mantenere la struttura attiva pulita da file prototipali e placeholder non utilizzati, in data 2025-10-28 alcuni file marcati come placeholder sono stati spostati nella cartella `/__deprecated__/` e archiviati. Questa operazione è conforme alle regole di deprecazione indicate nella sezione "Policy provider dati/mock file" (sezione 13): i file non sono eliminati e restano recuperabili dallo storico o dalla cartella di archivio.
+
+File archiviati (esempi):
+- `app/utils/exportToPdf.js`
+- `app/utils/exportToXls.js`
+- `app/api/clienti/[id]/route.js`
+- `.github/workflows/deploy.yml`
+- `placeholder_report.txt`
+
+Ricorda: dopo ogni spostamento strutturale è OBBLIGATORIO aggiornare `elencocompleto.txt`, `MAPPA_STRUTTURA_PROGETTO.md`, `README.md` e `LOG_OPERATIVO.md` nella stessa PR.

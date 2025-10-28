@@ -804,7 +804,7 @@ export default function LavagnaCanvas({
     } else {
       emitOrPublish('viewport:request', { lavagnaId, attivitaId, requesterId: utenteId });
     }
-  }, [spectatorMode, isAdmin, applyViewport, emitOrPublish, lavagnaId, attivitaId, utenteId]);
+  }, [spectatorMode, isAdmin, applyViewport, emitOrPublish, lavagnaId, attivitaId]);
 
   useEffect(() => {
     const key = attivitaId ?? lavagnaId;
@@ -1723,7 +1723,7 @@ export default function LavagnaCanvas({
         // Arrow head triangle hit test
         const angle = Math.atan2(y2 - y1, x2 - x1);
         const headLength = Math.max(12, tolerance * 1.2);
-        const headWidth = headLength * 0.8;
+               const headWidth = headLength * 0.8;
         const hx = x2;
         const hy = y2;
         const left = {
@@ -3090,27 +3090,44 @@ export default function LavagnaCanvas({
                 }}
                 title="Penna"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
                   <defs>
-                    <linearGradient id="pen-body" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={strumento==='penna'||showPenPopover? '#f5f7fb':'#f8f9ff'} />
-                      <stop offset="100%" stopColor={strumento==='penna'||showPenPopover? '#dfe3f3':'#e6e9f8'} />
+                    <linearGradient id="pen-body-gradient" x1="20.828" y1="3.172" x2="12.343" y2="11.657" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#FEFEFE" />
+                      <stop offset="1" stopColor="#D7D7D7" />
                     </linearGradient>
-                    <linearGradient id="pen-cap" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4b5563" />
-                      <stop offset="80%" stopColor="#1f2937" />
+                    <linearGradient id="pen-tip-gradient" x1="12.343" y1="11.657" x2="3.172" y2="20.828" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#4A4A4A" />
+                      <stop offset="1" stopColor="#1A1A1A" />
                     </linearGradient>
                   </defs>
-                  <g transform="translate(6 2)">
-                    <path d="M4.75 0h1.5a1 1 0 0 1 1 1v2.2c0 .33-.27.6-.6.6H4.35a.6.6 0 0 1-.6-.6V1a1 1 0 0 1 .999-1z" fill="url(#pen-cap)" />
-                    <rect x="1.4" y="2.5" width="7.2" height="11.2" rx="2.8" fill="url(#pen-body)" stroke={strumento==='penna'||showPenPopover? '#0f1f53':'#1f2e62'} strokeWidth="0.9" />
-                    <path d="M1.95 6.2h6.1" stroke="rgba(15,31,83,0.16)" strokeWidth="0.8" strokeLinecap="round" />
-                    <path d="M1.95 8.6h6.1" stroke="rgba(15,31,83,0.12)" strokeWidth="0.6" strokeLinecap="round" />
-                    <path d="M4.35 13.7h2.3L8 17.4a.9.9 0 0 1-.83 1.3H3.83A.9.9 0 0 1 3 17.4z" fill="#f9b4c1" />
-                    <path d="M5.5 13.7L6.7 12a1.1 1.1 0 0 0-1.21-1.68l-.11.04-2.13.84a1.8 1.8 0 0 0-.54.31L0 12.74l2.2 2.9h1.2z" fill="#1f2937" />
-                    <circle cx="4.99" cy="9.4" r="1.6" fill={colore} stroke="rgba(15,31,83,0.45)" strokeWidth="0.6" />
-                  </g>
+                  <path d="M20.828 3.172a4.09 4.09 0 0 1 0 5.784L9.13 20.654a2.06 2.06 0 0 1-1.23.595l-4.425.885a.5.5 0 0 1-.575-.575l.885-4.425a2.06 2.06 0 0 1 .595-1.23L15.043 3.172a4.09 4.09 0 0 1 5.785 0Z" fill="url(#pen-body-gradient)"/>
+                  <path d="M15.043 3.172 3.345 14.87a2.06 2.06 0 0 0-.595 1.23l-.885 4.425a.5.5 0 0 0 .575.575l4.425-.885a2.06 2.06 0 0 0 1.23-.595L19.828 8.956a4.09 4.09 0 0 0 0-5.784L15.043 3.172Z" fill="url(#pen-tip-gradient)"/>
+                  <path d="M19.121 4.586a2.061 2.061 0 0 1 0 2.916L7.424 19.199a1 1 0 0 1-.598.29l-2.212.442a.25.25 0 0 1-.288-.288l.442-2.212a1 1 0 0 1 .29-.598L16.205 4.586a2.061 2.061 0 0 1 2.916 0Z" fill="#111"/>
+                  <path d="M6.01 17.785l-1.53 1.53a.5.5 0 0 0 0 .707l.823.823a.5.5 0 0 0 .707 0l1.53-1.53-1.53-1.53Z" fill="#4A4A4A"/>
                 </svg>
+                {strumento === "penna" && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: colore,
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                      pointerEvents: "none",
+                      boxShadow: "0 0 0 2px rgba(255,255,255,0.7)",
+                    }}
+                  />
+                )}
               </button>
               {showPenPopover && (
                 <div style={st.penPopover}>
@@ -3332,7 +3349,7 @@ export default function LavagnaCanvas({
     colore,
     spessore,
     gommaPuntuale,
-    sfondo,
+       sfondo,
   sfondoLabels,
     handleChangeSfondo,
     spectatorToggleId,
@@ -3960,5 +3977,3 @@ const overlayBlock = {
   color: "#20489a",
   backdropFilter: "blur(2px)"
 };
-
-// final newline to ensure parser happy

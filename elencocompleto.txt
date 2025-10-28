@@ -180,3 +180,13 @@ tsconfig.json
 uploads/materiali/06228256-723c-4fc2-a15f-5d786fe264d3.png
 uploads/materiali/5397eda5-3385-459b-be6a-269dbc6b5196.png
 uploads/materiali/materiali.json
+
+# NOTE (2025-10-28): file placeholder spostati in /__deprecated__
+# Vedi LOG_OPERATIVO.md entry 2025-10-28 12:00 UTC+2
+# File spostati (esempi):
+# - app/utils/exportToPdf.js
+# - app/utils/exportToXls.js
+# - app/api/clienti/[id]/route.js
+# - .github/workflows/deploy.yml
+# - placeholder_report.txt
+
