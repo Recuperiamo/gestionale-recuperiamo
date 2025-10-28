@@ -36,7 +36,9 @@ export default function LavagnaCanvas({
   const ablyRef = useRef({ ch: null });
 
   const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|shape-tools
-  const [colore, setColore] = useState("#20489a");
+  // Default color: if this is a new lavagna, start with Grafite (#111827),
+  // otherwise keep the historical default (Blu) until the user changes it.
+  const [colore, setColore] = useState(() => (isNewLavagna ? '#111827' : '#20489a'));
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
     (trattiIniziali || []).map((s) =>
@@ -98,11 +100,14 @@ export default function LavagnaCanvas({
   }), []);
   const [showPenPopover, setShowPenPopover] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [inToolbar, setInToolbar] = useState(false);
+  const toolbarRef = useRef(null);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
   const [isPanning, setIsPanning] = useState(false);
   const [contextPanning, setContextPanning] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
+  const contextTempToolRef = useRef(null); // when right-click temporarily switches tool to 'mano'
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
@@ -170,9 +175,12 @@ export default function LavagnaCanvas({
   const overlaySize = useMemo(() => {
     // desired visual diameter in CSS pixels (match stroke thickness visually)
     const desired = Math.max(12, Math.min(spessore * 4 * zoom, 96));
+    // For the eraser we want it slightly larger (≈1cm on typical displays)
+    const oneCmPx = 38; // approx 1cm in CSS pixels at ~96dpi
+    const final = (strumento === 'gomma') ? Math.max(desired, oneCmPx) : desired;
     // clamp to a reasonable max so overlay doesn't become huge
-    return Math.round(desired);
-  }, [spessore, zoom]);
+    return Math.round(final);
+  }, [spessore, zoom, strumento]);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -412,6 +420,149 @@ export default function LavagnaCanvas({
           ctx.stroke();
           break;
         }
+        case 'assi2': {
+          // 2-axis Cartesian: horizontal and vertical axes centered on bbox,
+          // with arrowheads only on the top (vertical) and right (horizontal) ends.
+          const x = f.x;
+          const y = f.y;
+          const w = f.w || 0;
+          const h = f.h || 0;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const hw = Math.max(20, w / 2 || 40);
+          const hh = Math.max(20, h / 2 || 40);
+          const headLength = Math.max(8, (f.spessore || 3) * 3);
+          const headWidth = headLength * 0.8;
+          // horizontal axis (left -> right). Arrow only at right end.
+          const hx1 = cx - hw;
+          const hy1 = cy;
+          const hx2 = cx + hw;
+          const hy2 = cy;
+          const angleH = Math.atan2(hy2 - hy1, hx2 - hx1);
+          const uxH = Math.cos(angleH);
+          const uyH = Math.sin(angleH);
+          const shaftHx1 = hx1; // keep left end plain
+          const shaftHx2 = hx2 - headLength * uxH; // shorten before head
+          ctx.beginPath();
+          ctx.moveTo(shaftHx1, hy1);
+          ctx.lineTo(shaftHx2, hy2);
+          ctx.stroke();
+          // right arrowhead only
+          ctx.beginPath();
+          ctx.moveTo(hx2, hy2);
+          ctx.lineTo(hx2 - headLength * uxH + headWidth * uyH, hy2 - headLength * uyH - headWidth * uxH);
+          ctx.lineTo(hx2 - headLength * uxH - headWidth * uyH, hy2 - headLength * uyH + headWidth * uxH);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+
+          // vertical axis (top -> bottom). Arrow only at top end.
+          const vx1 = cx;
+          const vy1 = cy - hh;
+          const vx2 = cx;
+          const vy2 = cy + hh;
+          const angleV = Math.atan2(vy2 - vy1, vx2 - vx1);
+          const uxV = Math.cos(angleV);
+          const uyV = Math.sin(angleV);
+          // shorten the start (top) so head sits cleanly, leave bottom plain
+          const shaftVx1 = vx1 + headLength * uxV;
+          const shaftVy1 = vy1 + headLength * uyV;
+          const shaftVx2 = vx2;
+          const shaftVy2 = vy2;
+          ctx.beginPath();
+          ctx.moveTo(shaftVx1, shaftVy1);
+          ctx.lineTo(shaftVx2, shaftVy2);
+          ctx.stroke();
+          // top arrowhead only (at vx1, vy1)
+          ctx.beginPath();
+          // angle for the triangular head pointing upward (from base toward top)
+          const angleVT = Math.atan2(vy1 - vy2, vx1 - vx2);
+          const uxT = Math.cos(angleVT);
+          const uyT = Math.sin(angleVT);
+          ctx.moveTo(vx1, vy1);
+          ctx.lineTo(vx1 - headLength * uxT + headWidth * uyT, vy1 - headLength * uyT - headWidth * uxT);
+          ctx.lineTo(vx1 - headLength * uxT - headWidth * uyT, vy1 - headLength * uyT + headWidth * uxT);
+          ctx.closePath();
+          ctx.fill();
+          break;
+        }
+        case 'assi3': {
+          // 3-axis Cartesian: same styling as assi2 (arrow only top and right)
+          // plus one extra axis (diagonal down-right) with an outward arrow.
+          const x = f.x;
+          const y = f.y;
+          const w = f.w || 0;
+          const h = f.h || 0;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const hw = Math.max(28, w / 2 || 56);
+          const hh = Math.max(28, h / 2 || 56);
+          const headLength = Math.max(8, (f.spessore || 3) * 3);
+          const headWidth = headLength * 0.8;
+
+          // horizontal axis (left -> right) with arrow at right only
+          const hx1 = cx - hw;
+          const hy1 = cy;
+          const hx2 = cx + hw;
+          const hy2 = cy;
+          const angleH = Math.atan2(hy2 - hy1, hx2 - hx1);
+          const uxH = Math.cos(angleH);
+          const uyH = Math.sin(angleH);
+          ctx.beginPath();
+          ctx.moveTo(hx1, hy1);
+          ctx.lineTo(hx2 - headLength * uxH, hy2 - headLength * uyH);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(hx2, hy2);
+          ctx.lineTo(hx2 - headLength * uxH + headWidth * uyH, hy2 - headLength * uyH - headWidth * uxH);
+          ctx.lineTo(hx2 - headLength * uxH - headWidth * uyH, hy2 - headLength * uyH + headWidth * uxH);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+
+          // vertical axis (top -> bottom) with arrow at top only
+          const vx1 = cx;
+          const vy1 = cy - hh;
+          const vx2 = cx;
+          const vy2 = cy + hh;
+          const angleV = Math.atan2(vy2 - vy1, vx2 - vx1);
+          const uxV = Math.cos(angleV);
+          const uyV = Math.sin(angleV);
+          ctx.beginPath();
+          ctx.moveTo(vx1 + headLength * uxV, vy1 + headLength * uyV);
+          ctx.lineTo(vx2, vy2);
+          ctx.stroke();
+          // top arrowhead
+          ctx.beginPath();
+          const angleVT = Math.atan2(vy1 - vy2, vx1 - vx2);
+          const uxT = Math.cos(angleVT);
+          const uyT = Math.sin(angleVT);
+          ctx.moveTo(vx1, vy1);
+          ctx.lineTo(vx1 - headLength * uxT + headWidth * uyT, vy1 - headLength * uyT - headWidth * uxT);
+          ctx.lineTo(vx1 - headLength * uxT - headWidth * uyT, vy1 - headLength * uyT + headWidth * uxT);
+          ctx.closePath();
+          ctx.fill();
+
+          // diagonal extra axis (down-right) with arrow at outer end
+          const dx1 = cx;
+          const dy1 = cy;
+          const dx2 = cx + hw;
+          const dy2 = cy + hh;
+          const angleDR = Math.atan2(dy2 - dy1, dx2 - dx1);
+          const uxDR = Math.cos(angleDR);
+          const uyDR = Math.sin(angleDR);
+          ctx.beginPath();
+          ctx.moveTo(dx1 + headLength * uxDR, dy1 + headLength * uyDR);
+          ctx.lineTo(dx2 - headLength * uxDR, dy2 - headLength * uyDR);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(dx2, dy2);
+          ctx.lineTo(dx2 - headLength * uxDR + headWidth * uyDR, dy2 - headLength * uyDR - headWidth * uxDR);
+          ctx.lineTo(dx2 - headLength * uxDR - headWidth * uyDR, dy2 - headLength * uyDR + headWidth * uxDR);
+          ctx.closePath();
+          ctx.fill();
+          break;
+        }
         case 'immagine': {
           // disegna immagini incollate o aggiunte come forme
           try {
@@ -514,16 +665,19 @@ export default function LavagnaCanvas({
             break;
           }
           case 'linea':
+          case 'segmento':
           case 'freccia': {
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
             if (ps.kind === 'freccia') {
               const angle = Math.atan2(endY - startY, endX - startX);
               const headLength = Math.max(10, (ps.spessore || 2) * 3);
-              const headWidth = headLength * 0.8;
+              const bx = endX - headLength * Math.cos(angle);
+              const by = endY - headLength * Math.sin(angle);
+              ctx.beginPath();
+              ctx.moveTo(startX, startY);
+              ctx.lineTo(bx, by);
+              ctx.stroke();
               ctx.setLineDash([]);
+              const headWidth = headLength * 0.8;
               ctx.beginPath();
               ctx.moveTo(endX, endY);
               ctx.lineTo(
@@ -537,7 +691,37 @@ export default function LavagnaCanvas({
               ctx.closePath();
               ctx.stroke();
               ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            } else {
+              ctx.beginPath();
+              ctx.moveTo(startX, startY);
+              ctx.lineTo(endX, endY);
+              ctx.stroke();
             }
+            break;
+          }
+          case 'assi2': {
+            // preview for 2-axis: draw dashed axes centered on bounding box
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            const hw = Math.max(20, w / 2 || 40);
+            const hh = Math.max(20, h / 2 || 40);
+            // horizontal
+            ctx.beginPath(); ctx.moveTo(cx - hw, cy); ctx.lineTo(cx + hw, cy); ctx.stroke();
+            // vertical
+            ctx.beginPath(); ctx.moveTo(cx, cy - hh); ctx.lineTo(cx, cy + hh); ctx.stroke();
+            break;
+          }
+          case 'assi3': {
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            const hw = Math.max(28, w / 2 || 56);
+            const hh = Math.max(28, h / 2 || 56);
+            // vertical up
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - hh); ctx.stroke();
+            // diagonal down-right
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + hw, cy + hh); ctx.stroke();
+            // diagonal down-left
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - hw, cy + hh); ctx.stroke();
             break;
           }
           case 'triangolo': {
@@ -626,6 +810,33 @@ export default function LavagnaCanvas({
       document.removeEventListener('keydown', handleEscape);
     };
   }, [showExportMenu]);
+
+  // Hide custom overlay when pointer is over the toolbar area
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    function onEnter() {
+      setInToolbar(true);
+      try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
+    }
+    function onLeave() {
+      setInToolbar(false);
+      try {
+        const ov = overlayRef.current;
+        if (!ov) return;
+        // restore overlay only if appropriate (pen/eraser active and not panning)
+        if ((strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active) {
+          ov.style.display = 'block';
+        }
+      } catch(_) {}
+    }
+    el.addEventListener('pointerenter', onEnter);
+    el.addEventListener('pointerleave', onLeave);
+    return () => {
+      el.removeEventListener('pointerenter', onEnter);
+      el.removeEventListener('pointerleave', onLeave);
+    };
+  }, [toolbarRef, strumento]);
 
   useEffect(() => {
     if (!showTools) {
@@ -804,7 +1015,7 @@ export default function LavagnaCanvas({
     } else {
       emitOrPublish('viewport:request', { lavagnaId, attivitaId, requesterId: utenteId });
     }
-  }, [spectatorMode, isAdmin, applyViewport, emitOrPublish, lavagnaId, attivitaId, utenteId]);
+  }, [spectatorMode, isAdmin, applyViewport, emitOrPublish, lavagnaId, attivitaId]);
 
   useEffect(() => {
     const key = attivitaId ?? lavagnaId;
@@ -1159,6 +1370,7 @@ export default function LavagnaCanvas({
     const normalized = normalizeShape(shape);
     if (!normalized) return;
     setForme((prev) => [...prev, normalized]);
+    try { console.log('[LAVAGNA-DBG-SHAPE] created', JSON.stringify(normalized)); } catch(_){}
     // register undo entry for local user-created shapes
     try {
       if (normalized.autoreUserId && normalized.autoreUserId === utenteId) {
@@ -1723,7 +1935,7 @@ export default function LavagnaCanvas({
         // Arrow head triangle hit test
         const angle = Math.atan2(y2 - y1, x2 - x1);
         const headLength = Math.max(12, tolerance * 1.2);
-        const headWidth = headLength * 0.8;
+               const headWidth = headLength * 0.8;
         const hx = x2;
         const hy = y2;
         const left = {
@@ -2103,10 +2315,20 @@ export default function LavagnaCanvas({
     };
 
     if (btn === 2) {
+      // Right-click: start context panning. If the current tool is not 'mano',
+      // temporarily switch to 'mano' so the user can pan with right-drag and
+      // see the hand cursor. We'll restore the previous tool on pointer up/cancel.
       e.preventDefault();
       if (spectatorLocked) {
         return;
       }
+      try {
+        // If not already the hand tool, remember current and switch to 'mano'
+        if (strumento !== 'mano') {
+          contextTempToolRef.current = strumento;
+          setStrumento('mano');
+        }
+      } catch (_) {}
       try {
         canvas?.setPointerCapture?.(pointerId);
       } catch (_) {}
@@ -2116,6 +2338,8 @@ export default function LavagnaCanvas({
       panningRef.current.lastY = native.clientY;
       setContextPanning(true);
       setIsPanning(true);
+      // hide any overlay while context panning starts
+      try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
       return;
     }
 
@@ -2139,7 +2363,31 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
 
-    if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'freccia', 'rombo'].includes(strumento)) {
+      // If user clicked with the selection tool, begin a rectangular selection
+      // (the 'lazo' rectangular mode). This restores expected selection behavior
+      // which was previously inactive.
+      if (strumento === 'selezione') {
+        const p = getPointerWorld();
+        selectingRef.current = selectingRef.current || {};
+        selectingRef.current.active = true;
+        selectingRef.current.start = p;
+        setSelectionBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+        try {
+          canvas?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        selectionClickRef.current = {
+          pointerId,
+          pointerTool: 'selezione',
+          openCandidate: false,
+          metaClick: !!(native?.ctrlKey || native?.metaKey),
+          doubleTap: false,
+          aborted: false,
+          shapeId: null
+        };
+        return;
+      }
+
+      if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'freccia', 'rombo', 'assi2', 'assi3'].includes(strumento)) {
       const p = getPointerWorld();
       previewShapeRef.current = {
         kind: strumento,
@@ -2161,191 +2409,6 @@ export default function LavagnaCanvas({
       return;
     }
 
-    if (strumento === 'gomma') {
-      eraseSessionRef.current.strokeIds.clear();
-      eraseSessionRef.current.shapeIds.clear();
-      const p = getPointerWorld();
-      eraseShapesAt(p.x, p.y);
-      if (!gommaPuntuale) {
-        eraseStrokeAt(p.x, p.y);
-        erasingRef.current = true;
-        try {
-          canvas?.setPointerCapture?.(pointerId);
-        } catch (_) {}
-        return;
-      }
-    }
-
-    if (strumento === 'selezione') {
-      const p = getPointerWorld();
-      if (!p) {
-        return;
-      }
-      const pointerTool = strumento;
-      const additive = !!(native?.shiftKey || native?.metaKey || native?.ctrlKey);
-      try {
-        const shapes = (forme || []).slice().reverse();
-        let clickedShape = null;
-        for (const f of shapes) {
-          if (hitTestShape(f, p.x, p.y, 12)) {
-            clickedShape = f;
-            break;
-          }
-        }
-        if (clickedShape) {
-          let nextForme;
-          let nextTratti;
-          if (additive) {
-            const already = selectedItems.forme.includes(clickedShape.id);
-            if (already) {
-              nextForme = selectedItems.forme.filter((id) => id !== clickedShape.id);
-            } else {
-              nextForme = [...selectedItems.forme, clickedShape.id];
-            }
-            nextTratti = selectedItems.tratti.slice();
-          } else {
-            nextForme = [clickedShape.id];
-            nextTratti = [];
-          }
-
-          setSelectedItems({ tratti: nextTratti, forme: nextForme });
-
-          if (nextForme.length === 0 && nextTratti.length === 0) {
-            draggingSelectionRef.current = {
-              active: false,
-              lastWorld: null,
-              moved: false,
-              pointerTool: null,
-              pointerId: null,
-              primaryShapeId: null,
-              primaryStrokeIndex: null,
-              selectionSnapshot: null
-            };
-            selectionClickRef.current = null;
-            return;
-          }
-
-          draggingSelectionRef.current = {
-            active: true,
-            lastWorld: p,
-            moved: false,
-            pointerTool,
-            pointerId,
-            primaryShapeId: clickedShape.id,
-            primaryStrokeIndex: null,
-            selectionSnapshot: { tratti: nextTratti.slice(), forme: nextForme.slice() }
-          };
-
-          selectionClickRef.current = {
-            pointerId,
-            shapeId: clickedShape.id,
-            strokeIndex: null,
-            pointerTool,
-            openCandidate: clickedShape.kind === 'link',
-            aborted: false,
-            metaClick: !!(native?.metaKey || native?.ctrlKey || native?.altKey),
-            doubleTap: native?.detail >= 2
-          };
-
-          if (selectionClickRef.current.openCandidate && (selectionClickRef.current.metaClick || selectionClickRef.current.doubleTap)) {
-            openLinkShape(clickedShape);
-            selectionClickRef.current = null;
-            draggingSelectionRef.current = {
-              active: false,
-              lastWorld: null,
-              moved: false,
-              pointerTool: null,
-              pointerId: null,
-              primaryShapeId: null,
-              primaryStrokeIndex: null,
-              selectionSnapshot: null
-            };
-            return;
-          }
-
-          try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
-          return;
-        }
-
-        const strokeList = tratti || [];
-        let clickedStrokeIndex = null;
-        for (let i = strokeList.length - 1; i >= 0; i--) {
-          const stroke = strokeList[i];
-          if (!stroke) continue;
-          if (hitTestStroke(p.x, p.y, stroke)) {
-            clickedStrokeIndex = i;
-            break;
-          }
-        }
-        if (clickedStrokeIndex !== null) {
-          let nextTratti;
-          let nextForme = additive ? selectedItems.forme.slice() : [];
-          if (additive) {
-            const alreadyStroke = selectedItems.tratti.includes(clickedStrokeIndex);
-            if (alreadyStroke) {
-              nextTratti = selectedItems.tratti.filter((idx) => idx !== clickedStrokeIndex);
-            } else {
-              nextTratti = [...selectedItems.tratti, clickedStrokeIndex];
-            }
-          } else {
-            nextTratti = [clickedStrokeIndex];
-          }
-
-          setSelectedItems({ tratti: nextTratti, forme: nextForme });
-
-          if (nextTratti.length === 0 && nextForme.length === 0) {
-            draggingSelectionRef.current = {
-              active: false,
-              lastWorld: null,
-              moved: false,
-              pointerTool: null,
-              pointerId: null,
-              primaryShapeId: null,
-              primaryStrokeIndex: null,
-              selectionSnapshot: null
-            };
-            selectionClickRef.current = null;
-            return;
-          }
-
-          draggingSelectionRef.current = {
-            active: true,
-            lastWorld: p,
-            moved: false,
-            pointerTool,
-            pointerId,
-            primaryShapeId: null,
-            primaryStrokeIndex: clickedStrokeIndex,
-            selectionSnapshot: { tratti: nextTratti.slice(), forme: nextForme.slice() }
-          };
-
-          selectionClickRef.current = {
-            pointerId,
-            shapeId: null,
-            strokeIndex: clickedStrokeIndex,
-            pointerTool,
-            openCandidate: false,
-            aborted: false,
-            metaClick: false,
-            doubleTap: native?.detail >= 2
-          };
-
-          try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
-          return;
-        }
-      } catch (_) {}
-
-      if (!additive) {
-        setSelectedItems({ tratti: [], forme: [] });
-      }
-      selectingRef.current = { active: true, start: p };
-      setSelectionBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
-      try {
-        canvas?.setPointerCapture?.(pointerId);
-      } catch (_) {}
-      return;
-    }
-
     if (strumento === 'mano') {
       if (spectatorLocked) {
         return;
@@ -2355,6 +2418,7 @@ export default function LavagnaCanvas({
         canvas?.setPointerCapture?.(pointerId);
       } catch (_) {}
       panningRef.current.active = true;
+  try { console.log('[LAVAGNA-STATE] panningRef.active = true (mano)'); } catch(_){}
       panningRef.current.lastX = native.clientX;
       panningRef.current.lastY = native.clientY;
       panningRef.current.viaContext = false;
@@ -2383,11 +2447,11 @@ export default function LavagnaCanvas({
       spessore,
       start: punto,
     });
-    // ensure overlay visible and positioned on pointer down
+    // ensure overlay visible and positioned on pointer down (support pen and eraser)
     try {
       const ov = overlayRef.current;
       const canvas = canvasRef.current;
-      if (ov && canvas && strumento === 'penna') {
+      if (ov && canvas && (strumento === 'penna' || strumento === 'gomma')) {
         // Align overlay to world->screen computed position (avoids drift with zoom/pan)
         const expected = screenFromWorld(punto) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
         const clientX = expected.clientX;
@@ -2398,9 +2462,20 @@ export default function LavagnaCanvas({
         ov.style.width = `${overlaySize}px`;
         ov.style.height = `${overlaySize}px`;
         ov.style.borderRadius = '50%';
-        ov.style.background = colore;
-        ov.style.opacity = '0.95';
-        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+        if (strumento === 'gomma') {
+          ov.style.background = colore;
+          ov.style.opacity = '0.95';
+          ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+          ov.style.border = 'none';
+        } else {
+          // Eraser overlay: translucent fill with dashed border
+          ov.style.background = 'rgba(255,255,255,0.06)';
+            try { console.log('[LAVAGNA-STATE] erasingRef = true (gomma intero-tratto)'); } catch(_){}
+          ov.style.opacity = '1';
+          ov.style.boxShadow = 'none';
+          const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+          ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+        }
         ov.style.transform = 'translate(-50%, -50%)';
       }
     } catch (_) {}
@@ -2439,6 +2514,8 @@ export default function LavagnaCanvas({
         setContextPanning(false);
         return;
       }
+      // ensure overlay hidden while panning
+      try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
       const dx = e.nativeEvent.clientX - panningRef.current.lastX;
       const dy = e.nativeEvent.clientY - panningRef.current.lastY;
       panningRef.current.lastX = e.nativeEvent.clientX;
@@ -2488,6 +2565,32 @@ export default function LavagnaCanvas({
       pointerWorldRef.current = p;
       eraseShapesAt(p.x, p.y);
       eraseStrokeAt(p.x, p.y);
+      // Update overlay position so the visual eraser follows the real input
+      try {
+        const ov = overlayRef.current;
+        const canvas = canvasRef.current;
+        if (ov && canvas) {
+          const expected = screenFromWorld(p) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+          const clientX = expected.clientX;
+          const clientY = expected.clientY;
+          // Only show overlay if not panning and not over toolbar
+          const shouldShow = (strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+          if (shouldShow) {
+            ov.style.display = 'block';
+            ov.style.left = `${clientX}px`;
+            ov.style.top = `${clientY}px`;
+            ov.style.width = `${overlaySize}px`;
+            ov.style.height = `${overlaySize}px`;
+            ov.style.borderRadius = '50%';
+            const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+            ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+            ov.style.background = 'rgba(255,255,255,0.06)';
+            ov.style.transform = 'translate(-50%, -50%)';
+          } else {
+            ov.style.display = 'none';
+          }
+        }
+      } catch (_) {}
       return;
     }
 
@@ -2540,21 +2643,39 @@ export default function LavagnaCanvas({
     };
     try {
       const ov = overlayRef.current;
-      if (ov && strumento === 'penna') {
-        const worldPoint = ensurePoint();
-        const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
-        const clientX = expected.clientX;
-        const clientY = expected.clientY;
-        ov.style.display = 'block';
-        ov.style.left = `${clientX}px`;
-        ov.style.top = `${clientY}px`;
-        ov.style.width = `${overlaySize}px`;
-        ov.style.height = `${overlaySize}px`;
-        ov.style.borderRadius = '50%';
-        ov.style.background = colore;
-        ov.style.opacity = '0.95';
-        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-        ov.style.transform = 'translate(-50%, -50%)';
+      // Only show overlay while actively drawing (avoid persistent overlay after release)
+      // Show overlay while pointer is over the canvas and the active tool is
+      // pen or eraser. Hide it while panning (mano) or when the pointer is
+      // over the toolbar.
+      if (ov) {
+        const shouldShow = (strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+        if (shouldShow) {
+          const worldPoint = ensurePoint();
+          const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+          const clientX = expected.clientX;
+          const clientY = expected.clientY;
+          ov.style.display = 'block';
+          ov.style.left = `${clientX}px`;
+          ov.style.top = `${clientY}px`;
+          ov.style.width = `${overlaySize}px`;
+          ov.style.height = `${overlaySize}px`;
+          ov.style.borderRadius = '50%';
+          if (strumento === 'penna') {
+            ov.style.background = colore;
+            ov.style.opacity = '0.95';
+            ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+            ov.style.border = 'none';
+          } else {
+            ov.style.background = 'rgba(255,255,255,0.06)';
+            ov.style.opacity = '1';
+            ov.style.boxShadow = 'none';
+            const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+            ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+          }
+          ov.style.transform = 'translate(-50%, -50%)';
+        } else {
+          ov.style.display = 'none';
+        }
       }
     } catch (_) {}
 
@@ -2606,6 +2727,8 @@ export default function LavagnaCanvas({
     const pointerId = e?.nativeEvent?.pointerId;
     const pendingClick = selectionClickRef.current;
     const dragInfo = draggingSelectionRef.current;
+    // (no-op) -- overlay visibility will be reconciled below depending on
+    // whether the pointer remains over the canvas and current tool.
     // finalize any selection drag
     if (dragInfo && dragInfo.active) {
       try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
@@ -2641,9 +2764,17 @@ export default function LavagnaCanvas({
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}
       panningRef.current.active = false;
+      try { console.log('[LAVAGNA-STATE] panningRef.active = false'); } catch(_){}
       panningRef.current.viaContext = false;
       setIsPanning(false);
       setContextPanning(false);
+      // restore original tool if we temporarily switched on right-click
+      try {
+        if (contextTempToolRef.current) {
+          setStrumento(contextTempToolRef.current);
+          contextTempToolRef.current = null;
+        }
+      } catch (_) {}
       return; // non proseguire con logica disegno quando si rilascia pan
     }
     // Touch end handling is in pointerCancel/pointerUp below
@@ -2658,6 +2789,13 @@ export default function LavagnaCanvas({
     // stop erasing drag
     if (erasingRef.current) {
       erasingRef.current = false;
+      // ensure we release any pointer capture held during erasing; do not forcibly
+      // hide overlay here because pointer may still be hovering the canvas and
+      // the cursor preview should remain visible while the user is over the board.
+      try {
+        canvasRef.current?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      try { console.log('[LAVAGNA-STATE] erasing finished -> released capture'); } catch(_){}
     }
 
     // If currently drawing a shape, finalize it
@@ -2705,12 +2843,41 @@ export default function LavagnaCanvas({
       } catch (_) {}
       eraseSessionRef.current.strokeIds.clear();
       eraseSessionRef.current.shapeIds.clear();
-      // hide overlay when pointer released (if not pen tool keep it hidden)
+      // Reconcile overlay: if pointer is still over the canvas and the active
+      // tool is pen/gomma, keep the preview visible; otherwise hide it.
       try {
         const ov = overlayRef.current;
-        if (ov) {
-            // keep overlay visible only while pen tool active and pointer is present
-            ov.style.display = strumento === 'penna' ? 'block' : 'none';
+        const canvas = canvasRef.current;
+        if (ov && canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const cx = e?.nativeEvent?.clientX;
+          const cy = e?.nativeEvent?.clientY;
+          const inside = typeof cx === 'number' && typeof cy === 'number' && cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom;
+          const shouldShow = inside && (strumento === 'penna' || strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+          if (shouldShow) {
+            // position overlay at pointer location
+            ov.style.display = 'block';
+            ov.style.left = `${cx}px`;
+            ov.style.top = `${cy}px`;
+            ov.style.width = `${overlaySize}px`;
+            ov.style.height = `${overlaySize}px`;
+            ov.style.borderRadius = '50%';
+            if (strumento === 'penna') {
+              ov.style.background = colore;
+              ov.style.opacity = '0.95';
+              ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
+              ov.style.border = 'none';
+            } else {
+              ov.style.background = 'rgba(255,255,255,0.06)';
+              ov.style.opacity = '1';
+              ov.style.boxShadow = 'none';
+              const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+              ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+            }
+            ov.style.transform = 'translate(-50%, -50%)';
+          } else {
+            ov.style.display = 'none';
+          }
         }
       } catch (_) {}
       return;
@@ -2775,6 +2942,14 @@ export default function LavagnaCanvas({
       panningRef.current.viaContext = false;
       setIsPanning(false);
       setContextPanning(false);
+      // restore original tool if we temporarily switched on right-click
+      try {
+        if (contextTempToolRef.current) {
+          setStrumento(contextTempToolRef.current);
+          contextTempToolRef.current = null;
+        }
+      } catch (_) {}
+      try { console.log('[LAVAGNA-STATE] pointerCancel: panningRef reset'); } catch(_){}
     }
     if (e?.nativeEvent?.pointerType === 'touch') {
       touchesRef.current.delete(e.nativeEvent.pointerId);
@@ -3005,14 +3180,14 @@ export default function LavagnaCanvas({
   const toolbar = useMemo(() => {
     if (!showTools) return null;
     if (!isAdmin && spectatorMode) return null;
-  const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia'].includes(strumento);
+  const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
     const undoDisabled = !undoStack.length;
     const redoAvailable = redoStack.length > 0;
 
     return (
       <div style={st.bottomToolbarDock}>
-        <div style={st.commandBar}>
+        <div ref={toolbarRef} style={st.commandBar}>
           <button
             type="button"
             style={undoButtonStyle(undoDisabled, 'undo')}
@@ -3082,35 +3257,55 @@ export default function LavagnaCanvas({
                 type="button"
                 style={iconBtn(strumento === 'penna' || showPenPopover)}
                 onClick={() => {
-                  setStrumento('penna');
-                  setShowPenPopover((v) => !v);
-                  setShowShapesPopover(false);
-                  setShowMoreMenu(false);
-                  setShowExportMenu(false);
+                  // If user is switching to the pen tool, set default color and
+                  // do not immediately open the color popover. If the pen is
+                  // already active, toggle the color popover.
+                  if (strumento !== 'penna') {
+                    setStrumento('penna');
+                    // Do not override `colore` here: keep the last selected color.
+                    setShowPenPopover(false);
+                    setShowShapesPopover(false);
+                    setShowMoreMenu(false);
+                    setShowExportMenu(false);
+                  } else {
+                    setShowPenPopover((v) => !v);
+                    setShowShapesPopover(false);
+                    setShowMoreMenu(false);
+                    setShowExportMenu(false);
+                  }
                 }}
                 title="Penna"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  style={{ transform: 'scale(0.92)' }}
+                >
                   <defs>
-                    <linearGradient id="pen-body" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={strumento==='penna'||showPenPopover? '#f5f7fb':'#f8f9ff'} />
-                      <stop offset="100%" stopColor={strumento==='penna'||showPenPopover? '#dfe3f3':'#e6e9f8'} />
+                    <linearGradient id="pen-body-gradient" x1="20.828" y1="3.172" x2="12.343" y2="11.657" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#FEFEFE" />
+                      <stop offset="1" stopColor="#D7D7D7" />
                     </linearGradient>
-                    <linearGradient id="pen-cap" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4b5563" />
-                      <stop offset="80%" stopColor="#1f2937" />
+                    <linearGradient id="pen-tip-gradient" x1="12.343" y1="11.657" x2="3.172" y2="20.828" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#4A4A4A" />
+                      <stop offset="1" stopColor="#1A1A1A" />
                     </linearGradient>
                   </defs>
-                  <g transform="translate(6 2)">
-                    <path d="M4.75 0h1.5a1 1 0 0 1 1 1v2.2c0 .33-.27.6-.6.6H4.35a.6.6 0 0 1-.6-.6V1a1 1 0 0 1 .999-1z" fill="url(#pen-cap)" />
-                    <rect x="1.4" y="2.5" width="7.2" height="11.2" rx="2.8" fill="url(#pen-body)" stroke={strumento==='penna'||showPenPopover? '#0f1f53':'#1f2e62'} strokeWidth="0.9" />
-                    <path d="M1.95 6.2h6.1" stroke="rgba(15,31,83,0.16)" strokeWidth="0.8" strokeLinecap="round" />
-                    <path d="M1.95 8.6h6.1" stroke="rgba(15,31,83,0.12)" strokeWidth="0.6" strokeLinecap="round" />
-                    <path d="M4.35 13.7h2.3L8 17.4a.9.9 0 0 1-.83 1.3H3.83A.9.9 0 0 1 3 17.4z" fill="#f9b4c1" />
-                    <path d="M5.5 13.7L6.7 12a1.1 1.1 0 0 0-1.21-1.68l-.11.04-2.13.84a1.8 1.8 0 0 0-.54.31L0 12.74l2.2 2.9h1.2z" fill="#1f2937" />
-                    <circle cx="4.99" cy="9.4" r="1.6" fill={colore} stroke="rgba(15,31,83,0.45)" strokeWidth="0.6" />
-                  </g>
+                  <path d="M20.828 3.172a4.09 4.09 0 0 1 0 5.784L9.13 20.654a2.06 2.06 0 0 1-1.23.595l-4.425.885a.5.5 0 0 1-.575-.575l.885-4.425a2.06 2.06 0 0 1 .595-1.23L15.043 3.172a4.09 4.09 0 0 1 5.785 0Z" fill="url(#pen-body-gradient)"/>
+                  <path d="M15.043 3.172 3.345 14.87a2.06 2.06 0 0 0-.595 1.23l-.885 4.425a.5.5 0 0 0 .575.575l4.425-.885a2.06 2.06 0 0 0 1.23-.595L19.828 8.956a4.09 4.09 0 0 0 0-5.784L15.043 3.172Z" fill="url(#pen-tip-gradient)"/>
+                  <path d="M19.121 4.586a2.061 2.061 0 0 1 0 2.916L7.424 19.199a1 1 0 0 1-.598.29l-2.212.442a.25.25 0 0 1-.288-.288l.442-2.212a1 1 0 0 1 .29-.598L16.205 4.586a2.061 2.061 0 0 1 2.916 0Z" fill="#111"/>
+                  <path d="M6.01 17.785l-1.53 1.53a.5.5 0 0 0 0 .707l.823.823a.5.5 0 0 0 .707 0l1.53-1.53-1.53-1.53Z" fill="#4A4A4A"/>
                 </svg>
+                {/* pen scribble: always visible on the pen button (helps preview). */}
+                <div style={{ position: 'absolute', right: 6, bottom: 6, pointerEvents: 'none', transform: 'scale(0.92)' }}>
+                  <svg width="22" height="10" viewBox="0 0 22 10" fill="none" aria-hidden>
+                    {/* path starts near left and is shorter so it visually emerges from the pen tip */}
+                    <path d="M2 7c2-3 4 1 7-2 3-3 6 1 11-1" stroke={colore} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />
+                  </svg>
+                </div>
               </button>
               {showPenPopover && (
                 <div style={st.penPopover}>
@@ -3223,10 +3418,13 @@ export default function LavagnaCanvas({
                 }}
                 title="Forme"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="10" height="10" rx="2" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
-                  <circle cx="16.5" cy="7.5" r="4" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.8" fill="none" />
-                  <path d="M4 4l6 6" stroke={shapeButtonActive? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <g stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    {/* rotated square (top-left) */}
+                    <rect x="2" y="2" width="10" height="10" rx="1.8" transform="rotate(-25 7 7)" />
+                    {/* larger circle (moved closer) to intersect the square diagonally */}
+                    <circle cx="13" cy="11" r="5" />
+                  </g>
                 </svg>
               </button>
               {showShapesPopover && (
@@ -3247,8 +3445,24 @@ export default function LavagnaCanvas({
                     <button type="button" style={iconBtn(strumento === 'rombo')} onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Rombo">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
                     </button>
+                    <button type="button" style={iconBtn(strumento === 'assi2')} onClick={() => { setStrumento('assi2'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Assi (2)">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 3v18" stroke={strumento==='assi2'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
+                        <path d="M3 12h18" stroke={strumento==='assi2'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                    <button type="button" style={iconBtn(strumento === 'assi3')} onClick={() => { setStrumento('assi3'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Assi (3)">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 3v18" stroke={strumento==='assi3'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
+                        <path d="M5 16l14-8" stroke={strumento==='assi3'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
+                        <path d="M5 8l14 8" stroke={strumento==='assi3'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </button>
                     <button type="button" style={iconBtn(strumento === 'freccia')} onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Freccia">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h10" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/><path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12h8" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -3332,7 +3546,7 @@ export default function LavagnaCanvas({
     colore,
     spessore,
     gommaPuntuale,
-    sfondo,
+       sfondo,
   sfondoLabels,
     handleChangeSfondo,
     spectatorToggleId,
@@ -3354,7 +3568,7 @@ export default function LavagnaCanvas({
       return 'crosshair';
     }
   if (strumento === 'selezione') return 'default';
-  if (['rettangolo','cerchio','linea','triangolo','rombo','freccia'].includes(strumento)) {
+  if (['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3'].includes(strumento)) {
       return 'crosshair';
     }
     if (!penCursor) return 'crosshair';
@@ -3565,7 +3779,8 @@ export default function LavagnaCanvas({
           }}
           style={{
             ...st.canvas,
-            cursor: strumento === 'penna' ? 'none' : canvasCursor
+            // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
+            cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'penna' || strumento === 'gomma') ? 'none' : canvasCursor))
           }}
         />
       </div>
@@ -3751,8 +3966,8 @@ const st = {
   },
   penSwatchIcon: {
     width: 22,
-    height: 22,
-    borderRadius: '50%',
+    height: 14,
+    borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.9)',
     boxShadow: 'inset 0 1px 1px rgba(15,42,105,0.18)'
   },
@@ -3960,5 +4175,3 @@ const overlayBlock = {
   color: "#20489a",
   backdropFilter: "blur(2px)"
 };
-
-// final newline to ensure parser happy

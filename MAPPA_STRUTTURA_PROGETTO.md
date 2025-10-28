@@ -467,3 +467,16 @@ Per migliorare la fruibilità e ridurre ridondanze, in futuro è possibile accor
 **Data e ora**: 2025-08-25 23:15 (UTC+2)  
 **Nota**: Aggiornata la legenda file chiave e le note operative secondo la nuova distinzione di ruolo tra README.md, STANDARD_OPERATIVO.md e LOG_OPERATIVO.md. Ribadita la policy “mai per difetto”.  
 **Mantieni SEMPRE aggiornata questa sezione dopo ogni modifica strutturale!**
+
+## Nota operativa (2025-10-28) – file deprecati
+
+Per ridurre il rumore nella struttura attiva del progetto, alcuni file placeholder e prototipi non utilizzati sono stati spostati nella cartella `/__deprecated__/` il 2025-10-28. La mappa è stata aggiornata per dichiarare la presenza della cartella di archivio; i file rimangono recuperabili e la loro rimozione della tree attiva non compromette la storia.
+
+Esempi di file spostati:
+- `app/utils/exportToPdf.js`
+- `app/utils/exportToXls.js`
+- `app/api/clienti/[id]/route.js` (placeholder)
+- `.github/workflows/deploy.yml` (placeholder)
+- `placeholder_report.txt` (archiviato)
+
+Aggiornare `elencocompleto.txt` e `LOG_OPERATIVO.md` contestualmente per completare la documentazione dell'operazione.

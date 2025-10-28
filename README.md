@@ -88,8 +88,23 @@ npm test            # Test automatici
 ---
 
 ## Ultimo aggiornamento
-
 2025-08-25 23:01 UTC+2
+
+---
+
+## Nota (file deprecati)
+
+Alcuni file placeholder/prototipali sono stati spostati nella cartella `/__deprecated__/` il 2025-10-28 per ridurre il noise nella struttura attiva del progetto mantenendo comunque una copia storica.
+
+File spostati (esempi):
+- `app/utils/exportToPdf.js`
+- `app/utils/exportToXls.js`
+- `app/api/clienti/[id]/route.js` (placeholder)
+- `.github/workflows/deploy.yml` (placeholder)
+- `placeholder_report.txt` (archiviato)
+
+Se per qualche motivo è necessario ripristinare il contenuto originale, recuperalo dalla cartella `/__deprecated__/` o dalla storia Git della repository.
+
 ## Richieste Modifica Lezioni
 
 Flusso:
