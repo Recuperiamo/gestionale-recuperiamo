@@ -7,23 +7,23 @@ import React, {
   useMemo
 } from "react";
 import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from "../../lib/realtime/ablyClient";
-
-/**
- * LavagnaCanvas - LIVE con Socket.IO su /api/socketio
- * - Penna, gomma (puntuale/intero tratto)
- * - Undo/redo, export PNG
- * - Sincronizzazione live stroke:start/points/done/delete e clear-lavagna
- * - Emissione evento "new-lavagna" se la lavagna è nuova (isNewLavagna)
- * - Pulsante "Pulisci lavagna" solo per admin
- */
-
-export default function LavagnaCanvas({
-  lavagnaId,
-  attivitaId,
-  trattiIniziali,
-  utenteId,
-  clienteId,
-  ruolo,
+          try {
+            // accept either srcPreview (preferred) or srcData (older) as small
+            // inline previews; also preserve any server-hosted src separately.
+            const preview = data.srcPreview || data.srcData || null;
+            if (preview && normalized.kind === 'immagine') {
+              normalized.srcPreview = preview;
+            }
+            if (data.src && normalized.kind === 'immagine') {
+              // explicit server-hosted URL (e.g. /api/materiale?fileId=...)
+              normalized.srcServer = data.src;
+            }
+            // Choose initial src: prefer preview for immediate visibility,
+            // otherwise server src if available.
+            if (normalized.kind === 'immagine') {
+              normalized.src = normalized.srcPreview || normalized.srcServer || normalized.src;
+            }
+          } catch (_) {}
   altezza = 600,
   openInNewWindow = false,
   isNewLavagna = false,
@@ -78,18 +78,18 @@ export default function LavagnaCanvas({
       { value: "#f43f5e", label: "Corallo", preview: "#f43f5e" },
       { value: "#a855f7", label: "Viola", preview: "#a855f7" },
       { value: "#14b8a6", label: "Acqua", preview: "#14b8a6" },
-      {
-        value: "#ff6ec7",
-        label: "Arcobaleno",
-        preview: "linear-gradient(135deg,#f97316 0%,#f43f5e 35%,#8b5cf6 70%,#0ea5e9 100%)"
-      }
-    ],
-    []
-  );
-  const isCustomPenColor = useMemo(
-    () => penPalette.every((entry) => entry.value !== colore),
-    [penPalette, colore]
-  );
+          try {
+            const preview = data.srcPreview || data.srcData || null;
+            if (preview && normalized.kind === 'immagine') {
+              normalized.srcPreview = preview;
+            }
+            if (data.src && normalized.kind === 'immagine') {
+              normalized.srcServer = data.src;
+            }
+            if (normalized.kind === 'immagine') {
+              normalized.src = normalized.srcPreview || normalized.srcServer || normalized.src;
+            }
+          } catch (_) {}
   const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
@@ -591,23 +591,38 @@ export default function LavagnaCanvas({
           break;
         }
         case 'immagine': {
-          // disegna immagini incollate o aggiunte come forme
+          // Draw images: prefer a small realtime preview (srcPreview or srcData)
+          // for immediate visibility, but attempt to load the server-hosted
+          // src as well so it can replace the preview when available.
           try {
-            const imgSrc = f.src;
-            if (imgSrc) {
-              let imgEl = imageCacheRef.current.get(imgSrc);
+            const candidates = [];
+            if (f.srcPreview) candidates.push(f.srcPreview);
+            if (f.srcData) candidates.push(f.srcData);
+            if (f.src) candidates.push(f.src);
+            let drawn = false;
+            for (const src of candidates) {
+              if (!src) continue;
+              const cached = imageCacheRef.current.get(src);
+              if (cached === 'err') continue;
+              let imgEl = cached;
               if (!imgEl) {
                 imgEl = new Image();
-                imgEl.onload = () => { imageCacheRef.current.set(imgSrc, imgEl); drawAll(); };
-                imgEl.src = imgSrc;
-                imageCacheRef.current.set(imgSrc, imgEl);
+                // allow cross-origin images where possible
+                try { imgEl.crossOrigin = 'anonymous'; } catch (_) {}
+                imgEl.onload = () => { imageCacheRef.current.set(src, imgEl); drawAll(); };
+                imgEl.onerror = () => { imageCacheRef.current.set(src, 'err'); drawAll(); };
+                imgEl.src = src;
+                imageCacheRef.current.set(src, imgEl);
               }
-              if (imgEl && imgEl.complete) {
+              if (imgEl && imgEl !== 'err' && imgEl.complete && imgEl.naturalWidth) {
                 const w = f.w || imgEl.naturalWidth / (window.devicePixelRatio || 1);
                 const h = f.h || imgEl.naturalHeight / (window.devicePixelRatio || 1);
                 ctx.drawImage(imgEl, f.x, f.y, w, h);
+                drawn = true;
+                break;
               }
             }
+            // nothing to draw now; onload handlers will call drawAll when ready
           } catch (_) {}
           break;
         }
