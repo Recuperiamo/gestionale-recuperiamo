@@ -3090,11 +3090,26 @@ export default function LavagnaCanvas({
                 }}
                 title="Penna"
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 20h4.25L20 9.25l-5.25-5.25L4 14.75V19a1 1 0 001 1z" fill={strumento==='penna'||showPenPopover? '#fff':'#e6eeff'} stroke={strumento==='penna'||showPenPopover? '#0f1f53':'#20489a'} strokeWidth="1.4" strokeLinejoin="round"/>
-                  <path d="M13.5 6.5l3 3" stroke="#0f1f53" strokeWidth="1.4" strokeLinecap="round"/>
-                  <path d="M9.75 18.75l-3.5-3.5" stroke="#0f1f53" strokeWidth="1.2" strokeLinecap="round" opacity="0.35"/>
-                  <path d="M13.2 11.6l-4.3 4.3 2.5 2.5 4.3-4.3a1.8 1.8 0 000-2.55l-.25-.25a1.8 1.8 0 00-2.55 0z" fill={colore} opacity="0.9"/>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <defs>
+                    <linearGradient id="pen-body" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={strumento==='penna'||showPenPopover? '#f5f7fb':'#f8f9ff'} />
+                      <stop offset="100%" stopColor={strumento==='penna'||showPenPopover? '#dfe3f3':'#e6e9f8'} />
+                    </linearGradient>
+                    <linearGradient id="pen-cap" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4b5563" />
+                      <stop offset="80%" stopColor="#1f2937" />
+                    </linearGradient>
+                  </defs>
+                  <g transform="translate(6 2)">
+                    <path d="M4.75 0h1.5a1 1 0 0 1 1 1v2.2c0 .33-.27.6-.6.6H4.35a.6.6 0 0 1-.6-.6V1a1 1 0 0 1 .999-1z" fill="url(#pen-cap)" />
+                    <rect x="1.4" y="2.5" width="7.2" height="11.2" rx="2.8" fill="url(#pen-body)" stroke={strumento==='penna'||showPenPopover? '#0f1f53':'#1f2e62'} strokeWidth="0.9" />
+                    <path d="M1.95 6.2h6.1" stroke="rgba(15,31,83,0.16)" strokeWidth="0.8" strokeLinecap="round" />
+                    <path d="M1.95 8.6h6.1" stroke="rgba(15,31,83,0.12)" strokeWidth="0.6" strokeLinecap="round" />
+                    <path d="M4.35 13.7h2.3L8 17.4a.9.9 0 0 1-.83 1.3H3.83A.9.9 0 0 1 3 17.4z" fill="#f9b4c1" />
+                    <path d="M5.5 13.7L6.7 12a1.1 1.1 0 0 0-1.21-1.68l-.11.04-2.13.84a1.8 1.8 0 0 0-.54.31L0 12.74l2.2 2.9h1.2z" fill="#1f2937" />
+                    <circle cx="4.99" cy="9.4" r="1.6" fill={colore} stroke="rgba(15,31,83,0.45)" strokeWidth="0.6" />
+                  </g>
                 </svg>
               </button>
               {showPenPopover && (
