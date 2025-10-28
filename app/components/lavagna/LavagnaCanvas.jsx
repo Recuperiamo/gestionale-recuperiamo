@@ -10,7 +10,7 @@ import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from ".
 
 /**
  * LavagnaCanvas - LIVE con Socket.IO su /api/socketio
- * - Penna, gomma (puntuale/intero tratto)
+ * - Gomma (puntuale/intero tratto)
  * - Undo/redo, export PNG
  * - Sincronizzazione live stroke:start/points/done/delete e clear-lavagna
  * - Emissione evento "new-lavagna" se la lavagna è nuova (isNewLavagna)
@@ -32,10 +32,9 @@ export default function LavagnaCanvas({
 }) {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
 
-  const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|shape-tools
+  const [strumento, setStrumento] = useState("selezione"); // gomma|mano|selezione|shape-tools
   const [colore, setColore] = useState("#20489a");
   const [spessore, setSpessore] = useState(3);
   const [tratti, setTratti] = useState(() =>
@@ -65,16 +64,6 @@ export default function LavagnaCanvas({
   const backgroundRequestedRef = useRef(false);
   const backgroundRequestKeyRef = useRef(null);
   const [zoom, setZoom] = useState(1); // 1 = 100%
-  const penPalette = useMemo(() => [
-    "#111827",
-    "#2563eb",
-    "#ef4444",
-    "#16a34a",
-    "#f97316",
-    "#facc15",
-    "#a855f7"
-  ], []);
-  const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
     nero: "Nero",
@@ -82,7 +71,6 @@ export default function LavagnaCanvas({
     quadretti: "Quadretti",
     punti: "Punti"
   }), []);
-  const [showPenPopover, setShowPenPopover] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
   const [isPanning, setIsPanning] = useState(false);
@@ -112,34 +100,6 @@ export default function LavagnaCanvas({
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
 
-  const penCursor = useMemo(() => {
-    if (strumento !== "penna") return null;
-    // Scale cursor to reflect visible stroke size under current zoom
-    const effectiveSize = spessore * 4 * (zoom || 1);
-    const diameter = Math.max(12, Math.min(effectiveSize, 48));
-    const size = Math.round(diameter);
-    const radius = size / 2;
-    const strokeWidth = Math.max(2, Math.round(size * 0.18));
-    const innerRadius = Math.max(radius - strokeWidth / 2, 1);
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${radius}" cy="${radius}" r="${radius}" fill="${colore}" />
-        <circle cx="${radius}" cy="${radius}" r="${innerRadius}" fill="${colore}" stroke="white" stroke-width="${strokeWidth}" opacity="0.85" />
-      </svg>
-    `;
-    return {
-      url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
-      hotspot: radius
-    };
-  }, [strumento, colore, spessore, zoom]);
-
-  // Overlay cursor size in CSS pixels (used when we render our own cursor overlay)
-  const overlaySize = useMemo(() => {
-    // desired visual diameter in CSS pixels (match stroke thickness visually)
-    const desired = Math.max(12, Math.min(spessore * 4 * zoom, 96));
-    // clamp to a reasonable max so overlay doesn't become huge
-    return Math.round(desired);
-  }, [spessore, zoom]);
 
   const channelName = useMemo(
     () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
@@ -596,7 +556,6 @@ export default function LavagnaCanvas({
 
   useEffect(() => {
     if (!showTools) {
-      setShowPenPopover(false);
       setShowMoreMenu(false);
       setShowShapesPopover(false);
       setShowExportMenu(false);
@@ -672,7 +631,7 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!spectatorMode || isAdmin) return;
     if (strumento === 'mano') {
-      setStrumento('penna');
+      setStrumento('selezione');
     }
   }, [spectatorMode, isAdmin, strumento]);
 
@@ -2472,28 +2431,6 @@ export default function LavagnaCanvas({
       spessore,
       start: punto,
     });
-    // ensure overlay visible and positioned on pointer down
-    try {
-      const ov = overlayRef.current;
-      const canvas = canvasRef.current;
-      if (ov && canvas && strumento === 'penna') {
-        // Align overlay to world->screen computed position (avoids drift with zoom/pan)
-        const expected = screenFromWorld(punto) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
-        const clientX = expected.clientX;
-        const clientY = expected.clientY;
-        ov.style.display = 'block';
-        ov.style.left = `${clientX}px`;
-        ov.style.top = `${clientY}px`;
-        ov.style.width = `${overlaySize}px`;
-        ov.style.height = `${overlaySize}px`;
-        ov.style.borderRadius = '50%';
-        ov.style.background = colore;
-        ov.style.opacity = '0.95';
-        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-        ov.style.transform = 'translate(-50%, -50%)';
-      }
-    } catch (_) {}
-
     // Diagnostic: ensure computed world->screen mapping matches pointer client coords
     try {
       const lastPoint = punto;
@@ -2619,7 +2556,6 @@ export default function LavagnaCanvas({
     }
 
     // If not drawing stroke, nothing to do
-    // update overlay cursor position even when not drawing
     let memoPoint = null;
     const ensurePoint = () => {
       if (memoPoint) return memoPoint;
@@ -2627,25 +2563,6 @@ export default function LavagnaCanvas({
       pointerWorldRef.current = memoPoint;
       return memoPoint;
     };
-    try {
-      const ov = overlayRef.current;
-      if (ov && strumento === 'penna') {
-        const worldPoint = ensurePoint();
-        const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
-        const clientX = expected.clientX;
-        const clientY = expected.clientY;
-        ov.style.display = 'block';
-        ov.style.left = `${clientX}px`;
-        ov.style.top = `${clientY}px`;
-        ov.style.width = `${overlaySize}px`;
-        ov.style.height = `${overlaySize}px`;
-        ov.style.borderRadius = '50%';
-        ov.style.background = colore;
-        ov.style.opacity = '0.95';
-        ov.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.6) inset';
-        ov.style.transform = 'translate(-50%, -50%)';
-      }
-    } catch (_) {}
 
     // Occasional diagnostic: compare expected screen position for the last point
     try {
@@ -2794,14 +2711,6 @@ export default function LavagnaCanvas({
       } catch (_) {}
       eraseSessionRef.current.strokeIds.clear();
       eraseSessionRef.current.shapeIds.clear();
-      // hide overlay when pointer released (if not pen tool keep it hidden)
-      try {
-        const ov = overlayRef.current;
-        if (ov) {
-            // keep overlay visible only while pen tool active and pointer is present
-            ov.style.display = strumento === 'penna' ? 'block' : 'none';
-        }
-      } catch (_) {}
       return;
     }
     setDisegnando(false);
@@ -2924,8 +2833,6 @@ export default function LavagnaCanvas({
       setSelectionBox(null);
       setTimeout(drawAll, 0);
     }
-    // hide overlay on cancel
-    try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
   }
 
   // == SALVATAGGIO STROKE ==
@@ -3175,7 +3082,6 @@ export default function LavagnaCanvas({
               style={iconBtn(strumento === 'selezione')}
               onClick={() => {
                 setStrumento('selezione');
-                setShowPenPopover(false);
                 setShowMoreMenu(false);
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
@@ -3191,7 +3097,6 @@ export default function LavagnaCanvas({
               style={iconBtn(strumento === 'mano')}
               onClick={() => {
                 setStrumento('mano');
-                setShowPenPopover(false);
                 setShowMoreMenu(false);
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
@@ -3202,72 +3107,11 @@ export default function LavagnaCanvas({
                 <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
               </svg>
             </button>
-            <div style={{ position:'relative' }}>
-              <button
-                type="button"
-                style={iconBtn(strumento === 'penna' || showPenPopover)}
-                onClick={() => {
-                  setStrumento('penna');
-                  setShowPenPopover((v) => !v);
-                  setShowShapesPopover(false);
-                  setShowMoreMenu(false);
-                  setShowExportMenu(false);
-                }}
-                title="Penna"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M4 20l3.2-.8 10-10-2.4-2.4-10 10L4 20z" fill={strumento==='penna'||showPenPopover? '#fff':'#20489a'} />
-                  <path d="M14 4.2l2.6-2.6 3.4 3.4-2.6 2.6" stroke={strumento==='penna'||showPenPopover? '#fff':'#20489a'} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                </svg>
-              </button>
-              {showPenPopover && (
-                <div style={st.popover}>
-                  <div style={st.penColorsRow}>
-                    {penPalette.map((c) => {
-                      const isSelected = c === colore;
-                      return (
-                        <button
-                          key={c}
-                          onClick={() => setColore(c)}
-                          title={c}
-                          style={{
-                            ...st.penColorButton,
-                            border: isSelected ? '2px solid #20489a' : '1.5px solid #dbe6f5',
-                            boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #20489a' : '0 1px 2px rgba(32,72,154,0.25)',
-                            background: c
-                          }}
-                        />
-                      );
-                    })}
-                    <input
-                      ref={colorInputRef}
-                      type="color"
-                      value={colore}
-                      onChange={(e)=>setColore(e.target.value)}
-                      style={{ position:'absolute', width:1, height:1, opacity:0 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={()=>colorInputRef.current?.click()}
-                      title="Altro"
-                      style={st.colorWheelBtn}
-                    >
-                      🎨
-                    </button>
-                  </div>
-                  <div style={st.penOptionsRow}>
-                    <span style={st.sizeLabel}>{spessore}px</span>
-                    <input type="range" min={1} max={25} value={spessore} onChange={(e)=>setSpessore(Number(e.target.value))} />
-                  </div>
-                </div>
-              )}
-            </div>
             <button
               type="button"
               style={iconBtn(strumento === 'gomma')}
               onClick={() => {
                 setStrumento('gomma');
-                setShowPenPopover(false);
                 setShowMoreMenu(false);
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
@@ -3284,7 +3128,6 @@ export default function LavagnaCanvas({
                 style={iconBtn(shapeButtonActive)}
                 onClick={() => {
                   setShowShapesPopover((v) => !v);
-                  setShowPenPopover(false);
                   setShowMoreMenu(false);
                   setShowExportMenu(false);
                 }}
@@ -3330,7 +3173,6 @@ export default function LavagnaCanvas({
                 style={iconBtn(showMoreMenu)}
                 onClick={()=> {
                   setShowMoreMenu(v=>!v);
-                  setShowPenPopover(false);
                   setShowShapesPopover(false);
                   setShowExportMenu(false);
                 }}
@@ -3396,11 +3238,7 @@ export default function LavagnaCanvas({
     spectatorMode,
     strumento,
     showShapesPopover,
-    showPenPopover,
     showMoreMenu,
-    penPalette,
-    colore,
-    spessore,
     gommaPuntuale,
     sfondo,
   sfondoLabels,
@@ -3416,15 +3254,13 @@ export default function LavagnaCanvas({
   const canvasCursor = useMemo(() => {
     if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
     if (strumento === 'mano') return 'grab';
-    if (strumento === 'gomma') return `url(${st.eraserCursor}) 14 20, auto`;
-  if (strumento === 'selezione') return 'default';
-  if (['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
+  if (strumento === 'gomma') return `url(${st.eraserCursor}) 24 24, auto`;
+    if (strumento === 'selezione') return 'default';
+    if (['rettangolo','cerchio','linea','triangolo','rombo','freccia','magicpen'].includes(strumento)) {
       return 'crosshair';
     }
-    if (!penCursor) return 'crosshair';
-    const hotspot = Math.round(penCursor.hotspot);
-    return `url(${penCursor.url}) ${hotspot} ${hotspot}, auto`;
-  }, [contextPanning, strumento, isPanning, penCursor]);
+    return 'crosshair';
+  }, [contextPanning, strumento, isPanning]);
 
   const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
   const spectatorIndicatorTitle = isAdmin
@@ -3473,7 +3309,6 @@ export default function LavagnaCanvas({
                   type="button"
                   style={st.exportButton}
                   onClick={() => {
-                    setShowPenPopover(false);
                     setShowMoreMenu(false);
                     setShowShapesPopover(false);
                     setShowExportMenu((v) => !v);
@@ -3587,21 +3422,6 @@ export default function LavagnaCanvas({
             </svg>
           </button>
         </div>
-        <div
-          ref={overlayRef}
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            width: 0,
-            height: 0,
-            pointerEvents: 'none',
-            zIndex: 9999,
-            display: 'none',
-            transform: 'translate(-50%, -50%)'
-          }}
-        />
-
         <canvas
           ref={canvasRef}
           onPointerDown={pointerDown}
@@ -3629,7 +3449,7 @@ export default function LavagnaCanvas({
           }}
           style={{
             ...st.canvas,
-            cursor: strumento === 'penna' ? 'none' : canvasCursor
+            cursor: canvasCursor
           }}
         />
       </div>
@@ -3780,44 +3600,6 @@ const st = {
     borderRadius: 12,
     border: "1px solid #dbe6f5"
   },
-  penColorsRow: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-    flexWrap: 'wrap'
-  },
-  penColorButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    border: '1.5px solid #dbe6f5',
-    cursor: 'pointer',
-    outline: 'none',
-    transition: 'box-shadow .15s'
-  },
-  colorWheelBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    border: '1.5px solid #dbe6f5',
-    background: '#fff',
-    backgroundImage: 'conic-gradient(red, orange, yellow, green, blue, violet, red)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 18,
-    cursor: 'pointer',
-    margin: 2
-  },
-  penOptionsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10
-  },
-  sizeLabel: { fontSize: 12, fontWeight: 600, color: "#20489a" },
   saving: {
     fontSize: 12,
     fontWeight: 700,
@@ -3919,9 +3701,9 @@ const st = {
   eraserCursor:
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
-        <path fill="#f87171" d="M11 27l13-13 6 6-13 13h-6z"/>
-        <path fill="#fee2e2" d="M17 11l5-5 10 10-5 5z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+        <circle cx="24" cy="24" r="18" fill="none" stroke="#0f172a" stroke-width="2.4" stroke-dasharray="6 6" stroke-linecap="round" opacity="0.95" />
+        <circle cx="24" cy="24" r="22" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" />
       </svg>
     `)
 };
