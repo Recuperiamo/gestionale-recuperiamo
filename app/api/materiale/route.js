@@ -73,10 +73,13 @@ export async function GET(req) {
     const filePath = path.join(UPLOAD_DIR, meta.nomeSalvato);
     try {
       const fileBuf = await fs.readFile(filePath);
+      // Serve images/files inline so that <img src="/api/materiale?fileId=..."> renders
+      // in the browser instead of forcing a download. Keep Content-Type accurate.
       return new NextResponse(fileBuf, {
         headers: {
           "Content-Type": meta.mime || "application/octet-stream",
-          "Content-Disposition": `attachment; filename="${meta.nomeOriginale}"`
+          // use inline disposition to allow direct rendering in-page
+          "Content-Disposition": `inline; filename="${meta.nomeOriginale}"`
         }
       });
     } catch {
