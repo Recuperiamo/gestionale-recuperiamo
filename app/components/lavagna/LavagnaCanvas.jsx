@@ -1273,6 +1273,13 @@ export default function LavagnaCanvas({
           if (!data) return;
           const normalized = normalizeShape(data);
           if (!normalized) return;
+          // If the creator included an inline data URL fallback (srcData), prefer it
+          // for immediate rendering on clients that cannot fetch /api/materiale.
+          try {
+            if (data.srcData && normalized.kind === 'immagine') {
+              normalized.src = data.srcData;
+            }
+          } catch (_) {}
           setForme((prev) => {
             if (prev.find((f) => f.id === normalized.id)) return prev;
             return [...prev, normalized];
@@ -1284,6 +1291,11 @@ export default function LavagnaCanvas({
           if (!data || !data.id) return;
           const normalized = normalizeShape(data);
           if (!normalized) return;
+          try {
+            if (data.srcData && normalized.kind === 'immagine') {
+              normalized.src = data.srcData;
+            }
+          } catch (_) {}
           setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
           drawAll();
         };
@@ -1788,7 +1800,7 @@ export default function LavagnaCanvas({
 
                   // preload to adjust size then create persisted shape and remove temp
                   const img = new Image();
-                  img.onload = () => {
+                    img.onload = async () => {
                     const aspect = img.naturalWidth / img.naturalHeight || 1;
                     const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
                     const desiredH = desiredW / aspect;
@@ -1801,7 +1813,13 @@ export default function LavagnaCanvas({
                     // emit creation for realtime consumers and persist shape on server
                     try {
                       const normalized = normalizeShape({ ...shape, id: tempId });
-                      emitOrPublish('shape:create', { ...normalized, lavagnaId });
+                      // create data URL fallback for clients without access to /api/materiale
+                      try {
+                        const srcData = await fileToDataURL(file);
+                        emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData });
+                      } catch (_) {
+                        emitOrPublish('shape:create', { ...normalized, lavagnaId });
+                      }
                       persistShape(normalized).then((s) => {
                         if (s && s.id) {
                           setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
@@ -1812,20 +1830,25 @@ export default function LavagnaCanvas({
                     try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                     drawAll();
                   };
-                  img.onerror = () => {
-                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
-                    try {
-                      const normalized = normalizeShape({ ...shape, id: tempId });
-                      emitOrPublish('shape:create', { ...normalized, lavagnaId });
-                      persistShape(normalized).then((s) => {
-                        if (s && s.id) {
-                          setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
+                    img.onerror = async () => {
+                      setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
+                      try {
+                        const normalized = normalizeShape({ ...shape, id: tempId });
+                        try {
+                          const srcData = await fileToDataURL(file);
+                          emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData });
+                        } catch (_) {
+                          emitOrPublish('shape:create', { ...normalized, lavagnaId });
                         }
-                      }).catch(()=>{});
-                    } catch (_) {}
-                    try { URL.revokeObjectURL(tempSrc); } catch(_) {}
-                    drawAll();
-                  };
+                        persistShape(normalized).then((s) => {
+                          if (s && s.id) {
+                            setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
+                          }
+                        }).catch(()=>{});
+                      } catch (_) {}
+                      try { URL.revokeObjectURL(tempSrc); } catch(_) {}
+                      drawAll();
+                    };
                   img.src = serverSrc;
                 } catch (err) {
                   console.warn('[lavagna] error uploading pasted image', err);
@@ -2059,6 +2082,18 @@ export default function LavagnaCanvas({
         dedup.push(p);
         last = p;
       }
+    }
+
+    // Helper: convert File/Blob to data URL (Promise)
+    function fileToDataURL(file) {
+      return new Promise((resolve, reject) => {
+        try {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error('fileToDataURL error'));
+          reader.readAsDataURL(file);
+        } catch (err) { reject(err); }
+      });
     }
     if (dedup.length < 2) return dedup;
     // apply Chaikin smoothing to reduce jitter.
