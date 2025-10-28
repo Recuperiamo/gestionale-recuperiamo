@@ -7,23 +7,14 @@ import React, {
   useMemo
 } from "react";
 import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from "../../lib/realtime/ablyClient";
-          try {
-            // accept either srcPreview (preferred) or srcData (older) as small
-            // inline previews; also preserve any server-hosted src separately.
-            const preview = data.srcPreview || data.srcData || null;
-            if (preview && normalized.kind === 'immagine') {
-              normalized.srcPreview = preview;
-            }
-            if (data.src && normalized.kind === 'immagine') {
-              // explicit server-hosted URL (e.g. /api/materiale?fileId=...)
-              normalized.srcServer = data.src;
-            }
-            // Choose initial src: prefer preview for immediate visibility,
-            // otherwise server src if available.
-            if (normalized.kind === 'immagine') {
-              normalized.src = normalized.srcPreview || normalized.srcServer || normalized.src;
-            }
-          } catch (_) {}
+
+export default function LavagnaCanvas({
+  lavagnaId,
+  attivitaId,
+  trattiIniziali,
+  utenteId,
+  clienteId,
+  ruolo,
   altezza = 600,
   openInNewWindow = false,
   isNewLavagna = false,
@@ -77,19 +68,10 @@ import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from ".
       { value: "#f59e0b", label: "Ambra", preview: "#f59e0b" },
       { value: "#f43f5e", label: "Corallo", preview: "#f43f5e" },
       { value: "#a855f7", label: "Viola", preview: "#a855f7" },
-      { value: "#14b8a6", label: "Acqua", preview: "#14b8a6" },
-          try {
-            const preview = data.srcPreview || data.srcData || null;
-            if (preview && normalized.kind === 'immagine') {
-              normalized.srcPreview = preview;
-            }
-            if (data.src && normalized.kind === 'immagine') {
-              normalized.srcServer = data.src;
-            }
-            if (normalized.kind === 'immagine') {
-              normalized.src = normalized.srcPreview || normalized.srcServer || normalized.src;
-            }
-          } catch (_) {}
+      { value: "#14b8a6", label: "Acqua", preview: "#14b8a6" }
+    ],
+    []
+  );
   const colorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
