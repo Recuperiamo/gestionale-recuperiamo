@@ -574,21 +574,21 @@ export default function LavagnaCanvas({
           ctx.closePath();
           ctx.fill();
 
-          // diagonal extra axis: draw it so it intersects the center and
-          // points to the southwest (down-left). Ensure the shaft touches
-          // the center (no gap) so axes appear connected.
-          const dx1 = cx;
-          const dy1 = cy;
-          const dx2 = cx - hw; // go left for southwest
-          const dy2 = cy + hh; // go down
+          // diagonal extra axis: extends from top-right to bottom-left through center
+          // with arrow at bottom-left end only (matching the pattern of the other axes)
+          const dx1 = cx + hw; // start top-right
+          const dy1 = cy - hh;
+          const dx2 = cx - hw; // end bottom-left
+          const dy2 = cy + hh;
           const angleDR = Math.atan2(dy2 - dy1, dx2 - dx1);
           const uxDR = Math.cos(angleDR);
           const uyDR = Math.sin(angleDR);
           ctx.beginPath();
-          // start exactly at center so it intersects the other axes
+          // draw from top-right to bottom-left, shortening at arrow end
           ctx.moveTo(dx1, dy1);
           ctx.lineTo(dx2 - headLength * uxDR, dy2 - headLength * uyDR);
           ctx.stroke();
+          // arrowhead at bottom-left end
           ctx.beginPath();
           ctx.moveTo(dx2, dy2);
           ctx.lineTo(dx2 - headLength * uxDR + headWidth * uyDR, dy2 - headLength * uyDR - headWidth * uxDR);
