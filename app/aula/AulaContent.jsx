@@ -32,6 +32,7 @@ function useCommenti(materiali) {
 function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStudente = [] }) {
   const [files, setFiles] = useState([]);
   const [materia, setMateria] = useState("");
+  const [sezione, setSezione] = useState("MATERIALE");
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef();
@@ -45,6 +46,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
   function resetForm() {
     setFiles([]);
     setMateria("");
+    setSezione("MATERIALE");
     setNome("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -63,7 +65,8 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
         const formData = new FormData();
         formData.append("file", file);
         formData.append("titolo", titolo);
-        if (materia) formData.append("materia", materia);
+  if (materia) formData.append("materia", materia);
+  if (sezione) formData.append("sezione", sezione);
         formData.append("clienteId", clienteId);
         const res = await fetch("/api/materiale", { method: "POST", body: formData });
         if (!res.ok) {
@@ -128,6 +131,18 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
               ? materieStudente.map(m => <option key={m} value={m}>{m}</option>)
               : materieLiceo.map(m => <option key={m} value={m}>{m}</option>)
             }
+          </select>
+        </div>
+        <div style={{marginBottom:12}}>
+          <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block"}}>Sezione</label>
+          <select
+            value={sezione}
+            onChange={e => setSezione(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="MATERIALE">Materiale</option>
+            <option value="COMPITI">Compiti</option>
+            <option value="VOTI">Voti</option>
           </select>
         </div>
         <div style={{marginBottom:16, fontSize:13, fontWeight:600}}>
@@ -345,12 +360,11 @@ export default function AulaContent({ initialClienteId = null }) {
     
     // Filtro per tab attiva
     if (activeTab === "compiti") {
-      list = list.filter(it => it.tipo && it.tipo.toLowerCase() === "compiti");
+      list = list.filter(it => (it.sezione || '').toUpperCase() === "COMPITI");
     } else if (activeTab === "materiale") {
-      list = list.filter(it => it.tipo && it.tipo.toLowerCase() === "materiale");
+      list = list.filter(it => (it.sezione || '').toUpperCase() === "MATERIALE");
     } else if (activeTab === "voti") {
-      // TODO: implementare quando avremo il modello Voti
-      list = [];
+      list = list.filter(it => (it.sezione || '').toUpperCase() === "VOTI");
     }
     // bacheca mostra tutto, quindi non filtriamo
     
@@ -478,18 +492,16 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           ) : (
             <>
-          {/* TABS CLASSROOM + VIDEO BUTTON */}
+          {/* TABS CLASSROOM */}
           {targetClienteId && (
             <div style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
+              gap: "8px",
               marginTop: "24px",
-              marginBottom: "16px",
+              marginBottom: "8px",
               borderBottom: "2px solid #e0e4f0",
               paddingBottom: "0"
             }}>
-              <div style={{ display: "flex", gap: "8px" }}>
                 {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
@@ -514,44 +526,30 @@ export default function AulaContent({ initialClienteId = null }) {
                     </button>
                   );
                 })}
-              </div>
-              
-              {/* PULSANTE VIDEOLEZIONE - spostato a destra */}
-              {studenteCorrente && (
-                <button
-                  style={{
-                    background: "linear-gradient(135deg, #1cb0f6 0%, #0891d1 100%)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 12,
-                    padding: "10px 20px",
-                    fontWeight: 700,
-                    fontSize: 14,
-                    cursor: "pointer",
-                    boxShadow: "0 4px 14px rgba(28,176,246,0.35)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    transition: "all 0.2s ease",
-                    marginBottom: "-2px"
-                  }}
-                  onClick={() => {
-                    const link = studenteCorrente.linkVideolezione;
-                    if (link) {
-                      window.open(link, '_blank', 'noopener,noreferrer');
-                    } else {
-                      alert('Link videolezione non configurato per questo studente');
-                    }
-                  }}
-                  title="Apri videolezione"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                  </svg>
-                  <span>Apri videolezione</span>
-                </button>
-              )}
+            </div>
+          )}
+
+          {/* VIDEO LEZIONE BUTTON - a sinistra sopra i tag/filtri */}
+          {targetClienteId && studenteCorrente && (
+            <div style={{ display:"flex", justifyContent:"flex-start", marginBottom: 10 }}>
+              <button
+                style={videoLinkButton}
+                onClick={() => {
+                  const link = studenteCorrente.linkVideolezione;
+                  if (link) {
+                    window.open(link, '_blank', 'noopener,noreferrer');
+                  } else {
+                    alert('Link videolezione non configurato per questo studente');
+                  }
+                }}
+                title="Apri videolezione"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+                <span>Apri videolezione</span>
+              </button>
             </div>
           )}
 
@@ -608,8 +606,8 @@ export default function AulaContent({ initialClienteId = null }) {
                     <div style={streamCardHead}>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
                         <h3 style={streamCardTitle}>{m.titolo}</h3>
-                        {typeof m.tipo === "string" && m.tipo.trim() && m.tipo !== "undefined" && (
-                          <span style={badgeTipo(m.tipo)}>{m.tipo.toUpperCase()}</span>
+                        {m.sezione && (
+                          <span style={badgeTipo(m.sezione)}>{String(m.sezione).toUpperCase()}</span>
                         )}
                       </div>
                       {isAdmin && (

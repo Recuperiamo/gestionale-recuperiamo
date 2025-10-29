@@ -243,6 +243,8 @@ model MaterialeDidattico {
   clienteId     Int
   titolo        String
   materia       String?
+  // Sezione didattica: MATERIALe, COMPITI, VOTI
+  sezione       MaterialeSezione @default(MATERIALE)
   nomeOriginale String
   blobUrl       String   // URL del file su Vercel Blob
   mimeType      String?
@@ -253,6 +255,12 @@ model MaterialeDidattico {
 
   @@index([clienteId])
   @@index([createdAt])
+}
+
+enum MaterialeSezione {
+  MATERIALE
+  COMPITI
+  VOTI
 }
 
 model Lavagna {

@@ -135,6 +135,8 @@ export async function POST(req) {
         tipo,
         referenteId,
         materie: materieSelezionate,
+        coloreTema: tipo === 'STUDENTE' ? (body.coloreTema || null) : null,
+        linkVideolezione: tipo === 'STUDENTE' ? (body.linkVideolezione || null) : null,
       },
       include: {
         referente: {
@@ -329,6 +331,8 @@ export async function PUT(req) {
         tipo,
         referenteId,
         materie: materieSelezionate,
+        coloreTema: tipo === 'STUDENTE' ? (body.coloreTema || null) : null,
+        linkVideolezione: tipo === 'STUDENTE' ? (body.linkVideolezione || null) : null,
       },
       include: {
         referente: {

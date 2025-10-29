@@ -75,6 +75,7 @@ export async function GET(req) {
       id: m.id,
       titolo: m.titolo,
       materia: m.materia,
+      sezione: m.sezione,
       clienteId: m.clienteId,
       nomeOriginale: m.nomeOriginale,
       tipo: m.nomeOriginale.split('.').pop()?.toLowerCase() || 'file',
@@ -118,6 +119,8 @@ export async function POST(req) {
   }
   
   const materia = formData.get("materia") || "";
+  let sezione = (formData.get("sezione") || "MATERIALE").toString().trim().toUpperCase();
+  if (!['MATERIALE','COMPITI','VOTI'].includes(sezione)) sezione = 'MATERIALE';
 
   try {
     // Upload to Vercel Blob
@@ -132,6 +135,7 @@ export async function POST(req) {
         clienteId: parseInt(clienteId),
         titolo: titolo.trim(),
         materia: materia || null,
+        sezione,
         nomeOriginale: file.name,
         blobUrl: blob.url,
         mimeType: file.type || 'application/octet-stream',
@@ -161,6 +165,7 @@ export async function POST(req) {
         titolo: materiale.titolo,
         nomeOriginale: materiale.nomeOriginale,
         clienteId: materiale.clienteId,
+        sezione: materiale.sezione,
         tipo: file.name.split('.').pop()?.toLowerCase() || 'file',
         updatedAt: materiale.updatedAt.toISOString(),
         mime: materiale.mimeType
