@@ -9,6 +9,7 @@ import { useRichiesteModifica } from "../components/modifiche/useRichiesteModifi
 import AttivitaDettaglioModal from "../components/attivita/AttivitaDettaglioModal";
 import RichiestaModificaModal from "../components/modifiche/RichiestaModificaModal";
 import ApprovaRichiestaModal from "../admin/modifiche/ApprovaRichiestaModal";
+import PacchettoSummaryPanel from "../components/pacchetti/PacchettoSummaryPanel";
 
 const GRACE_MS = 5 * 60 * 1000;
 const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 3600 * 1000);
@@ -287,6 +288,8 @@ export default function PacchettiLezioniPage() {
           <div style={errBox}>Errore: {errore}</div>
         ) : (
           <>
+            <PacchettoSummaryPanel attivita={attivita} />
+
             <SectionTitle>Lezioni Prenotate (future / prenotate)</SectionTitle>
             <TableWrapper>
               <MainTable

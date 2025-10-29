@@ -1,0 +1,451 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import PacchettoForm from "./PacchettoForm";
+import PacchettoEditForm from "./PacchettoEditForm";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import Alert from "../Alert";
+
+async function fetchPacchetti() {
+  const res = await fetch("/api/pacchetti");
+  return res.json();
+}
+
+async function fetchAttivitaByPacchetto(pacchettoId) {
+  const res = await fetch(`/api/attivita?pacchettoId=${pacchettoId}`);
+  return res.json();
+}
+
+async function fetchAlertLetti() {
+  const res = await fetch("/api/pacchetti/alert-letto", {
+    credentials: "include"
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.ids || [];
+}
+
+async function segnalaAlertLetto(pacchettoId) {
+  await fetch("/api/pacchetti/alert-letto", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pacchettoId }),
+    credentials: "include"
+  });
+}
+
+export default function PacchettiCardsAdmin() {
+  const [pacchetti, setPacchetti] = useState([]);
+  const [attivitaMap, setAttivitaMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [editPacchetto, setEditPacchetto] = useState(null);
+  const [deletePacchetto, setDeletePacchetto] = useState(null);
+  const [alertLetti, setAlertLetti] = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      const packs = await fetchPacchetti();
+      setPacchetti(packs || []);
+      
+      // Carica attività per ogni pacchetto
+      const attMap = {};
+      for (const p of packs || []) {
+        try {
+          const att = await fetchAttivitaByPacchetto(p.id);
+          attMap[p.id] = Array.isArray(att) ? att : [];
+        } catch (e) {
+          attMap[p.id] = [];
+        }
+      }
+      setAttivitaMap(attMap);
+      
+      const letti = await fetchAlertLetti();
+      setAlertLetti(letti);
+      
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  async function handleHideAlert(id) {
+    await segnalaAlertLetto(id);
+    setAlertLetti((prev) => [...prev, id]);
+  }
+
+  function handleCreateSuccess() {
+    setEditPacchetto(null);
+    setDeletePacchetto(null);
+    // Ricarica
+    fetchPacchetti().then((packs) => {
+      setPacchetti(packs || []);
+      const loadAtt = async () => {
+        const attMap = {};
+        for (const p of packs || []) {
+          const att = await fetchAttivitaByPacchetto(p.id);
+          attMap[p.id] = Array.isArray(att) ? att : [];
+        }
+        setAttivitaMap(attMap);
+      };
+      loadAtt();
+    });
+  }
+
+  const alertTop = pacchetti.find(
+    (p) =>
+      p.sogliaOreResidue !== null &&
+      p.sogliaOreResidue !== undefined &&
+      Number(p.oreResidue) <= Number(p.sogliaOreResidue) &&
+      Number(p.sogliaOreResidue) > 0 &&
+      !alertLetti.includes(p.id)
+  );
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 40, color: '#5a6d90' }}>
+        Caricamento pacchetti...
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 24, color: '#20489a' }}>
+        Tutti i Pacchetti
+      </h2>
+
+      {alertTop && (
+        <Alert
+          message={
+            <>
+              <b>
+                Pacchetto <span style={{ color: "#4B65C2" }}>{alertTop.descrizione}</span>
+                {" "}del cliente{" "}
+                <span style={{ color: "#0B7B5B" }}>
+                  {alertTop.cliente?.nomeReferente || alertTop.clienteId}
+                </span>
+                :{" "}
+              </b>
+              Ore residue sotto soglia ({alertTop.sogliaOreResidue})!
+              <button
+                className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition"
+                onClick={() => setEditPacchetto(alertTop)}
+                style={{ textDecoration: "underline", fontWeight: 500, marginLeft: 8 }}
+              >
+                Vai al dettaglio/modifica
+              </button>
+              <button
+                className="ml-2 px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+                onClick={() => handleHideAlert(alertTop.id)}
+                style={{ marginLeft: 12, fontWeight: 500 }}
+              >
+                Segnala come letto
+              </button>
+            </>
+          }
+          type="warning"
+          topPage={true}
+          large={true}
+          onClose={() => handleHideAlert(alertTop.id)}
+        />
+      )}
+
+      <div style={gridStyle}>
+        {pacchetti.map((p) => (
+          <PacchettoCard
+            key={p.id}
+            pacchetto={p}
+            attivita={attivitaMap[p.id] || []}
+            onEdit={() => setEditPacchetto(p)}
+            onDelete={() => setDeletePacchetto(p)}
+          />
+        ))}
+      </div>
+
+      {pacchetti.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          Nessun pacchetto presente.
+        </div>
+      )}
+
+      <button
+        onClick={() => setEditPacchetto({})}
+        style={btnNewStyle}
+      >
+        + Nuovo Pacchetto
+      </button>
+
+      {editPacchetto && Object.keys(editPacchetto).length === 0 && (
+        <PacchettoForm
+          onClose={() => setEditPacchetto(null)}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
+
+      {editPacchetto && Object.keys(editPacchetto).length > 0 && (
+        <PacchettoEditForm
+          pacchetto={editPacchetto}
+          onClose={() => setEditPacchetto(null)}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
+
+      {deletePacchetto && (
+        <ConfirmDeleteModal
+          pacchetto={deletePacchetto}
+          onClose={() => setDeletePacchetto(null)}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
+    </div>
+  );
+}
+
+function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
+  const GRACE_MS = 5 * 60 * 1000;
+  const now = Date.now();
+  
+  const stats = {
+    oreAcquistate: pacchetto.oreAcquistate || 0,
+    oreResidue: pacchetto.oreResidue || 0,
+    orePrenotate: 0,
+    oreSvolte: 0,
+    oreProgrammate: 0,
+  };
+
+  attivita.forEach(att => {
+    const ore = att.oreConsumate || att.durataOre || 0;
+    const orario = att.orario ? new Date(att.orario) : new Date(att.createdAt);
+    const isPast = orario.getTime() < (now - GRACE_MS);
+    const isCancelled = (att.stato || '').toLowerCase() === 'cancellata';
+    
+    if (isCancelled) return;
+    
+    if (isPast) {
+      stats.oreSvolte += ore;
+    } else {
+      stats.oreProgrammate += ore;
+    }
+    
+    stats.orePrenotate += ore;
+  });
+
+  const oreRimanenti = stats.oreAcquistate - stats.orePrenotate;
+  const isLow = oreRimanenti < 5;
+  const isEmpty = oreRimanenti <= 0;
+
+  return (
+    <div style={{
+      ...cardContainerStyle,
+      borderLeft: isEmpty ? '4px solid #EF4444' : isLow ? '4px solid #F59E0B' : '4px solid #3B82F6',
+      boxShadow: isLow ? '0 4px 20px rgba(239, 68, 68, 0.15)' : '0 4px 12px rgba(0,0,0,0.08)',
+    }}>
+      <div style={cardHeaderStyle}>
+        <div>
+          <h3 style={cardTitleStyle}>{pacchetto.descrizione}</h3>
+          <p style={cardSubtitleStyle}>
+            Cliente: {pacchetto.cliente?.nomeReferente || `ID ${pacchetto.clienteId}`}
+          </p>
+          <p style={cardSubtitleStyle}>
+            Stato: <span style={getStatoBadgeStyle(pacchetto.stato)}>{pacchetto.stato}</span>
+          </p>
+        </div>
+      </div>
+
+      <div style={statsGridStyle}>
+        <StatMini label="Acquistate" value={stats.oreAcquistate} color="#3B82F6" />
+        <StatMini label="Prenotate" value={stats.orePrenotate} color="#8B5CF6" />
+        <StatMini label="Svolte" value={stats.oreSvolte} color="#10B981" />
+        <StatMini label="Programmate" value={stats.oreProgrammate} color="#F59E0B" />
+        <StatMini 
+          label="Rimanenti" 
+          value={oreRimanenti} 
+          color={isEmpty ? '#EF4444' : isLow ? '#F59E0B' : '#06B6D4'}
+          highlighted={isLow}
+        />
+      </div>
+
+      {isLow && (
+        <div style={{
+          ...warningBoxStyle,
+          background: isEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+          border: isEmpty ? '2px solid rgba(239, 68, 68, 0.3)' : '2px solid rgba(251, 191, 36, 0.3)',
+        }}>
+          {isEmpty ? '🚨 Pacchetto esaurito!' : '⚠️ Ore quasi esaurite!'}
+        </div>
+      )}
+
+      <div style={actionsStyle}>
+        <button onClick={onEdit} style={btnEditStyle}>
+          ✏️ Modifica
+        </button>
+        <button onClick={onDelete} style={btnDeleteStyle}>
+          🗑️ Elimina
+        </button>
+        <Link
+          href={`/pacchetti/${pacchetto.id}/changelog`}
+          style={btnHistoryStyle}
+        >
+          🕐 Storico
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function StatMini({ label, value, color, highlighted }) {
+  return (
+    <div style={{
+      textAlign: 'center',
+      padding: '8px 4px',
+      borderRadius: 8,
+      background: highlighted ? `${color}15` : '#f8fafc',
+    }}>
+      <div style={{
+        fontSize: 18,
+        fontWeight: 800,
+        color: color,
+      }}>
+        {value.toFixed(1)}
+      </div>
+      <div style={{
+        fontSize: 10,
+        fontWeight: 600,
+        color: '#64748b',
+        textTransform: 'uppercase',
+        marginTop: 2,
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function getStatoBadgeStyle(stato) {
+  const base = {
+    padding: '2px 8px',
+    borderRadius: 12,
+    fontSize: 11,
+    fontWeight: 700,
+    display: 'inline-block',
+  };
+  
+  if (stato === 'attivo') {
+    return { ...base, background: '#D1FAE5', color: '#065F46' };
+  }
+  if (stato === 'sospeso') {
+    return { ...base, background: '#FEF3C7', color: '#92400E' };
+  }
+  return { ...base, background: '#F1F5F9', color: '#475569' };
+}
+
+const gridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+  gap: 24,
+  marginTop: 20,
+};
+
+const cardContainerStyle = {
+  background: '#fff',
+  borderRadius: 16,
+  padding: 20,
+  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+  transition: 'all 0.3s ease',
+  cursor: 'default',
+};
+
+const cardHeaderStyle = {
+  marginBottom: 16,
+};
+
+const cardTitleStyle = {
+  fontSize: 18,
+  fontWeight: 800,
+  color: '#20489a',
+  marginBottom: 6,
+};
+
+const cardSubtitleStyle = {
+  fontSize: 13,
+  color: '#64748b',
+  marginBottom: 4,
+};
+
+const statsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(5, 1fr)',
+  gap: 8,
+  marginBottom: 12,
+};
+
+const warningBoxStyle = {
+  padding: '8px 12px',
+  borderRadius: 8,
+  textAlign: 'center',
+  fontSize: 13,
+  fontWeight: 700,
+  marginBottom: 12,
+};
+
+const actionsStyle = {
+  display: 'flex',
+  gap: 8,
+  justifyContent: 'space-between',
+};
+
+const btnEditStyle = {
+  flex: 1,
+  padding: '8px 12px',
+  background: '#FEF3C7',
+  color: '#92400E',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+};
+
+const btnDeleteStyle = {
+  flex: 1,
+  padding: '8px 12px',
+  background: '#FEE2E2',
+  color: '#991B1B',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+};
+
+const btnHistoryStyle = {
+  flex: 1,
+  padding: '8px 12px',
+  background: '#DBEAFE',
+  color: '#1E40AF',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  textAlign: 'center',
+  textDecoration: 'none',
+  display: 'inline-block',
+};
+
+const btnNewStyle = {
+  marginTop: 24,
+  padding: '12px 24px',
+  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 12,
+  fontSize: 16,
+  fontWeight: 700,
+  cursor: 'pointer',
+  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+  transition: 'all 0.3s',
+};

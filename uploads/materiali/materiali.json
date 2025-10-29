@@ -31,5 +31,16 @@
     "tipo": "png",
     "updatedAt": "2025-10-28T15:18:39.315Z",
     "mime": "image/png"
+  },
+  {
+    "id": "a4d3f0bd-d1f4-469b-952a-903be934da1d",
+    "nomeSalvato": "a4d3f0bd-d1f4-469b-952a-903be934da1d.png",
+    "nomeOriginale": "immagine.png",
+    "titolo": "incollato_2025_10_29_11_18_19",
+    "materia": "",
+    "clienteId": "sandbox-cliente",
+    "tipo": "png",
+    "updatedAt": "2025-10-29T11:18:19.860Z",
+    "mime": "image/png"
   }
 ]
