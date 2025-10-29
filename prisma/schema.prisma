@@ -283,3 +283,36 @@ model LavagnaTratto {
   @@index([autoreUserId])
   @@index([createdAt])
 }
+
+/**
+ * ====================== LAVAGNA SHAPES ======================
+ * Forme vettoriali persistite sulla lavagna (rettangoli, cerchi, assi, ecc.)
+ */
+model LavagnaShape {
+  id           Int       @id @default(autoincrement())
+  lavagnaId    Int
+  kind         String
+  // Bounding box o coordinate base
+  x            Float?
+  y            Float?
+  w            Float?
+  h            Float?
+  // Coordinate addizionali per linee/assi
+  x1           Float?
+  y1           Float?
+  x2           Float?
+  y2           Float?
+  // Stile
+  colore       String?
+  spessore     Float?
+  // Autore e auditing
+  autoreUserId Int?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  lavagna    Lavagna @relation(fields: [lavagnaId], references: [id])
+  autoreUser User?   @relation(fields: [autoreUserId], references: [id])
+
+  @@index([lavagnaId])
+  @@index([createdAt])
+}
