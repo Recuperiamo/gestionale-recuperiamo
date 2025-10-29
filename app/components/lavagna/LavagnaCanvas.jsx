@@ -2902,7 +2902,7 @@ export default function LavagnaCanvas({
     const offY = event.clientY - rect.top;
     const worldBefore = { x: pan.x + offX / zoom, y: pan.y + offY / zoom };
     const factor = event.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.min(2, Math.max(0.5, Math.round((zoom * factor) * 100) / 100));
+    const newZoom = Math.min(2, Math.max(0.2, Math.round((zoom * factor) * 100) / 100));
     const newPan = {
       x: worldBefore.x - offX / newZoom,
       y: worldBefore.y - offY / newZoom,
@@ -2937,7 +2937,7 @@ export default function LavagnaCanvas({
       y: currentPan.y + offY / currentZoom
     };
     const candidate = Math.round((currentZoom * factor) * 100) / 100;
-    const newZoom = Math.min(2, Math.max(0.5, candidate));
+    const newZoom = Math.min(2, Math.max(0.2, candidate));
     if (Math.abs(newZoom - currentZoom) < 0.001) return;
     const newPan = {
       x: worldBefore.x - offX / newZoom,
@@ -5245,7 +5245,7 @@ export default function LavagnaCanvas({
   const showInCanvasActions = topRightPlacement === 'in-canvas' && (!spectatorMode || isAdmin);
   const showTopRightBar = showInCanvasActions || spectatorIndicatorVisible;
   const zoomDisabled = spectatorMode && !isAdmin;
-  const canZoomOut = zoom > 0.51;
+  const canZoomOut = zoom > 0.21;
   const canZoomIn = zoom < 1.99;
   const canResetView = zoom < 0.99 || zoom > 1.01 || Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5;
   const zoomLabel = `${Math.round(zoom * 100)}%`;

@@ -137,15 +137,36 @@ export default function AulePage() {
                 <div style={studentsGrid}>
                   {Array.isArray(ref.studenti) && ref.studenti.length > 0 ? (
                     ref.studenti.map(stud => (
-                      <Link key={stud.id} href={`/aula/${stud.id}`} style={studentCard}>
-                        <div style={studentCardInfo}>
-                          <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
-                          {Array.isArray(stud.materie) && stud.materie.length > 0 && (
-                            <div style={studentSubjects}>{stud.materie.slice(0, 2).join(", ")}{stud.materie.length > 2 ? '...' : ''}</div>
-                          )}
-                        </div>
-                        <div style={enterButtonCompact}>→</div>
-                      </Link>
+                      <div key={stud.id} style={studentCardWrapper}>
+                        <Link href={`/aula/${stud.id}`} style={studentCard}>
+                          <div style={studentCardInfo}>
+                            <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
+                            {Array.isArray(stud.materie) && stud.materie.length > 0 && (
+                              <div style={studentSubjects}>{stud.materie.slice(0, 2).join(", ")}{stud.materie.length > 2 ? '...' : ''}</div>
+                            )}
+                          </div>
+                          <div style={enterButtonCompact}>→</div>
+                        </Link>
+                        {/* Videolezione link - placeholder (sarà attivato quando aggiungi linkVideolezione al DB) */}
+                        <button
+                          onClick={() => {
+                            // TODO: sostituisci con stud.linkVideolezione quando aggiungi il campo al DB
+                            const link = null; // stud.linkVideolezione
+                            if (link) {
+                              window.open(link, '_blank', 'noopener,noreferrer');
+                            } else {
+                              alert('Link videolezione non configurato per questo studente');
+                            }
+                          }}
+                          style={videoButton}
+                          title="Apri videolezione"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                          </svg>
+                        </button>
+                      </div>
                     ))
                   ) : (
                     <div style={emptyStudent}>Nessuno studente associato.</div>
@@ -259,22 +280,45 @@ const badge = {
 
 const studentsGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-  gap: "12px"
+  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+  gap: "14px"
+};
+
+const studentCardWrapper = {
+  display: "flex",
+  alignItems: "stretch",
+  gap: "8px"
 };
 
 const studentCard = {
+  flex: 1,
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   gap: "8px",
   background: "linear-gradient(135deg, #f5f8ff 0%, #e3eefe 100%)",
-  padding: "14px 16px",
-  borderRadius: "12px",
+  padding: "16px",
+  borderRadius: "14px",
   border: "1.5px solid #d8e3fb",
   textDecoration: "none",
   transition: "all 0.2s ease",
   cursor: "pointer"
+};
+
+const videoButton = {
+  background: "#1cb0f6",
+  color: "#fff",
+  border: "none",
+  width: "44px",
+  height: "auto",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "12px",
+  cursor: "pointer",
+  transition: "all 0.2s ease",
+  padding: "0",
+  flexShrink: 0
 };
 
 const studentCardInfo = {
