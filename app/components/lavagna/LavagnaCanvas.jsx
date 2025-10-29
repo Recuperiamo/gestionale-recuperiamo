@@ -1604,6 +1604,8 @@ export default function LavagnaCanvas({
         const onShapeDelete = (msg) => {
           const { data } = msg || {};
           if (!data || !data.id) return;
+          console.log('[LAVAGNA-REMOTE-DELETE] Received shape:delete event:', data);
+          // Only remove from local state; persistence is handled by the originating client
           setForme((prev) => prev.filter((f) => f.id !== data.id));
           drawAll();
         };
@@ -2060,7 +2062,11 @@ export default function LavagnaCanvas({
         // do not prevent default so images/links from system clipboard still arrive in onPaste
       }
       if (e.key === 'Delete') { // delete selection
-        selectedItems.forme.forEach(id => deleteShapeLocal(id, true));
+        console.log('[LAVAGNA-DELETE-KEY] Delete pressed, selectedItems:', selectedItems);
+        selectedItems.forme.forEach(id => {
+          console.log('[LAVAGNA-DELETE-KEY] Calling deleteShapeLocal for id:', id);
+          deleteShapeLocal(id, true);
+        });
         setTratti(prev => prev.filter((_, idx) => !selectedItems.tratti.includes(idx)));
         setSelectedItems({ tratti: [], forme: [] });
         e.preventDefault();
@@ -2907,8 +2913,10 @@ export default function LavagnaCanvas({
         }
       }
       if (!toDelete.length) return false;
+      console.log('[LAVAGNA-ERASE] Erasing shapes:', toDelete);
       toDelete.forEach((id) => {
         eraseSessionRef.current.shapeIds.add(id);
+        console.log('[LAVAGNA-ERASE] Calling deleteShapeLocal for id:', id);
         deleteShapeLocal(id, true);
       });
       drawAll();
