@@ -1830,16 +1830,20 @@ export default function LavagnaCanvas({
   }, [emitOrPublish, lavagnaId]);
 
   const deleteShapeLocal = useCallback((id, emit = true, force = false) => {
+    console.log('[LAVAGNA-DELETE] deleteShapeLocal called:', { id, emit, force, formeLengthBefore: forme.length });
     let removedShape = null;
     setForme((prev) => {
       const target = prev.find((f) => f.id === id);
+      console.log('[LAVAGNA-DELETE] Searching for shape in setForme:', { id, found: !!target, prevLength: prev.length });
       if (!target) return prev;
       if (!force && !isAdmin && target.autoreUserId && target.autoreUserId !== utenteId) {
+        console.log('[LAVAGNA-DELETE] Permission denied:', { isAdmin, targetAuthor: target.autoreUserId, utenteId });
         return prev;
       }
       removedShape = target;
       return prev.filter((f) => f.id !== id);
     });
+    console.log('[LAVAGNA-DELETE] After setForme, removedShape:', removedShape);
     if (!removedShape) return;
     // register undo entry for deletions performed by this user
     try {
