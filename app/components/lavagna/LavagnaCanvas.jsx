@@ -212,8 +212,34 @@ export default function LavagnaCanvas({
     primaryStrokeIndex: null,
     selectionSnapshot: null
   });
+  const resizingSelectionRef = useRef({
+    active: false,
+    handle: null, // e.g., 'top-left', 'bottom-right'
+    aspectRatio: 1,
+    originalBounds: null,
+    selectionSnapshot: null,
+  });
   const selectionClickRef = useRef(null);
   const [showShapesPopover, setShowShapesPopover] = useState(false);
+
+  const getResizeCursor = (handle) => {
+    switch (handle) {
+      case 'top-left':
+      case 'bottom-right':
+        return 'nwse-resize';
+      case 'top-right':
+      case 'bottom-left':
+        return 'nesw-resize';
+      case 'top':
+      case 'bottom':
+        return 'ns-resize';
+      case 'left':
+      case 'right':
+        return 'ew-resize';
+      default:
+        return 'default';
+    }
+  };
 
   const isAdmin = String(ruolo || "").toLowerCase() === "admin";
   const eraseSessionRef = useRef({
@@ -523,7 +549,6 @@ export default function LavagnaCanvas({
           ctx.lineTo(hx2 - headLength * uxH + headWidth * uyH, hy2 - headLength * uyH - headWidth * uxH);
           ctx.lineTo(hx2 - headLength * uxH - headWidth * uyH, hy2 - headLength * uyH + headWidth * uxH);
           ctx.closePath();
-          ctx.fillStyle = f.colore || '#20489a';
           ctx.fill();
 
           // vertical axis (top -> bottom) with arrow at top only
@@ -623,6 +648,26 @@ export default function LavagnaCanvas({
           const height = bounds.maxY - bounds.minY;
           ctx.strokeRect(bounds.minX - padding, bounds.minY - padding, width + padding * 2, height + padding * 2);
           ctx.setLineDash([]);
+
+          // Draw resize handles
+          const handleSize = 10 / safeZoom;
+          const handleOffset = handleSize / 2;
+          const handles = {
+            'top-left': { x: bounds.minX, y: bounds.minY },
+            'top-right': { x: bounds.maxX, y: bounds.minY },
+            'bottom-left': { x: bounds.minX, y: bounds.maxY },
+            'bottom-right': { x: bounds.maxX, y: bounds.maxY },
+            'top': {x: bounds.minX + width/2, y: bounds.minY},
+            'bottom': {x: bounds.minX + width/2, y: bounds.maxY},
+            'left': {x: bounds.minX, y: bounds.minY + height/2},
+            'right': {x: bounds.maxX, y: bounds.minY + height/2},
+          };
+
+          ctx.fillStyle = '#2563eb';
+          for (const key in handles) {
+            const pos = handles[key];
+            ctx.fillRect(pos.x - handleOffset, pos.y - handleOffset, handleSize, handleSize);
+          }
         }
       }
       ctx.restore();
@@ -1762,6 +1807,26 @@ export default function LavagnaCanvas({
               const tempSrc = URL.createObjectURL(file);
               const tempId = insertLocalPastedImage(tempSrc);
 
+              // Immediately create and emit a preview for remote clients
+              (async () => {
+                try {
+                  const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
+                  const previewShape = {
+                    id: tempId,
+                    kind: 'immagine',
+                    src: srcPreview,
+                    x: (pointerWorldRef.current || getWorldCenter()).x - 200 / (zoom || 1),
+                    y: (pointerWorldRef.current || getWorldCenter()).y - 150 / (zoom || 1),
+                    w: 400 / (zoom || 1),
+                    h: 300 / (zoom || 1),
+                    autoreUserId: utenteId
+                  };
+                  emitOrPublish('shape:create', { ...previewShape, lavagnaId, srcPreview });
+                } catch (previewErr) {
+                  console.warn('[lavagna] failed to create preview', previewErr);
+                }
+              })();
+
               // Upload in background; when done, replace temp shape with persisted one
               (async () => {
                 try {
@@ -1810,26 +1875,16 @@ export default function LavagnaCanvas({
                     shape.y = anchor.y - desiredH / 2;
                     // update temp preview in-place to point to server URL
                     setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h, x: shape.x, y: shape.y } : f));
-                    // emit creation for realtime consumers and persist shape on server
+                    // persist shape on server and notify remote clients of server URL
                     try {
                       const normalized = normalizeShape({ ...shape, id: tempId });
-                      // create data URL fallback for clients without access to /api/materiale
-                      try {
-                        // Create a small preview thumbnail (JPEG) to include in the
-                        // realtime event. Full data URLs can be very large and may
-                        // be dropped/limited by the realtime transport. A compact
-                        // preview gives remote clients an immediate visual while
-                        // the server-hosted image is available for full-resolution.
-                        const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
-                        emitOrPublish('shape:create', { ...normalized, lavagnaId, srcPreview });
-                      } catch (_) {
-                        try { const srcData = await fileToDataURL(file); emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData }); } catch (_) { emitOrPublish('shape:create', { ...normalized, lavagnaId }); }
-                      }
                       persistShape(normalized).then((s) => {
                         if (s && s.id) {
                           setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
                         }
                       }).catch(()=>{});
+                      // Notify remote clients that a persisted server URL is available
+                      emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, materialeId: mat.id, w: shape.w, h: shape.h, x: shape.x, y: shape.y });
                     } catch (_) {}
                     // revoke temp URL
                     try { URL.revokeObjectURL(tempSrc); } catch(_) {}
@@ -1839,17 +1894,13 @@ export default function LavagnaCanvas({
                       setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
                       try {
                         const normalized = normalizeShape({ ...shape, id: tempId });
-                        try {
-                          const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
-                          emitOrPublish('shape:create', { ...normalized, lavagnaId, srcPreview });
-                        } catch (_) {
-                          try { const srcData = await fileToDataURL(file); emitOrPublish('shape:create', { ...normalized, lavagnaId, srcData }); } catch (_) { emitOrPublish('shape:create', { ...normalized, lavagnaId }); }
-                        }
                         persistShape(normalized).then((s) => {
                           if (s && s.id) {
                             setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
                           }
                         }).catch(()=>{});
+                        // Notify remote clients that a persisted server URL is available
+                        emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, materialeId: mat.id });
                       } catch (_) {}
                       try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                       drawAll();
@@ -1885,7 +1936,7 @@ export default function LavagnaCanvas({
                 h: baseH,
                 autoreUserId: utenteId
               };
-              createShapeLocal(shape, true);
+              createShapeLocal(shape, true); // <-- emit = true
               e.preventDefault();
               return;
             }
@@ -2687,7 +2738,7 @@ export default function LavagnaCanvas({
             draggingSelectionRef.current.primaryShapeId = hitShape.id;
             draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify({ forme: [hitShape.id], tratti: [] }));
             try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select)', hitShape.id); } catch(_) {}
+            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select)', hitShape.id); } catch(_){}
             return;
           }
         } catch (_) {}
@@ -2713,7 +2764,7 @@ export default function LavagnaCanvas({
                 draggingSelectionRef.current.primaryShapeId = selectedItems.forme[0];
                 draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
                 try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems.forme[0]); } catch(_) {}
+                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems.forme[0]); } catch(_){}
                 selectionClickRef.current = {
                   pointerId,
                   pointerTool: 'selezione',
@@ -2728,9 +2779,51 @@ export default function LavagnaCanvas({
             }
           }
         } catch (_) {}
+        
+        // Check if the user clicked on a resize handle
+        const selBounds = getSelectionBoundsForIds(selectedItems.forme || []);
+        if (selBounds && selectedItems.forme && selectedItems.forme.length > 0) {
+          const handleSize = 10 / (zoom || 1);
+          const handleTol = Math.max(handleSize, 12 / (zoom || 1));
+          const width = selBounds.maxX - selBounds.minX;
+          const height = selBounds.maxY - selBounds.minY;
+          
+          const handles = {
+            'top-left': { x: selBounds.minX, y: selBounds.minY },
+            'top-right': { x: selBounds.maxX, y: selBounds.minY },
+            'bottom-left': { x: selBounds.minX, y: selBounds.maxY },
+            'bottom-right': { x: selBounds.maxX, y: selBounds.maxY },
+            'top': { x: selBounds.minX + width / 2, y: selBounds.minY },
+            'bottom': { x: selBounds.minX + width / 2, y: selBounds.maxY },
+            'left': { x: selBounds.minX, y: selBounds.minY + height / 2 },
+            'right': { x: selBounds.maxX, y: selBounds.minY + height / 2 },
+          };
+          
+          let hitHandle = null;
+          for (const [name, pos] of Object.entries(handles)) {
+            const dx = p.x - pos.x;
+            const dy = p.y - pos.y;
+            if (Math.hypot(dx, dy) <= handleTol) {
+              hitHandle = name;
+              break;
+            }
+          }
+          
+          if (hitHandle) {
+            // Start resizing
+            resizingSelectionRef.current.active = true;
+            resizingSelectionRef.current.handle = hitHandle;
+            resizingSelectionRef.current.originalBounds = { ...selBounds };
+            resizingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
+            resizingSelectionRef.current.startPoint = { x: p.x, y: p.y };
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+            try { console.log('[LAVAGNA-DBG-RESIZE] start', hitHandle); } catch(_) {}
+            return;
+          }
+        }
+        
         // If there is already a selection and the pointer is on one of the
         // selection corners, begin rotation around the SELECTION CENTER.
-        const selBounds = getSelectionBoundsForIds(selectedItems.forme || []);
         if (selBounds) {
           const corners = [
             { x: selBounds.minX, y: selBounds.minY },
@@ -2783,7 +2876,7 @@ export default function LavagnaCanvas({
         return;
       }
 
-      if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'freccia', 'rombo', 'assi2', 'assi3'].includes(strumento)) {
+      if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'rombo', 'freccia', 'assi2', 'assi3'].includes(strumento)) {
       const p = getPointerWorld();
       previewShapeRef.current = {
         kind: strumento,
@@ -2953,6 +3046,89 @@ export default function LavagnaCanvas({
       return;
     }
 
+    // If we're resizing, update the selected shapes
+    if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
+      try {
+        const p = getPoint(e);
+        pointerWorldRef.current = p;
+        const resizeInfo = resizingSelectionRef.current;
+        const origBounds = resizeInfo.originalBounds;
+        const handle = resizeInfo.handle;
+        const startPoint = resizeInfo.startPoint;
+        
+        if (!origBounds || !handle || !startPoint || !p) return;
+        
+        const dx = p.x - startPoint.x;
+        const dy = p.y - startPoint.y;
+        
+        let newBounds = { ...origBounds };
+        
+        // Update bounds based on which handle is being dragged
+        if (handle.includes('left')) {
+          newBounds.minX = origBounds.minX + dx;
+        }
+        if (handle.includes('right')) {
+          newBounds.maxX = origBounds.maxX + dx;
+        }
+        if (handle.includes('top')) {
+          newBounds.minY = origBounds.minY + dy;
+        }
+        if (handle.includes('bottom')) {
+          newBounds.maxY = origBounds.maxY + dy;
+        }
+        
+        // Calculate scale factors
+        const origWidth = origBounds.maxX - origBounds.minX;
+        const origHeight = origBounds.maxY - origBounds.minY;
+        const newWidth = newBounds.maxX - newBounds.minX;
+        const newHeight = newBounds.maxY - newBounds.minY;
+        
+        if (origWidth <= 0 || origHeight <= 0 || newWidth <= 0 || newHeight <= 0) return;
+        
+        const scaleX = newWidth / origWidth;
+        const scaleY = newHeight / origHeight;
+        
+        // Apply scaling to all selected shapes
+        const selectionSnapshot = resizeInfo.selectionSnapshot || selectedItems;
+        setForme(prev => prev.map(f => {
+          if (!selectionSnapshot.forme.includes(f.id)) return f;
+          
+          // Calculate new position and size based on original bounds
+          const relX = (f.x - origBounds.minX) / origWidth;
+          const relY = (f.y - origBounds.minY) / origHeight;
+          const relW = (f.w || 0) / origWidth;
+          const relH = (f.h || 0) / origHeight;
+          
+          const updated = {
+            ...f,
+            x: newBounds.minX + relX * newWidth,
+            y: newBounds.minY + relY * newHeight,
+            w: relW * newWidth,
+            h: relH * newHeight,
+          };
+          
+          // Handle shapes with x1, y1, x2, y2
+          if (typeof f.x1 === 'number' && typeof f.y1 === 'number') {
+            const relX1 = (f.x1 - origBounds.minX) / origWidth;
+            const relY1 = (f.y1 - origBounds.minY) / origHeight;
+            updated.x1 = newBounds.minX + relX1 * newWidth;
+            updated.y1 = newBounds.minY + relY1 * newHeight;
+          }
+          if (typeof f.x2 === 'number' && typeof f.y2 === 'number') {
+            const relX2 = (f.x2 - origBounds.minX) / origWidth;
+            const relY2 = (f.y2 - origBounds.minY) / origHeight;
+            updated.x2 = newBounds.minX + relX2 * newWidth;
+            updated.y2 = newBounds.minY + relY2 * newHeight;
+          }
+          
+          return updated;
+        }));
+        
+        drawAll();
+      } catch (_) {}
+      return;
+    }
+
     // Continuous erase while dragging in intero-tratto mode
     if (erasingRef.current) {
       const p = getPoint(e);
@@ -3045,6 +3221,50 @@ export default function LavagnaCanvas({
       pointerWorldRef.current = p;
       setSelectionBox({ x1: selectingRef.current.start.x, y1: selectingRef.current.start.y, x2: p.x, y2: p.y });
       return;
+    }
+
+    // Update cursor when hovering over resize handles
+    if (strumento === 'selezione' && selectedItems.forme && selectedItems.forme.length > 0) {
+      try {
+        const p = getPoint(e);
+        const selBounds = getSelectionBoundsForIds(selectedItems.forme);
+        if (selBounds) {
+          const handleSize = 10 / (zoom || 1);
+          const handleTol = Math.max(handleSize, 12 / (zoom || 1));
+          const width = selBounds.maxX - selBounds.minX;
+          const height = selBounds.maxY - selBounds.minY;
+          
+          const handles = {
+            'top-left': { x: selBounds.minX, y: selBounds.minY },
+            'top-right': { x: selBounds.maxX, y: selBounds.minY },
+            'bottom-left': { x: selBounds.minX, y: selBounds.maxY },
+            'bottom-right': { x: selBounds.maxX, y: selBounds.maxY },
+            'top': { x: selBounds.minX + width / 2, y: selBounds.minY },
+            'bottom': { x: selBounds.minX + width / 2, y: selBounds.maxY },
+            'left': { x: selBounds.minX, y: selBounds.minY + height / 2 },
+            'right': { x: selBounds.maxX, y: selBounds.minY + height / 2 },
+          };
+          
+          let hoveredHandle = null;
+          for (const [name, pos] of Object.entries(handles)) {
+            const dx = p.x - pos.x;
+            const dy = p.y - pos.y;
+            if (Math.hypot(dx, dy) <= handleTol) {
+              hoveredHandle = name;
+              break;
+            }
+          }
+          
+          const canvas = canvasRef.current;
+          if (canvas) {
+            if (hoveredHandle) {
+              canvas.style.cursor = getResizeCursor(hoveredHandle);
+            } else {
+              canvas.style.cursor = 'default';
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     // If not drawing stroke, nothing to do
@@ -3177,6 +3397,37 @@ export default function LavagnaCanvas({
       drawAll();
       return;
     }
+    
+    // Finalize resize if active
+    if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
+      try {
+        // Emit shape:update events for all resized shapes
+        const selectionSnapshot = resizingSelectionRef.current.selectionSnapshot || selectedItems;
+        for (const shapeId of selectionSnapshot.forme) {
+          const shape = forme.find(f => f.id === shapeId);
+          if (shape) {
+            emitOrPublish('shape:update', { ...shape, lavagnaId });
+            // Also persist to database
+            fetch(`/api/lavagna/shape/${shape.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(shape)
+            }).catch(() => {});
+          }
+        }
+      } catch (_) {}
+      
+      resizingSelectionRef.current.active = false;
+      resizingSelectionRef.current.handle = null;
+      resizingSelectionRef.current.originalBounds = null;
+      resizingSelectionRef.current.selectionSnapshot = null;
+      resizingSelectionRef.current.startPoint = null;
+      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
+      try { console.log('[LAVAGNA-DBG-RESIZE] finished'); } catch(_) {}
+      drawAll();
+      return;
+    }
+    
     if (panningRef.current.active) {
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
@@ -3835,68 +4086,6 @@ export default function LavagnaCanvas({
                 />
               </svg>
             </button>
-            <div style={{ position:'relative' }}>
-              <button
-                type="button"
-                style={iconBtn(shapeButtonActive)}
-                onClick={() => {
-                  setShowShapesPopover((v) => !v);
-                  setShowPenPopover(false);
-                  setShowMoreMenu(false);
-                  setShowExportMenu(false);
-                }}
-                title="Forme"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <g stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                    {/* rotated square (top-left) */}
-                    <rect x="2" y="2" width="10" height="10" rx="1.8" transform="rotate(-25 7 7)" />
-                    {/* larger circle (moved closer) to intersect the square diagonally */}
-                    <circle cx="13" cy="11" r="5" />
-                  </g>
-                </svg>
-              </button>
-              {showShapesPopover && (
-                <div style={st.popover}>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:8 }}>
-                    <button type="button" style={iconBtn(strumento === 'rettangolo')} onClick={() => { setStrumento('rettangolo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Rettangolo">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke={strumento==='rettangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'cerchio')} onClick={() => { setStrumento('cerchio'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Cerchio / Ellisse">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke={strumento==='cerchio'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'linea')} onClick={() => { setStrumento('linea'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Linea">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><line x1="5" y1="19" x2="19" y2="5" stroke={strumento==='linea'? '#fff':'#20489a'} strokeWidth="2"/></svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'triangolo')} onClick={() => { setStrumento('triangolo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Triangolo">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5l8 14H4L12 5z" stroke={strumento==='triangolo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'rombo')} onClick={() => { setStrumento('rombo'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Rombo">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 9-7 9-7-9 7-9z" stroke={strumento==='rombo'? '#fff':'#20489a'} strokeWidth="2" fill="none"/></svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'assi2')} onClick={() => { setStrumento('assi2'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Assi (2)">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 3v18" stroke={strumento==='assi2'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
-                        <path d="M3 12h18" stroke={strumento==='assi2'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'assi3')} onClick={() => { setStrumento('assi3'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Assi (3)">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 3v18" stroke={strumento==='assi3'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
-                        <path d="M5 16l14-8" stroke={strumento==='assi3'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
-                        <path d="M5 8l14 8" stroke={strumento==='assi3'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                    <button type="button" style={iconBtn(strumento === 'freccia')} onClick={() => { setStrumento('freccia'); setShowShapesPopover(false); setShowExportMenu(false); }} title="Freccia">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <path d="M5 12h8" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round"/>
-                        <path d="M13 7l6 5-6 5" stroke={strumento==='freccia'? '#fff':'#20489a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
             <div style={{ position:'relative' }}>
               <button
                 type="button"
