@@ -460,6 +460,106 @@ export default function LavagnaCanvas({
           ctx.stroke();
           break;
         }
+        case 'assi2d': {
+          // Assi cartesiani 2D: asse X e Y con frecce
+          const x = f.x;
+          const y = f.y;
+          const w = f.w;
+          const h = f.h;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const arrowSize = Math.max(10, (f.spessore || 3) * 3);
+          
+          // Asse X (orizzontale)
+          ctx.beginPath();
+          ctx.moveTo(x, cy);
+          ctx.lineTo(x + w, cy);
+          ctx.stroke();
+          
+          // Freccia asse X
+          ctx.beginPath();
+          ctx.moveTo(x + w, cy);
+          ctx.lineTo(x + w - arrowSize, cy - arrowSize * 0.5);
+          ctx.lineTo(x + w - arrowSize, cy + arrowSize * 0.5);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+          
+          // Asse Y (verticale)
+          ctx.beginPath();
+          ctx.moveTo(cx, y);
+          ctx.lineTo(cx, y + h);
+          ctx.stroke();
+          
+          // Freccia asse Y
+          ctx.beginPath();
+          ctx.moveTo(cx, y);
+          ctx.lineTo(cx - arrowSize * 0.5, y + arrowSize);
+          ctx.lineTo(cx + arrowSize * 0.5, y + arrowSize);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+          break;
+        }
+        case 'assi3d': {
+          // Assi cartesiani 3D: X, Y e Z con frecce
+          const x = f.x;
+          const y = f.y;
+          const w = f.w;
+          const h = f.h;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const arrowSize = Math.max(10, (f.spessore || 3) * 3);
+          
+          // Asse X (orizzontale a destra)
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(x + w, cy);
+          ctx.stroke();
+          
+          // Freccia asse X
+          ctx.beginPath();
+          ctx.moveTo(x + w, cy);
+          ctx.lineTo(x + w - arrowSize, cy - arrowSize * 0.5);
+          ctx.lineTo(x + w - arrowSize, cy + arrowSize * 0.5);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+          
+          // Asse Y (verticale verso l'alto)
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx, y);
+          ctx.stroke();
+          
+          // Freccia asse Y
+          ctx.beginPath();
+          ctx.moveTo(cx, y);
+          ctx.lineTo(cx - arrowSize * 0.5, y + arrowSize);
+          ctx.lineTo(cx + arrowSize * 0.5, y + arrowSize);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+          
+          // Asse Z (diagonale verso destra-basso)
+          const zLen = Math.min(w, h) * 0.7;
+          const zEndX = cx + zLen * 0.7;
+          const zEndY = cy + zLen * 0.7;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(zEndX, zEndY);
+          ctx.stroke();
+          
+          // Freccia asse Z
+          ctx.beginPath();
+          ctx.moveTo(zEndX, zEndY);
+          ctx.lineTo(zEndX - arrowSize * 0.8, zEndY - arrowSize * 0.3);
+          ctx.lineTo(zEndX - arrowSize * 0.3, zEndY - arrowSize * 0.8);
+          ctx.closePath();
+          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+          break;
+        }
         case 'assi2': {
           // 2-axis Cartesian: horizontal and vertical axes centered on bbox,
           // with arrowheads only on the top (vertical) and right (horizontal) ends.
@@ -863,6 +963,103 @@ export default function LavagnaCanvas({
             ctx.lineTo(minX, cy);
             ctx.closePath();
             ctx.stroke();
+            break;
+          }
+          case 'assi2d': {
+            // Assi cartesiani 2D: asse X orizzontale e asse Y verticale con frecce
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
+            
+            // Asse X (orizzontale)
+            ctx.beginPath();
+            ctx.moveTo(minX, cy);
+            ctx.lineTo(minX + w, cy);
+            ctx.stroke();
+            
+            // Freccia asse X
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(minX + w, cy);
+            ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
+            ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            
+            // Asse Y (verticale)
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(cx, minY + h);
+            ctx.stroke();
+            
+            // Freccia asse Y
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
+            ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            break;
+          }
+          case 'assi3d': {
+            // Assi cartesiani 3D: X, Y e Z con frecce
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
+            
+            // Asse X (orizzontale a destra)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(minX + w, cy);
+            ctx.stroke();
+            
+            // Freccia asse X
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(minX + w, cy);
+            ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
+            ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            
+            // Asse Y (verticale verso l'alto)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx, minY);
+            ctx.stroke();
+            
+            // Freccia asse Y
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
+            ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            
+            // Asse Z (diagonale verso destra-basso)
+            const zLen = Math.min(w, h) * 0.7;
+            const zEndX = cx + zLen * 0.7;
+            const zEndY = cy + zLen * 0.7;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(zEndX, zEndY);
+            ctx.stroke();
+            
+            // Freccia asse Z
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(zEndX, zEndY);
+            ctx.lineTo(zEndX - arrowSize * 0.8, zEndY - arrowSize * 0.3);
+            ctx.lineTo(zEndX - arrowSize * 0.3, zEndY - arrowSize * 0.8);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
             break;
           }
           default:
@@ -2233,10 +2430,10 @@ export default function LavagnaCanvas({
   const z = zoomRef.current || 1;
   // Reduce deduplication threshold strongly so we keep more raw samples from
   // tablet devices; value is in world units and scales with zoom. At zoom=1
-  // we accept much closer points (≈0.03) so final smoothing has more input
+  // we accept much closer points (≈0.015) so final smoothing has more input
   // to work on and we avoid losing small/fast letter strokes. Reduced from
-  // 0.06 to 0.03 to capture more points during fast cursive writing.
-  const minDist = Math.max(0.01, 0.03 / (z || 1)); // world units (lower => keep more points)
+  // 0.06 to 0.03, then to 0.015 to capture even more points for complex numbers.
+  const minDist = Math.max(0.005, 0.015 / (z || 1)); // world units (lower => keep more points)
     const dedup = [];
     let last = null;
     for (const p of rawPoints) {
@@ -4578,6 +4775,34 @@ export default function LavagnaCanvas({
                     >
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path d="M12 4 L20 12 L12 20 L4 12 Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'assi2d')}
+                      onClick={() => {
+                        setStrumento('assi2d');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Assi Cartesiani 2D"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 12 L20 12 M12 4 L12 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        <path d="M20 12 L17 9 M20 12 L17 15 M12 4 L9 7 M12 4 L15 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'assi3d')}
+                      onClick={() => {
+                        setStrumento('assi3d');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Assi Cartesiani 3D"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 12 L20 12 M12 4 L12 20 M12 12 L18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        <path d="M20 12 L17 9 M20 12 L17 15 M12 4 L9 7 M12 4 L15 7 M18 18 L16 20 M18 18 L20 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </button>
                   </div>
