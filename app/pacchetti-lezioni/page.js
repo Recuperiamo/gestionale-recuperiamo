@@ -29,6 +29,9 @@ export default function PacchettiLezioniPage() {
 
   const [selectedRichiesta, setSelectedRichiesta] = useState(null);
   const [showModalApprova, setShowModalApprova] = useState(false);
+  // Selezione multipla per eliminazione di gruppo
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const isCliente = session?.user?.role === "cliente";
   const isAdmin = !isCliente;
@@ -55,6 +58,13 @@ export default function PacchettiLezioniPage() {
     }
     fetchAttivita();
   }, [status, session, router]);
+
+  // Pulizia selezione quando si disattiva il multi-select
+  useEffect(() => {
+    if (!multiSelect && selectedIds.size) {
+      setSelectedIds(new Set());
+    }
+  }, [multiSelect, selectedIds]);
 
   const richiesteHook = useRichiesteModifica({ auto: isCliente || isAdmin });
   const richiesteSafe = Array.isArray(richiesteHook?.richieste) ? richiesteHook.richieste : [];
@@ -290,15 +300,94 @@ export default function PacchettiLezioniPage() {
           <>
             <PacchettoSummaryPanel attivita={attivita} />
 
+            {isAdmin && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 20px'
+              }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={multiSelect}
+                    onChange={(e)=> setMultiSelect(e.target.checked)}
+                  />
+                  <span style={{ fontWeight: 700 }}>Selezione multipla</span>
+                </label>
+                {multiSelect && (
+                  <button
+                    disabled={selectedIds.size === 0}
+                    onClick={async () => {
+                      if (selectedIds.size === 0) return;
+                      const count = selectedIds.size;
+                      if (!confirm(`Confermi l'eliminazione di ${count} attività selezionate?`)) return;
+                      // Elimina una ad una usando l'endpoint esistente (gestisce anche pacchetto/lavagna)
+                      const ids = Array.from(selectedIds);
+                      let ok = 0, fail = 0;
+                      for (const id of ids) {
+                        try {
+                          const r = await fetch('/api/attivita', {
+                            method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id })
+                          });
+                          if (r.ok) ok++; else fail++;
+                        } catch (_) { fail++; }
+                      }
+                      await fetchAttivita();
+                      setSelectedIds(new Set());
+                      if (fail) alert(`Eliminazione completata: ${ok} ok, ${fail} fallite.`);
+                    }}
+                    style={{
+                      background: selectedIds.size ? '#ff6464' : '#ffb3b3', color: '#fff', border: 0,
+                      borderRadius: 10, padding: '6px 12px', fontWeight: 800, cursor: selectedIds.size ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    Elimina selezionate ({selectedIds.size})
+                  </button>
+                )}
+              </div>
+            )}
+
             <SectionTitle>Lezioni Prenotate (future / prenotate)</SectionTitle>
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione prenotata"
-                columns={colsPrenotate}
+                columns={(() => {
+                  if (!(isAdmin && multiSelect)) return colsPrenotate;
+                  const ids = prenotate.map(a => a.id);
+                  const all = ids.length > 0 && ids.every(id => selectedIds.has(id));
+                  return [
+                    { key: 'sel-pren', content: (
+                      <input
+                        type="checkbox"
+                        checked={all}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) ids.forEach(id => next.add(id)); else ids.forEach(id => next.delete(id));
+                          setSelectedIds(next);
+                        }}
+                        title={all ? 'Deseleziona tutte' : 'Seleziona tutte'}
+                      />
+                    )},
+                    ...colsPrenotate
+                  ];
+                })()}
                 rows={prenotate.map(a => {
                   const reqList = byAttivita[a.id] || [];
                   const openReq = reqList.find(r => ["pending", "in_review"].includes(r.stato));
                   const cells = [];
+                  if (isAdmin && multiSelect) {
+                    cells.push({ content: (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(a.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) next.add(a.id); else next.delete(a.id);
+                          setSelectedIds(next);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title={selectedIds.has(a.id) ? 'Deseleziona' : 'Seleziona'}
+                      />
+                    )});
+                  }
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
                   cells.push(a.oreConsumate ?? a.durataOre ?? "—");
@@ -361,9 +450,43 @@ export default function PacchettiLezioniPage() {
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione svolta"
-                columns={colsSvolte}
+                columns={(() => {
+                  if (!(isAdmin && multiSelect)) return colsSvolte;
+                  const ids = svolte.map(a => a.id);
+                  const all = ids.length > 0 && ids.every(id => selectedIds.has(id));
+                  return [
+                    { key: 'sel-svolte', content: (
+                      <input
+                        type="checkbox"
+                        checked={all}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) ids.forEach(id => next.add(id)); else ids.forEach(id => next.delete(id));
+                          setSelectedIds(next);
+                        }}
+                        title={all ? 'Deseleziona tutte' : 'Seleziona tutte'}
+                      />
+                    )},
+                    ...colsSvolte
+                  ];
+                })()}
                 rows={svolte.map(a => {
                   const cells = [];
+                  if (isAdmin && multiSelect) {
+                    cells.push({ content: (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(a.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) next.add(a.id); else next.delete(a.id);
+                          setSelectedIds(next);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title={selectedIds.has(a.id) ? 'Deseleziona' : 'Seleziona'}
+                      />
+                    )});
+                  }
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
                   const statoEl = (
@@ -390,9 +513,43 @@ export default function PacchettiLezioniPage() {
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione cancellata"
-                columns={colsCancellate}
+                columns={(() => {
+                  if (!(isAdmin && multiSelect)) return colsCancellate;
+                  const ids = cancellate.map(a => a.id);
+                  const all = ids.length > 0 && ids.every(id => selectedIds.has(id));
+                  return [
+                    { key: 'sel-canc', content: (
+                      <input
+                        type="checkbox"
+                        checked={all}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) ids.forEach(id => next.add(id)); else ids.forEach(id => next.delete(id));
+                          setSelectedIds(next);
+                        }}
+                        title={all ? 'Deseleziona tutte' : 'Seleziona tutte'}
+                      />
+                    )},
+                    ...colsCancellate
+                  ];
+                })()}
                 rows={cancellate.map(a => {
                   const cells = [];
+                  if (isAdmin && multiSelect) {
+                    cells.push({ content: (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(a.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) next.add(a.id); else next.delete(a.id);
+                          setSelectedIds(next);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        title={selectedIds.has(a.id) ? 'Deseleziona' : 'Seleziona'}
+                      />
+                    )});
+                  }
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
                   const statoEl = (
@@ -548,7 +705,12 @@ function MainTable({ columns = [], rows = [], emptyLabel }) {
     <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
       <thead>
         <tr>
-          {safeCols.map(c => <Th key={c}>{c}</Th>)}
+          {safeCols.map((c, idx) => {
+            if (c && typeof c === 'object' && 'content' in c) {
+              return <Th key={c.key || `col-${idx}`}>{c.content}</Th>;
+            }
+            return <Th key={String(c)}>{c}</Th>;
+          })}
         </tr>
       </thead>
       <tbody>
