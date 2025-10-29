@@ -1,12 +1,10 @@
 const puppeteer = require('puppeteer');
-const { spawn } = require('child_process');
-const path = require('path');
 
 // Funzione di utilità per attendere un certo tempo
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
-// URL della lavagna (assicurati che il server di sviluppo sia in esecuzione)
-const LAVAGNA_URL = 'http://localhost:3000/lavagna/test-sync';
+// URL della lavagna sandbox che non richiede autenticazione
+const LAVAGNA_URL = 'http://localhost:3000/lavagna-sandbox';
 
 // Dati di un'immagine di esempio (un piccolo PNG rosso in formato data URL)
 const SAMPLE_IMAGE_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAHElEQVQ4T2P8z8AAROQDMBoGcUAANgMAlwQACPlh/xAAAAAASUVORK5CYII=';
@@ -15,23 +13,18 @@ describe('Sincronizzazione contenuti incollati e ridimensionamento sulla Lavagna
   let browser;
   let adminPage;
   let clientPage;
-  let devServer;
 
   beforeAll(async () => {
-    // Avvia il server di sviluppo di Next.js come processo figlio
-    devServer = spawn('npm', ['run', 'dev'], {
-      cwd: path.resolve(__dirname, '..'), // Esegui dalla root del progetto
-      detached: true, // Permette di terminare il server indipendentemente dallo script
-    });
-
-    // Attendi che il server sia pronto (potrebbe essere necessario aumentare il delay)
-    console.log('Avvio del server di sviluppo...');
-    await delay(15000); // Aumentato a 15 secondi per dare tempo a Next.js di avviarsi
+    // Nota: assicurati che il server di sviluppo sia già in esecuzione su localhost:3000
+    // Prima di eseguire il test, lancia manualmente: npm run dev
+    console.log('Connessione al server di sviluppo su http://localhost:3000...');
+    console.log('Assicurati che il server sia già in esecuzione prima di eseguire questo test.');
 
     // Avvia Puppeteer
     browser = await puppeteer.launch({
       headless: false, // Esegui in modalità non-headless per vedere cosa succede
       slowMo: 50, // Rallenta le azioni per una migliore osservazione
+      args: ['--no-sandbox', '--disable-setuid-sandbox'], // Necessario su alcuni sistemi
     });
 
     // Crea due pagine, una per l'admin e una per il client
@@ -49,10 +42,8 @@ describe('Sincronizzazione contenuti incollati e ridimensionamento sulla Lavagna
   }, 30000); // Timeout più lungo per beforeAll
 
   afterAll(async () => {
-    await browser.close();
-    // Termina il server di sviluppo
-    if (devServer) {
-      process.kill(-devServer.pid);
+    if (browser) {
+      await browser.close();
     }
   });
 
