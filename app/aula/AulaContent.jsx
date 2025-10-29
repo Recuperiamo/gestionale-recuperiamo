@@ -342,6 +342,18 @@ export default function AulaContent({ initialClienteId = null }) {
 
   const visible = useMemo(() => {
     let list = [...items];
+    
+    // Filtro per tab attiva
+    if (activeTab === "compiti") {
+      list = list.filter(it => it.tipo && it.tipo.toLowerCase() === "compiti");
+    } else if (activeTab === "materiale") {
+      list = list.filter(it => it.tipo && it.tipo.toLowerCase() === "materiale");
+    } else if (activeTab === "voti") {
+      // TODO: implementare quando avremo il modello Voti
+      list = [];
+    }
+    // bacheca mostra tutto, quindi non filtriamo
+    
     if (filtroTipo) {
       list = list.filter(it => it.tipo === filtroTipo);
     }
@@ -356,7 +368,7 @@ export default function AulaContent({ initialClienteId = null }) {
       );
     }
     return list.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  }, [items, filtroTipo, filtroMateria, search]);
+  }, [items, filtroTipo, filtroMateria, search, activeTab]);
 
   // Recupera nome studente da lista clienti (solo per admin/operator)
   const [clienti, setClienti] = useState([]);
@@ -466,64 +478,80 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           ) : (
             <>
-          {/* PULSANTE VIDEOLEZIONE */}
-          {targetClienteId && studenteCorrente && (
-            <div style={videoLinkBox}>
-              <button
-                style={videoLinkButton}
-                onClick={() => {
-                  const link = studenteCorrente.linkVideolezione;
-                  if (link) {
-                    window.open(link, '_blank', 'noopener,noreferrer');
-                  } else {
-                    alert('Link videolezione non configurato per questo studente');
-                  }
-                }}
-                title="Apri videolezione"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                </svg>
-                <span>Apri videolezione</span>
-              </button>
-            </div>
-          )}
-
-          {/* TABS CLASSROOM */}
+          {/* TABS CLASSROOM + VIDEO BUTTON */}
           {targetClienteId && (
             <div style={{
               display: "flex",
-              gap: "8px",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
               marginTop: "24px",
               marginBottom: "16px",
               borderBottom: "2px solid #e0e4f0",
               paddingBottom: "0"
             }}>
-              {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      borderBottom: isActive ? `3px solid ${coloreTema}` : "3px solid transparent",
-                      color: isActive ? coloreTema : "#5a6c8f",
-                      padding: "12px 20px",
-                      fontSize: "15px",
-                      fontWeight: isActive ? 700 : 500,
-                      cursor: "pointer",
-                      textTransform: "capitalize",
-                      transition: "all 0.2s ease",
-                      marginBottom: "-2px"
-                    }}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
-                );
-              })}
+              <div style={{ display: "flex", gap: "8px" }}>
+                {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        borderBottom: isActive ? `3px solid ${coloreTema}` : "3px solid transparent",
+                        color: isActive ? coloreTema : "#5a6c8f",
+                        padding: "12px 20px",
+                        fontSize: "15px",
+                        fontWeight: isActive ? 700 : 500,
+                        cursor: "pointer",
+                        textTransform: "capitalize",
+                        transition: "all 0.2s ease",
+                        marginBottom: "-2px"
+                      }}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* PULSANTE VIDEOLEZIONE - spostato a destra */}
+              {studenteCorrente && (
+                <button
+                  style={{
+                    background: "linear-gradient(135deg, #1cb0f6 0%, #0891d1 100%)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "10px 20px",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 14px rgba(28,176,246,0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    transition: "all 0.2s ease",
+                    marginBottom: "-2px"
+                  }}
+                  onClick={() => {
+                    const link = studenteCorrente.linkVideolezione;
+                    if (link) {
+                      window.open(link, '_blank', 'noopener,noreferrer');
+                    } else {
+                      alert('Link videolezione non configurato per questo studente');
+                    }
+                  }}
+                  title="Apri videolezione"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                  </svg>
+                  <span>Apri videolezione</span>
+                </button>
+              )}
             </div>
           )}
 

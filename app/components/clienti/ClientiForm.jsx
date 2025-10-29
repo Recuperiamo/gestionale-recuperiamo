@@ -57,7 +57,9 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
         note: "",
         tipo: "REFERENTE",
         referenteId: "",
-        materie: []
+        materie: [],
+        coloreTema: "",
+        linkVideolezione: ""
       });
     }
   };
@@ -74,7 +76,9 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
       note: "",
       tipo: "REFERENTE",
       referenteId: "",
-      materie: []
+      materie: [],
+      coloreTema: "",
+      linkVideolezione: ""
     });
     setErrors([]);
     if (setAlert) setAlert({ type: "", message: "" });
@@ -151,6 +155,50 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
             })}
           </div>
         </div>
+      )}
+      {form.tipo === 'STUDENTE' && (
+        <>
+          <div>
+            <label className="block font-bold">Colore tema aula</label>
+            <div className="flex gap-3 items-center">
+              <input 
+                type="color" 
+                name="coloreTema" 
+                value={form.coloreTema || "#1cb0f6"} 
+                onChange={handleChange} 
+                className="h-10 w-20 rounded border cursor-pointer" 
+                disabled={loading}
+                title="Scegli il colore tema per l'aula dello studente"
+              />
+              <span className="text-sm text-gray-600">Colore usato nelle tabs e badge dell'aula</span>
+            </div>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {["#1cb0f6", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#34495e"].map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, coloreTema: color }))}
+                  className="w-8 h-8 rounded border-2 hover:scale-110 transition-transform"
+                  style={{ backgroundColor: color, borderColor: form.coloreTema === color ? "#000" : "#ddd" }}
+                  title={color}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block font-bold">Link videolezione</label>
+            <input 
+              name="linkVideolezione" 
+              type="url"
+              value={form.linkVideolezione || ""} 
+              onChange={handleChange} 
+              placeholder="https://meet.google.com/..." 
+              className="border px-2 py-1 rounded w-full" 
+              disabled={loading}
+            />
+            <span className="text-xs text-gray-500">URL della videolezione (Google Meet, Zoom, ecc.)</span>
+          </div>
+        </>
       )}
       <div>
         <label className="block font-bold">Email *</label>

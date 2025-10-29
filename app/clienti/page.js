@@ -20,7 +20,9 @@ export default function ClientiPage() {
     note: '',
     tipo: 'REFERENTE',
     referenteId: '',
-    materie: []
+    materie: [],
+    coloreTema: '',
+    linkVideolezione: ''
   });
   const [alert, setAlert] = useState({ message: '', type: 'error' });
   const [loading, setLoading] = useState(false);
@@ -62,7 +64,9 @@ export default function ClientiPage() {
         tipo === 'STUDENTE' && formData.referenteId
           ? Number(formData.referenteId)
           : null,
-      materie: tipo === 'STUDENTE' ? (formData.materie || []) : []
+      materie: tipo === 'STUDENTE' ? (formData.materie || []) : [],
+      coloreTema: tipo === 'STUDENTE' ? (formData.coloreTema || null) : null,
+      linkVideolezione: tipo === 'STUDENTE' ? (formData.linkVideolezione || null) : null
     };
   };
 
@@ -101,7 +105,9 @@ export default function ClientiPage() {
       note: cliente.note || '',
       tipo: (cliente.tipo || 'REFERENTE').toUpperCase(),
       referenteId: cliente.referenteId ? String(cliente.referenteId) : '',
-      materie: Array.isArray(cliente.materie) ? cliente.materie : []
+      materie: Array.isArray(cliente.materie) ? cliente.materie : [],
+      coloreTema: cliente.coloreTema || '',
+      linkVideolezione: cliente.linkVideolezione || ''
     });
     setEditId(cliente.id);
     setDettaglioCliente(null);

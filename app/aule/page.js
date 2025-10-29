@@ -241,19 +241,19 @@ const infoBox = {
 
 const cardsGrid = {
   display: "grid",
-  gap: "28px",
+  gap: "36px",
   gridTemplateColumns: "1fr"
 };
 
 const card = {
   background: "#fff",
   borderRadius: "18px",
-  padding: "24px",
+  padding: "28px",
   boxShadow: "0 12px 28px rgba(32,72,154,0.12)",
   border: "1px solid #e2e8f0",
   display: "flex",
   flexDirection: "column",
-  gap: "20px"
+  gap: "24px"
 };
 
 const cardHeader = {
@@ -280,7 +280,7 @@ const badge = {
 const studentsGrid = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-  gap: "14px"
+  gap: "20px"
 };
 
 const studentCardWrapper = {
