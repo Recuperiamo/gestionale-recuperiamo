@@ -370,7 +370,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
       {loading && <div style={{ fontSize: 14, marginBottom: 8 }}>Caricamento lavagne…</div>}
       <ul style={{ padding: 0, margin: 0, listStyle: "none" }}>
-        {lavagne.length === 0 && !loading && (
+        {lavagne.length === 0 && !loading && !isAdmin && (
           <li style={{
             background: "#e3eefe",
             border: "1px solid #4268b3",

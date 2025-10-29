@@ -325,7 +325,7 @@ function RichiestaModificaCard({ richiesta, onGestisci, readonly }) {
   );
 }
 
-function RichiestaLavagnaCard({ richiesta, onApprova, onRifiuta, readonly }) {
+function RichiestaLavagnaCard({ richiesta, onApprova, onRifiuta, onElimina, readonly }) {
   const statoColors = {
     pending: { bg: "#FEF3C7", border: "#F59E0B", text: "#92400E" },
     in_review: { bg: "#DBEAFE", border: "#3B82F6", text: "#1E40AF" },
