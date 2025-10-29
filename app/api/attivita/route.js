@@ -483,6 +483,31 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Verifica se pacchettoId esiste
+    if (!att.pacchettoId) {
+      console.log('[DELETE /api/attivita] ATTENZIONE: pacchettoId è null, elimino solo attività e lavagna')
+      
+      // Elimina solo la lavagna e l'attività senza aggiornare il pacchetto
+      const lavagna = await prisma.lavagna.findUnique({
+        where: { attivitaId: att.id },
+        select: { id: true }
+      })
+      
+      const result = await prisma.$transaction(async tx => {
+        await tx.richiestaModifica.deleteMany({ where: { attivitaId: att.id } })
+        
+        if (lavagna) {
+          await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: lavagna.id } })
+          await tx.lavagna.delete({ where: { id: lavagna.id } })
+        }
+        
+        const deleted = await tx.attivita.delete({ where: { id: att.id } })
+        return { deleted, pacchettoBefore: null, pacchettoAggiornato: null }
+      })
+      
+      return NextResponse.json({ deleted: result.deleted, pacchetto: null })
+    }
+
     const pacchetto = await prisma.pacchettoOre.findUnique({ where: { id: att.pacchettoId } })
     if (!pacchetto) {
       console.log('[DELETE /api/attivita] Pacchetto non trovato:', att.pacchettoId)
