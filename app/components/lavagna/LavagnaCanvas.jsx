@@ -47,6 +47,9 @@ export default function LavagnaCanvas({
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
+  const [enablePinchZoom, setEnablePinchZoom] = useState(true);
+  const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
+  const [showHandPopover, setShowHandPopover] = useState(false);
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const sfondoRef = useRef(sfondo);
@@ -95,6 +98,8 @@ export default function LavagnaCanvas({
   const contextTempToolRef = useRef(null); // when right-click temporarily switches tool to 'mano'
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
   const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
+  const enablePinchZoomRef = useRef(enablePinchZoom);
+  const enableSingleFingerPanRef = useRef(enableSingleFingerPan);
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
@@ -1193,6 +1198,14 @@ export default function LavagnaCanvas({
   useEffect(() => {
     spectatorModeRef.current = spectatorMode;
   }, [spectatorMode]);
+
+  useEffect(() => {
+    enablePinchZoomRef.current = enablePinchZoom;
+  }, [enablePinchZoom]);
+
+  useEffect(() => {
+    enableSingleFingerPanRef.current = enableSingleFingerPan;
+  }, [enableSingleFingerPan]);
 
   // removed undoMode toggling effect
 
@@ -3248,26 +3261,8 @@ export default function LavagnaCanvas({
       return;
     }
 
-    if (strumento === 'mano') {
-      if (spectatorLocked) {
-        return;
-      }
-      getPointerWorld();
-      try {
-        canvas?.setPointerCapture?.(pointerId);
-      } catch (_) {}
-      panningRef.current.active = true;
-  try { console.log('[LAVAGNA-STATE] panningRef.active = true (mano)'); } catch(_){}
-      panningRef.current.lastX = native.clientX;
-      panningRef.current.lastY = native.clientY;
-      panningRef.current.viaContext = false;
-      setContextPanning(false);
-      setIsPanning(true);
-      return;
-    }
-
-    // On mobile: enable single-finger panning by default (unless drawing with penna/gomma)
-    if (isMobile && native?.pointerType === 'touch' && touchesRef.current.size === 1) {
+    // Single-finger pan if enabled (except when drawing with penna/gomma)
+    if (enableSingleFingerPanRef.current && native?.pointerType === 'touch' && touchesRef.current.size === 1) {
       if (!['penna', 'gomma'].includes(strumento)) {
         if (spectatorLocked) {
           return;
@@ -3284,6 +3279,24 @@ export default function LavagnaCanvas({
         setIsPanning(true);
         return;
       }
+    }
+
+    if (strumento === 'mano') {
+      if (spectatorLocked) {
+        return;
+      }
+      getPointerWorld();
+      try {
+        canvas?.setPointerCapture?.(pointerId);
+      } catch (_) {}
+      panningRef.current.active = true;
+  try { console.log('[LAVAGNA-STATE] panningRef.active = true (mano)'); } catch(_){}
+      panningRef.current.lastX = native.clientX;
+      panningRef.current.lastY = native.clientY;
+      panningRef.current.viaContext = false;
+      setContextPanning(false);
+      setIsPanning(true);
+      return;
     }
 
     setDisegnando(true);
@@ -3631,7 +3644,8 @@ export default function LavagnaCanvas({
       if (spectatorLocked) {
         return;
       }
-      if (touchesRef.current.size === 2) {
+      // Only handle pinch if enabled
+      if (enablePinchZoomRef.current && touchesRef.current.size === 2) {
         const pts = Array.from(touchesRef.current.values());
         const dx = pts[1].x - pts[0].x;
         const dy = pts[1].y - pts[0].y;
@@ -4712,22 +4726,58 @@ export default function LavagnaCanvas({
                 <path d="M5 3l6.8 6.4 3-3.4 3.7 11.8-11.8-3.7 3.4-3-6.4-6.8z" stroke={strumento==='selezione' ? '#fff' : '#20489a'} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" fill={strumento==='selezione' ? '#fff' : 'none'} />
               </svg>
             </button>
-            <button
-              type="button"
-              style={iconBtn(strumento === 'mano')}
-              onClick={() => {
-                setStrumento('mano');
-                setShowPenPopover(false);
-                setShowMoreMenu(false);
-                setShowShapesPopover(false);
-                setShowExportMenu(false);
-              }}
-              title="Sposta"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-              </svg>
-            </button>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(strumento === 'mano' || showHandPopover)}
+                onClick={() => {
+                  if (strumento !== 'mano') {
+                    setStrumento('mano');
+                    setShowHandPopover(false);
+                    setShowPenPopover(false);
+                    setShowMoreMenu(false);
+                    setShowShapesPopover(false);
+                    setShowExportMenu(false);
+                  } else {
+                    setShowHandPopover((v) => !v);
+                    setShowPenPopover(false);
+                    setShowMoreMenu(false);
+                    setShowShapesPopover(false);
+                    setShowExportMenu(false);
+                  }
+                }}
+                title="Sposta (clicca per opzioni)"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'|| showHandPopover? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </button>
+              {showHandPopover && (
+                <div style={st.popover}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#20489a', marginBottom: 10 }}>
+                    Opzioni Mano
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={enablePinchZoom}
+                      onChange={(e) => setEnablePinchZoom(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Pinch-to-zoom (2 dita)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={enableSingleFingerPan}
+                      onChange={(e) => setEnableSingleFingerPan(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Pan con 1 dito (tranne penna/gomma)</span>
+                  </label>
+                </div>
+              )}
+            </div>
             <div style={{ position:'relative' }}>
               <button
                 type="button"
