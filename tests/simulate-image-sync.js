@@ -7,10 +7,8 @@ const path = require('path');
     const outDir = path.join(__dirname, 'output');
     try { fs.mkdirSync(outDir, { recursive: true }); } catch (_) {}
 
-    const adminSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300'><rect width='100%' height='100%' fill='cornflowerblue'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='32' fill='white'>ADMIN</text></svg>`;
-    const clientSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300'><rect width='100%' height='100%' fill='seagreen'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='32' fill='white'>CLIENT</text></svg>`;
-    const adminData = 'data:image/svg+xml;utf8,' + encodeURIComponent(adminSvg);
-    const clientData = 'data:image/svg+xml;utf8,' + encodeURIComponent(clientSvg);
+  // We'll create PNG data URLs inside each page using an in-page canvas to
+  // avoid SVG/data-URL handling differences between environments.
 
     const browser = await puppeteer.launch({ headless: true });
     const adminPage = await browser.newPage();
@@ -41,16 +39,30 @@ const path = require('path');
     await adminPage.setContent(html('cv-admin'));
     await clientPage.setContent(html('cv-client'));
 
-    // Simulate admin receiving a persisted server URL (full-res)
-    await adminPage.evaluate((src) => {
-      window.receiveShape({ id: 's1', kind: 'immagine', src });
-    }, adminData);
+    // Simulate admin receiving a persisted server URL (full-res) by drawing a
+    // PNG in-page and sending its data URL.
+    await adminPage.evaluate(() => {
+      const cvs = document.createElement('canvas'); cvs.width = 400; cvs.height = 300;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = 'cornflowerblue'; ctx.fillRect(0,0,400,300);
+      ctx.fillStyle = 'white'; ctx.font = '32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('ADMIN', 200, 150);
+      const data = cvs.toDataURL('image/png');
+      window.receiveShape({ id: 's1', kind: 'immagine', src: data });
+    });
 
-    // Simulate client receiving only a realtime preview (srcPreview)
-    await clientPage.evaluate((src) => {
+    // Simulate client receiving only a realtime preview (srcPreview) as a
+    // separate PNG data URL drawn in-page.
+    await clientPage.evaluate(() => {
+      const cvs = document.createElement('canvas'); cvs.width = 400; cvs.height = 300;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = 'seagreen'; ctx.fillRect(0,0,400,300);
+      ctx.fillStyle = 'white'; ctx.font = '32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('CLIENT', 200, 150);
+      const data = cvs.toDataURL('image/png');
       // In the real app the normalized shape would have src set to srcPreview.
-      window.receiveShape({ id: 's1', kind: 'immagine', src });
-    }, clientData);
+      window.receiveShape({ id: 's1', kind: 'immagine', src: data });
+    });
 
     // Wait until both pages report loaded or timeout
     async function waitLoaded(page, timeout = 3000) {

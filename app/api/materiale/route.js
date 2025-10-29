@@ -64,15 +64,19 @@ export async function GET(req) {
     // Download file
     const meta = index.find(m => m.id === fileId);
     if (!meta) return NextResponse.json({ error: "File non trovato" }, { status: 404 });
+    // Log access attempt for debugging (temporary)
+    try { console.debug(`[materiale] GET attempt fileId=${fileId} meta.clienteId=${meta.clienteId} requesterRole=${user?.role} requesterClienteId=${user?.clienteId}`); } catch(_) {}
     // Permessi: admin/operator tutto, studente solo i suoi
     if (user?.role !== "admin" && user?.role !== "operatore") {
       if (String(meta.clienteId) !== String(user?.clienteId)) {
+        try { console.debug(`[materiale] GET denied fileId=${fileId} requesterClienteId=${user?.clienteId}`); } catch(_) {}
         return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
       }
     }
     const filePath = path.join(UPLOAD_DIR, meta.nomeSalvato);
     try {
       const fileBuf = await fs.readFile(filePath);
+      try { console.debug(`[materiale] GET success fileId=${fileId} serving ${meta.nomeSalvato}`); } catch(_) {}
       // Serve images/files inline so that <img src="/api/materiale?fileId=..."> renders
       // in the browser instead of forcing a download. Keep Content-Type accurate.
       return new NextResponse(fileBuf, {

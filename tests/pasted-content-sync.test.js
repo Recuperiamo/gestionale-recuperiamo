@@ -22,9 +22,11 @@ describe('Sincronizzazione contenuti incollati e ridimensionamento sulla Lavagna
 
     // Avvia Puppeteer
     browser = await puppeteer.launch({
-      headless: false, // Esegui in modalità non-headless per vedere cosa succede
-      slowMo: 50, // Rallenta le azioni per una migliore osservazione
-      args: ['--no-sandbox', '--disable-setuid-sandbox'], // Necessario su alcuni sistemi
+      headless: true, // Usa modalità headless per evitare conflitti
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+      ],
     });
 
     // Crea due pagine, una per l'admin e una per il client
@@ -42,10 +44,16 @@ describe('Sincronizzazione contenuti incollati e ridimensionamento sulla Lavagna
   }, 30000); // Timeout più lungo per beforeAll
 
   afterAll(async () => {
-    if (browser) {
-      await browser.close();
+    if (adminPage) {
+      await adminPage.close().catch(() => {});
     }
-  });
+    if (clientPage) {
+      await clientPage.close().catch(() => {});
+    }
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+  }, 10000);
 
   test('Un\'immagine incollata dall\'admin dovrebbe apparire al client', async () => {
     // Simula l'incollamento di un'immagine sulla lavagna dell'admin
