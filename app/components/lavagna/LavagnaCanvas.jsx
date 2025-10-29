@@ -1868,7 +1868,26 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
     const dbId = removedShape.dbId || id;
-    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, removedShape });
+    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, kind: removedShape.kind, removedShape });
+    
+    // SPECIAL HANDLING FOR AXES: Always queue them for deletion to ensure persistence
+    if (removedShape.kind === 'assi2d' || removedShape.kind === 'assi3d') {
+      console.log('[LAVAGNA-DELETE-AXES] Detected axes deletion, forcing queue:', { localId: id, dbId, kind: removedShape.kind });
+      pendingDeletions.current.set(id, true);
+      // If we already have a dbId, delete immediately AND keep in queue (belt and suspenders)
+      if (typeof dbId === 'number' || !isNaN(Number(dbId))) {
+        console.log('[LAVAGNA-DELETE-AXES] Axes has dbId, sending immediate DELETE:', { localId: id, dbId });
+        fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
+          .then(res => {
+            console.log('[LAVAGNA-DELETE-AXES] Immediate DELETE response:', res.status);
+            return res.json();
+          })
+          .then(data => console.log('[LAVAGNA-DELETE-AXES] Immediate DELETE data:', data))
+          .catch(err => console.error('[LAVAGNA-DELETE-AXES] Immediate DELETE error:', err));
+      }
+      return;
+    }
+    
     // If dbId is not numeric, this shape was deleted before persistence finished;
     // queue it so when persist callback arrives, it will delete server-side.
     if (typeof dbId !== 'number' && isNaN(Number(dbId))) {
@@ -4810,7 +4829,7 @@ export default function LavagnaCanvas({
                   <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'|| showHandPopover? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                 </svg>
               </button>
-              {showHandPopover && (
+              {showHandPopover && ('ontouchstart' in window || navigator.maxTouchPoints > 0) && (
                 <div style={st.popover}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#20489a', marginBottom: 10 }}>
                     Opzioni Mano
