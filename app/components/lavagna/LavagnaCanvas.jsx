@@ -730,8 +730,17 @@ export default function LavagnaCanvas({
                 imageCacheRef.current.set(src, imgEl);
               }
               if (imgEl && imgEl !== 'err' && imgEl.complete && imgEl.naturalWidth) {
-                const w = f.w || imgEl.naturalWidth / (window.devicePixelRatio || 1);
-                const h = f.h || imgEl.naturalHeight / (window.devicePixelRatio || 1);
+                // Preserve aspect ratio when rendering images
+                const imgAspect = imgEl.naturalWidth / imgEl.naturalHeight;
+                let w = f.w || imgEl.naturalWidth / (window.devicePixelRatio || 1);
+                let h = f.h || imgEl.naturalHeight / (window.devicePixelRatio || 1);
+                
+                // If both w and h are set, adjust to maintain aspect ratio
+                // by using the width and calculating height from aspect ratio
+                if (f.w && f.h) {
+                  h = w / imgAspect;
+                }
+                
                 ctx.drawImage(imgEl, f.x, f.y, w, h);
                 drawn = true;
                 break;
@@ -3476,11 +3485,23 @@ export default function LavagnaCanvas({
           }
           
           // Scale width and height
-          if (typeof originalShape.w === 'number') {
-            updated.w = originalShape.w * scaleX;
-          }
-          if (typeof originalShape.h === 'number') {
-            updated.h = originalShape.h * scaleY;
+          // For images, preserve aspect ratio by using only scaleX
+          if (originalShape.kind === 'immagine') {
+            if (typeof originalShape.w === 'number') {
+              updated.w = originalShape.w * scaleX;
+            }
+            if (typeof originalShape.h === 'number') {
+              // Preserve aspect ratio for images
+              updated.h = originalShape.h * scaleX;
+            }
+          } else {
+            // For other shapes, scale independently
+            if (typeof originalShape.w === 'number') {
+              updated.w = originalShape.w * scaleX;
+            }
+            if (typeof originalShape.h === 'number') {
+              updated.h = originalShape.h * scaleY;
+            }
           }
           
           // Handle shapes with x1, y1, x2, y2 (lines, arrows, etc.)
