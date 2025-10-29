@@ -29,7 +29,7 @@ function useCommenti(materiali) {
 }
 
 // --- COMPONENTE UPLOAD MODALE (MULTIFILE) ---
-function UploadMaterialeModal({ open, onClose, onUploaded, clienteId }) {
+function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStudente = [] }) {
   const [files, setFiles] = useState([]);
   const [materia, setMateria] = useState("");
   const [nome, setNome] = useState("");
@@ -124,7 +124,10 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId }) {
             style={inputStyle}
           >
             <option value="">- Nessuna -</option>
-            {materieLiceo.map(m => <option key={m} value={m}>{m}</option>)}
+            {materieStudente.length > 0 
+              ? materieStudente.map(m => <option key={m} value={m}>{m}</option>)
+              : materieLiceo.map(m => <option key={m} value={m}>{m}</option>)
+            }
           </select>
         </div>
         <div style={{marginBottom:16, fontSize:13, fontWeight:600}}>
@@ -356,6 +359,8 @@ export default function AulaContent({ initialClienteId = null }) {
 
   // Recupera nome studente da lista clienti (solo per admin/operator)
   const [clienti, setClienti] = useState([]);
+  const [studenteCorrente, setStudenteCorrente] = useState(null);
+  
   useEffect(() => {
     if (isAdmin) {
       fetch("/api/clienti?tipo=STUDENTE")
@@ -364,11 +369,27 @@ export default function AulaContent({ initialClienteId = null }) {
         .catch(() => setClienti([]));
     }
   }, [isAdmin]);
+  
+  // Recupera i dati dello studente corrente (per ottenere le sue materie)
+  useEffect(() => {
+    if (targetClienteId) {
+      fetch(`/api/clienti/${targetClienteId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => setStudenteCorrente(data))
+        .catch(() => setStudenteCorrente(null));
+    } else {
+      setStudenteCorrente(null);
+    }
+  }, [targetClienteId]);
+  
   function getStudenteLabel(clienteId) {
     const c = clienti.find(x => String(x.id) === String(clienteId));
     if (!c) return "";
     return c.nomeReferente || c.email || `Studente #${clienteId}`;
   }
+  
+  // Materie dello studente (fallback a array vuoto se non disponibili)
+  const materieStudente = studenteCorrente?.materie || [];
 
   async function handleDeleteMateriale(fileId) {
     if (!window.confirm("Sei sicuro di voler eliminare questo materiale?")) return;
@@ -389,13 +410,16 @@ export default function AulaContent({ initialClienteId = null }) {
   }
   if (!session) return null;
 
+  // Materie da mostrare nella sidebar: usa quelle dello studente se disponibili, altrimenti quelle nei materiali
+  const materieSidebar = materieStudente.length > 0 ? materieStudente : materieEffettive;
+
   // ---- SIDEBAR (desktop) ----
   const sidebar = (
     <aside style={sidebarStyle}>
       <div style={sidebarBox}>
         <div style={{fontWeight:700, color:"#20489a", marginBottom:6}}>Materie</div>
         <button style={sidebarBtn} onClick={()=>setFiltroMateria("")}>Tutte</button>
-        {materieEffettive.map(materia=>
+        {materieSidebar.map(materia=>
           <button key={materia} style={sidebarBtn} onClick={()=>setFiltroMateria(materia)}>{materia}</button>
         )}
       </div>
@@ -466,7 +490,7 @@ export default function AulaContent({ initialClienteId = null }) {
                 style={selectStyle}
               >
                 <option value="">Tutte le materie</option>
-                {materieEffettive.map(m => <option key={m} value={m}>{m}</option>)}
+                {materieSidebar.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
               {isAdmin && targetClienteId && (
                 <EliminaTuttiMateriali
@@ -592,6 +616,7 @@ export default function AulaContent({ initialClienteId = null }) {
         onClose={() => setShowUpload(false)}
         onUploaded={() => targetClienteId ? fetchMateriali(targetClienteId) : undefined}
         clienteId={targetClienteId}
+        materieStudente={materieStudente}
       />
     </div>
   );
