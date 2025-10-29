@@ -1809,10 +1809,11 @@ export default function LavagnaCanvas({
     if (!normalized) return;
     setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, ...normalized } : f)));
     if (emit) emitOrPublish('shape:update', { ...normalized, lavagnaId });
-    fetch(`/api/lavagna/shape/${shape.id}`, {
+    const dbId = shape.dbId || shape.id;
+    fetch(`/api/lavagna/shape/${dbId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(normalized)
+      body: JSON.stringify({ ...normalized, dbId })
     }).catch(() => {});
   }, [emitOrPublish, lavagnaId]);
 
@@ -1842,7 +1843,8 @@ export default function LavagnaCanvas({
         try { URL.revokeObjectURL(removedShape.src); } catch(_) {}
       }
     } catch (_) {}
-    fetch(`/api/lavagna/shape/${id}`, { method: 'DELETE' }).catch(() => {});
+    const dbId = removedShape.dbId || id;
+    fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' }).catch(() => {});
   }, [emitOrPublish, lavagnaId, isAdmin, utenteId]);
 
   // Clipboard for cut/copy/paste
