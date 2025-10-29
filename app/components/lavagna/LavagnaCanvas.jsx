@@ -2642,21 +2642,24 @@ export default function LavagnaCanvas({
 
   // == POINTER EVENTS ==
   function pointerDown(e) {
-    const native = e?.nativeEvent;
-    const btn = native?.button;
-    const pointerId = native?.pointerId;
-    const canvas = canvasRef.current;
-    const spectatorLocked = spectatorModeRef.current && !isAdmin;
-    selectionClickRef.current = null;
+    try {
+      const native = e?.nativeEvent;
+      if (!native) return;
+      const btn = native?.button;
+      const pointerId = native?.pointerId;
+      const canvas = canvasRef.current;
+      const spectatorLocked = spectatorModeRef.current && !isAdmin;
+      selectionClickRef.current = null;
 
-    let cachedPoint = null;
-    const getPointerWorld = () => {
-      if (!cachedPoint) {
-        cachedPoint = getPoint(e);
-      }
-      pointerWorldRef.current = cachedPoint;
-      return cachedPoint;
-    };
+      let cachedPoint = null;
+      const getPointerWorld = () => {
+        if (!cachedPoint) {
+          cachedPoint = getPoint(e);
+          if (!cachedPoint) return null;
+        }
+        pointerWorldRef.current = cachedPoint;
+        return cachedPoint;
+      };
 
     if (btn === 2) {
       // Right-click: start context panning. If the current tool is not 'mano',
@@ -2729,6 +2732,10 @@ export default function LavagnaCanvas({
       // which was previously inactive.
       if (strumento === 'selezione') {
         const p = getPointerWorld();
+        if (!p) {
+          console.warn('[lavagna] selection: invalid point');
+          return;
+        }
         // If there is no current selection but the user clicked on a shape,
         // select that shape and begin dragging immediately. We search from
         // the topmost shape backwards so visual stacking is respected.
@@ -2895,6 +2902,10 @@ export default function LavagnaCanvas({
 
       if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'rombo', 'freccia', 'assi2', 'assi3'].includes(strumento)) {
       const p = getPointerWorld();
+      if (!p) {
+        console.warn('[lavagna] shape tool: invalid point');
+        return;
+      }
       previewShapeRef.current = {
         kind: strumento,
         x: p.x,
@@ -2935,6 +2946,10 @@ export default function LavagnaCanvas({
 
     setDisegnando(true);
     const punto = getPointerWorld();
+    if (!punto) {
+      console.warn('[lavagna] pointerDown: invalid point, aborting');
+      return;
+    }
     if (strumento === 'gomma' && gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
     }
@@ -3006,6 +3021,9 @@ export default function LavagnaCanvas({
         }
       }
     } catch (_) {}
+    } catch (err) {
+      console.error('[lavagna] pointerDown error:', err);
+    }
   }
 
   function pointerMove(e) {
