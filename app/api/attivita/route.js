@@ -502,9 +502,6 @@ export async function DELETE(request) {
       await tx.richiestaModifica.deleteMany({ where: { attivitaId: att.id } })
 
       if (lavagna) {
-        console.log('[DELETE /api/attivita][TX] Eliminazione forme lavagna')
-        await tx.lavagnaForma.deleteMany({ where: { lavagnaId: lavagna.id } })
-        
         console.log('[DELETE /api/attivita][TX] Eliminazione tratti lavagna')
         await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: lavagna.id } })
         
