@@ -4582,6 +4582,40 @@ export default function LavagnaCanvas({
       padding: 0
     });
 
+    // Responsive toolbar styles
+    const bottomToolbarDock = {
+      position: "absolute",
+      left: isMobile ? 0 : "50%",
+      bottom: isMobile ? 8 : 18,
+      transform: isMobile ? "none" : "translateX(-50%)",
+      zIndex: 3,
+      ...(isMobile && {
+        right: 0,
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '0 8px'
+      })
+    };
+
+    const commandBar = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: isMobile ? 6 : 10,
+      padding: isMobile ? '8px 10px' : '10px 14px',
+      borderRadius: isMobile ? 14 : 16,
+      background: 'rgba(255,255,255,0.92)',
+      border: '1px solid #d4dff6',
+      boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
+      backdropFilter: 'blur(8px)',
+      userSelect: 'none',
+      ...(isMobile && {
+        flexWrap: 'wrap',
+        maxWidth: '100%',
+        justifyContent: 'center'
+      })
+    };
+
   const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
     const undoDisabled = !undoStack.length;
@@ -4589,8 +4623,8 @@ export default function LavagnaCanvas({
     const isCustomPenColor = !penPalette.some(entry => entry.value === colore);
 
     return (
-      <div style={st.bottomToolbarDock}>
-        <div ref={toolbarRef} style={st.commandBar}>
+      <div style={bottomToolbarDock}>
+        <div ref={toolbarRef} style={commandBar}>
           <button
             type="button"
             style={undoButtonStyle(undoDisabled, 'undo')}
@@ -5270,37 +5304,6 @@ export default function LavagnaCanvas({
 // == STYLES ==
 const st = {
   wrapper: { width: "100%", userSelect: "none" },
-  bottomToolbarDock: {
-    position: "absolute",
-    left: isMobile ? 0 : "50%",
-    bottom: isMobile ? 8 : 18,
-    transform: isMobile ? "none" : "translateX(-50%)",
-    zIndex: 3,
-    ...(isMobile && {
-      right: 0,
-      width: '100%',
-      display: 'flex',
-      justifyContent: 'center',
-      padding: '0 8px'
-    })
-  },
-  commandBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: isMobile ? 6 : 10,
-    padding: isMobile ? '8px 10px' : '10px 14px',
-    borderRadius: isMobile ? 14 : 16,
-    background: 'rgba(255,255,255,0.92)',
-    border: '1px solid #d4dff6',
-    boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
-    backdropFilter: 'blur(8px)',
-    userSelect: 'none',
-    ...(isMobile && {
-      flexWrap: 'wrap',
-      maxWidth: '100%',
-      justifyContent: 'center'
-    })
-  },
   toolGroup: {
     display: 'flex',
     alignItems: 'center',
