@@ -12,6 +12,7 @@ export default function LavagnaCanvas({
   lavagnaId,
   attivitaId,
   trattiIniziali,
+  formeIniziali,
   utenteId,
   clienteId,
   ruolo,
@@ -195,7 +196,13 @@ export default function LavagnaCanvas({
   );
 
   // Shapes and selection
-  const [forme, setForme] = useState([]); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
+  const [forme, setForme] = useState(() =>
+    (formeIniziali || []).map((s) => ({
+      ...s,
+      dbId: s.id,
+      id: `shape-${s.id}` // Unique client-side ID
+    }))
+  ); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
   const previewShapeRef = useRef(null);
   const drawingShapeRef = useRef(false);
   const erasingRef = useRef(false);

@@ -102,6 +102,7 @@ export default function LavagnaFullScreenPage() {
             lavagnaId={lavagna.id}
             attivitaId={lavagna.attivitaId}
             trattiIniziali={lavagna.tratti}
+            formeIniziali={lavagna.forme}
             utenteId={session.user.id}
             ruolo={session.user.role}
             altezza={canvasH}

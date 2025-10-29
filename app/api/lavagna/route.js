@@ -98,6 +98,27 @@ export async function GET(req) {
       }
     });
 
+    const forme = await prisma.lavagnaShape.findMany({
+      where: { lavagnaId: lavagna.id, deletedAt: null },
+      orderBy: { id: "asc" },
+      select: {
+        id: true,
+        kind: true,
+        x: true,
+        y: true,
+        w: true,
+        h: true,
+        x1: true,
+        y1: true,
+        x2: true,
+        y2: true,
+        colore: true,
+        spessore: true,
+        autoreUserId: true,
+        createdAt: true
+      }
+    });
+
     const nomeStudente =
       att.cliente?.nomeReferente ||
       att.cliente?.email ||
@@ -115,7 +136,8 @@ export async function GET(req) {
         titolo: lavagna.titolo,
         titoloVisuale,
         nomeStudente,
-        tratti
+        tratti,
+        forme
       }
     });
   } catch (e) {
