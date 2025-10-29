@@ -84,9 +84,11 @@ export default function PacchettoSummaryPanel({ attivita = [] }) {
   
   // LOGICA STATI:
   // 1. ESAURITO (priorità massima): ore_svolte >= ore_acquistate
-  // 2. ORE DISPONIBILI LIMITATE: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate
+  // 2. TUTTE LE ORE PRENOTATE: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate
+  // 3. DISPONIBILITÀ LIMITATA: ore_rimanenti < 5
   const isEsaurito = stats.oreSvolte >= stats.oreAcquistate;
-  const isDisponibilitaLimitata = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
+  const isTuttePrenotate = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
+  const isDisponibilitaLimitata = !isEsaurito && !isTuttePrenotate && oreRimanenti < 5 && oreRimanenti > 0;
 
   return (
     <div style={panelStyle}>
@@ -123,8 +125,8 @@ export default function PacchettoSummaryPanel({ attivita = [] }) {
           label="Ore Rimanenti"
           value={oreRimanenti}
           icon="⏳"
-          color={oreRimanenti < 5 ? '#EF4444' : '#06B6D4'}
-          highlighted={oreRimanenti < 5}
+          color={isEsaurito ? '#EF4444' : isTuttePrenotate ? '#F59E0B' : isDisponibilitaLimitata ? '#D97706' : '#06B6D4'}
+          highlighted={isEsaurito || isTuttePrenotate || isDisponibilitaLimitata}
         />
       </div>
       
@@ -134,15 +136,15 @@ export default function PacchettoSummaryPanel({ attivita = [] }) {
         </div>
       )}
       
-      {!isEsaurito && isDisponibilitaLimitata && (
-        <div style={warningStyle}>
+      {!isEsaurito && isTuttePrenotate && (
+        <div style={warningStrongStyle}>
           ⚠️ Attenzione: tutte le ore sono state prenotate, non ci sono più slot disponibili!
         </div>
       )}
       
-      {!isEsaurito && !isDisponibilitaLimitata && oreRimanenti < 5 && oreRimanenti > 0 && (
+      {!isEsaurito && !isTuttePrenotate && isDisponibilitaLimitata && (
         <div style={warningStyle}>
-          ⚠️ Attenzione: stai per esaurire le ore del pacchetto!
+          ⚠️ Disponibilità limitata: stai per esaurire le ore del pacchetto!
         </div>
       )}
     </div>
@@ -219,6 +221,18 @@ const labelStyle = {
 };
 
 const warningStyle = {
+  marginTop: 20,
+  padding: '12px 16px',
+  background: 'rgba(217, 119, 6, 0.15)',
+  border: '2px solid rgba(217, 119, 6, 0.4)',
+  borderRadius: 12,
+  textAlign: 'center',
+  fontSize: 14,
+  fontWeight: 600,
+  color: '#FFF',
+};
+
+const warningStrongStyle = {
   marginTop: 20,
   padding: '12px 16px',
   background: 'rgba(251, 191, 36, 0.15)',

@@ -234,23 +234,23 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
   
   // LOGICA STATI:
   // 1. ESAURITO (priorità massima): ore_svolte >= ore_acquistate
-  // 2. DISPONIBILITÀ LIMITATA: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate
-  // 3. ORE BASSE: ore_rimanenti < 5 (warning generico)
+  // 2. TUTTE LE ORE PRENOTATE: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate (arancione strong)
+  // 3. DISPONIBILITÀ LIMITATA: ore_rimanenti < 5 (arancione ocra - warning generico)
   const isEsaurito = stats.oreSvolte >= stats.oreAcquistate;
-  const isDisponibilitaLimitata = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
-  const isLow = !isEsaurito && !isDisponibilitaLimitata && oreRimanenti < 5 && oreRimanenti > 0;
+  const isTuttePrenotate = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
+  const isDisponibilitaLimitata = !isEsaurito && !isTuttePrenotate && oreRimanenti < 5 && oreRimanenti > 0;
   
   // Determina colore bordo card
   let borderColor = '#3B82F6'; // default blu
   if (isEsaurito) borderColor = '#EF4444'; // rosso
-  else if (isDisponibilitaLimitata) borderColor = '#F59E0B'; // arancione
-  else if (isLow) borderColor = '#F59E0B'; // arancione
+  else if (isTuttePrenotate) borderColor = '#F59E0B'; // arancione strong
+  else if (isDisponibilitaLimitata) borderColor = '#D97706'; // arancione ocra
 
   return (
     <div style={{
       ...cardContainerStyle,
       borderLeft: `4px solid ${borderColor}`,
-      boxShadow: (isEsaurito || isDisponibilitaLimitata || isLow) 
+      boxShadow: (isEsaurito || isTuttePrenotate || isDisponibilitaLimitata) 
         ? '0 4px 20px rgba(239, 68, 68, 0.15)' 
         : '0 4px 12px rgba(0,0,0,0.08)',
     }}>
@@ -274,8 +274,8 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
         <StatMini 
           label="Rimanenti" 
           value={oreRimanenti} 
-          color={isEsaurito ? '#EF4444' : isDisponibilitaLimitata ? '#F59E0B' : isLow ? '#F59E0B' : '#06B6D4'}
-          highlighted={isEsaurito || isDisponibilitaLimitata || isLow}
+          color={isEsaurito ? '#EF4444' : isTuttePrenotate ? '#F59E0B' : isDisponibilitaLimitata ? '#D97706' : '#06B6D4'}
+          highlighted={isEsaurito || isTuttePrenotate || isDisponibilitaLimitata}
         />
       </div>
 
@@ -289,23 +289,23 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
         </div>
       )}
       
-      {!isEsaurito && isDisponibilitaLimitata && (
+      {!isEsaurito && isTuttePrenotate && (
         <div style={{
           ...warningBoxStyle,
-          background: 'rgba(251, 191, 36, 0.1)',
-          border: '2px solid rgba(251, 191, 36, 0.3)',
+          background: 'rgba(251, 191, 36, 0.15)',
+          border: '2px solid rgba(251, 191, 36, 0.4)',
         }}>
-          ⚠️ Tutte le ore sono state prenotate - Disponibilità limitata!
+          ⚠️ Tutte le ore sono state prenotate ⚠️
         </div>
       )}
       
-      {!isEsaurito && !isDisponibilitaLimitata && isLow && (
+      {!isEsaurito && !isTuttePrenotate && isDisponibilitaLimitata && (
         <div style={{
           ...warningBoxStyle,
-          background: 'rgba(251, 191, 36, 0.1)',
-          border: '2px solid rgba(251, 191, 36, 0.3)',
+          background: 'rgba(217, 119, 6, 0.1)',
+          border: '2px solid rgba(217, 119, 6, 0.3)',
         }}>
-          ⚠️ Ore quasi esaurite!
+          ⚠️ Disponibilità limitata - Ore quasi esaurite!
         </div>
       )}
 
