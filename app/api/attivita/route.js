@@ -77,9 +77,25 @@ export async function GET(request) {
       return NextResponse.json(attivita)
     }
 
-    const where = {}
+  const where = {}
     if (effectiveClienteId) where.clienteId = effectiveClienteId
     if (pacchettoId) where.pacchettoId = Number(pacchettoId)
+
+    // Exclude ad-hoc lavagna placeholder activities (created to host a lavagna without consuming hours)
+    // unless explicitly requested with ?includeAdHocLavagne=1
+    const includeAdHoc = searchParams.get('includeAdHocLavagne') === '1';
+    if (!includeAdHoc) {
+      // Recognize ad-hoc lavagne by zero hours, no pacchetto, and a generated description starting with "Lavagna"
+      // Stato is usually 'svolta' but we don't hard-require it.
+      where.NOT = {
+        AND: [
+          { oreConsumate: 0 },
+          { durataOre: 0 },
+          { pacchettoId: null },
+          { descrizione: { startsWith: 'Lavagna' } }
+        ]
+      }
+    }
 
     const attivitaList = await prisma.attivita.findMany({
       where,

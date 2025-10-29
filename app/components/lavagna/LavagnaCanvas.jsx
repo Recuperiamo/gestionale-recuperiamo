@@ -475,7 +475,7 @@ export default function LavagnaCanvas({
           break;
         }
         case 'assi2d': {
-          // Assi cartesiani 2D: asse X e Y con frecce
+          // Assi cartesiani 2D: X e Y estesi in entrambe le direzioni, frecce a entrambe le estremità
           const x = f.x;
           const y = f.y;
           const w = f.w;
@@ -483,14 +483,13 @@ export default function LavagnaCanvas({
           const cx = x + w / 2;
           const cy = y + h / 2;
           const arrowSize = Math.max(10, (f.spessore || 3) * 3);
-          
-          // Asse X (orizzontale)
+
+          // Asse X (orizzontale, bidirezionale)
           ctx.beginPath();
           ctx.moveTo(x, cy);
           ctx.lineTo(x + w, cy);
           ctx.stroke();
-          
-          // Freccia asse X
+          // Frecce: destra
           ctx.beginPath();
           ctx.moveTo(x + w, cy);
           ctx.lineTo(x + w - arrowSize, cy - arrowSize * 0.5);
@@ -498,25 +497,37 @@ export default function LavagnaCanvas({
           ctx.closePath();
           ctx.fillStyle = f.colore || '#20489a';
           ctx.fill();
-          
-          // Asse Y (verticale)
+          // Frecce: sinistra
+          ctx.beginPath();
+          ctx.moveTo(x, cy);
+          ctx.lineTo(x + arrowSize, cy - arrowSize * 0.5);
+          ctx.lineTo(x + arrowSize, cy + arrowSize * 0.5);
+          ctx.closePath();
+          ctx.fill();
+
+          // Asse Y (verticale, bidirezionale)
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx, y + h);
           ctx.stroke();
-          
-          // Freccia asse Y
+          // Freccia: alto
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx - arrowSize * 0.5, y + arrowSize);
           ctx.lineTo(cx + arrowSize * 0.5, y + arrowSize);
           ctx.closePath();
-          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+          // Freccia: basso
+          ctx.beginPath();
+          ctx.moveTo(cx, y + h);
+          ctx.lineTo(cx - arrowSize * 0.5, y + h - arrowSize);
+          ctx.lineTo(cx + arrowSize * 0.5, y + h - arrowSize);
+          ctx.closePath();
           ctx.fill();
           break;
         }
         case 'assi3d': {
-          // Assi cartesiani 3D: X, Y e Z con frecce
+          // Assi cartesiani 3D: X, Y e Z bidirezionali; Z orientato nord-est <-> sud-ovest (diagonale verso sud-ovest)
           const x = f.x;
           const y = f.y;
           const w = f.w;
@@ -524,14 +535,13 @@ export default function LavagnaCanvas({
           const cx = x + w / 2;
           const cy = y + h / 2;
           const arrowSize = Math.max(10, (f.spessore || 3) * 3);
-          
-          // Asse X (orizzontale a destra)
+
+          // Asse X (orizzontale, bidirezionale)
           ctx.beginPath();
-          ctx.moveTo(cx, cy);
+          ctx.moveTo(x, cy);
           ctx.lineTo(x + w, cy);
           ctx.stroke();
-          
-          // Freccia asse X
+          // Arrow right
           ctx.beginPath();
           ctx.moveTo(x + w, cy);
           ctx.lineTo(x + w - arrowSize, cy - arrowSize * 0.5);
@@ -539,38 +549,56 @@ export default function LavagnaCanvas({
           ctx.closePath();
           ctx.fillStyle = f.colore || '#20489a';
           ctx.fill();
-          
-          // Asse Y (verticale verso l'alto)
+          // Arrow left
           ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(cx, y);
+          ctx.moveTo(x, cy);
+          ctx.lineTo(x + arrowSize, cy - arrowSize * 0.5);
+          ctx.lineTo(x + arrowSize, cy + arrowSize * 0.5);
+          ctx.closePath();
+          ctx.fill();
+
+          // Asse Y (verticale, bidirezionale)
+          ctx.beginPath();
+          ctx.moveTo(cx, y);
+          ctx.lineTo(cx, y + h);
           ctx.stroke();
-          
-          // Freccia asse Y
+          // Arrow up
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx - arrowSize * 0.5, y + arrowSize);
           ctx.lineTo(cx + arrowSize * 0.5, y + arrowSize);
           ctx.closePath();
-          ctx.fillStyle = f.colore || '#20489a';
           ctx.fill();
-          
-          // Asse Z (diagonale verso destra-basso)
-          const zLen = Math.min(w, h) * 0.7;
-          const zEndX = cx + zLen * 0.7;
-          const zEndY = cy + zLen * 0.7;
+          // Arrow down
           ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(zEndX, zEndY);
-          ctx.stroke();
-          
-          // Freccia asse Z
-          ctx.beginPath();
-          ctx.moveTo(zEndX, zEndY);
-          ctx.lineTo(zEndX - arrowSize * 0.8, zEndY - arrowSize * 0.3);
-          ctx.lineTo(zEndX - arrowSize * 0.3, zEndY - arrowSize * 0.8);
+          ctx.moveTo(cx, y + h);
+          ctx.lineTo(cx - arrowSize * 0.5, y + h - arrowSize);
+          ctx.lineTo(cx + arrowSize * 0.5, y + h - arrowSize);
           ctx.closePath();
-          ctx.fillStyle = f.colore || '#20489a';
+          ctx.fill();
+
+          // Asse Z (diagonale nord-est <-> sud-ovest)
+          const dx1 = x + w; // top-right
+          const dy1 = y;
+          const dx2 = x;     // bottom-left
+          const dy2 = y + h;
+          ctx.beginPath();
+          ctx.moveTo(dx1, dy1);
+          ctx.lineTo(dx2, dy2);
+          ctx.stroke();
+          // Triangolo freccia a nord-est (dx1,dy1) puntato verso NE
+          ctx.beginPath();
+          ctx.moveTo(dx1, dy1);
+          ctx.lineTo(dx1 - arrowSize * 0.8, dy1 + arrowSize * 0.3);
+          ctx.lineTo(dx1 - arrowSize * 0.3, dy1 + arrowSize * 0.8);
+          ctx.closePath();
+          ctx.fill();
+          // Triangolo freccia a sud-ovest (dx2,dy2) puntato verso SW
+          ctx.beginPath();
+          ctx.moveTo(dx2, dy2);
+          ctx.lineTo(dx2 + arrowSize * 0.8, dy2 - arrowSize * 0.3);
+          ctx.lineTo(dx2 + arrowSize * 0.3, dy2 - arrowSize * 0.8);
+          ctx.closePath();
           ctx.fill();
           break;
         }
@@ -989,99 +1017,99 @@ export default function LavagnaCanvas({
             break;
           }
           case 'assi2d': {
-            // Assi cartesiani 2D: asse X orizzontale e asse Y verticale con frecce
+            // 2D axes, bidirectional with arrowheads on both ends
             const cx = minX + w / 2;
             const cy = minY + h / 2;
             const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
-            
-            // Asse X (orizzontale)
-            ctx.beginPath();
-            ctx.moveTo(minX, cy);
-            ctx.lineTo(minX + w, cy);
-            ctx.stroke();
-            
-            // Freccia asse X
+
+            // X axis
+            ctx.beginPath(); ctx.moveTo(minX, cy); ctx.lineTo(minX + w, cy); ctx.stroke();
+            // right head
             ctx.setLineDash([]);
             ctx.beginPath();
             ctx.moveTo(minX + w, cy);
             ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
             ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
-            ctx.closePath();
-            ctx.stroke();
-            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
-            
-            // Asse Y (verticale)
+            ctx.closePath(); ctx.stroke();
+            // left head
             ctx.beginPath();
-            ctx.moveTo(cx, minY);
-            ctx.lineTo(cx, minY + h);
-            ctx.stroke();
-            
-            // Freccia asse Y
+            ctx.moveTo(minX, cy);
+            ctx.lineTo(minX + arrowSize, cy - arrowSize * 0.5);
+            ctx.lineTo(minX + arrowSize, cy + arrowSize * 0.5);
+            ctx.closePath(); ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+
+            // Y axis
+            ctx.beginPath(); ctx.moveTo(cx, minY); ctx.lineTo(cx, minY + h); ctx.stroke();
+            // top head
             ctx.setLineDash([]);
             ctx.beginPath();
             ctx.moveTo(cx, minY);
             ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
             ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
-            ctx.closePath();
-            ctx.stroke();
+            ctx.closePath(); ctx.stroke();
+            // bottom head
+            ctx.beginPath();
+            ctx.moveTo(cx, minY + h);
+            ctx.lineTo(cx - arrowSize * 0.5, minY + h - arrowSize);
+            ctx.lineTo(cx + arrowSize * 0.5, minY + h - arrowSize);
+            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
             break;
           }
           case 'assi3d': {
-            // Assi cartesiani 3D: X, Y e Z con frecce
+            // 3D axes, bidirectional; Z diagonal oriented NE <-> SW
             const cx = minX + w / 2;
             const cy = minY + h / 2;
             const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
-            
-            // Asse X (orizzontale a destra)
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(minX + w, cy);
-            ctx.stroke();
-            
-            // Freccia asse X
+
+            // X axis
+            ctx.beginPath(); ctx.moveTo(minX, cy); ctx.lineTo(minX + w, cy); ctx.stroke();
             ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.moveTo(minX + w, cy);
+            // right head
+            ctx.beginPath(); ctx.moveTo(minX + w, cy);
             ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
             ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
-            ctx.closePath();
-            ctx.stroke();
+            ctx.closePath(); ctx.stroke();
+            // left head
+            ctx.beginPath(); ctx.moveTo(minX, cy);
+            ctx.lineTo(minX + arrowSize, cy - arrowSize * 0.5);
+            ctx.lineTo(minX + arrowSize, cy + arrowSize * 0.5);
+            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
-            
-            // Asse Y (verticale verso l'alto)
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(cx, minY);
-            ctx.stroke();
-            
-            // Freccia asse Y
+
+            // Y axis
+            ctx.beginPath(); ctx.moveTo(cx, minY); ctx.lineTo(cx, minY + h); ctx.stroke();
             ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.moveTo(cx, minY);
+            // top head
+            ctx.beginPath(); ctx.moveTo(cx, minY);
             ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
             ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
-            ctx.closePath();
-            ctx.stroke();
+            ctx.closePath(); ctx.stroke();
+            // bottom head
+            ctx.beginPath(); ctx.moveTo(cx, minY + h);
+            ctx.lineTo(cx - arrowSize * 0.5, minY + h - arrowSize);
+            ctx.lineTo(cx + arrowSize * 0.5, minY + h - arrowSize);
+            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
-            
-            // Asse Z (diagonale verso destra-basso)
-            const zLen = Math.min(w, h) * 0.7;
-            const zEndX = cx + zLen * 0.7;
-            const zEndY = cy + zLen * 0.7;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(zEndX, zEndY);
-            ctx.stroke();
-            
-            // Freccia asse Z
+
+            // Z axis diagonal NE <-> SW
+            const dx1 = minX + w; const dy1 = minY; // NE
+            const dx2 = minX; const dy2 = minY + h; // SW
+            ctx.beginPath(); ctx.moveTo(dx1, dy1); ctx.lineTo(dx2, dy2); ctx.stroke();
             ctx.setLineDash([]);
+            // NE head
             ctx.beginPath();
-            ctx.moveTo(zEndX, zEndY);
-            ctx.lineTo(zEndX - arrowSize * 0.8, zEndY - arrowSize * 0.3);
-            ctx.lineTo(zEndX - arrowSize * 0.3, zEndY - arrowSize * 0.8);
-            ctx.closePath();
-            ctx.stroke();
+            ctx.moveTo(dx1, dy1);
+            ctx.lineTo(dx1 - arrowSize * 0.8, dy1 + arrowSize * 0.3);
+            ctx.lineTo(dx1 - arrowSize * 0.3, dy1 + arrowSize * 0.8);
+            ctx.closePath(); ctx.stroke();
+            // SW head
+            ctx.beginPath();
+            ctx.moveTo(dx2, dy2);
+            ctx.lineTo(dx2 + arrowSize * 0.8, dy2 - arrowSize * 0.3);
+            ctx.lineTo(dx2 + arrowSize * 0.3, dy2 - arrowSize * 0.8);
+            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
             break;
           }
@@ -2642,6 +2670,60 @@ export default function LavagnaCanvas({
         pointInTriangle({ x, y }, top, left, right) ||
         pointInTriangle({ x, y }, bottom, left, right)
       );
+    }
+    if (kind === 'assi2d' || kind === 'assi2' || kind === 'assi3d' || kind === 'assi3') {
+      // Hit-test axes by checking proximity to their shaft segments and arrowhead triangles
+      const baseX = Number(shape.x ?? 0);
+      const baseY = Number(shape.y ?? 0);
+      const width = Number(shape.w ?? 0);
+      const height = Number(shape.h ?? 0);
+      const cx = baseX + width / 2;
+      const cy = baseY + height / 2;
+      const arrowLen = Math.max(12, tolerance * 1.2);
+      const arrowW = arrowLen * 0.8;
+      const tri = (hx, hy, angle) => {
+        const ux = Math.cos(angle);
+        const uy = Math.sin(angle);
+        return [
+          { x: hx, y: hy },
+          { x: hx - arrowLen * ux + arrowW * uy, y: hy - arrowLen * uy - arrowW * ux },
+          { x: hx - arrowLen * ux - arrowW * uy, y: hy - arrowLen * uy + arrowW * ux }
+        ];
+      };
+      // Always test the horizontal and vertical shafts (for all axis types)
+      if (distPointToSegment(x, y, baseX, cy, baseX + width, cy) <= tolerance) return true;
+      if (distPointToSegment(x, y, cx, baseY, cx, baseY + height) <= tolerance) return true;
+      // Arrowheads for 2d/3d: both ends; for 2/3 legacy: right and top only
+      const testTri = (p1, p2, p3) => pointInTriangle({ x, y }, p1, p2, p3);
+      const wantBoth = (kind === 'assi2d' || kind === 'assi3d');
+      // X axis heads
+      const headsX = [];
+      // right
+      headsX.push(tri(baseX + width, cy, 0));
+      // left (only if bidirectional)
+      if (wantBoth) headsX.push(tri(baseX, cy, Math.PI));
+      for (const [p1, p2, p3] of headsX) { if (testTri(p1, p2, p3)) return true; }
+      // Y axis heads
+      const headsY = [];
+      // up
+      headsY.push(tri(cx, baseY, -Math.PI / 2));
+      // down (only if bidirectional)
+      if (wantBoth) headsY.push(tri(cx, baseY + height, Math.PI / 2));
+      for (const [p1, p2, p3] of headsY) { if (testTri(p1, p2, p3)) return true; }
+      // Z diagonal for 3-axis variants
+      if (kind === 'assi3' || kind === 'assi3d') {
+        // In both cases, we draw a NE <-> SW diagonal (top-right to bottom-left)
+        const dx1 = baseX + width; const dy1 = baseY;
+        const dx2 = baseX; const dy2 = baseY + height;
+        if (distPointToSegment(x, y, dx1, dy1, dx2, dy2) <= tolerance) return true;
+        const headsZ = [];
+        // NE head
+        headsZ.push(tri(dx1, dy1, -Math.PI / 4));
+        // SW head: only if bidirectional or if legacy 'assi3' which has arrow at SW
+        if (wantBoth || kind === 'assi3') headsZ.push(tri(dx2, dy2, (3 * Math.PI) / 4));
+        for (const [p1, p2, p3] of headsZ) { if (testTri(p1, p2, p3)) return true; }
+      }
+      return false;
     }
     return false;
   }

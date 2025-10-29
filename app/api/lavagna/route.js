@@ -234,6 +234,14 @@ export async function DELETE(req) {
   if (!id) return new Response("ID mancante", { status: 400 });
   // Elimina lavagna e relativi tratti
   await prisma.lavagnaTratto.deleteMany({ where: { lavagnaId: id } });
+  // Elimina anche le forme se il modello è presente
+  try {
+    if (prisma.lavagnaShape && typeof prisma.lavagnaShape.deleteMany === 'function') {
+      await prisma.lavagnaShape.deleteMany({ where: { lavagnaId: id } });
+    }
+  } catch (e) {
+    console.warn("DELETE /api/lavagna: errore eliminazione forme (ignoro)", e?.message || e);
+  }
   await prisma.lavagna.delete({ where: { id } });
   return Response.json({ ok: true });
 }
