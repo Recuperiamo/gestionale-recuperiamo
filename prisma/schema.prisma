@@ -232,6 +232,26 @@ model RichiestaLavagna {
   @@index([stato])
 }
 
+/**
+ * ====================== MATERIALE DIDATTICO ======================
+ */
+model MaterialeDidattico {
+  id            Int      @id @default(autoincrement())
+  clienteId     Int
+  titolo        String
+  materia       String?
+  nomeOriginale String
+  blobUrl       String   // URL del file su Vercel Blob
+  mimeType      String?
+  fileSize      Int?     // dimensione in bytes
+  uploadedBy    String?  // email o nome utente che ha caricato
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([clienteId])
+  @@index([createdAt])
+}
+
 model Lavagna {
   id         Int             @id @default(autoincrement())
   attivitaId Int             @unique

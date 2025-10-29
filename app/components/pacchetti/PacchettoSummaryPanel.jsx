@@ -81,6 +81,12 @@ export default function PacchettoSummaryPanel({ attivita = [] }) {
 
   // Ore rimanenti = ore acquistate - ore prenotate (includono sia svolte che programmate)
   const oreRimanenti = stats.oreAcquistate - stats.orePrenotate;
+  
+  // LOGICA STATI:
+  // 1. ESAURITO (priorità massima): ore_svolte >= ore_acquistate
+  // 2. ORE DISPONIBILI LIMITATE: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate
+  const isEsaurito = stats.oreSvolte >= stats.oreAcquistate;
+  const isDisponibilitaLimitata = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
 
   return (
     <div style={panelStyle}>
@@ -122,15 +128,21 @@ export default function PacchettoSummaryPanel({ attivita = [] }) {
         />
       </div>
       
-      {oreRimanenti < 5 && oreRimanenti > 0 && (
-        <div style={warningStyle}>
-          ⚠️ Attenzione: stai per esaurire le ore del pacchetto!
+      {isEsaurito && (
+        <div style={dangerStyle}>
+          🚨 Pacchetto esaurito! Contatta l'amministratore per rinnovare.
         </div>
       )}
       
-      {oreRimanenti <= 0 && (
-        <div style={dangerStyle}>
-          🚨 Pacchetto esaurito! Contatta l'amministratore per rinnovare.
+      {!isEsaurito && isDisponibilitaLimitata && (
+        <div style={warningStyle}>
+          ⚠️ Attenzione: tutte le ore sono state prenotate, non ci sono più slot disponibili!
+        </div>
+      )}
+      
+      {!isEsaurito && !isDisponibilitaLimitata && oreRimanenti < 5 && oreRimanenti > 0 && (
+        <div style={warningStyle}>
+          ⚠️ Attenzione: stai per esaurire le ore del pacchetto!
         </div>
       )}
     </div>

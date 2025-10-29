@@ -231,14 +231,28 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
   });
 
   const oreRimanenti = stats.oreAcquistate - stats.orePrenotate;
-  const isLow = oreRimanenti < 5;
-  const isEmpty = oreRimanenti <= 0;
+  
+  // LOGICA STATI:
+  // 1. ESAURITO (priorità massima): ore_svolte >= ore_acquistate
+  // 2. DISPONIBILITÀ LIMITATA: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate
+  // 3. ORE BASSE: ore_rimanenti < 5 (warning generico)
+  const isEsaurito = stats.oreSvolte >= stats.oreAcquistate;
+  const isDisponibilitaLimitata = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
+  const isLow = !isEsaurito && !isDisponibilitaLimitata && oreRimanenti < 5 && oreRimanenti > 0;
+  
+  // Determina colore bordo card
+  let borderColor = '#3B82F6'; // default blu
+  if (isEsaurito) borderColor = '#EF4444'; // rosso
+  else if (isDisponibilitaLimitata) borderColor = '#F59E0B'; // arancione
+  else if (isLow) borderColor = '#F59E0B'; // arancione
 
   return (
     <div style={{
       ...cardContainerStyle,
-      borderLeft: isEmpty ? '4px solid #EF4444' : isLow ? '4px solid #F59E0B' : '4px solid #3B82F6',
-      boxShadow: isLow ? '0 4px 20px rgba(239, 68, 68, 0.15)' : '0 4px 12px rgba(0,0,0,0.08)',
+      borderLeft: `4px solid ${borderColor}`,
+      boxShadow: (isEsaurito || isDisponibilitaLimitata || isLow) 
+        ? '0 4px 20px rgba(239, 68, 68, 0.15)' 
+        : '0 4px 12px rgba(0,0,0,0.08)',
     }}>
       <div style={cardHeaderStyle}>
         <div>
@@ -260,18 +274,38 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
         <StatMini 
           label="Rimanenti" 
           value={oreRimanenti} 
-          color={isEmpty ? '#EF4444' : isLow ? '#F59E0B' : '#06B6D4'}
-          highlighted={isLow}
+          color={isEsaurito ? '#EF4444' : isDisponibilitaLimitata ? '#F59E0B' : isLow ? '#F59E0B' : '#06B6D4'}
+          highlighted={isEsaurito || isDisponibilitaLimitata || isLow}
         />
       </div>
 
-      {isLow && (
+      {isEsaurito && (
         <div style={{
           ...warningBoxStyle,
-          background: isEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(251, 191, 36, 0.1)',
-          border: isEmpty ? '2px solid rgba(239, 68, 68, 0.3)' : '2px solid rgba(251, 191, 36, 0.3)',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '2px solid rgba(239, 68, 68, 0.3)',
         }}>
-          {isEmpty ? '🚨 Pacchetto esaurito!' : '⚠️ Ore quasi esaurite!'}
+          🚨 Pacchetto esaurito - Tutte le ore sono state svolte!
+        </div>
+      )}
+      
+      {!isEsaurito && isDisponibilitaLimitata && (
+        <div style={{
+          ...warningBoxStyle,
+          background: 'rgba(251, 191, 36, 0.1)',
+          border: '2px solid rgba(251, 191, 36, 0.3)',
+        }}>
+          ⚠️ Tutte le ore sono state prenotate - Disponibilità limitata!
+        </div>
+      )}
+      
+      {!isEsaurito && !isDisponibilitaLimitata && isLow && (
+        <div style={{
+          ...warningBoxStyle,
+          background: 'rgba(251, 191, 36, 0.1)',
+          border: '2px solid rgba(251, 191, 36, 0.3)',
+        }}>
+          ⚠️ Ore quasi esaurite!
         </div>
       )}
 
