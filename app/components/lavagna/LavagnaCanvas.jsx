@@ -116,6 +116,15 @@ export default function LavagnaCanvas({
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
 
+  // Mobile responsive hook
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
   // Always show a simple colored circular cursor (even smaller now).
@@ -4537,6 +4546,42 @@ export default function LavagnaCanvas({
   const toolbar = useMemo(() => {
     if (!showTools) return null;
     if (!isAdmin && spectatorMode) return null;
+
+    // Responsive button styles
+    const iconBtn = (active) => ({
+      width: isMobile ? 40 : 36,
+      height: isMobile ? 40 : 36,
+      minWidth: isMobile ? 40 : 36,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: isMobile ? 10 : 12,
+      border: active ? '1px solid rgba(27,102,220,0.2)' : '1px solid rgba(212,223,246,0.9)',
+      background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(248,251,255,0.96)',
+      color: active ? '#fff' : '#20489a',
+      boxShadow: active ? '0 14px 26px rgba(28,125,247,0.28)' : '0 8px 20px rgba(15,42,105,0.15)',
+      cursor: 'pointer',
+      transition: 'transform .15s ease, box-shadow .2s ease',
+      fontWeight: 700,
+      fontSize: 18
+    });
+
+    const shapeBtn = (active) => ({
+      width: isMobile ? 42 : 46,
+      height: isMobile ? 42 : 46,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: isMobile ? 10 : 12,
+      border: active ? '1.5px solid rgba(27,102,220,0.3)' : '1px solid rgba(212,223,246,0.9)',
+      background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(255,255,255,0.9)',
+      color: active ? '#fff' : '#20489a',
+      boxShadow: active ? '0 8px 18px rgba(28,125,247,0.25)' : '0 2px 8px rgba(15,42,105,0.1)',
+      cursor: 'pointer',
+      transition: 'all .15s ease',
+      padding: 0
+    });
+
   const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
     const undoDisabled = !undoStack.length;
@@ -4557,7 +4602,7 @@ export default function LavagnaCanvas({
               <path d="M7.5 8.5l-4 4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M7 12.5h6.5c3.59 0 6.5 2.91 6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
-            <span style={st.undoLabel}>Undo</span>
+            {!isMobile && <span style={st.undoLabel}>Undo</span>}
           </button>
 
           {redoAvailable && (
@@ -4571,7 +4616,7 @@ export default function LavagnaCanvas({
                 <path d="M16.5 8.5l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M17 12.5H10.5C6.91 12.5 4 9.59 4 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
-              <span style={st.undoLabel}>Redo</span>
+              {!isMobile && <span style={st.undoLabel}>Redo</span>}
             </button>
           )}
 
@@ -4987,7 +5032,8 @@ export default function LavagnaCanvas({
     setShowPenPopover,
     setShowMoreMenu,
     setShowShapesPopover,
-    setShowExportMenu
+    setShowExportMenu,
+    isMobile
   ]);
 
   const canvasCursor = useMemo(() => {
@@ -5226,22 +5272,34 @@ const st = {
   wrapper: { width: "100%", userSelect: "none" },
   bottomToolbarDock: {
     position: "absolute",
-    left: "50%",
-    bottom: 18,
-    transform: "translateX(-50%)",
-    zIndex: 3
+    left: isMobile ? 0 : "50%",
+    bottom: isMobile ? 8 : 18,
+    transform: isMobile ? "none" : "translateX(-50%)",
+    zIndex: 3,
+    ...(isMobile && {
+      right: 0,
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'center',
+      padding: '0 8px'
+    })
   },
   commandBar: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '10px 14px',
-    borderRadius: 16,
+    gap: isMobile ? 6 : 10,
+    padding: isMobile ? '8px 10px' : '10px 14px',
+    borderRadius: isMobile ? 14 : 16,
     background: 'rgba(255,255,255,0.92)',
     border: '1px solid #d4dff6',
     boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
     backdropFilter: 'blur(8px)',
-    userSelect: 'none'
+    userSelect: 'none',
+    ...(isMobile && {
+      flexWrap: 'wrap',
+      maxWidth: '100%',
+      justifyContent: 'center'
+    })
   },
   toolGroup: {
     display: 'flex',
@@ -5568,39 +5626,6 @@ const btn = (active) => ({
   fontSize: 13,
   padding: "6px 12px",
   cursor: "pointer"
-});
-
-const iconBtn = (active) => ({
-  width: 36,
-  height: 36,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 12,
-  border: active ? '1px solid rgba(27,102,220,0.2)' : '1px solid rgba(212,223,246,0.9)',
-  background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(248,251,255,0.96)',
-  color: active ? '#fff' : '#20489a',
-  boxShadow: active ? '0 14px 26px rgba(28,125,247,0.28)' : '0 8px 20px rgba(15,42,105,0.15)',
-  cursor: 'pointer',
-  transition: 'transform .15s ease, box-shadow .2s ease',
-  fontWeight: 700,
-  fontSize: 18
-});
-
-const shapeBtn = (active) => ({
-  width: 46,
-  height: 46,
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 12,
-  border: active ? '1.5px solid rgba(27,102,220,0.3)' : '1px solid rgba(212,223,246,0.9)',
-  background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(255,255,255,0.9)',
-  color: active ? '#fff' : '#20489a',
-  boxShadow: active ? '0 8px 18px rgba(28,125,247,0.25)' : '0 2px 8px rgba(15,42,105,0.1)',
-  cursor: 'pointer',
-  transition: 'all .15s ease',
-  padding: 0
 });
 
 const zoomButtonStyle = (disabled) => ({
