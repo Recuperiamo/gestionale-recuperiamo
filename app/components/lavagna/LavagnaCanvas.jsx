@@ -2834,11 +2834,20 @@ export default function LavagnaCanvas({
           }
           
           if (hitHandle) {
-            // Start resizing
+            // Start resizing - save original shapes for proper scaling
+            const originalShapes = {};
+            for (const shapeId of selectedItems.forme || []) {
+              const shape = forme.find(s => s.id === shapeId);
+              if (shape) {
+                originalShapes[shapeId] = JSON.parse(JSON.stringify(shape));
+              }
+            }
+            
             resizingSelectionRef.current.active = true;
             resizingSelectionRef.current.handle = hitHandle;
             resizingSelectionRef.current.originalBounds = { ...selBounds };
             resizingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
+            resizingSelectionRef.current.originalShapes = originalShapes;
             resizingSelectionRef.current.startPoint = { x: p.x, y: p.y };
             try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
             try { console.log('[LAVAGNA-DBG-RESIZE] start', hitHandle); } catch(_) {}
@@ -3123,40 +3132,84 @@ export default function LavagnaCanvas({
         const scaleX = newWidth / origWidth;
         const scaleY = newHeight / origHeight;
         
-        // Calculate original center (which should remain fixed)
-        const origCenterX = origBounds.minX + origWidth / 2;
-        const origCenterY = origBounds.minY + origHeight / 2;
+        // Determine the anchor point (opposite corner/side from the handle being dragged)
+        let anchorX, anchorY;
         
-        // Apply scaling to all selected shapes around the center
+        if (handle === 'top-left') {
+          anchorX = origBounds.maxX;
+          anchorY = origBounds.maxY;
+        } else if (handle === 'top-right') {
+          anchorX = origBounds.minX;
+          anchorY = origBounds.maxY;
+        } else if (handle === 'bottom-left') {
+          anchorX = origBounds.maxX;
+          anchorY = origBounds.minY;
+        } else if (handle === 'bottom-right') {
+          anchorX = origBounds.minX;
+          anchorY = origBounds.minY;
+        } else if (handle === 'top') {
+          anchorX = origBounds.minX + origWidth / 2;
+          anchorY = origBounds.maxY;
+        } else if (handle === 'bottom') {
+          anchorX = origBounds.minX + origWidth / 2;
+          anchorY = origBounds.minY;
+        } else if (handle === 'left') {
+          anchorX = origBounds.maxX;
+          anchorY = origBounds.minY + origHeight / 2;
+        } else if (handle === 'right') {
+          anchorX = origBounds.minX;
+          anchorY = origBounds.minY + origHeight / 2;
+        } else {
+          // Fallback to center if handle not recognized
+          anchorX = origBounds.minX + origWidth / 2;
+          anchorY = origBounds.minY + origHeight / 2;
+        }
+        
+        // Apply scaling to all selected shapes relative to the anchor point
         const selectionSnapshot = resizeInfo.selectionSnapshot || selectedItems;
         setForme(prev => prev.map(f => {
           if (!selectionSnapshot.forme.includes(f.id)) return f;
           
-          // Calculate offset from original center
-          const offsetX = f.x - origCenterX;
-          const offsetY = f.y - origCenterY;
+          // Get the original shape from the snapshot
+          const originalShape = resizeInfo.originalShapes?.[f.id] || f;
           
-          // Scale offset and add back to center
-          const updated = {
-            ...f,
-            x: origCenterX + offsetX * scaleX,
-            y: origCenterY + offsetY * scaleY,
-            w: (f.w || 0) * scaleX,
-            h: (f.h || 0) * scaleY,
-          };
+          // Calculate offset from anchor point for each coordinate
+          const updated = { ...f };
           
-          // Handle shapes with x1, y1, x2, y2
-          if (typeof f.x1 === 'number' && typeof f.y1 === 'number') {
-            const offsetX1 = f.x1 - origCenterX;
-            const offsetY1 = f.y1 - origCenterY;
-            updated.x1 = origCenterX + offsetX1 * scaleX;
-            updated.y1 = origCenterY + offsetY1 * scaleY;
+          // Scale x, y coordinates (top-left of the shape)
+          if (typeof originalShape.x === 'number') {
+            const offsetX = originalShape.x - anchorX;
+            updated.x = anchorX + offsetX * scaleX;
           }
-          if (typeof f.x2 === 'number' && typeof f.y2 === 'number') {
-            const offsetX2 = f.x2 - origCenterX;
-            const offsetY2 = f.y2 - origCenterY;
-            updated.x2 = origCenterX + offsetX2 * scaleX;
-            updated.y2 = origCenterY + offsetY2 * scaleY;
+          if (typeof originalShape.y === 'number') {
+            const offsetY = originalShape.y - anchorY;
+            updated.y = anchorY + offsetY * scaleY;
+          }
+          
+          // Scale width and height
+          if (typeof originalShape.w === 'number') {
+            updated.w = originalShape.w * scaleX;
+          }
+          if (typeof originalShape.h === 'number') {
+            updated.h = originalShape.h * scaleY;
+          }
+          
+          // Handle shapes with x1, y1, x2, y2 (lines, arrows, etc.)
+          if (typeof originalShape.x1 === 'number') {
+            const offsetX1 = originalShape.x1 - anchorX;
+            updated.x1 = anchorX + offsetX1 * scaleX;
+          }
+          if (typeof originalShape.y1 === 'number') {
+            const offsetY1 = originalShape.y1 - anchorY;
+            updated.y1 = anchorY + offsetY1 * scaleY;
+          }
+          if (typeof originalShape.x2 === 'number') {
+            const offsetX2 = originalShape.x2 - anchorX;
+            updated.x2 = anchorX + offsetX2 * scaleX;
+          }
+          if (typeof originalShape.y2 === 'number') {
+            const offsetY2 = originalShape.y2 - anchorY;
+            updated.y2 = anchorY + offsetY2 * scaleY;
           }
           
           return updated;
@@ -3439,8 +3492,30 @@ export default function LavagnaCanvas({
     // Finalize resize if active
     if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
       try {
-        // Emit shape:update events for all resized shapes
+        // Save current state to undo stack before finishing
         const selectionSnapshot = resizingSelectionRef.current.selectionSnapshot || selectedItems;
+        const originalShapes = resizingSelectionRef.current.originalShapes || {};
+        const currentShapes = {};
+        
+        for (const shapeId of selectionSnapshot.forme) {
+          const shape = forme.find(f => f.id === shapeId);
+          if (shape) {
+            currentShapes[shapeId] = { ...shape };
+          }
+        }
+        
+        // Add to undo stack
+        setUndoStack(prev => [...prev, {
+          type: 'resize',
+          shapes: Object.entries(originalShapes).map(([id, shape]) => ({
+            id,
+            before: shape,
+            after: currentShapes[id]
+          }))
+        }]);
+        setRedoStack([]);
+        
+        // Emit shape:update events for all resized shapes
         for (const shapeId of selectionSnapshot.forme) {
           const shape = forme.find(f => f.id === shapeId);
           if (shape) {
@@ -3459,6 +3534,7 @@ export default function LavagnaCanvas({
       resizingSelectionRef.current.handle = null;
       resizingSelectionRef.current.originalBounds = null;
       resizingSelectionRef.current.selectionSnapshot = null;
+      resizingSelectionRef.current.originalShapes = null;
       resizingSelectionRef.current.startPoint = null;
       try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
       try { console.log('[LAVAGNA-DBG-RESIZE] finished'); } catch(_) {}
@@ -3793,6 +3869,22 @@ export default function LavagnaCanvas({
           }
         }).catch(() => {});
       } catch(_) {}
+    } else if (last.type === 'resize') {
+      // restore shapes to their state before resize
+      setForme((prev) => prev.map((f) => {
+        const resized = last.shapes.find(s => s.id === f.id);
+        if (resized && resized.before) {
+          // Emit update and persist
+          emitOrPublish('shape:update', { ...resized.before, lavagnaId });
+          fetch(`/api/lavagna/shape/${resized.before.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resized.before)
+          }).catch(() => {});
+          return resized.before;
+        }
+        return f;
+      }));
     }
     drawAll();
   }
@@ -3831,6 +3923,22 @@ export default function LavagnaCanvas({
       if (action.shape.dbId && (isAdmin || action.shape.autoreUserId === utenteId)) {
         fetch(`/api/lavagna/shape/${action.shape.dbId}`, { method: 'DELETE' }).catch(() => {});
       }
+    } else if (action.type === 'resize') {
+      // redo resize: apply the 'after' state
+      setForme((prev) => prev.map((f) => {
+        const resized = action.shapes.find(s => s.id === f.id);
+        if (resized && resized.after) {
+          // Emit update and persist
+          emitOrPublish('shape:update', { ...resized.after, lavagnaId });
+          fetch(`/api/lavagna/shape/${resized.after.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resized.after)
+          }).catch(() => {});
+          return resized.after;
+        }
+        return f;
+      }));
     }
     drawAll();
   }
