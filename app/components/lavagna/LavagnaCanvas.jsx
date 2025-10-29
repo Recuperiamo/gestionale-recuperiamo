@@ -2226,9 +2226,10 @@ export default function LavagnaCanvas({
   const z = zoomRef.current || 1;
   // Reduce deduplication threshold strongly so we keep more raw samples from
   // tablet devices; value is in world units and scales with zoom. At zoom=1
-  // we accept much closer points (≈0.06) so final smoothing has more input
-  // to work on and we avoid losing small/fast letter strokes.
-  const minDist = Math.max(0.02, 0.06 / (z || 1)); // world units (lower => keep more points)
+  // we accept much closer points (≈0.03) so final smoothing has more input
+  // to work on and we avoid losing small/fast letter strokes. Reduced from
+  // 0.06 to 0.03 to capture more points during fast cursive writing.
+  const minDist = Math.max(0.01, 0.03 / (z || 1)); // world units (lower => keep more points)
     const dedup = [];
     let last = null;
     for (const p of rawPoints) {
