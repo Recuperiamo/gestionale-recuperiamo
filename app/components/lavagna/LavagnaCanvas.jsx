@@ -1839,54 +1839,61 @@ export default function LavagnaCanvas({
 
   const deleteShapeLocal = useCallback((id, emit = true, force = false) => {
     console.log('[LAVAGNA-DELETE] deleteShapeLocal called:', { id, emit, force, formeLengthBefore: forme.length });
-    let removedShape = null;
-    setForme((prev) => {
-      const target = prev.find((f) => f.id === id);
-      console.log('[LAVAGNA-DELETE] Searching for shape in setForme:', { id, found: !!target, prevLength: prev.length });
-      if (!target) return prev;
-      if (!force && !isAdmin && target.autoreUserId && target.autoreUserId !== utenteId) {
-        console.log('[LAVAGNA-DELETE] Permission denied:', { isAdmin, targetAuthor: target.autoreUserId, utenteId });
-        return prev;
-      }
-      removedShape = target;
-      return prev.filter((f) => f.id !== id);
-    });
-    console.log('[LAVAGNA-DELETE] After setForme, removedShape:', removedShape);
-    if (!removedShape) return;
+    
+    // Find the shape BEFORE removing it from state
+    const target = forme.find((f) => f.id === id);
+    console.log('[LAVAGNA-DELETE] Found target shape:', { id, found: !!target, kind: target?.kind });
+    
+    if (!target) {
+      console.warn('[LAVAGNA-DELETE] Shape not found:', { id });
+      return;
+    }
+    
+    if (!force && !isAdmin && target.autoreUserId && target.autoreUserId !== utenteId) {
+      console.log('[LAVAGNA-DELETE] Permission denied:', { isAdmin, targetAuthor: target.autoreUserId, utenteId });
+      return;
+    }
+    
+    // Now remove from state
+    setForme((prev) => prev.filter((f) => f.id !== id));
+    
     // register undo entry for deletions performed by this user
     try {
-      if (!removedShape.autoreUserId || removedShape.autoreUserId === utenteId || isAdmin) {
-        setUndoStack((prev) => [...prev, { type: 'delete-shape', shape: removedShape }]);
+      if (!target.autoreUserId || target.autoreUserId === utenteId || isAdmin) {
+        setUndoStack((prev) => [...prev, { type: 'delete-shape', shape: target }]);
         setRedoStack([]);
       }
     } catch (_) {}
+    
     if (emit) emitOrPublish('shape:delete', { id, lavagnaId });
+    
     // revoke any temporary object URL used by this shape
     try {
-      if (removedShape.src && typeof removedShape.src === 'string' && removedShape.src.startsWith('blob:')) {
-        try { URL.revokeObjectURL(removedShape.src); } catch(_) {}
+      if (target.src && typeof target.src === 'string' && target.src.startsWith('blob:')) {
+        try { URL.revokeObjectURL(target.src); } catch(_) {}
       }
     } catch (_) {}
-    const dbId = removedShape.dbId || id;
-    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, kind: removedShape.kind, dbIdType: typeof dbId });
+    
+    const dbId = target.dbId || id;
+    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, kind: target.kind, dbIdType: typeof dbId });
     
     // If dbId is not numeric, queue for deletion when persist completes
     if (typeof dbId !== 'number' && isNaN(Number(dbId))) {
-      console.log('[LAVAGNA-DELETE] dbId not yet assigned, queuing deletion:', { localId: id, kind: removedShape.kind });
+      console.log('[LAVAGNA-DELETE] dbId not yet assigned, queuing deletion:', { localId: id, kind: target.kind });
       pendingDeletions.current.set(id, true);
       return;
     }
     
     // Send DELETE to server
-    console.log('[LAVAGNA-DELETE] Sending DELETE to server:', { localId: id, dbId, kind: removedShape.kind });
+    console.log('[LAVAGNA-DELETE] Sending DELETE to server:', { localId: id, dbId, kind: target.kind });
     fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
       .then(res => {
-        console.log('[LAVAGNA-DELETE] DELETE response:', { status: res.status, dbId, kind: removedShape.kind });
+        console.log('[LAVAGNA-DELETE] DELETE response:', { status: res.status, dbId, kind: target.kind });
         return res.json();
       })
-      .then(data => console.log('[LAVAGNA-DELETE] DELETE success:', { data, dbId, kind: removedShape.kind }))
-      .catch(err => console.error('[LAVAGNA-DELETE] DELETE error:', { err, dbId, kind: removedShape.kind }));
-  }, [emitOrPublish, lavagnaId, isAdmin, utenteId]);
+      .then(data => console.log('[LAVAGNA-DELETE] DELETE success:', { data, dbId, kind: target.kind }))
+      .catch(err => console.error('[LAVAGNA-DELETE] DELETE error:', { err, dbId, kind: target.kind }));
+  }, [emitOrPublish, lavagnaId, isAdmin, utenteId, forme]);
 
   // Clipboard for cut/copy/paste
   const clipboardRef = useRef({ tratti: [], forme: [] });
