@@ -235,6 +235,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
+  const [activeTab, setActiveTab] = useState("bacheca"); // bacheca, compiti, materiale, voti
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
   const myClienteId = session?.user?.clienteId ? String(session.user.clienteId) : "";
@@ -390,6 +391,9 @@ export default function AulaContent({ initialClienteId = null }) {
   
   // Materie dello studente (fallback a array vuoto se non disponibili)
   const materieStudente = studenteCorrente?.materie || [];
+  
+  // Colore tema dello studente (default blu se non impostato)
+  const coloreTema = studenteCorrente?.coloreTema || "#1cb0f6";
 
   async function handleDeleteMateriale(fileId) {
     if (!window.confirm("Sei sicuro di voler eliminare questo materiale?")) return;
@@ -468,8 +472,7 @@ export default function AulaContent({ initialClienteId = null }) {
               <button
                 style={videoLinkButton}
                 onClick={() => {
-                  // TODO: sostituisci con studenteCorrente.linkVideolezione quando aggiungi il campo al DB
-                  const link = null; // studenteCorrente.linkVideolezione
+                  const link = studenteCorrente.linkVideolezione;
                   if (link) {
                     window.open(link, '_blank', 'noopener,noreferrer');
                   } else {
@@ -486,10 +489,48 @@ export default function AulaContent({ initialClienteId = null }) {
               </button>
             </div>
           )}
+
+          {/* TABS CLASSROOM */}
+          {targetClienteId && (
+            <div style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: "24px",
+              marginBottom: "16px",
+              borderBottom: "2px solid #e0e4f0",
+              paddingBottom: "0"
+            }}>
+              {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      borderBottom: isActive ? `3px solid ${coloreTema}` : "3px solid transparent",
+                      color: isActive ? coloreTema : "#5a6c8f",
+                      padding: "12px 20px",
+                      fontSize: "15px",
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: "pointer",
+                      textTransform: "capitalize",
+                      transition: "all 0.2s ease",
+                      marginBottom: "-2px"
+                    }}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* BAR: Carica materiale a sinistra, filtri e ricerca a destra */}
           <div style={barFlex}>
             {targetClienteId && (
-              <button style={btnPrimary} onClick={() => setShowUpload(true)}>
+              <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
                 Carica materiale
               </button>
             )}
@@ -563,7 +604,7 @@ export default function AulaContent({ initialClienteId = null }) {
                         </div>
                       )}
                       <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                        {m.materia && <span style={categoria}>{m.materia}</span>}
+                        {m.materia && <span style={{...categoria, background: `${coloreTema}20`, color: coloreTema}}>{m.materia}</span>}
                         {isAdmin && <span style={clientePill}>{getStudenteLabel(m.clienteId)}</span>}
                         {typeof m.tipo === "string" && m.tipo.trim() && m.tipo !== "undefined" && !["jpg","jpeg","png","gif","bmp","webp"].includes(m.tipo.toLowerCase()) &&
                           <FileIcon tipo={m.tipo} />

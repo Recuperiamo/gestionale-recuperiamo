@@ -89,6 +89,8 @@ model Client {
   materie           String[]            @default([])
   tipo              ClientType          @default(REFERENTE)
   referenteId       Int?
+  coloreTema        String?             // Colore hex per tema aula (es: "#1cb0f6")
+  linkVideolezione  String?             // Link videolezione
   referente         Client?             @relation("ReferenteStudenti", fields: [referenteId], references: [id], onDelete: SetNull)
   studenti          Client[]            @relation("ReferenteStudenti")
   pacchetti         PacchettoOre[]

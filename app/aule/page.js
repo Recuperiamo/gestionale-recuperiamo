@@ -150,8 +150,7 @@ export default function AulePage() {
                         {/* Videolezione link - placeholder (sarà attivato quando aggiungi linkVideolezione al DB) */}
                         <button
                           onClick={() => {
-                            // TODO: sostituisci con stud.linkVideolezione quando aggiungi il campo al DB
-                            const link = null; // stud.linkVideolezione
+                            const link = stud.linkVideolezione;
                             if (link) {
                               window.open(link, '_blank', 'noopener,noreferrer');
                             } else {
