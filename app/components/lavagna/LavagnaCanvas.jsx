@@ -49,7 +49,6 @@ export default function LavagnaCanvas({
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
   const [enablePinchZoom, setEnablePinchZoom] = useState(true);
   const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
-  const [showHandPopover, setShowHandPopover] = useState(false);
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const sfondoRef = useRef(sfondo);
@@ -3302,6 +3301,33 @@ export default function LavagnaCanvas({
         return;
       }
 
+      // Shift + Penna = Linea retta (shape)
+      if (strumento === 'penna' && native?.shiftKey) {
+        const p = getPointerWorld();
+        if (!p) {
+          console.warn('[lavagna] shift+pen: invalid point');
+          return;
+        }
+        previewShapeRef.current = {
+          kind: 'linea',
+          x: p.x,
+          y: p.y,
+          xStart: p.x,
+          yStart: p.y,
+          x2: p.x,
+          y2: p.y,
+          colore,
+          spessore,
+          autoreUserId: utenteId
+        };
+        drawingShapeRef.current = true;
+        try {
+          canvas?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        drawAll();
+        return;
+      }
+
       if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'rombo', 'freccia', 'assi2', 'assi3', 'assi2d', 'assi3d'].includes(strumento)) {
       const p = getPointerWorld();
       if (!p) {
@@ -4800,7 +4826,6 @@ export default function LavagnaCanvas({
                 style={iconBtn(strumento === 'mano')}
                 onClick={() => {
                   setStrumento('mano');
-                  setShowHandPopover(false);
                   setShowPenPopover(false);
                   setShowMoreMenu(false);
                   setShowShapesPopover(false);
