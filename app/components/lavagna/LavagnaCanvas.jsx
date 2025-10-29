@@ -3266,6 +3266,26 @@ export default function LavagnaCanvas({
       return;
     }
 
+    // On mobile: enable single-finger panning by default (unless drawing with penna/gomma)
+    if (isMobile && native?.pointerType === 'touch' && touchesRef.current.size === 1) {
+      if (!['penna', 'gomma'].includes(strumento)) {
+        if (spectatorLocked) {
+          return;
+        }
+        getPointerWorld();
+        try {
+          canvas?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        panningRef.current.active = true;
+        panningRef.current.lastX = native.clientX;
+        panningRef.current.lastY = native.clientY;
+        panningRef.current.viaContext = false;
+        setContextPanning(false);
+        setIsPanning(true);
+        return;
+      }
+    }
+
     setDisegnando(true);
     const punto = getPointerWorld();
     if (!punto) {
@@ -3619,9 +3639,28 @@ export default function LavagnaCanvas({
         const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
         const rect = canvasRef.current.getBoundingClientRect();
         const midOff = { x: mid.x - rect.left, y: mid.y - rect.top };
-        const midWorld = { x: pan.x + midOff.x / zoom, y: pan.y + midOff.y / zoom };
-        gestureRef.current = { mode: 'panzoom', startZoom: zoom, startPan: { ...pan }, startDist: dist, startMidWorld: midWorld };
-        setDisegnando(false);
+        
+        // Initialize gesture on first detection
+        if (gestureRef.current.mode !== 'panzoom') {
+          const midWorld = { x: pan.x + midOff.x / zoom, y: pan.y + midOff.y / zoom };
+          gestureRef.current = { mode: 'panzoom', startZoom: zoom, startPan: { ...pan }, startDist: dist, startMidWorld: midWorld };
+          setDisegnando(false);
+        } else {
+          // Apply pinch-to-zoom
+          const g = gestureRef.current;
+          const scale = dist / g.startDist;
+          let newZoom = g.startZoom * scale;
+          newZoom = Math.max(0.1, Math.min(5, newZoom)); // Clamp between 0.1x and 5x
+          
+          // Keep the midpoint fixed in world coordinates
+          const newPan = {
+            x: g.startMidWorld.x - midOff.x / newZoom,
+            y: g.startMidWorld.y - midOff.y / newZoom
+          };
+          
+          setZoom(newZoom);
+          setPan(newPan);
+        }
         return;
       }
     }
@@ -5217,7 +5256,8 @@ export default function LavagnaCanvas({
       )}
       <div style={st.canvasBox}>
         {toolbar}
-  <div ref={zoomControlsRef} style={st.zoomControls}>
+  {!isMobile && (
+    <div ref={zoomControlsRef} style={st.zoomControls}>
           <button
             type="button"
             style={zoomButtonStyle(zoomDisabled || !canZoomOut)}
@@ -5250,6 +5290,7 @@ export default function LavagnaCanvas({
             </svg>
           </button>
         </div>
+  )}
         <div
           ref={overlayRef}
           style={{
