@@ -3902,6 +3902,7 @@ export default function LavagnaCanvas({
     const shapeButtonActive = shapeActive || showShapesPopover;
     const undoDisabled = !undoStack.length;
     const redoAvailable = redoStack.length > 0;
+    const isCustomPenColor = !penPalette.some(entry => entry.value === colore);
 
     return (
       <div style={st.bottomToolbarDock}>
