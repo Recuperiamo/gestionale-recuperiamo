@@ -2707,6 +2707,23 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
 
+      // Single-click on link shapes when using selection tool: open URL
+      try {
+        if (btn === 0 && strumento === 'selezione') {
+          const p = getPointerWorld();
+          if (p) {
+            for (const f of (forme || [])) {
+              if (f.kind !== 'link') continue;
+              if (hitTestShape(f, p.x, p.y, 12)) {
+                openLinkShape(f);
+                e.preventDefault();
+                return;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
       // If user clicked with the selection tool, begin a rectangular selection
       // (the 'lazo' rectangular mode). This restores expected selection behavior
       // which was previously inactive.
@@ -3088,37 +3105,40 @@ export default function LavagnaCanvas({
         const scaleX = newWidth / origWidth;
         const scaleY = newHeight / origHeight;
         
-        // Apply scaling to all selected shapes
+        // Calculate original center (which should remain fixed)
+        const origCenterX = origBounds.minX + origWidth / 2;
+        const origCenterY = origBounds.minY + origHeight / 2;
+        
+        // Apply scaling to all selected shapes around the center
         const selectionSnapshot = resizeInfo.selectionSnapshot || selectedItems;
         setForme(prev => prev.map(f => {
           if (!selectionSnapshot.forme.includes(f.id)) return f;
           
-          // Calculate new position and size based on original bounds
-          const relX = (f.x - origBounds.minX) / origWidth;
-          const relY = (f.y - origBounds.minY) / origHeight;
-          const relW = (f.w || 0) / origWidth;
-          const relH = (f.h || 0) / origHeight;
+          // Calculate offset from original center
+          const offsetX = f.x - origCenterX;
+          const offsetY = f.y - origCenterY;
           
+          // Scale offset and add back to center
           const updated = {
             ...f,
-            x: newBounds.minX + relX * newWidth,
-            y: newBounds.minY + relY * newHeight,
-            w: relW * newWidth,
-            h: relH * newHeight,
+            x: origCenterX + offsetX * scaleX,
+            y: origCenterY + offsetY * scaleY,
+            w: (f.w || 0) * scaleX,
+            h: (f.h || 0) * scaleY,
           };
           
           // Handle shapes with x1, y1, x2, y2
           if (typeof f.x1 === 'number' && typeof f.y1 === 'number') {
-            const relX1 = (f.x1 - origBounds.minX) / origWidth;
-            const relY1 = (f.y1 - origBounds.minY) / origHeight;
-            updated.x1 = newBounds.minX + relX1 * newWidth;
-            updated.y1 = newBounds.minY + relY1 * newHeight;
+            const offsetX1 = f.x1 - origCenterX;
+            const offsetY1 = f.y1 - origCenterY;
+            updated.x1 = origCenterX + offsetX1 * scaleX;
+            updated.y1 = origCenterY + offsetY1 * scaleY;
           }
           if (typeof f.x2 === 'number' && typeof f.y2 === 'number') {
-            const relX2 = (f.x2 - origBounds.minX) / origWidth;
-            const relY2 = (f.y2 - origBounds.minY) / origHeight;
-            updated.x2 = newBounds.minX + relX2 * newWidth;
-            updated.y2 = newBounds.minY + relY2 * newHeight;
+            const offsetX2 = f.x2 - origCenterX;
+            const offsetY2 = f.y2 - origCenterY;
+            updated.x2 = origCenterX + offsetX2 * scaleX;
+            updated.y2 = origCenterY + offsetY2 * scaleY;
           }
           
           return updated;
