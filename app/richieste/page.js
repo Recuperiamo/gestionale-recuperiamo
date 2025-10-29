@@ -87,6 +87,24 @@ export default function RichiestePage() {
     }
   }
 
+  async function handleEliminaLavagna(id) {
+    if (!window.confirm("Sei sicuro di voler eliminare questa richiesta dallo storico?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/richieste-lavagna?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        loadRichieste();
+      } else {
+        alert("Errore nell'eliminazione");
+      }
+    } catch (e) {
+      alert("Errore nell'eliminazione");
+    }
+  }
+
   if (status === "loading" || loading) {
     return (
       <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
@@ -199,6 +217,7 @@ export default function RichiestePage() {
                     key={r.id}
                     richiesta={r}
                     readonly
+                    onElimina={() => handleEliminaLavagna(r.id)}
                   />
                 ))}
             </div>
@@ -375,6 +394,14 @@ function RichiestaLavagnaCard({ richiesta, onApprova, onRifiuta, readonly }) {
           </button>
         </div>
       )}
+      
+      {readonly && onElimina && (
+        <div style={{ marginTop: 12 }}>
+          <button onClick={onElimina} style={btnDeleteStyle}>
+            🗑️ Elimina dallo storico
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -492,4 +519,16 @@ const btnDangerStyle = {
   fontSize: 14,
   fontWeight: 600,
   cursor: "pointer",
+};
+
+const btnDeleteStyle = {
+  padding: "8px 16px",
+  background: "#6B7280",
+  color: "#fff",
+  border: "none",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  width: "100%",
 };

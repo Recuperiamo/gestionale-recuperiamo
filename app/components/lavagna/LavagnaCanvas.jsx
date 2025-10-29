@@ -4031,34 +4031,224 @@ export default function LavagnaCanvas({
   const esportaPNG = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
+    
+    // Calcola i bounds di tutti i tratti e forme
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+    
+    // Bounds dei tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      hasContent = true;
+      for (const p of t.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    
+    // Bounds delle forme
+    for (const f of forme) {
+      if (!f) continue;
+      hasContent = true;
+      const bounds = getShapeBounds(f);
+      if (bounds) {
+        if (bounds.minX < minX) minX = bounds.minX;
+        if (bounds.maxX > maxX) maxX = bounds.maxX;
+        if (bounds.minY < minY) minY = bounds.minY;
+        if (bounds.maxY > maxY) maxY = bounds.maxY;
+      }
+    }
+    
+    // Se non c'è contenuto, esporta canvas vuoto
+    if (!hasContent) {
+      const url = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lavagna-${lavagnaId}.png`;
+      link.click();
+      return;
+    }
+    
+    // Aggiungi margini (40px in coordinate mondo)
+    const margin = 40;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Crea un canvas temporaneo per l'export
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = Math.ceil(contentWidth);
+    exportCanvas.height = Math.ceil(contentHeight);
+    const ctx = exportCanvas.getContext('2d');
+    
+    // Riempi sfondo
+    ctx.fillStyle = sfondo;
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    
+    // Trasla il contesto per centrare il contenuto
+    ctx.save();
+    ctx.translate(-minX, -minY);
+    
+    // Disegna tutti i tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      const prepared = prepareStroke(t);
+      if (!prepared || !prepared.punti || prepared.punti.length === 0) continue;
+      
+      ctx.beginPath();
+      ctx.moveTo(prepared.punti[0].x, prepared.punti[0].y);
+      for (let i = 1; i < prepared.punti.length; i++) {
+        ctx.lineTo(prepared.punti[i].x, prepared.punti[i].y);
+      }
+      ctx.strokeStyle = prepared.colore;
+      ctx.lineWidth = prepared.spessore;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    
+    // Disegna tutte le forme
+    for (const shape of forme) {
+      if (!shape) continue;
+      drawShape(ctx, shape, 1); // zoom = 1 per export
+    }
+    
+    ctx.restore();
+    
+    // Esporta come PNG
+    const url = exportCanvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = url;
     link.download = `lavagna-${lavagnaId}.png`;
     link.click();
-  }, [lavagnaId]);
+  }, [lavagnaId, tratti, forme, sfondo, getShapeBounds, prepareStroke]);
 
   const esportaPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf");
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Calcola i bounds di tutti i tratti e forme
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+    
+    // Bounds dei tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      hasContent = true;
+      for (const p of t.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    
+    // Bounds delle forme
+    for (const f of forme) {
+      if (!f) continue;
+      hasContent = true;
+      const bounds = getShapeBounds(f);
+      if (bounds) {
+        if (bounds.minX < minX) minX = bounds.minX;
+        if (bounds.maxX > maxX) maxX = bounds.maxX;
+        if (bounds.minY < minY) minY = bounds.minY;
+        if (bounds.maxY > maxY) maxY = bounds.maxY;
+      }
+    }
+    
+    // Se non c'è contenuto, usa il canvas corrente
+    if (!hasContent) {
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+      });
+      pdf.addImage(
+        canvas.toDataURL("image/png"),
+        "PNG",
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+      pdf.save(`lavagna-${lavagnaId || attivitaId}.pdf`);
+      return;
+    }
+    
+    // Aggiungi margini
+    const margin = 40;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Crea un canvas temporaneo
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = Math.ceil(contentWidth);
+    exportCanvas.height = Math.ceil(contentHeight);
+    const ctx = exportCanvas.getContext('2d');
+    
+    // Riempi sfondo
+    ctx.fillStyle = sfondo;
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    
+    // Trasla il contesto
+    ctx.save();
+    ctx.translate(-minX, -minY);
+    
+    // Disegna tutti i tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      const prepared = prepareStroke(t);
+      if (!prepared || !prepared.punti || prepared.punti.length === 0) continue;
+      
+      ctx.beginPath();
+      ctx.moveTo(prepared.punti[0].x, prepared.punti[0].y);
+      for (let i = 1; i < prepared.punti.length; i++) {
+        ctx.lineTo(prepared.punti[i].x, prepared.punti[i].y);
+      }
+      ctx.strokeStyle = prepared.colore;
+      ctx.lineWidth = prepared.spessore;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    
+    // Disegna tutte le forme
+    for (const shape of forme) {
+      if (!shape) continue;
+      drawShape(ctx, shape, 1);
+    }
+    
+    ctx.restore();
+    
+    // Crea PDF
     const pdf = new jsPDF({
-      orientation: "landscape",
+      orientation: contentWidth > contentHeight ? "landscape" : "portrait",
       unit: "px",
-      format: [canvas.width, canvas.height],
+      format: [exportCanvas.width, exportCanvas.height],
     });
 
     pdf.addImage(
-      canvas.toDataURL("image/png"),
+      exportCanvas.toDataURL("image/png"),
       "PNG",
       0,
       0,
-      canvas.width,
-      canvas.height
+      exportCanvas.width,
+      exportCanvas.height
     );
     pdf.save(`lavagna-${lavagnaId || attivitaId}.pdf`);
-  }, [lavagnaId, attivitaId]);
+  }, [lavagnaId, attivitaId, tratti, forme, sfondo, getShapeBounds, prepareStroke]);
 
   // == CLEAR ==
   const pulisciLavagna = useCallback(() => {

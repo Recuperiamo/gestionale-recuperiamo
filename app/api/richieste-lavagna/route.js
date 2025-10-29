@@ -163,3 +163,33 @@ export async function PATCH(req) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
+    }
+
+    const isAdmin = ["admin", "operatore"].includes(session.user.role);
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "id richiesto" }, { status: 400 });
+    }
+
+    await prisma.richiestaLavagna.delete({
+      where: { id: parseInt(id) },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Errore DELETE /api/richieste-lavagna:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
