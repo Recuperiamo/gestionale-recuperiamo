@@ -50,10 +50,10 @@ export default function AulePage() {
           }
         }
 
-        // Compose final list: existing referenti plus a synthetic "Senza referente" group if needed
+        // Compose final list: existing referenti plus a synthetic "Studenti" group if needed
         const finalReferenti = Array.from(refMap.values());
         if (orphanStudents.length > 0) {
-          finalReferenti.push({ id: "_orphan", nomeReferente: "Senza referente", email: "", studenti: orphanStudents });
+          finalReferenti.push({ id: "_orphan", nomeReferente: "Studenti", email: "", studenti: orphanStudents });
         }
 
         if (isMounted) setReferenti(finalReferenti);
@@ -243,7 +243,7 @@ const infoBox = {
 const cardsGrid = {
   display: "grid",
   gap: "28px",
-  gridTemplateColumns: "repeat(auto-fill, minmax(480px, 1fr))"
+  gridTemplateColumns: "1fr"
 };
 
 const card = {
@@ -280,7 +280,7 @@ const badge = {
 
 const studentsGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
   gap: "14px"
 };
 

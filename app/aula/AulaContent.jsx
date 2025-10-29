@@ -462,6 +462,30 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           ) : (
             <>
+          {/* PULSANTE VIDEOLEZIONE */}
+          {targetClienteId && studenteCorrente && (
+            <div style={videoLinkBox}>
+              <button
+                style={videoLinkButton}
+                onClick={() => {
+                  // TODO: sostituisci con studenteCorrente.linkVideolezione quando aggiungi il campo al DB
+                  const link = null; // studenteCorrente.linkVideolezione
+                  if (link) {
+                    window.open(link, '_blank', 'noopener,noreferrer');
+                  } else {
+                    alert('Link videolezione non configurato per questo studente');
+                  }
+                }}
+                title="Apri videolezione"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+                <span>Apri videolezione</span>
+              </button>
+            </div>
+          )}
           {/* BAR: Carica materiale a sinistra, filtri e ricerca a destra */}
           <div style={barFlex}>
             {targetClienteId && (
@@ -763,6 +787,26 @@ const inputStyle = {
   border:"1px solid #cbe5fc",
   borderRadius:5,
   background:"#f8fafd"
+};
+const videoLinkBox = {
+  marginBottom:20,
+  display:"flex",
+  justifyContent:"center"
+};
+const videoLinkButton = {
+  background:"linear-gradient(135deg, #1cb0f6 0%, #0891d1 100%)",
+  color:"#fff",
+  border:"none",
+  borderRadius:14,
+  padding:"14px 28px",
+  fontWeight:700,
+  fontSize:16,
+  cursor:"pointer",
+  boxShadow:"0 6px 20px rgba(28,176,246,0.40)",
+  display:"flex",
+  alignItems:"center",
+  gap:12,
+  transition:"all 0.2s ease"
 };
 const emptyBox = {
   border:"1px dashed #b9c9e3",
