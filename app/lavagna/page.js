@@ -47,14 +47,20 @@ export default function PaginaLavagna() {
 
   async function carica(id) {
     if (!id) return;
+    console.log('[LAVAGNA] Caricamento lavagna con attivitaId:', id);
     setLoading(true);
     try {
       const r = await fetch(`/api/lavagna?attivitaId=${id}`, { cache: "no-store" });
       const js = await r.json();
-      if (r.ok) setLavagna(js.lavagna);
-      else console.error(js.error);
+      console.log('[LAVAGNA] Risposta API:', { ok: r.ok, status: r.status, data: js });
+      if (r.ok) {
+        console.log('[LAVAGNA] Lavagna caricata con successo:', js.lavagna);
+        setLavagna(js.lavagna);
+      } else {
+        console.error('[LAVAGNA] Errore API:', js.error);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('[LAVAGNA] Eccezione durante caricamento:', e);
     } finally {
       setLoading(false);
     }
@@ -71,6 +77,8 @@ export default function PaginaLavagna() {
   }, [status]);
 
   function handleLavagnaSelect(lavagna) {
+    console.log('[LAVAGNA] Lavagna selezionata:', lavagna);
+    console.log('[LAVAGNA] attivitaId:', lavagna.attivitaId);
     setAttivitaId(lavagna.attivitaId);
     carica(lavagna.attivitaId);
   }
