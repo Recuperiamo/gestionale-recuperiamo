@@ -4198,19 +4198,25 @@ export default function LavagnaCanvas({
     showShapesPopover,
     showPenPopover,
     showMoreMenu,
+    showExportMenu,
     penPalette,
     colore,
     spessore,
     gommaPuntuale,
-       sfondo,
-  sfondoLabels,
+    sfondo,
+    sfondoLabels,
     handleChangeSfondo,
     spectatorToggleId,
     pulisciLavagna,
     undoStack,
     redoStack,
     undo,
-    redo
+    redo,
+    setStrumento,
+    setShowPenPopover,
+    setShowMoreMenu,
+    setShowShapesPopover,
+    setShowExportMenu
   ]);
 
   const canvasCursor = useMemo(() => {
