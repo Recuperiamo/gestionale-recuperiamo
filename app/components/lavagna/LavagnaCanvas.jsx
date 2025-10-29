@@ -1791,13 +1791,25 @@ export default function LavagnaCanvas({
     // try persist async (best-effort)
     persistShape(normalized).then((s) => {
       if (s && s.id) {
-        console.log('[LAVAGNA-CREATE] Shape persisted, mapping dbId:', { localId: normalized.id, dbId: s.id });
-        setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+        console.log('[LAVAGNA-CREATE] Shape persisted, mapping dbId:', { localId: normalized.id, dbId: s.id, kind: normalized.kind });
+        setForme((prev) => {
+          const found = prev.find((f) => f.id === normalized.id);
+          console.log('[LAVAGNA-CREATE] setForme mapping:', { localId: normalized.id, foundInState: !!found });
+          return prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f));
+        });
         // If this shape was queued for deletion before dbId arrived, delete now
+        console.log('[LAVAGNA-CREATE] Checking pendingDeletions:', { 
+          localId: normalized.id, 
+          hasPending: pendingDeletions.current.has(normalized.id),
+          queueSize: pendingDeletions.current.size,
+          queueKeys: Array.from(pendingDeletions.current.keys())
+        });
         if (pendingDeletions.current.has(normalized.id)) {
           pendingDeletions.current.delete(normalized.id);
-          console.log('[LAVAGNA-DELAYED-DELETE] Shape was deleted before persist, deleting now with dbId:', { localId: normalized.id, dbId: s.id });
-          fetch(`/api/lavagna/shape/${s.id}`, { method: 'DELETE' }).catch(() => {});
+          console.log('[LAVAGNA-DELAYED-DELETE] Shape was deleted before persist, deleting now with dbId:', { localId: normalized.id, dbId: s.id, kind: normalized.kind });
+          fetch(`/api/lavagna/shape/${s.id}`, { method: 'DELETE' })
+            .then(res => console.log('[LAVAGNA-DELAYED-DELETE] DELETE response:', res.status))
+            .catch(err => console.error('[LAVAGNA-DELAYED-DELETE] DELETE error:', err));
         }
       } else {
         console.warn('[LAVAGNA-CREATE] Shape persist failed or returned no id:', s);
@@ -3018,34 +3030,13 @@ export default function LavagnaCanvas({
       };
 
     if (btn === 2) {
-      // Right-click: if in pen mode, start a straight line preview (linea); else pan
+      // Right-click: start context panning. If the current tool is not 'mano',
+      // temporarily switch to 'mano' so the user can pan with right-drag and
+      // see the hand cursor. We'll restore the previous tool on pointer up/cancel.
       e.preventDefault();
       if (spectatorLocked) {
         return;
       }
-      if (strumento === 'penna') {
-        // Start straight line with right-click
-        const p = getPointerWorld();
-        if (!p) return;
-        rightClickLineRef.current = { active: true, start: p };
-        previewShapeRef.current = {
-          kind: 'linea',
-          x: p.x,
-          y: p.y,
-          xStart: p.x,
-          yStart: p.y,
-          x2: p.x,
-          y2: p.y,
-          colore,
-          spessore,
-          autoreUserId: utenteId
-        };
-        drawingShapeRef.current = true;
-        try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
-        drawAll();
-        return;
-      }
-      // Otherwise (not penna): context menu pan
       try {
         // If not already the hand tool, remember current and switch to 'mano'
         if (strumento !== 'mano') {
@@ -3328,6 +3319,7 @@ export default function LavagnaCanvas({
     }
 
     // Single-finger pan if enabled (except when drawing with penna/gomma)
+    // Only activate on mobile/touch devices, not mouse/pen input
     if (enableSingleFingerPanRef.current && native?.pointerType === 'touch' && touchesRef.current.size === 1) {
       if (!['penna', 'gomma'].includes(strumento)) {
         if (spectatorLocked) {
