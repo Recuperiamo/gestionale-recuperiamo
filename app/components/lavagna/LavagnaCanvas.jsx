@@ -1799,9 +1799,12 @@ export default function LavagnaCanvas({
     // try persist async (best-effort)
     persistShape(normalized).then((s) => {
       if (s && s.id) {
+        console.log('[LAVAGNA-CREATE] Shape persisted, mapping dbId:', { localId: normalized.id, dbId: s.id });
         setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+      } else {
+        console.warn('[LAVAGNA-CREATE] Shape persist failed or returned no id:', s);
       }
-    });
+    }).catch(err => console.error('[LAVAGNA-CREATE] Error persisting shape:', err));
   }, [emitOrPublish, lavagnaId, persistShape]);
 
   const updateShapeLocal = useCallback((shape, emit = true) => {
@@ -1810,11 +1813,18 @@ export default function LavagnaCanvas({
     setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, ...normalized } : f)));
     if (emit) emitOrPublish('shape:update', { ...normalized, lavagnaId });
     const dbId = shape.dbId || shape.id;
+    console.log('[LAVAGNA-UPDATE] Updating shape:', { localId: shape.id, dbId, normalized });
     fetch(`/api/lavagna/shape/${dbId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...normalized, dbId })
-    }).catch(() => {});
+    })
+      .then(res => {
+        console.log('[LAVAGNA-UPDATE] Response status:', res.status);
+        return res.json();
+      })
+      .then(data => console.log('[LAVAGNA-UPDATE] Response data:', data))
+      .catch(err => console.error('[LAVAGNA-UPDATE] Error:', err));
   }, [emitOrPublish, lavagnaId]);
 
   const deleteShapeLocal = useCallback((id, emit = true, force = false) => {
@@ -1844,7 +1854,14 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
     const dbId = removedShape.dbId || id;
-    fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' }).catch(() => {});
+    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, removedShape });
+    fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
+      .then(res => {
+        console.log('[LAVAGNA-DELETE] Response status:', res.status);
+        return res.json();
+      })
+      .then(data => console.log('[LAVAGNA-DELETE] Response data:', data))
+      .catch(err => console.error('[LAVAGNA-DELETE] Error:', err));
   }, [emitOrPublish, lavagnaId, isAdmin, utenteId]);
 
   // Clipboard for cut/copy/paste
