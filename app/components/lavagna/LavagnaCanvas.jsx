@@ -217,8 +217,10 @@ export default function LavagnaCanvas({
       id: `shape-${s.id}` // Unique client-side ID
     }))
   ); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
+  const pendingDeletions = useRef(new Map()); // localId -> true (queued for deletion once dbId arrives)
   const previewShapeRef = useRef(null);
   const drawingShapeRef = useRef(false);
+  const rightClickLineRef = useRef({ active: false, start: null }); // for right-click straight line while pen mode
   const erasingRef = useRef(false);
   const selectingRef = useRef({ active: false, start: null });
   const rotatingRef = useRef({ active: false, center: null, startAngle: 0, originals: {} });
@@ -1791,6 +1793,12 @@ export default function LavagnaCanvas({
       if (s && s.id) {
         console.log('[LAVAGNA-CREATE] Shape persisted, mapping dbId:', { localId: normalized.id, dbId: s.id });
         setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+        // If this shape was queued for deletion before dbId arrived, delete now
+        if (pendingDeletions.current.has(normalized.id)) {
+          pendingDeletions.current.delete(normalized.id);
+          console.log('[LAVAGNA-DELAYED-DELETE] Shape was deleted before persist, deleting now with dbId:', { localId: normalized.id, dbId: s.id });
+          fetch(`/api/lavagna/shape/${s.id}`, { method: 'DELETE' }).catch(() => {});
+        }
       } else {
         console.warn('[LAVAGNA-CREATE] Shape persist failed or returned no id:', s);
       }
@@ -1849,6 +1857,13 @@ export default function LavagnaCanvas({
     } catch (_) {}
     const dbId = removedShape.dbId || id;
     console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, removedShape });
+    // If dbId is not numeric, this shape was deleted before persistence finished;
+    // queue it so when persist callback arrives, it will delete server-side.
+    if (typeof dbId !== 'number' && isNaN(Number(dbId))) {
+      console.log('[LAVAGNA-DELETE] dbId not yet assigned, queuing deletion:', { localId: id });
+      pendingDeletions.current.set(id, true);
+      return;
+    }
     fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
       .then(res => {
         console.log('[LAVAGNA-DELETE] Response status:', res.status);
@@ -3003,13 +3018,34 @@ export default function LavagnaCanvas({
       };
 
     if (btn === 2) {
-      // Right-click: start context panning. If the current tool is not 'mano',
-      // temporarily switch to 'mano' so the user can pan with right-drag and
-      // see the hand cursor. We'll restore the previous tool on pointer up/cancel.
+      // Right-click: if in pen mode, start a straight line preview (linea); else pan
       e.preventDefault();
       if (spectatorLocked) {
         return;
       }
+      if (strumento === 'penna') {
+        // Start straight line with right-click
+        const p = getPointerWorld();
+        if (!p) return;
+        rightClickLineRef.current = { active: true, start: p };
+        previewShapeRef.current = {
+          kind: 'linea',
+          x: p.x,
+          y: p.y,
+          xStart: p.x,
+          yStart: p.y,
+          x2: p.x,
+          y2: p.y,
+          colore,
+          spessore,
+          autoreUserId: utenteId
+        };
+        drawingShapeRef.current = true;
+        try { canvas?.setPointerCapture?.(pointerId); } catch (_) {}
+        drawAll();
+        return;
+      }
+      // Otherwise (not penna): context menu pan
       try {
         // If not already the hand tool, remember current and switch to 'mano'
         if (strumento !== 'mano') {
@@ -3709,8 +3745,8 @@ export default function LavagnaCanvas({
       }
     }
 
-    // Update shape preview if drawing a shape
-    if (drawingShapeRef.current && previewShapeRef.current) {
+    // Update shape preview if drawing a shape (or right-click line in pen mode)
+    if ((drawingShapeRef.current || rightClickLineRef.current.active) && previewShapeRef.current) {
       const p = getPoint(e);
       pointerWorldRef.current = p;
       previewShapeRef.current.x2 = p.x; previewShapeRef.current.y2 = p.y;
@@ -4021,7 +4057,7 @@ export default function LavagnaCanvas({
       if (shapeObj) {
         createShapeLocal(shapeObj, true);
       }
-      previewShapeRef.current = null; drawingShapeRef.current = false;
+      previewShapeRef.current = null; drawingShapeRef.current = false; rightClickLineRef.current = { active: false, start: null };
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}

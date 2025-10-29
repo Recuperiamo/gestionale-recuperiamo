@@ -13,13 +13,26 @@ function formatDateTime(dateString) {
   });
 }
 
-export default function AttivitaList({ attivita, onDettaglio }) {
+export default function AttivitaList({
+  attivita,
+  onDettaglio,
+  multiSelect = false,
+  selectedIds = new Set(),
+  onToggleRow = () => {},
+  onToggleAll = () => {}
+}) {
   console.log("AttivitaList riceve:", attivita);
+  const allSelected = multiSelect && attivita.length > 0 && attivita.every(a => selectedIds.has(a.id));
   return (
     <section>
       <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: "#f8fafd", borderRadius: 8, boxShadow: "0 1px 4px #1976d220", fontSize: "1rem", marginTop: 8 }}>
         <thead>
           <tr>
+            {multiSelect && (
+              <th style={{ width: 36, textAlign: 'center', padding: '12px 10px' }}>
+                <input type="checkbox" checked={allSelected} onChange={(e) => onToggleAll(e.target.checked)} />
+              </th>
+            )}
             <th style={{ textAlign: "left", padding: "12px 14px", fontWeight: 700, fontSize: "1.08rem", color: "#252525" }}>Descrizione</th>
             <th style={{ textAlign: "right", padding: "12px 10px", fontWeight: 700 }}>Ore</th>
             <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Pacchetto</th>
@@ -31,7 +44,7 @@ export default function AttivitaList({ attivita, onDettaglio }) {
         <tbody>
           {attivita.length === 0 ? (
             <tr>
-              <td colSpan={6} style={{ textAlign: "center", color: "#888", padding: 24 }}>
+              <td colSpan={multiSelect ? 7 : 6} style={{ textAlign: "center", color: "#888", padding: 24 }}>
                 Nessuna attività trovata
               </td>
             </tr>
@@ -45,6 +58,15 @@ export default function AttivitaList({ attivita, onDettaglio }) {
               onMouseOver={e => e.currentTarget.style.background = "#f2faff"}
               onMouseOut={e => e.currentTarget.style.background = "#fff"}
             >
+              {multiSelect && (
+                <td style={{ padding: '10px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(a.id)}
+                    onChange={(e) => onToggleRow(a.id, e.target.checked)}
+                  />
+                </td>
+              )}
               <td style={{ padding: "10px 14px" }}>{a.descrizione}</td>
               <td style={{ padding: "10px", textAlign: "right" }}>{a.oreConsumate}</td>
               <td style={{ padding: "10px" }}>{a.pacchetto?.descrizione || ""}</td>

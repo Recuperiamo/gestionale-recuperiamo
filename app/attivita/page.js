@@ -8,6 +8,8 @@ import AttivitaDettaglioModal from '../components/attivita/AttivitaDettaglioModa
 
 export default function AttivitaPage() {
   const [attivitaList, setAttivitaList] = useState([]);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   console.log("Attività passate ad AttivitaList:", attivitaList);
 
   const [clienti, setClienti] = useState([]);
@@ -88,6 +90,42 @@ export default function AttivitaPage() {
     setFiltroCliente(''); setFiltroPacchetto(''); setFiltroDataDa(''); setFiltroDataA('');
   };
 
+  const handleDeleteMultiple = async () => {
+    if (!selectedIds.size) return window.alert("Seleziona almeno un'attività.");
+    if (!window.confirm(`Eliminare ${selectedIds.size} attività selezionate?`)) return;
+    let success = 0, failed = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch('/api/attivita', {
+          method: 'DELETE',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id })
+        });
+        if (res.ok) success++; else failed++;
+      } catch { failed++; }
+    }
+    window.alert(`Operazione completata.\nEliminate: ${success}\nFallite: ${failed}`);
+    setSelectedIds(new Set());
+    setMultiSelect(false);
+    fetchAttivita();
+    fetchPacchetti();
+  };
+
+  const toggleRow = (id, checked) => {
+    setSelectedIds(prev => {
+      const updated = new Set(prev);
+      if (checked) updated.add(id);
+      else updated.delete(id);
+      return updated;
+    });
+  };
+
+  const toggleAll = (checked) => {
+    if (checked) setSelectedIds(new Set(attivitaFiltrate.map(a => a.id)));
+    else setSelectedIds(new Set());
+  };
+
+
   const handlePurgeAll = async () => {
     if (purgeLoading) return;
     const ok1 = window.confirm(
@@ -158,6 +196,31 @@ export default function AttivitaPage() {
           >
             + Nuova attività
           </button>
+
+          <button
+            onClick={() => setMultiSelect(prev => !prev)}
+            style={{
+              background: multiSelect ? "#1976d2" : "#e3eafc", color: multiSelect ? "#fff" : "#1976d2",
+              border: "none", borderRadius: 5, padding: "8px 18px",
+              fontWeight: 500, fontSize: "1rem", cursor: "pointer",
+              boxShadow: multiSelect ? "0 1px 4px #1976d220" : "none"
+            }}
+          >
+            {multiSelect ? "Selezione multipla: ON" : "Selezione multipla"}
+          </button>
+
+          {multiSelect && selectedIds.size > 0 && (
+            <button
+              onClick={handleDeleteMultiple}
+              style={{
+                background: "#c62828", color: "#fff", border: "none", borderRadius: 5,
+                padding: "8px 18px", fontWeight: 600, fontSize: "1rem", cursor: "pointer",
+                boxShadow: "0 1px 4px #c6282820"
+              }}
+            >
+              Elimina selezionate ({selectedIds.size})
+            </button>
+          )}
 
           <button
             onClick={handlePurgeAll}
@@ -232,7 +295,15 @@ export default function AttivitaPage() {
             onClose={() => { setShowForm(false); setFormInitialData(null); }}
           />
         )}
-        <AttivitaList attivita={attivitaFiltrate} onEdit={handleEdit} onDettaglio={handleShowDettaglio} />
+        <AttivitaList
+          attivita={attivitaFiltrate}
+          onEdit={handleEdit}
+          onDettaglio={handleShowDettaglio}
+          multiSelect={multiSelect}
+          selectedIds={selectedIds}
+          onToggleRow={toggleRow}
+          onToggleAll={toggleAll}
+        />
         <AttivitaDettaglioModal attivita={dettaglioAttivita} onClose={handleCloseDettaglio} onEdit={handleEdit} onDelete={handleDeleteDettaglio} />
       </div>
     </>
