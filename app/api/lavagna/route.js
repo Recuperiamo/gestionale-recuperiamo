@@ -102,26 +102,38 @@ export async function GET(req) {
       }
     });
 
-    const forme = await prisma.lavagnaShape.findMany({
-      where: { lavagnaId: lavagna.id, deletedAt: null },
-      orderBy: { id: "asc" },
-      select: {
-        id: true,
-        kind: true,
-        x: true,
-        y: true,
-        w: true,
-        h: true,
-        x1: true,
-        y1: true,
-        x2: true,
-        y2: true,
-        colore: true,
-        spessore: true,
-        autoreUserId: true,
-        createdAt: true
+    // Forme: il modello LavagnaShape potrebbe non essere ancora presente nello schema Prisma in produzione.
+    // Se assente, evitiamo il 500 e ritorniamo un array vuoto per permettere l'apertura della lavagna.
+    let forme = [];
+    try {
+      if (prisma.lavagnaShape && typeof prisma.lavagnaShape.findMany === "function") {
+        forme = await prisma.lavagnaShape.findMany({
+          where: { lavagnaId: lavagna.id, deletedAt: null },
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            kind: true,
+            x: true,
+            y: true,
+            w: true,
+            h: true,
+            x1: true,
+            y1: true,
+            x2: true,
+            y2: true,
+            colore: true,
+            spessore: true,
+            autoreUserId: true,
+            createdAt: true
+          }
+        });
+      } else {
+        console.warn("[lavagna API] Prisma model 'lavagnaShape' non disponibile: restituisco forme=[]");
       }
-    });
+    } catch (err) {
+      console.error("[lavagna API] Errore nel caricamento delle forme, fallback a forme=[]:", err?.message || err);
+      forme = [];
+    }
 
     const nomeStudente =
       att.cliente?.nomeReferente ||
