@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../lib/prisma";
+import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/authOptions";
 
-// Force rebuild - prisma import fix (Oct 29, 2025)
+// Direct Prisma import to avoid module resolution issues in Vercel
+const prisma = global.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') global.prisma = prisma;
 /**
  * GET /api/lavagna?attivitaId=123
  * Titolo persistito: "dd/MM/yyyy HH:mm"
