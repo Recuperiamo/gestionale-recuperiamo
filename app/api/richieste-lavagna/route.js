@@ -94,15 +94,31 @@ export async function PATCH(req) {
     }
 
     if (azione === "approva") {
-      // Crea attività ad-hoc per il cliente
+      // Recupera info cliente per nome lavagna
+      const cliente = await prisma.client.findUnique({
+        where: { id: richiesta.clienteId },
+        select: { nomeReferente: true },
+      });
+
+      const nomeStudente = cliente?.nomeReferente || `Studente ${richiesta.clienteId}`;
+      const timestamp = new Date().toLocaleString("it-IT", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const titoloLavagna = `[Richiesta] ${nomeStudente} - ${timestamp}`;
+
+      // Crea attività ad-hoc per il cliente con stato "lavagna"
       const attivita = await prisma.attivita.create({
         data: {
           clienteId: richiesta.clienteId,
-          descrizione: richiesta.titolo || "Lavagna ad-hoc",
+          descrizione: titoloLavagna,
           oreConsumate: 0,
           orario: new Date(),
           durataOre: 1,
-          stato: "attiva",
+          stato: "lavagna",
         },
       });
 
@@ -110,7 +126,7 @@ export async function PATCH(req) {
       const lavagna = await prisma.lavagna.create({
         data: {
           attivitaId: attivita.id,
-          titolo: richiesta.titolo || "Lavagna",
+          titolo: titoloLavagna,
         },
       });
 

@@ -137,11 +137,6 @@ export default function PaginaLavagna() {
           </div>
         )}
         <LavagneList clienteId={clienteId} onSelect={handleLavagnaSelect} sessionUser={session.user} />
-        {!attivitaId && !lavagna && (
-          <div style={infoBox}>
-            Nessuna lavagna disponibile.
-          </div>
-        )}
 
         {loading && (
           <div style={{ fontSize: 14, marginTop: 10 }}>Caricamento lavagna…</div>

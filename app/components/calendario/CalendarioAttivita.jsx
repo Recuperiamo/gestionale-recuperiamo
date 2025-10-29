@@ -105,7 +105,9 @@ export default function CalendarioAttivita({
       .then(data => {
         if (abort) return;
         const arr = Array.isArray(data) ? data : data?.attivita || [];
-        setAttivita(arr);
+        // Filtra le attività con stato "lavagna" per non mostrarle nel calendario
+        const filtered = arr.filter(a => a.stato !== "lavagna");
+        setAttivita(filtered);
         setErrore(null);
       })
       .catch(e => !abort && setErrore(e.message))
