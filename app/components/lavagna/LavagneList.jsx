@@ -257,7 +257,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
   return (
     <div>
       <h3 style={{ marginBottom: 12, display: "flex", alignItems: "center" }}>
-        Lavagne disponibili
+      
         {isAdmin && lavagne.length > 0 && (
           <button
             onClick={handleDeleteAll}

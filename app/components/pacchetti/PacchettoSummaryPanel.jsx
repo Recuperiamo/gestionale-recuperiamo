@@ -85,7 +85,7 @@ export default function PacchettoSummaryPanel({ attivita = [] }) {
   return (
     <div style={panelStyle}>
       <h3 style={titleStyle}>
-        Riepilogo Pacchetto: <span style={{ color: '#2563eb' }}>{pacchetto.descrizione}</span>
+        Riepilogo Pacchetto: <span style={{ color: '#fff' }}>{pacchetto.descrizione}</span>
       </h3>
       
       <div style={gridStyle}>
