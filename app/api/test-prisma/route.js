@@ -82,7 +82,44 @@ export async function GET() {
     });
   }
 
-  // Test 3: Check environment
+  // Test 3: Check LavagnaShape model availability via both imports
+  try {
+    const { prisma: libPrisma2 } = await import("../../../lib/prisma");
+    if (libPrisma2?.lavagnaShape?.count) {
+      try {
+        const c = await libPrisma2.lavagnaShape.count();
+        results.tests.push({ name: "LavagnaShape count (lib)", status: "success", count: c });
+      } catch (err) {
+        results.tests.push({ name: "LavagnaShape count (lib)", status: "error", error: err.message });
+      }
+    } else {
+      results.tests.push({ name: "LavagnaShape model (lib)", status: "missing" });
+    }
+  } catch (err) {
+    results.tests.push({ name: "LavagnaShape model (lib)", status: "error", error: err.message });
+  }
+
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const pc = new PrismaClient();
+    if (pc?.lavagnaShape?.count) {
+      try {
+        const c = await pc.lavagnaShape.count();
+        results.tests.push({ name: "LavagnaShape count (direct)", status: "success", count: c });
+      } catch (err) {
+        results.tests.push({ name: "LavagnaShape count (direct)", status: "error", error: err.message });
+      } finally {
+        await pc.$disconnect();
+      }
+    } else {
+      results.tests.push({ name: "LavagnaShape model (direct)", status: "missing" });
+      await pc.$disconnect();
+    }
+  } catch (err) {
+    results.tests.push({ name: "LavagnaShape model (direct)", status: "error", error: err.message });
+  }
+
+  // Environment
   results.environment = {
     nodeEnv: process.env.NODE_ENV,
     databaseUrl: process.env.DATABASE_URL ? "SET" : "NOT SET",
