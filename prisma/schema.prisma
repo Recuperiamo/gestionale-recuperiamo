@@ -212,6 +212,26 @@ model RichiestaModifica {
   @@index([attivitaId])
 }
 
+/**
+ * ====================== RICHIESTE LAVAGNA ======================
+ */
+model RichiestaLavagna {
+  id           Int            @id @default(autoincrement())
+  clienteId    Int
+  titolo       String?
+  noteStudente String?
+  noteAdmin    String?
+  stato        RichiestaStato @default(pending)
+  processedAt  DateTime?
+  processedBy  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lavagnaId    Int?
+
+  @@index([clienteId])
+  @@index([stato])
+}
+
 model Lavagna {
   id         Int             @id @default(autoincrement())
   attivitaId Int             @unique

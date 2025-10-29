@@ -170,6 +170,40 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
   async function handleCreateLavagna(e) {
     e.preventDefault();
+    
+    // LATO CLIENTE: Invia richiesta invece di creare direttamente
+    if (!isAdmin) {
+      if (!clienteId) {
+        alert("Errore: cliente non identificato.");
+        return;
+      }
+      setCreating(true);
+      try {
+        const res = await fetch("/api/richieste-lavagna", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            clienteId: Number(clienteId), 
+            titolo: newTitle || `Lavagna ${new Date().toLocaleString("it-IT")}`,
+            noteStudente: "Richiesta dal cliente"
+          })
+        });
+        if (res.ok) {
+          alert("Richiesta inviata con successo! L'admin dovrà approvarla.");
+          setShowCreate(false);
+          setNewTitle("");
+        } else {
+          alert("Errore nell'invio della richiesta");
+        }
+      } catch (e) {
+        alert("Errore nell'invio della richiesta");
+      } finally {
+        setCreating(false);
+      }
+      return;
+    }
+    
+    // LATO ADMIN: Crea direttamente come prima
     if (!selectedAttivita && !clienteId) {
       alert("Seleziona uno studente o specifica un cliente.");
       return;
@@ -244,12 +278,24 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
             Crea nuova lavagna
           </button>
         )}
+        {!isAdmin && (
+          <button
+            onClick={openCreateLavagna}
+            style={{
+              marginLeft: 8, background: "#10B981", color: "#fff", padding: "6px 14px",
+              borderRadius: 8, border: 0, fontWeight: 700, cursor: "pointer"
+            }}>
+            Richiedi lavagna
+          </button>
+        )}
       </h3>
 
       {showCreate && (
         <form onSubmit={handleCreateLavagna} style={{
           background: "#e3eefe", padding: 16, borderRadius: 12, marginBottom: 14
         }}>
+          {isAdmin ? (
+            <>
               <label style={{ display: 'block', marginBottom: 8 }}>
                 Seleziona lezione/attività:
                 <select
@@ -277,15 +323,39 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
                   style={{ marginLeft: 8, padding: 6, fontSize: 15, minWidth: 260 }}
                 />
               </label>
-          <button
-            type="submit"
-            disabled={!selectedAttivita || creating}
-            style={{
-              marginLeft: 12, background: "#1cb0f6", color: "#fff", borderRadius: 8, border: 0,
-              fontWeight: 700, cursor: "pointer", padding: "6px 14px"
-            }}>
-            {creating ? "Creazione..." : "Crea"}
-          </button>
+              <button
+                type="submit"
+                disabled={!selectedAttivita || creating}
+                style={{
+                  marginLeft: 12, background: "#1cb0f6", color: "#fff", borderRadius: 8, border: 0,
+                  fontWeight: 700, cursor: "pointer", padding: "6px 14px"
+                }}>
+                {creating ? "Creazione..." : "Crea"}
+              </button>
+            </>
+          ) : (
+            <>
+              <label style={{ display: 'block', marginBottom: 8 }}>
+                Titolo lavagna (opzionale):
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  placeholder={`Lavagna ${new Date().toLocaleString("it-IT")}`}
+                  style={{ marginLeft: 8, padding: 6, fontSize: 15, minWidth: 260 }}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={creating}
+                style={{
+                  marginLeft: 12, background: "#10B981", color: "#fff", borderRadius: 8, border: 0,
+                  fontWeight: 700, cursor: "pointer", padding: "6px 14px"
+                }}>
+                {creating ? "Invio richiesta..." : "Invia richiesta"}
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => setShowCreate(false)}

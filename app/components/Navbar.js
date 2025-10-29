@@ -25,7 +25,8 @@ export default function Navbar() {
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/calendario", label: "Calendario" },
     { href: "/lavagna", label: "Lavagna" },
-    { href: "/aule", label: "Aule" }
+    { href: "/aule", label: "Aule" },
+    { href: "/richieste", label: "Richieste" }
   ];
 
   // Client links (niente "Storico")
