@@ -475,7 +475,7 @@ export default function LavagnaCanvas({
           break;
         }
         case 'assi2d': {
-          // Assi cartesiani 2D: X e Y estesi in entrambe le direzioni, frecce a entrambe le estremità
+          // Assi cartesiani 2D: X e Y estesi in entrambe le direzioni, frecce solo sui semiassi positivi (destra e alto)
           const x = f.x;
           const y = f.y;
           const w = f.w;
@@ -489,7 +489,7 @@ export default function LavagnaCanvas({
           ctx.moveTo(x, cy);
           ctx.lineTo(x + w, cy);
           ctx.stroke();
-          // Frecce: destra
+          // Freccia: destra (positivo)
           ctx.beginPath();
           ctx.moveTo(x + w, cy);
           ctx.lineTo(x + w - arrowSize, cy - arrowSize * 0.5);
@@ -497,37 +497,24 @@ export default function LavagnaCanvas({
           ctx.closePath();
           ctx.fillStyle = f.colore || '#20489a';
           ctx.fill();
-          // Frecce: sinistra
-          ctx.beginPath();
-          ctx.moveTo(x, cy);
-          ctx.lineTo(x + arrowSize, cy - arrowSize * 0.5);
-          ctx.lineTo(x + arrowSize, cy + arrowSize * 0.5);
-          ctx.closePath();
-          ctx.fill();
 
           // Asse Y (verticale, bidirezionale)
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx, y + h);
           ctx.stroke();
-          // Freccia: alto
+          // Freccia: alto (positivo)
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx - arrowSize * 0.5, y + arrowSize);
           ctx.lineTo(cx + arrowSize * 0.5, y + arrowSize);
-          ctx.closePath();
-          ctx.fill();
-          // Freccia: basso
-          ctx.beginPath();
-          ctx.moveTo(cx, y + h);
-          ctx.lineTo(cx - arrowSize * 0.5, y + h - arrowSize);
-          ctx.lineTo(cx + arrowSize * 0.5, y + h - arrowSize);
           ctx.closePath();
           ctx.fill();
           break;
         }
         case 'assi3d': {
-          // Assi cartesiani 3D: X, Y e Z bidirezionali; Z orientato nord-est <-> sud-ovest (diagonale verso sud-ovest)
+          // Assi cartesiani 3D: X, Y bidirezionali con frecce solo sui positivi (destra e alto).
+          // Z diagonale orientata NE <-> SW con freccia solo sul semiasse positivo (SW).
           const x = f.x;
           const y = f.y;
           const w = f.w;
@@ -541,7 +528,7 @@ export default function LavagnaCanvas({
           ctx.moveTo(x, cy);
           ctx.lineTo(x + w, cy);
           ctx.stroke();
-          // Arrow right
+          // Freccia: destra (positivo)
           ctx.beginPath();
           ctx.moveTo(x + w, cy);
           ctx.lineTo(x + w - arrowSize, cy - arrowSize * 0.5);
@@ -549,31 +536,17 @@ export default function LavagnaCanvas({
           ctx.closePath();
           ctx.fillStyle = f.colore || '#20489a';
           ctx.fill();
-          // Arrow left
-          ctx.beginPath();
-          ctx.moveTo(x, cy);
-          ctx.lineTo(x + arrowSize, cy - arrowSize * 0.5);
-          ctx.lineTo(x + arrowSize, cy + arrowSize * 0.5);
-          ctx.closePath();
-          ctx.fill();
 
           // Asse Y (verticale, bidirezionale)
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx, y + h);
           ctx.stroke();
-          // Arrow up
+          // Freccia: alto (positivo)
           ctx.beginPath();
           ctx.moveTo(cx, y);
           ctx.lineTo(cx - arrowSize * 0.5, y + arrowSize);
           ctx.lineTo(cx + arrowSize * 0.5, y + arrowSize);
-          ctx.closePath();
-          ctx.fill();
-          // Arrow down
-          ctx.beginPath();
-          ctx.moveTo(cx, y + h);
-          ctx.lineTo(cx - arrowSize * 0.5, y + h - arrowSize);
-          ctx.lineTo(cx + arrowSize * 0.5, y + h - arrowSize);
           ctx.closePath();
           ctx.fill();
 
@@ -586,14 +559,7 @@ export default function LavagnaCanvas({
           ctx.moveTo(dx1, dy1);
           ctx.lineTo(dx2, dy2);
           ctx.stroke();
-          // Triangolo freccia a nord-est (dx1,dy1) puntato verso NE
-          ctx.beginPath();
-          ctx.moveTo(dx1, dy1);
-          ctx.lineTo(dx1 - arrowSize * 0.8, dy1 + arrowSize * 0.3);
-          ctx.lineTo(dx1 - arrowSize * 0.3, dy1 + arrowSize * 0.8);
-          ctx.closePath();
-          ctx.fill();
-          // Triangolo freccia a sud-ovest (dx2,dy2) puntato verso SW
+          // Freccia solo sul semiasse positivo: sud-ovest (dx2,dy2)
           ctx.beginPath();
           ctx.moveTo(dx2, dy2);
           ctx.lineTo(dx2 + arrowSize * 0.8, dy2 - arrowSize * 0.3);
@@ -1017,7 +983,7 @@ export default function LavagnaCanvas({
             break;
           }
           case 'assi2d': {
-            // 2D axes, bidirectional with arrowheads on both ends
+            // 2D axes, arrowheads only on positive semiaxes (right for X, up for Y)
             const cx = minX + w / 2;
             const cy = minY + h / 2;
             const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
@@ -1031,12 +997,6 @@ export default function LavagnaCanvas({
             ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
             ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
             ctx.closePath(); ctx.stroke();
-            // left head
-            ctx.beginPath();
-            ctx.moveTo(minX, cy);
-            ctx.lineTo(minX + arrowSize, cy - arrowSize * 0.5);
-            ctx.lineTo(minX + arrowSize, cy + arrowSize * 0.5);
-            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
 
             // Y axis
@@ -1048,17 +1008,11 @@ export default function LavagnaCanvas({
             ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
             ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
             ctx.closePath(); ctx.stroke();
-            // bottom head
-            ctx.beginPath();
-            ctx.moveTo(cx, minY + h);
-            ctx.lineTo(cx - arrowSize * 0.5, minY + h - arrowSize);
-            ctx.lineTo(cx + arrowSize * 0.5, minY + h - arrowSize);
-            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
             break;
           }
           case 'assi3d': {
-            // 3D axes, bidirectional; Z diagonal oriented NE <-> SW
+            // 3D axes: arrowheads only on positive semiaxes (X right, Y up, Z to SW)
             const cx = minX + w / 2;
             const cy = minY + h / 2;
             const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
@@ -1071,11 +1025,6 @@ export default function LavagnaCanvas({
             ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
             ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
             ctx.closePath(); ctx.stroke();
-            // left head
-            ctx.beginPath(); ctx.moveTo(minX, cy);
-            ctx.lineTo(minX + arrowSize, cy - arrowSize * 0.5);
-            ctx.lineTo(minX + arrowSize, cy + arrowSize * 0.5);
-            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
 
             // Y axis
@@ -1086,11 +1035,6 @@ export default function LavagnaCanvas({
             ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
             ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
             ctx.closePath(); ctx.stroke();
-            // bottom head
-            ctx.beginPath(); ctx.moveTo(cx, minY + h);
-            ctx.lineTo(cx - arrowSize * 0.5, minY + h - arrowSize);
-            ctx.lineTo(cx + arrowSize * 0.5, minY + h - arrowSize);
-            ctx.closePath(); ctx.stroke();
             ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
 
             // Z axis diagonal NE <-> SW
@@ -1098,12 +1042,6 @@ export default function LavagnaCanvas({
             const dx2 = minX; const dy2 = minY + h; // SW
             ctx.beginPath(); ctx.moveTo(dx1, dy1); ctx.lineTo(dx2, dy2); ctx.stroke();
             ctx.setLineDash([]);
-            // NE head
-            ctx.beginPath();
-            ctx.moveTo(dx1, dy1);
-            ctx.lineTo(dx1 - arrowSize * 0.8, dy1 + arrowSize * 0.3);
-            ctx.lineTo(dx1 - arrowSize * 0.3, dy1 + arrowSize * 0.8);
-            ctx.closePath(); ctx.stroke();
             // SW head
             ctx.beginPath();
             ctx.moveTo(dx2, dy2);
@@ -2671,7 +2609,7 @@ export default function LavagnaCanvas({
         pointInTriangle({ x, y }, bottom, left, right)
       );
     }
-    if (kind === 'assi2d' || kind === 'assi2' || kind === 'assi3d' || kind === 'assi3') {
+  if (kind === 'assi2d' || kind === 'assi2' || kind === 'assi3d' || kind === 'assi3') {
       // Hit-test axes by checking proximity to their shaft segments and arrowhead triangles
       const baseX = Number(shape.x ?? 0);
       const baseY = Number(shape.y ?? 0);
@@ -2693,22 +2631,18 @@ export default function LavagnaCanvas({
       // Always test the horizontal and vertical shafts (for all axis types)
       if (distPointToSegment(x, y, baseX, cy, baseX + width, cy) <= tolerance) return true;
       if (distPointToSegment(x, y, cx, baseY, cx, baseY + height) <= tolerance) return true;
-      // Arrowheads for 2d/3d: both ends; for 2/3 legacy: right and top only
+      // Arrowheads: only on positive semiaxes for assi2d/assi3d (X right, Y up, Z SW).
+      // Legacy: assi2 -> right/top; assi3 -> SW only for diagonal.
       const testTri = (p1, p2, p3) => pointInTriangle({ x, y }, p1, p2, p3);
-      const wantBoth = (kind === 'assi2d' || kind === 'assi3d');
       // X axis heads
       const headsX = [];
-      // right
+      // right (positive X)
       headsX.push(tri(baseX + width, cy, 0));
-      // left (only if bidirectional)
-      if (wantBoth) headsX.push(tri(baseX, cy, Math.PI));
       for (const [p1, p2, p3] of headsX) { if (testTri(p1, p2, p3)) return true; }
       // Y axis heads
       const headsY = [];
-      // up
+      // up (positive Y)
       headsY.push(tri(cx, baseY, -Math.PI / 2));
-      // down (only if bidirectional)
-      if (wantBoth) headsY.push(tri(cx, baseY + height, Math.PI / 2));
       for (const [p1, p2, p3] of headsY) { if (testTri(p1, p2, p3)) return true; }
       // Z diagonal for 3-axis variants
       if (kind === 'assi3' || kind === 'assi3d') {
@@ -2717,10 +2651,8 @@ export default function LavagnaCanvas({
         const dx2 = baseX; const dy2 = baseY + height;
         if (distPointToSegment(x, y, dx1, dy1, dx2, dy2) <= tolerance) return true;
         const headsZ = [];
-        // NE head
-        headsZ.push(tri(dx1, dy1, -Math.PI / 4));
-        // SW head: only if bidirectional or if legacy 'assi3' which has arrow at SW
-        if (wantBoth || kind === 'assi3') headsZ.push(tri(dx2, dy2, (3 * Math.PI) / 4));
+        // Only SW head (positive for our projection), for both assi3 and assi3d
+        headsZ.push(tri(dx2, dy2, (3 * Math.PI) / 4));
         for (const [p1, p2, p3] of headsZ) { if (testTri(p1, p2, p3)) return true; }
       }
       return false;
