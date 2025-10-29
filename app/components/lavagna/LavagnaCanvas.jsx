@@ -4473,6 +4473,109 @@ export default function LavagnaCanvas({
                 </div>
               )}
             </div>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(shapeButtonActive)}
+                onClick={() => {
+                  setShowShapesPopover(v => !v);
+                  setShowPenPopover(false);
+                  setShowMoreMenu(false);
+                  setShowExportMenu(false);
+                }}
+                title="Forme"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="8" height="8" rx="1" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none"/>
+                  <circle cx="17" cy="17" r="4" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none"/>
+                  <path d="M13 7 L17 3 L21 7 Z" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showShapesPopover && (
+                <div style={st.shapesPopover}>
+                  <div style={st.shapesGrid}>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'rettangolo')}
+                      onClick={() => {
+                        setStrumento('rettangolo');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Rettangolo"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <rect x="4" y="7" width="16" height="10" rx="1" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'cerchio')}
+                      onClick={() => {
+                        setStrumento('cerchio');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Cerchio"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'triangolo')}
+                      onClick={() => {
+                        setStrumento('triangolo');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Triangolo"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 5 L20 19 L4 19 Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'linea')}
+                      onClick={() => {
+                        setStrumento('linea');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Linea"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 19 L19 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'freccia')}
+                      onClick={() => {
+                        setStrumento('freccia');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Freccia"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12 L19 12 M14 7 L19 12 L14 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'rombo')}
+                      onClick={() => {
+                        setStrumento('rombo');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Rombo"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 4 L20 12 L12 20 L4 12 Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               style={iconBtn(strumento === 'gomma')}
@@ -4989,6 +5092,24 @@ const st = {
     minWidth: 220,
     zIndex: 6
   },
+  shapesPopover: {
+    position: 'absolute',
+    bottom: '110%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'linear-gradient(180deg, #f8fbff 0%, #eef3ff 100%)',
+    border: '1px solid rgba(51,94,168,0.18)',
+    boxShadow: '0 22px 38px rgba(16,42,105,0.16)',
+    borderRadius: 18,
+    padding: '14px 16px',
+    minWidth: 200,
+    zIndex: 6
+  },
+  shapesGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 8
+  },
   penTray: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -5179,6 +5300,22 @@ const iconBtn = (active) => ({
   transition: 'transform .15s ease, box-shadow .2s ease',
   fontWeight: 700,
   fontSize: 18
+});
+
+const shapeBtn = (active) => ({
+  width: 46,
+  height: 46,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 12,
+  border: active ? '1.5px solid rgba(27,102,220,0.3)' : '1px solid rgba(212,223,246,0.9)',
+  background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(255,255,255,0.9)',
+  color: active ? '#fff' : '#20489a',
+  boxShadow: active ? '0 8px 18px rgba(28,125,247,0.25)' : '0 2px 8px rgba(15,42,105,0.1)',
+  cursor: 'pointer',
+  transition: 'all .15s ease',
+  padding: 0
 });
 
 const zoomButtonStyle = (disabled) => ({
