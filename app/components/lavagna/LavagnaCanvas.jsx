@@ -1868,40 +1868,24 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
     const dbId = removedShape.dbId || id;
-    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, kind: removedShape.kind, removedShape });
+    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, kind: removedShape.kind, dbIdType: typeof dbId });
     
-    // SPECIAL HANDLING FOR AXES: Always queue them for deletion to ensure persistence
-    if (removedShape.kind === 'assi2d' || removedShape.kind === 'assi3d') {
-      console.log('[LAVAGNA-DELETE-AXES] Detected axes deletion, forcing queue:', { localId: id, dbId, kind: removedShape.kind });
-      pendingDeletions.current.set(id, true);
-      // If we already have a dbId, delete immediately AND keep in queue (belt and suspenders)
-      if (typeof dbId === 'number' || !isNaN(Number(dbId))) {
-        console.log('[LAVAGNA-DELETE-AXES] Axes has dbId, sending immediate DELETE:', { localId: id, dbId });
-        fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
-          .then(res => {
-            console.log('[LAVAGNA-DELETE-AXES] Immediate DELETE response:', res.status);
-            return res.json();
-          })
-          .then(data => console.log('[LAVAGNA-DELETE-AXES] Immediate DELETE data:', data))
-          .catch(err => console.error('[LAVAGNA-DELETE-AXES] Immediate DELETE error:', err));
-      }
-      return;
-    }
-    
-    // If dbId is not numeric, this shape was deleted before persistence finished;
-    // queue it so when persist callback arrives, it will delete server-side.
+    // If dbId is not numeric, queue for deletion when persist completes
     if (typeof dbId !== 'number' && isNaN(Number(dbId))) {
-      console.log('[LAVAGNA-DELETE] dbId not yet assigned, queuing deletion:', { localId: id });
+      console.log('[LAVAGNA-DELETE] dbId not yet assigned, queuing deletion:', { localId: id, kind: removedShape.kind });
       pendingDeletions.current.set(id, true);
       return;
     }
+    
+    // Send DELETE to server
+    console.log('[LAVAGNA-DELETE] Sending DELETE to server:', { localId: id, dbId, kind: removedShape.kind });
     fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
       .then(res => {
-        console.log('[LAVAGNA-DELETE] Response status:', res.status);
+        console.log('[LAVAGNA-DELETE] DELETE response:', { status: res.status, dbId, kind: removedShape.kind });
         return res.json();
       })
-      .then(data => console.log('[LAVAGNA-DELETE] Response data:', data))
-      .catch(err => console.error('[LAVAGNA-DELETE] Error:', err));
+      .then(data => console.log('[LAVAGNA-DELETE] DELETE success:', { data, dbId, kind: removedShape.kind }))
+      .catch(err => console.error('[LAVAGNA-DELETE] DELETE error:', { err, dbId, kind: removedShape.kind }));
   }, [emitOrPublish, lavagnaId, isAdmin, utenteId]);
 
   // Clipboard for cut/copy/paste
