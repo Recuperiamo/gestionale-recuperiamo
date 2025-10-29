@@ -134,19 +134,18 @@ export default function AulePage() {
                   </div>
                   <div style={badge}>{Array.isArray(ref.studenti) ? ref.studenti.length : 0} studenti</div>
                 </div>
-                <div style={studentsList}>
+                <div style={studentsGrid}>
                   {Array.isArray(ref.studenti) && ref.studenti.length > 0 ? (
                     ref.studenti.map(stud => (
-                      <div key={stud.id} style={studentRow}>
-                        <div>
+                      <Link key={stud.id} href={`/aula/${stud.id}`} style={studentCard}>
+                        <div style={studentCardInfo}>
                           <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
-                          <div style={studentEmail}>{stud.email}</div>
-                            {Array.isArray(stud.materie) && stud.materie.length > 0 && (
-                              <div style={studentSubjects}>Materie: {stud.materie.join(", ")}</div>
-                            )}
+                          {Array.isArray(stud.materie) && stud.materie.length > 0 && (
+                            <div style={studentSubjects}>{stud.materie.slice(0, 2).join(", ")}{stud.materie.length > 2 ? '...' : ''}</div>
+                          )}
                         </div>
-                        <Link href={`/aula/${stud.id}`} style={enterButton}>Apri Aula</Link>
-                      </div>
+                        <div style={enterButtonCompact}>→</div>
+                      </Link>
                     ))
                   ) : (
                     <div style={emptyStudent}>Nessuno studente associato.</div>
@@ -222,30 +221,32 @@ const infoBox = {
 
 const cardsGrid = {
   display: "grid",
-  gap: "22px",
-  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))"
+  gap: "28px",
+  gridTemplateColumns: "repeat(auto-fill, minmax(480px, 1fr))"
 };
 
 const card = {
   background: "#fff",
   borderRadius: "18px",
-  padding: "20px",
+  padding: "24px",
   boxShadow: "0 12px 28px rgba(32,72,154,0.12)",
   border: "1px solid #e2e8f0",
   display: "flex",
   flexDirection: "column",
-  gap: "16px"
+  gap: "20px"
 };
 
 const cardHeader = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "flex-start",
-  gap: "12px"
+  gap: "12px",
+  paddingBottom: "16px",
+  borderBottom: "2px solid #e3eefe"
 };
 
-const cardReferente = { fontWeight: 700, fontSize: "15px" };
-const cardEmail = { fontSize: "13px", color: "#5a6d90" };
+const cardReferente = { fontWeight: 700, fontSize: "16px", color: "#20489a" };
+const cardEmail = { fontSize: "13px", color: "#5a6d90", marginTop: "4px" };
 
 const badge = {
   background: "#1cb0f6",
@@ -253,42 +254,70 @@ const badge = {
   padding: "6px 12px",
   borderRadius: "999px",
   fontWeight: 700,
-  fontSize: "13px"
+  fontSize: "12px"
 };
 
-const studentsList = {
-  display: "flex",
-  flexDirection: "column",
+const studentsGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
   gap: "12px"
 };
 
-const studentRow = {
+const studentCard = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: "12px",
-  background: "#f5f8ff",
-  padding: "12px 14px",
+  gap: "8px",
+  background: "linear-gradient(135deg, #f5f8ff 0%, #e3eefe 100%)",
+  padding: "14px 16px",
   borderRadius: "12px",
-  border: "1px solid #d8e3fb"
+  border: "1.5px solid #d8e3fb",
+  textDecoration: "none",
+  transition: "all 0.2s ease",
+  cursor: "pointer"
 };
 
-const studentName = { fontWeight: 600, fontSize: "14px" };
-const studentEmail = { fontSize: "12px", color: "#5a6d90" };
-const studentSubjects = { fontSize: "12px", color: "#1e3a8a", marginTop: "4px" };
+const studentCardInfo = {
+  flex: 1,
+  minWidth: 0
+};
 
-const enterButton = {
+const studentName = { 
+  fontWeight: 600, 
+  fontSize: "14px", 
+  color: "#20489a",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis"
+};
+
+const studentSubjects = { 
+  fontSize: "11px", 
+  color: "#1e3a8a", 
+  marginTop: "4px",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis"
+};
+
+const enterButtonCompact = {
   background: "#20489a",
   color: "#fff",
-  padding: "8px 14px",
-  borderRadius: "10px",
-  fontWeight: 600,
-  fontSize: "13px",
-  textDecoration: "none"
+  width: "32px",
+  height: "32px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "8px",
+  fontWeight: 700,
+  fontSize: "18px",
+  flexShrink: 0
 };
 
 const emptyStudent = {
   fontSize: "13px",
   color: "#5a6d90",
-  textAlign: "center"
+  textAlign: "center",
+  padding: "20px",
+  gridColumn: "1 / -1"
 };

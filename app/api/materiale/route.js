@@ -3,6 +3,7 @@ import { put, del } from '@vercel/blob';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/authOptions';
 import { prisma } from '../../../lib/prisma';
+import { getAblyServerClient } from '../../../app/lib/realtime/ablyServer';
 
 // Recupera la sessione NextAuth dal server e normalizza le informazioni utente
 async function getUserFromRequest(req) {
@@ -139,6 +140,20 @@ export async function POST(req) {
       }
     });
 
+    // Notifica realtime via Ably
+    try {
+      const ably = getAblyServerClient();
+      const channel = ably.channels.get(`materiale:${clienteId}`);
+      await channel.publish('new-material', { 
+        materialeId: materiale.id,
+        clienteId: parseInt(clienteId),
+        titolo: materiale.titolo
+      });
+    } catch (ablyErr) {
+      console.error('[materiale] Ably notification error:', ablyErr);
+      // Non blocca l'upload se Ably fallisce
+    }
+
     return NextResponse.json({ 
       ok: true, 
       materiale: {
@@ -197,6 +212,18 @@ export async function DELETE(req) {
       where: { id: parseInt(fileId) }
     });
 
+    // Notifica realtime via Ably
+    try {
+      const ably = getAblyServerClient();
+      const channel = ably.channels.get(`materiale:${materiale.clienteId}`);
+      await channel.publish('delete-material', { 
+        materialeId: parseInt(fileId),
+        clienteId: materiale.clienteId
+      });
+    } catch (ablyErr) {
+      console.error('[materiale] Ably delete notification error:', ablyErr);
+    }
+
     return NextResponse.json({ ok: true, deleted: fileId });
   }
 
@@ -224,6 +251,20 @@ export async function DELETE(req) {
 
     // Delete from database
     const result = await prisma.materialeDidattico.deleteMany({ where });
+    
+    // Notifica realtime via Ably
+    if (result.count > 0) {
+      try {
+        const ably = getAblyServerClient();
+        const channel = ably.channels.get(`materiale:${clienteId}`);
+        await channel.publish('delete-material', { 
+          count: result.count,
+          clienteId: parseInt(clienteId)
+        });
+      } catch (ablyErr) {
+        console.error('[materiale] Ably batch delete notification error:', ablyErr);
+      }
+    }
     
     return NextResponse.json({ ok: true, deleted: result.count });
   }

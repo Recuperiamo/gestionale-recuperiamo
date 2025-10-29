@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
+import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 
 // --- COMMENTI: gestione locale (per demo, sostituire con API per DB/file persistente) ---
 function useCommenti(materiali) {
@@ -275,6 +276,53 @@ export default function AulaContent({ initialClienteId = null }) {
       }
     }
   }, [status, targetClienteId]);
+
+  // --- REALTIME: Auto-refresh quando viene caricato nuovo materiale ---
+  useEffect(() => {
+    if (!targetClienteId || status !== "authenticated") return;
+
+    let cleanupAbly = () => {};
+
+    (async () => {
+      try {
+        const ch = await getAblyChannelAsync(`materiale:${targetClienteId}`);
+        if (ch) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[AulaContent] Ably channel attached materiale:' + targetClienteId);
+          }
+          
+          const onNewMaterial = ({ data }) => {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[AulaContent] received new-material', data);
+            }
+            // Ricarica automaticamente la lista
+            fetchMateriali(targetClienteId);
+          };
+
+          const onDeleteMaterial = ({ data }) => {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[AulaContent] received delete-material', data);
+            }
+            // Ricarica automaticamente la lista
+            fetchMateriali(targetClienteId);
+          };
+
+          ch.subscribe('new-material', onNewMaterial);
+          ch.subscribe('delete-material', onDeleteMaterial);
+
+          cleanupAbly = () => {
+            ch.unsubscribe('new-material', onNewMaterial);
+            ch.unsubscribe('delete-material', onDeleteMaterial);
+            ch.detach();
+          };
+        }
+      } catch (err) {
+        console.error('[AulaContent] Ably setup error:', err);
+      }
+    })();
+
+    return () => cleanupAbly();
+  }, [targetClienteId, status]);
 
   // Materie effettive nei materiali filtrati
   const materieEffettive = useMemo(
