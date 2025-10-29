@@ -244,6 +244,10 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
         setShowCreate(false);
         setSelectedAttivita("");
         setNewTitle("");
+        // Apri automaticamente la lavagna appena creata
+        if (typeof onSelect === "function") {
+          onSelect(js.lavagna);
+        }
       } else {
         alert("Errore nella creazione lavagna");
       }
