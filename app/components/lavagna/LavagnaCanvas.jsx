@@ -2608,12 +2608,20 @@ export default function LavagnaCanvas({
       const top = { x: (minX + maxX) / 2, y: minY };
       const left = { x: minX, y: maxY };
       const right = { x: maxX, y: maxY };
+      // Edge hit-test (so touching the outline also counts)
+      if (
+        distPointToSegment(x, y, top.x, top.y, left.x, left.y) <= tolerance ||
+        distPointToSegment(x, y, left.x, left.y, right.x, right.y) <= tolerance ||
+        distPointToSegment(x, y, right.x, right.y, top.x, top.y) <= tolerance
+      ) return true;
+      // Interior hit-test with slight tolerance expansion
       if (pointInTriangle({ x, y }, top, left, right)) return true;
-      // allow tolerance by expanding bounding triangle slightly
-      return pointInTriangle({ x, y },
+      return pointInTriangle(
+        { x, y },
         { x: top.x, y: top.y - tolerance },
         { x: left.x - tolerance, y: left.y + tolerance },
-        { x: right.x + tolerance, y: right.y + tolerance });
+        { x: right.x + tolerance, y: right.y + tolerance }
+      );
     }
     if (kind === 'rombo') {
       const cx = (minX + maxX) / 2;
@@ -2622,6 +2630,14 @@ export default function LavagnaCanvas({
       const bottom = { x: cx, y: maxY };
       const left = { x: minX, y: cy };
       const right = { x: maxX, y: cy };
+      // Edge hit-test on diamond outline
+      if (
+        distPointToSegment(x, y, top.x, top.y, right.x, right.y) <= tolerance ||
+        distPointToSegment(x, y, right.x, right.y, bottom.x, bottom.y) <= tolerance ||
+        distPointToSegment(x, y, bottom.x, bottom.y, left.x, left.y) <= tolerance ||
+        distPointToSegment(x, y, left.x, left.y, top.x, top.y) <= tolerance
+      ) return true;
+      // Interior hit-test via two triangles
       return (
         pointInTriangle({ x, y }, top, left, right) ||
         pointInTriangle({ x, y }, bottom, left, right)
@@ -3235,7 +3251,7 @@ export default function LavagnaCanvas({
         return;
       }
 
-      if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'rombo', 'freccia', 'assi2', 'assi3'].includes(strumento)) {
+      if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'rombo', 'freccia', 'assi2', 'assi3', 'assi2d', 'assi3d'].includes(strumento)) {
       const p = getPointerWorld();
       if (!p) {
         console.warn('[lavagna] shape tool: invalid point');
@@ -4669,7 +4685,7 @@ export default function LavagnaCanvas({
       })
     };
 
-  const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3'].includes(strumento);
+  const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3','assi2d','assi3d'].includes(strumento);
     const shapeButtonActive = shapeActive || showShapesPopover;
     const undoDisabled = !undoStack.length;
     const redoAvailable = redoStack.length > 0;
