@@ -89,6 +89,7 @@ export default function LavagnaCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [contextPanning, setContextPanning] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [proportionalResize, setProportionalResize] = useState(true); // Lucchetto proporzioni
   const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
   const contextTempToolRef = useRef(null); // when right-click temporarily switches tool to 'mano'
   const touchesRef = useRef(new Map()); // pointerId -> { x,y }
@@ -667,6 +668,49 @@ export default function LavagnaCanvas({
           for (const key in handles) {
             const pos = handles[key];
             ctx.fillRect(pos.x - handleOffset, pos.y - handleOffset, handleSize, handleSize);
+          }
+          
+          // Draw proportional resize lock icon above selection
+          const lockSize = 24 / safeZoom;
+          const lockX = bounds.minX + width / 2;
+          const lockY = bounds.minY - padding - lockSize - 8 / safeZoom;
+          
+          // Lock background
+          ctx.fillStyle = proportionalResize ? '#2563eb' : '#94a3b8';
+          ctx.fillRect(lockX - lockSize/2, lockY, lockSize, lockSize);
+          
+          // Lock icon
+          ctx.strokeStyle = '#ffffff';
+          ctx.fillStyle = '#ffffff';
+          ctx.lineWidth = 2 / safeZoom;
+          
+          if (proportionalResize) {
+            // Closed lock
+            const lockBodyW = 12 / safeZoom;
+            const lockBodyH = 10 / safeZoom;
+            const lockBodyX = lockX - lockBodyW / 2;
+            const lockBodyY = lockY + lockSize - lockBodyH - 2 / safeZoom;
+            ctx.fillRect(lockBodyX, lockBodyY, lockBodyW, lockBodyH);
+            
+            // Lock shackle
+            const shackleW = 8 / safeZoom;
+            const shackleH = 6 / safeZoom;
+            ctx.beginPath();
+            ctx.arc(lockX, lockBodyY, shackleW / 2, Math.PI, 0, false);
+            ctx.stroke();
+          } else {
+            // Open lock
+            const lockBodyW = 12 / safeZoom;
+            const lockBodyH = 10 / safeZoom;
+            const lockBodyX = lockX - lockBodyW / 2;
+            const lockBodyY = lockY + lockSize - lockBodyH - 2 / safeZoom;
+            ctx.fillRect(lockBodyX, lockBodyY, lockBodyW, lockBodyH);
+            
+            // Open shackle (offset to the right)
+            const shackleW = 8 / safeZoom;
+            ctx.beginPath();
+            ctx.arc(lockX + shackleW / 2, lockBodyY, shackleW / 2, Math.PI, 0, false);
+            ctx.stroke();
           }
         }
       }
@@ -2804,12 +2848,27 @@ export default function LavagnaCanvas({
           }
         } catch (_) {}
         
-        // Check if the user clicked on a resize handle
+        // Check if user clicked on the proportional resize lock icon
         const selBounds = getSelectionBoundsForIds(selectedItems.forme || []);
         if (selBounds && selectedItems.forme && selectedItems.forme.length > 0) {
+          const padding = 6 / (zoom || 1);
+          const lockSize = 24 / (zoom || 1);
+          const width = selBounds.maxX - selBounds.minX;
+          const lockX = selBounds.minX + width / 2;
+          const lockY = selBounds.minY - padding - lockSize - 8 / (zoom || 1);
+          
+          // Check if click is within lock icon bounds
+          if (p.x >= lockX - lockSize/2 && p.x <= lockX + lockSize/2 &&
+              p.y >= lockY && p.y <= lockY + lockSize) {
+            // Toggle proportional resize
+            setProportionalResize(prev => !prev);
+            drawAll();
+            return;
+          }
+          
+          // Check if the user clicked on a resize handle
           const handleSize = 10 / (zoom || 1);
           const handleTol = Math.max(handleSize, 12 / (zoom || 1));
-          const width = selBounds.maxX - selBounds.minX;
           const height = selBounds.maxY - selBounds.minY;
           
           const handles = {
@@ -3124,13 +3183,38 @@ export default function LavagnaCanvas({
         // Calculate scale factors
         const origWidth = origBounds.maxX - origBounds.minX;
         const origHeight = origBounds.maxY - origBounds.minY;
-        const newWidth = newBounds.maxX - newBounds.minX;
-        const newHeight = newBounds.maxY - newBounds.minY;
+        let newWidth = newBounds.maxX - newBounds.minX;
+        let newHeight = newBounds.maxY - newBounds.minY;
         
         if (origWidth <= 0 || origHeight <= 0 || newWidth <= 0 || newHeight <= 0) return;
         
-        const scaleX = newWidth / origWidth;
-        const scaleY = newHeight / origHeight;
+        let scaleX = newWidth / origWidth;
+        let scaleY = newHeight / origHeight;
+        
+        // If proportional resize is enabled, use uniform scaling
+        if (proportionalResize) {
+          // Use the scale factor with the larger absolute change
+          const scale = Math.abs(scaleX - 1) > Math.abs(scaleY - 1) ? scaleX : scaleY;
+          scaleX = scale;
+          scaleY = scale;
+          
+          // Recalculate bounds to maintain aspect ratio
+          newWidth = origWidth * scale;
+          newHeight = origHeight * scale;
+          
+          // Adjust bounds based on handle position
+          if (handle.includes('left')) {
+            newBounds.minX = origBounds.maxX - newWidth;
+          } else if (handle.includes('right')) {
+            newBounds.maxX = origBounds.minX + newWidth;
+          }
+          
+          if (handle.includes('top')) {
+            newBounds.minY = origBounds.maxY - newHeight;
+          } else if (handle.includes('bottom')) {
+            newBounds.maxY = origBounds.minY + newHeight;
+          }
+        }
         
         // Determine the anchor point (opposite corner/side from the handle being dragged)
         let anchorX, anchorY;
