@@ -247,6 +247,11 @@ export default function AulaContent({ initialClienteId = null }) {
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMateria, setFiltroMateria] = useState("");
   const [search, setSearch] = useState("");
+  // Stato modale Voti
+  const [showVoto, setShowVoto] = useState(false);
+  const [votoData, setVotoData] = useState(() => new Date().toISOString().slice(0,10));
+  const [votoMateria, setVotoMateria] = useState("");
+  const [votoVal, setVotoVal] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
@@ -443,15 +448,53 @@ export default function AulaContent({ initialClienteId = null }) {
   // Materie da mostrare nella sidebar: usa quelle dello studente se disponibili, altrimenti quelle nei materiali
   const materieSidebar = materieStudente.length > 0 ? materieStudente : materieEffettive;
 
-  // ---- SIDEBAR (desktop) ----
+  // ---- SIDEBAR (desktop) con ricerca e filtri spostati a sinistra ----
   const sidebar = (
     <aside style={sidebarStyle}>
+      {/* Materie */}
       <div style={sidebarBox}>
         <div style={{fontWeight:700, color:"#20489a", marginBottom:6}}>Materie</div>
         <button style={sidebarBtn} onClick={()=>setFiltroMateria("")}>Tutte</button>
         {materieSidebar.map(materia=>
           <button key={materia} style={sidebarBtn} onClick={()=>setFiltroMateria(materia)}>{materia}</button>
         )}
+      </div>
+      {/* Ricerca e filtri */}
+      <div style={sidebarBox}>
+        <div style={{fontWeight:700, color:"#20489a", marginBottom:10}}>Ricerca e filtri</div>
+        <input
+          placeholder="Cerca titolo o materia..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{...searchInput, width:'100%'}}
+        />
+        <div style={{height:10}}/>
+        <div style={{fontSize:13,fontWeight:700,color:'#20489a',marginBottom:4}}>Sezione</div>
+        <select
+          value={activeTab}
+          onChange={e=>setActiveTab(e.target.value)}
+          style={{...selectStyle, width:'100%'}}
+        >
+          <option value="bacheca">Bacheca (tutto)</option>
+          <option value="materiale">Materiale</option>
+          <option value="compiti">Compiti</option>
+          <option value="voti">Voti</option>
+        </select>
+        <div style={{height:10}}/>
+        <div style={{fontSize:13,fontWeight:700,color:'#20489a',marginBottom:4}}>Tipo file</div>
+        <select
+          value={filtroTipo}
+          onChange={e => setFiltroTipo(e.target.value)}
+          style={{...selectStyle, width:'100%'}}
+        >
+          <option value="">Tutti i tipi</option>
+          {tipi.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+        </select>
+        <div style={{height:6}}/>
+        <button
+          style={{...btnPrimary, background: coloreTema, width:'100%'}}
+          onClick={()=>{ /* i filtri sono live; bottone solo per UX */ }}
+        >Visualizza</button>
       </div>
     </aside>
   );
@@ -553,36 +596,19 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           )}
 
-          {/* BAR: Carica materiale a sinistra, filtri e ricerca a destra */}
+          {/* BAR: solo azioni principali */}
           <div style={barFlex}>
             {targetClienteId && (
               <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
                 Carica materiale
               </button>
             )}
+            {activeTab === 'voti' && targetClienteId && (
+              <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
+                Registra voto
+              </button>
+            )}
             <div style={filtersBarRight}>
-              <input
-                placeholder="Cerca titolo o materia..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={searchInput}
-              />
-              <select
-                value={filtroTipo}
-                onChange={e => setFiltroTipo(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">Tutti i tipi</option>
-                {tipi.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
-              </select>
-              <select
-                value={filtroMateria}
-                onChange={e => setFiltroMateria(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">Tutte le materie</option>
-                {materieSidebar.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
               {isAdmin && targetClienteId && (
                 <EliminaTuttiMateriali
                   clienteId={targetClienteId}
@@ -709,6 +735,56 @@ export default function AulaContent({ initialClienteId = null }) {
         clienteId={targetClienteId}
         materieStudente={materieStudente}
       />
+
+      {/* MODALE VOTI */}
+      {showVoto && (
+        <div style={{position:'fixed',inset:0,background:'rgba(32,72,154,0.15)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
+          <div style={{background:'#fff',borderRadius:14,padding:22,minWidth:320,boxShadow:'0 8px 28px #2563eb35'}}>
+            <h3 style={{marginTop:0,marginBottom:14,color:'#20489a'}}>Registra voto</h3>
+            <div style={{display:'grid',gap:10}}>
+              <div>
+                <label style={{fontWeight:600,fontSize:14}}>Data</label>
+                <input type="date" value={votoData} onChange={e=>setVotoData(e.target.value)} style={inputStyle}/>
+              </div>
+              <div>
+                <label style={{fontWeight:600,fontSize:14}}>Materia</label>
+                <select value={votoMateria} onChange={e=>setVotoMateria(e.target.value)} style={inputStyle}>
+                  <option value="">- Seleziona -</option>
+                  {materieSidebar.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{fontWeight:600,fontSize:14}}>Voto</label>
+                <input type="number" step="0.5" min="0" max="10" value={votoVal} onChange={e=>setVotoVal(e.target.value)} style={inputStyle}/>
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:14}}>
+              <button style={btnGhost} onClick={()=>setShowVoto(false)}>Annulla</button>
+              <button
+                style={{...btnPrimary, background: coloreTema}}
+                onClick={async ()=>{
+                  if (!targetClienteId) return;
+                  if (!votoData || !votoMateria || !votoVal) { alert('Compila tutti i campi'); return; }
+                  // Crea un piccolo file testo JSON e usa la stessa API materiale con sezione=VOTI
+                  const payload = { data: votoData, materia: votoMateria, voto: votoVal };
+                  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                  const file = new File([blob], `voto_${votoData}_${votoMateria}.json`, { type: 'application/json' });
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  fd.append('titolo', `Voto ${votoVal} · ${votoMateria} · ${votoData}`);
+                  fd.append('materia', votoMateria);
+                  fd.append('sezione', 'VOTI');
+                  fd.append('clienteId', targetClienteId);
+                  const res = await fetch('/api/materiale', { method:'POST', body: fd });
+                  if (!res.ok) { alert('Errore salvataggio voto'); return; }
+                  setShowVoto(false);
+                  fetchMateriali(targetClienteId);
+                }}
+              >Salva voto</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
