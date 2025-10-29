@@ -463,36 +463,62 @@ export async function DELETE(request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+    
     const body = await request.json()
     const { id } = body
     if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
 
+    console.log('[DELETE /api/attivita] Richiesta eliminazione attività ID:', id)
+
     const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
-    if (!att) return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
-    if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId))
+    if (!att) {
+      console.log('[DELETE /api/attivita] Attività non trovata:', id)
+      return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
+    }
+    
+    console.log('[DELETE /api/attivita] Attività trovata:', { id: att.id, pacchettoId: att.pacchettoId, clienteId: att.clienteId })
+
+    if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId)) {
+      console.log('[DELETE /api/attivita] Forbidden: cliente non autorizzato')
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const pacchetto = await prisma.pacchettoOre.findUnique({ where: { id: att.pacchettoId } })
-    if (!pacchetto) return NextResponse.json({ error: 'Pacchetto non trovato (collegato)' }, { status: 404 })
+    if (!pacchetto) {
+      console.log('[DELETE /api/attivita] Pacchetto non trovato:', att.pacchettoId)
+      return NextResponse.json({ error: 'Pacchetto non trovato (collegato)' }, { status: 404 })
+    }
 
+    console.log('[DELETE /api/attivita] Ricerca lavagna per attivitaId:', att.id)
     const lavagna = await prisma.lavagna.findUnique({
       where: { attivitaId: att.id },
       select: { id: true }
     })
+    console.log('[DELETE /api/attivita] Lavagna trovata:', lavagna?.id || 'nessuna')
 
+    console.log('[DELETE /api/attivita] Inizio transazione')
     const result = await prisma.$transaction(async tx => {
+      console.log('[DELETE /api/attivita][TX] Eliminazione richiesteModifica')
       await tx.richiestaModifica.deleteMany({ where: { attivitaId: att.id } })
 
       if (lavagna) {
+        console.log('[DELETE /api/attivita][TX] Eliminazione forme lavagna')
+        await tx.lavagnaForma.deleteMany({ where: { lavagnaId: lavagna.id } })
+        
+        console.log('[DELETE /api/attivita][TX] Eliminazione tratti lavagna')
         await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: lavagna.id } })
+        
+        console.log('[DELETE /api/attivita][TX] Eliminazione lavagna')
         await tx.lavagna.delete({ where: { id: lavagna.id } })
       }
 
+      console.log('[DELETE /api/attivita][TX] Recupero pacchetto per aggiornamento')
       const pacchettoBefore = await tx.pacchettoOre.findUnique({
         where: { id: att.pacchettoId },
         select: { id: true, oreResidue: true, descrizione: true }
       })
 
+      console.log('[DELETE /api/attivita][TX] Aggiornamento pacchetto ore residue')
       const pacchettoAggiornato = pacchettoBefore
         ? await tx.pacchettoOre.update({
             where: { id: pacchettoBefore.id },
@@ -503,11 +529,14 @@ export async function DELETE(request) {
           })
         : null
 
+      console.log('[DELETE /api/attivita][TX] Eliminazione attività')
       const deleted = await tx.attivita.delete({ where: { id: att.id } })
 
+      console.log('[DELETE /api/attivita][TX] Transazione completata con successo')
       return { deleted, pacchettoBefore, pacchettoAggiornato }
     })
 
+    console.log('[DELETE /api/attivita] Log changelog')
     if (result.pacchettoBefore && result.pacchettoAggiornato) {
       await logPacchettoChange({
         pacchettoId: result.pacchettoBefore.id,
@@ -521,9 +550,14 @@ export async function DELETE(request) {
       })
     }
 
+    console.log('[DELETE /api/attivita] Eliminazione completata con successo')
     return NextResponse.json({ deleted: result.deleted, pacchetto: result.pacchettoAggiornato })
   } catch (err) {
-    console.error('Errore DELETE /api/attivita:', err)
-    return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
+    console.error('[DELETE /api/attivita] ERRORE:', err)
+    console.error('[DELETE /api/attivita] Stack:', err.stack)
+    return NextResponse.json({ 
+      error: 'Errore interno', 
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined 
+    }, { status: 500 })
   }
 }
