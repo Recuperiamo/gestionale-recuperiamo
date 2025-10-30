@@ -2157,14 +2157,11 @@ export default function LavagnaCanvas({
               const tempSrc = URL.createObjectURL(file);
               const tempId = insertLocalPastedImage(tempSrc);
 
-              // Store preview for later use in updates
-              let savedPreview = null;
-
-              // Immediately create and emit a preview for remote clients
-              (async () => {
+              // Create and emit a preview for remote clients, and save it for persistence
+              const previewPromise = (async () => {
                 try {
                   const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
-                  savedPreview = srcPreview; // Save for later updates
+                  console.log('[LAVAGNA-PASTE] Preview created, length:', srcPreview?.length);
                   const previewShape = {
                     id: tempId,
                     kind: 'immagine',
@@ -2176,16 +2173,19 @@ export default function LavagnaCanvas({
                     autoreUserId: utenteId
                   };
                   emitOrPublish('shape:create', { ...previewShape, lavagnaId, srcPreview });
+                  return srcPreview; // Return for later use
                 } catch (previewErr) {
                   console.warn('[lavagna] failed to create preview', previewErr);
+                  return null;
                 }
               })();
 
               // Upload in background; when done, replace temp shape with persisted one
               (async () => {
                 try {
-                  // Wait a bit for preview to be generated
-                  await new Promise(r => setTimeout(r, 100));
+                  // Wait for preview to be ready
+                  const savedPreview = await previewPromise;
+                  console.log('[LAVAGNA-PASTE] Upload starting, preview ready:', !!savedPreview);
                   
                   const fd = new FormData();
                   const titolo = `incollato_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'_')}`;
@@ -2200,6 +2200,7 @@ export default function LavagnaCanvas({
                     return;
                   }
                   const mat = js.materiale;
+                  console.log('[LAVAGNA-PASTE] Upload successful, materiale:', mat.id);
                   const serverSrc = `/api/materiale?fileId=${mat.id}`;
                   const baseWidth = 400 / (zoom || 1);
                   const baseHeight = 300 / (zoom || 1);
@@ -2587,6 +2588,43 @@ export default function LavagnaCanvas({
     const baseY = Number(shape.y ?? 0);
     const width = Number(shape.w ?? (shape.x2 != null ? shape.x2 - baseX : 0));
     const height = Number(shape.h ?? (shape.y2 != null ? shape.y2 - baseY : 0));
+    
+    // If shape has rotation, calculate rotated bounding box
+    const rotation = Number(shape.rotation ?? 0);
+    if (rotation !== 0) {
+      // Calculate center of unrotated shape
+      const cx = baseX + width / 2;
+      const cy = baseY + height / 2;
+      
+      // Calculate 4 corners of unrotated rectangle
+      const corners = [
+        { x: baseX, y: baseY },
+        { x: baseX + width, y: baseY },
+        { x: baseX + width, y: baseY + height },
+        { x: baseX, y: baseY + height }
+      ];
+      
+      // Rotate each corner around center
+      const rotatedCorners = corners.map(corner => {
+        const dx = corner.x - cx;
+        const dy = corner.y - cy;
+        return {
+          x: cx + dx * Math.cos(rotation) - dy * Math.sin(rotation),
+          y: cy + dx * Math.sin(rotation) + dy * Math.cos(rotation)
+        };
+      });
+      
+      // Find min/max of rotated corners
+      const xs = rotatedCorners.map(c => c.x);
+      const ys = rotatedCorners.map(c => c.y);
+      return {
+        minX: Math.min(...xs),
+        maxX: Math.max(...xs),
+        minY: Math.min(...ys),
+        maxY: Math.max(...ys)
+      };
+    }
+    
     const minX = Math.min(baseX, baseX + width);
     const maxX = Math.max(baseX, baseX + width);
     const minY = Math.min(baseY, baseY + height);
