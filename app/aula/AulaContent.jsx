@@ -147,10 +147,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
             <option value="VOTI">Voti</option>
           </select>
         </div>
-        <div style={{marginBottom:16, fontSize:13, fontWeight:600}}>
-          <span>Assegna a studente: </span>
-          <span style={{fontWeight:700, color: coloreTema}}>{clienteId}</span>
-        </div>
+        {/* Rimosso: Assegna a studente (assegnato automaticamente) */}
         <div style={{textAlign:"right"}}>
           <button type="button" onClick={onClose} style={btnGhost}>Annulla</button>
           <button type="submit" disabled={!files.length || loading} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>
@@ -392,6 +389,11 @@ export default function AulaContent({ initialClienteId = null }) {
     return list.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   }, [items, filtroTipo, filtroMateria, search, activeTab]);
 
+  // Tipi di file mostrati come tag in ordine fisso
+  const TIPI_TAG_ORDER = [
+    'pdf','doc','docx','xls','xlsx','ppt','pptx','png','jpg','jpeg','txt'
+  ];
+
   // Recupera nome studente da lista clienti (solo per admin/operator)
   const [clienti, setClienti] = useState([]);
   const [studenteCorrente, setStudenteCorrente] = useState(null);
@@ -477,6 +479,35 @@ export default function AulaContent({ initialClienteId = null }) {
   // ---- SIDEBAR (desktop) con ricerca e filtri spostati a sinistra ----
   const sidebar = (
     <aside style={sidebarStyle}>
+      {/* Bottone videolezione a sinistra, sopra i tag, allineato con le sezioni */}
+      {targetClienteId && studenteCorrente && (
+        <button
+          style={{
+            ...videoLinkButton,
+            background: coloreTema,
+            boxShadow: `0 4px 12px ${coloreTema}40`,
+            width: '100%',
+            justifyContent: 'center',
+            marginTop: 24,
+            marginBottom: 18
+          }}
+          onClick={() => {
+            const link = studenteCorrente.linkVideolezione;
+            if (link) {
+              window.open(link, '_blank', 'noopener,noreferrer');
+            } else {
+              alert('Link videolezione non configurato per questo studente');
+            }
+          }}
+          title="Apri videolezione"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <span>Videolezione</span>
+        </button>
+      )}
       {/* TAG UNIFICATI */}
       <div style={sidebarBox}>
         <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Tag</div>
@@ -550,7 +581,7 @@ export default function AulaContent({ initialClienteId = null }) {
           </div>
         )}
 
-        {/* Tipi di file */}
+        {/* Tipi di file (solo set consentito) */}
         {tipi.length > 0 && (
           <div>
             <div style={{fontSize:12,fontWeight:600,color:"#5a6d90",marginBottom:6}}>TIPI FILE</div>
@@ -566,7 +597,7 @@ export default function AulaContent({ initialClienteId = null }) {
               >
                 Tutti
               </button>
-              {tipi.map(tipo => (
+              {TIPI_TAG_ORDER.filter(t => tipi.includes(t)).map(tipo => (
                 <button
                   key={tipo}
                   onClick={() => setFiltroTipo(tipo)}
@@ -641,18 +672,16 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           ) : (
             <>
-          {/* TABS CLASSROOM con bottone videolezione */}
+          {/* TABS CLASSROOM */}
           {targetClienteId && (
             <div style={{
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              gap: "8px",
               marginTop: "24px",
               marginBottom: "8px",
               borderBottom: "2px solid #e0e4f0",
               paddingBottom: "0"
             }}>
-              <div style={{display: "flex", gap: "8px"}}>
                 {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
@@ -677,52 +706,23 @@ export default function AulaContent({ initialClienteId = null }) {
                     </button>
                   );
                 })}
-              </div>
-              
-              {/* Bottone videolezione allineato a destra delle tabs */}
-              {studenteCorrente && (
-                <button
-                  style={{
-                    ...videoLinkButton, 
-                    background: coloreTema, 
-                    boxShadow: `0 4px 12px ${coloreTema}40`,
-                    padding: "10px 20px",
-                    fontSize: 14,
-                    marginBottom: "-2px"
-                  }}
-                  onClick={() => {
-                    const link = studenteCorrente.linkVideolezione;
-                    if (link) {
-                      window.open(link, '_blank', 'noopener,noreferrer');
-                    } else {
-                      alert('Link videolezione non configurato per questo studente');
-                    }
-                  }}
-                  title="Apri videolezione"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                  </svg>
-                  <span>Videolezione</span>
-                </button>
-              )}
             </div>
           )}
 
-          {/* BAR: solo azioni principali */}
+          {/* BAR: azioni principali a destra */}
           <div style={barFlex}>
-            {targetClienteId && (
-              <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
-                Carica materiale
-              </button>
-            )}
-            {activeTab === 'voti' && targetClienteId && (
-              <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
-                Registra voto
-              </button>
-            )}
+            <div />
             <div style={filtersBarRight}>
+              {targetClienteId && (
+                <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
+                  Carica materiale
+                </button>
+              )}
+              {activeTab === 'voti' && targetClienteId && (
+                <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
+                  Registra voto
+                </button>
+              )}
               {isAdmin && targetClienteId && (
                 <EliminaTuttiMateriali
                   clienteId={targetClienteId}
