@@ -29,7 +29,7 @@ function useCommenti(materiali) {
 }
 
 // --- COMPONENTE UPLOAD MODALE (MULTIFILE) ---
-function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStudente = [] }) {
+function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStudente = [], coloreTema = "#1cb0f6" }) {
   const [files, setFiles] = useState([]);
   const [materia, setMateria] = useState("");
   const [sezione, setSezione] = useState("MATERIALE");
@@ -97,48 +97,50 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
         background:"#fff", borderRadius:18, padding:"32px 28px", boxShadow:"0 8px 28px #2563eb35",
         minWidth:340, maxWidth:440
       }}>
-        <h2 style={{marginTop:0, marginBottom:14, fontWeight:700, fontSize:22, color:"#20489a"}}>Carica materiale</h2>
+        <h2 style={{marginTop:0, marginBottom:14, fontWeight:700, fontSize:22, color: coloreTema}}>Carica materiale</h2>
         <div style={{marginBottom:14}}>
           <input
             type="file"
-            accept=".pdf,.doc,.docx,.xlsx,.png,.jpg,.jpeg,.zip"
+            accept=".pdf,.doc,.docx,.xlsx,.xls,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg,.zip,.rar,.txt,.csv"
             required
             multiple
             ref={fileInputRef}
             onChange={e => setFiles(Array.from(e.target.files))}
             style={{marginBottom:10}}
           />
+          <div style={{fontSize:12,color:"#5a6d90",marginTop:4}}>
+            Tipi di file supportati: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, PNG, JPG, JPEG, GIF, BMP, WEBP, SVG, ZIP, RAR, TXT, CSV
+          </div>
         </div>
         <div style={{marginBottom:12}}>
-          <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block"}}>Nome (opzionale)</label>
+          <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block", color: coloreTema}}>Nome (opzionale)</label>
           <input
             type="text"
             placeholder=""
             value={nome}
             onChange={e => setNome(e.target.value)}
-            style={inputStyle}
+            style={{...inputStyle, borderColor: coloreTema}}
           />
         </div>
+        {materieStudente.length > 1 && (
+          <div style={{marginBottom:12}}>
+            <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block", color: coloreTema}}>Materia</label>
+            <select
+              value={materia}
+              onChange={e => setMateria(e.target.value)}
+              style={{...inputStyle, borderColor: coloreTema}}
+            >
+              <option value="">- Nessuna -</option>
+              {materieStudente.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        )}
         <div style={{marginBottom:12}}>
-          <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block"}}>Materia (opzionale)</label>
-          <select
-            value={materia}
-            onChange={e => setMateria(e.target.value)}
-            style={inputStyle}
-          >
-            <option value="">- Nessuna -</option>
-            {materieStudente.length > 0 
-              ? materieStudente.map(m => <option key={m} value={m}>{m}</option>)
-              : materieLiceo.map(m => <option key={m} value={m}>{m}</option>)
-            }
-          </select>
-        </div>
-        <div style={{marginBottom:12}}>
-          <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block"}}>Sezione</label>
+          <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block", color: coloreTema}}>Sezione</label>
           <select
             value={sezione}
             onChange={e => setSezione(e.target.value)}
-            style={inputStyle}
+            style={{...inputStyle, borderColor: coloreTema}}
           >
             <option value="MATERIALE">Materiale</option>
             <option value="COMPITI">Compiti</option>
@@ -147,11 +149,11 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
         </div>
         <div style={{marginBottom:16, fontSize:13, fontWeight:600}}>
           <span>Assegna a studente: </span>
-          <span style={{fontWeight:700, color:"#1e3a8a"}}>{clienteId}</span>
+          <span style={{fontWeight:700, color: coloreTema}}>{clienteId}</span>
         </div>
         <div style={{textAlign:"right"}}>
           <button type="button" onClick={onClose} style={btnGhost}>Annulla</button>
-          <button type="submit" disabled={!files.length || loading} style={btnPrimary}>
+          <button type="submit" disabled={!files.length || loading} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>
             {loading ? "Caricamento..." : "Carica"}
           </button>
         </div>
@@ -448,32 +450,98 @@ export default function AulaContent({ initialClienteId = null }) {
   // Materie da mostrare nella sidebar: usa quelle dello studente se disponibili, altrimenti quelle nei materiali
   const materieSidebar = materieStudente.length > 0 ? materieStudente : materieEffettive;
 
+  // Helper per scurire/schiarire un colore
+  function adjustColorBrightness(hex, percent) {
+    // Rimuove il # se presente
+    hex = hex.replace('#', '');
+    
+    // Converte hex in RGB
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+    
+    // Applica la percentuale
+    r = Math.min(255, Math.max(0, r + (r * percent / 100)));
+    g = Math.min(255, Math.max(0, g + (g * percent / 100)));
+    b = Math.min(255, Math.max(0, b + (b * percent / 100)));
+    
+    // Converte di nuovo in hex
+    const rr = Math.round(r).toString(16).padStart(2, '0');
+    const gg = Math.round(g).toString(16).padStart(2, '0');
+    const bb = Math.round(b).toString(16).padStart(2, '0');
+    
+    return `#${rr}${gg}${bb}`;
+  }
+
   // ---- SIDEBAR (desktop) con ricerca e filtri spostati a sinistra ----
   const sidebar = (
     <aside style={sidebarStyle}>
+      {/* VIDEO LEZIONE - sopra tutti i box */}
+      {targetClienteId && studenteCorrente && (
+        <button
+          style={{
+            ...videoLinkButton, 
+            background: coloreTema, 
+            boxShadow: `0 6px 20px ${coloreTema}40`,
+            width:'100%', 
+            justifyContent:'center', 
+            marginBottom:18
+          }}
+          onClick={() => {
+            const link = studenteCorrente.linkVideolezione;
+            if (link) {
+              window.open(link, '_blank', 'noopener,noreferrer');
+            } else {
+              alert('Link videolezione non configurato per questo studente');
+            }
+          }}
+          title="Apri videolezione"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <span>Apri videolezione</span>
+        </button>
+      )}
       {/* Materie */}
       <div style={sidebarBox}>
-        <div style={{fontWeight:700, color:"#20489a", marginBottom:6}}>Materie</div>
-        <button style={sidebarBtn} onClick={()=>setFiltroMateria("")}>Tutte</button>
+        <div style={{fontWeight:700, color: coloreTema, marginBottom:6}}>Materie</div>
+        <button 
+          style={{
+            ...sidebarBtn, 
+            background: filtroMateria === "" ? coloreTema : `${coloreTema}15`,
+            color: filtroMateria === "" ? "#fff" : coloreTema
+          }} 
+          onClick={()=>setFiltroMateria("")}
+        >Tutte</button>
         {materieSidebar.map(materia=>
-          <button key={materia} style={sidebarBtn} onClick={()=>setFiltroMateria(materia)}>{materia}</button>
+          <button 
+            key={materia} 
+            style={{
+              ...sidebarBtn, 
+              background: filtroMateria === materia ? coloreTema : `${coloreTema}15`,
+              color: filtroMateria === materia ? "#fff" : coloreTema
+            }} 
+            onClick={()=>setFiltroMateria(materia)}
+          >{materia}</button>
         )}
       </div>
       {/* Ricerca e filtri */}
       <div style={sidebarBox}>
-        <div style={{fontWeight:700, color:"#20489a", marginBottom:10}}>Ricerca e filtri</div>
+        <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Ricerca e filtri</div>
         <input
           placeholder="Cerca titolo o materia..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{...searchInput, width:'100%'}}
+          style={{...searchInput, width:'100%', borderColor: coloreTema}}
         />
         <div style={{height:10}}/>
-        <div style={{fontSize:13,fontWeight:700,color:'#20489a',marginBottom:4}}>Sezione</div>
+        <div style={{fontSize:13,fontWeight:700,color: coloreTema,marginBottom:4}}>Sezione</div>
         <select
           value={activeTab}
           onChange={e=>setActiveTab(e.target.value)}
-          style={{...selectStyle, width:'100%'}}
+          style={{...selectStyle, width:'100%', borderColor: coloreTema}}
         >
           <option value="bacheca">Bacheca (tutto)</option>
           <option value="materiale">Materiale</option>
@@ -481,18 +549,35 @@ export default function AulaContent({ initialClienteId = null }) {
           <option value="voti">Voti</option>
         </select>
         <div style={{height:10}}/>
-        <div style={{fontSize:13,fontWeight:700,color:'#20489a',marginBottom:4}}>Tipo file</div>
+        <div style={{fontSize:13,fontWeight:700,color: coloreTema,marginBottom:4}}>Tipo file</div>
         <select
           value={filtroTipo}
           onChange={e => setFiltroTipo(e.target.value)}
-          style={{...selectStyle, width:'100%'}}
+          style={{...selectStyle, width:'100%', borderColor: coloreTema}}
         >
           <option value="">Tutti i tipi</option>
-          {tipi.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+          <option value="pdf">PDF</option>
+          <option value="doc">DOC</option>
+          <option value="docx">DOCX</option>
+          <option value="xls">XLS</option>
+          <option value="xlsx">XLSX</option>
+          <option value="ppt">PPT</option>
+          <option value="pptx">PPTX</option>
+          <option value="png">PNG</option>
+          <option value="jpg">JPG</option>
+          <option value="jpeg">JPEG</option>
+          <option value="gif">GIF</option>
+          <option value="bmp">BMP</option>
+          <option value="webp">WEBP</option>
+          <option value="svg">SVG</option>
+          <option value="zip">ZIP</option>
+          <option value="rar">RAR</option>
+          <option value="txt">TXT</option>
+          <option value="csv">CSV</option>
         </select>
         <div style={{height:6}}/>
         <button
-          style={{...btnPrimary, background: coloreTema, width:'100%'}}
+          style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`, width:'100%'}}
           onClick={()=>{ /* i filtri sono live; bottone solo per UX */ }}
         >Visualizza</button>
       </div>
@@ -513,8 +598,11 @@ export default function AulaContent({ initialClienteId = null }) {
   return (
     <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
       <Navbar />
-      {/* HEADER stile classroom */}
-      <header style={headerStyle}>
+      {/* HEADER stile classroom con gradiente coloreTema */}
+      <header style={{
+        ...headerStyle, 
+        background: `linear-gradient(135deg, ${coloreTema} 0%, ${adjustColorBrightness(coloreTema, -30)} 100%)`
+      }}>
         <div style={headerBanner}>
           <div style={{ fontSize:32, fontWeight:800, color:"#fff" }}>
             {titoloAula}
@@ -572,30 +660,6 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           )}
 
-          {/* VIDEO LEZIONE BUTTON - a sinistra sopra i tag/filtri */}
-          {targetClienteId && studenteCorrente && (
-            <div style={{ display:"flex", justifyContent:"flex-start", marginBottom: 10 }}>
-              <button
-                style={videoLinkButton}
-                onClick={() => {
-                  const link = studenteCorrente.linkVideolezione;
-                  if (link) {
-                    window.open(link, '_blank', 'noopener,noreferrer');
-                  } else {
-                    alert('Link videolezione non configurato per questo studente');
-                  }
-                }}
-                title="Apri videolezione"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                </svg>
-                <span>Apri videolezione</span>
-              </button>
-            </div>
-          )}
-
           {/* BAR: solo azioni principali */}
           <div style={barFlex}>
             {targetClienteId && (
@@ -626,14 +690,14 @@ export default function AulaContent({ initialClienteId = null }) {
           <div style={streamWrap}>
             {grouped.map(([giorno, materiali]) => (
               <React.Fragment key={giorno}>
-                <div style={dayHeaderStyle}>{formatDayHeader(giorno)}</div>
+                <div style={{...dayHeaderStyle, color: coloreTema}}>{formatDayHeader(giorno)}</div>
                 {materiali.map(m => (
                   <div key={m.id} style={streamCard}>
                     <div style={streamCardHead}>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <h3 style={streamCardTitle}>{m.titolo}</h3>
+                        <h3 style={{...streamCardTitle, color: coloreTema}}>{m.titolo}</h3>
                         {m.sezione && (
-                          <span style={badgeTipo(m.sezione)}>{String(m.sezione).toUpperCase()}</span>
+                          <span style={{...badgeTipo(m.sezione), background: coloreTema}}>{String(m.sezione).toUpperCase()}</span>
                         )}
                       </div>
                       {isAdmin && (
@@ -682,6 +746,7 @@ export default function AulaContent({ initialClienteId = null }) {
                         lista={commenti[m.id] || []}
                         user={session?.user}
                         addCommento={addCommento}
+                        coloreTema={coloreTema}
                       />
                     </div>
                   </div>
@@ -698,11 +763,11 @@ export default function AulaContent({ initialClienteId = null }) {
       {previewItem && (
         <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100}} onClick={() => setPreviewItem(null)}>
           <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'90%',maxHeight:'90%',width:900,overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:'1px solid #eef3ff'}}>
-              <div style={{fontWeight:700,color:'#20489a'}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`}}>
+              <div style={{fontWeight:700,color: coloreTema}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
               <div>
                 <a href={`/api/materiale?fileId=${previewItem.id}`} style={{...btnGhost, marginRight:8}} download={previewItem.nomeOriginale}>Scarica</a>
-                <button type="button" style={btnOutline} onClick={() => setPreviewItem(null)}>Chiudi</button>
+                <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewItem(null)}>Chiudi</button>
               </div>
             </div>
             <div style={{padding:16,display:'flex',alignItems:'center',justifyContent:'center',height:'calc(100% - 64px)'}}>
@@ -717,10 +782,10 @@ export default function AulaContent({ initialClienteId = null }) {
                 // other files: show icon + info
                 return (
                   <div style={{textAlign:'center'}}>
-                    <div style={{fontSize:64,fontWeight:700,color:'#20489a',marginBottom:12}}>{previewItem.tipo ? previewItem.tipo.toUpperCase() : 'FILE'}</div>
+                    <div style={{fontSize:64,fontWeight:700,color: coloreTema,marginBottom:12}}>{previewItem.tipo ? previewItem.tipo.toUpperCase() : 'FILE'}</div>
                     <div style={{marginBottom:8,fontWeight:700}}>{previewItem.nomeOriginale || previewItem.titolo}</div>
                     <div style={{color:'#6b7b9a',marginBottom:12}}>{previewItem.materia}</div>
-                    <a href={`/api/materiale?fileId=${previewItem.id}`} download={previewItem.nomeOriginale} style={btnPrimary}>Scarica file</a>
+                    <a href={`/api/materiale?fileId=${previewItem.id}`} download={previewItem.nomeOriginale} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>Scarica file</a>
                   </div>
                 );
               })()}
@@ -734,45 +799,49 @@ export default function AulaContent({ initialClienteId = null }) {
         onUploaded={() => targetClienteId ? fetchMateriali(targetClienteId) : undefined}
         clienteId={targetClienteId}
         materieStudente={materieStudente}
+        coloreTema={coloreTema}
       />
 
       {/* MODALE VOTI */}
       {showVoto && (
         <div style={{position:'fixed',inset:0,background:'rgba(32,72,154,0.15)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
           <div style={{background:'#fff',borderRadius:14,padding:22,minWidth:320,boxShadow:'0 8px 28px #2563eb35'}}>
-            <h3 style={{marginTop:0,marginBottom:14,color:'#20489a'}}>Registra voto</h3>
+            <h3 style={{marginTop:0,marginBottom:14,color: coloreTema}}>Registra voto</h3>
             <div style={{display:'grid',gap:10}}>
               <div>
-                <label style={{fontWeight:600,fontSize:14}}>Data</label>
-                <input type="date" value={votoData} onChange={e=>setVotoData(e.target.value)} style={inputStyle}/>
+                <label style={{fontWeight:600,fontSize:14,color: coloreTema}}>Data</label>
+                <input type="date" value={votoData} onChange={e=>setVotoData(e.target.value)} style={{...inputStyle, borderColor: coloreTema}}/>
               </div>
+              {materieSidebar.length > 1 && (
+                <div>
+                  <label style={{fontWeight:600,fontSize:14,color: coloreTema}}>Materia</label>
+                  <select value={votoMateria} onChange={e=>setVotoMateria(e.target.value)} style={{...inputStyle, borderColor: coloreTema}}>
+                    <option value="">- Seleziona -</option>
+                    {materieSidebar.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
-                <label style={{fontWeight:600,fontSize:14}}>Materia</label>
-                <select value={votoMateria} onChange={e=>setVotoMateria(e.target.value)} style={inputStyle}>
-                  <option value="">- Seleziona -</option>
-                  {materieSidebar.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{fontWeight:600,fontSize:14}}>Voto</label>
-                <input type="number" step="0.5" min="0" max="10" value={votoVal} onChange={e=>setVotoVal(e.target.value)} style={inputStyle}/>
+                <label style={{fontWeight:600,fontSize:14,color: coloreTema}}>Voto</label>
+                <input type="number" step="0.5" min="0" max="10" value={votoVal} onChange={e=>setVotoVal(e.target.value)} style={{...inputStyle, borderColor: coloreTema}}/>
               </div>
             </div>
             <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:14}}>
               <button style={btnGhost} onClick={()=>setShowVoto(false)}>Annulla</button>
               <button
-                style={{...btnPrimary, background: coloreTema}}
+                style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}
                 onClick={async ()=>{
                   if (!targetClienteId) return;
-                  if (!votoData || !votoMateria || !votoVal) { alert('Compila tutti i campi'); return; }
+                  const finalMateria = materieSidebar.length === 1 ? materieSidebar[0] : votoMateria;
+                  if (!votoData || !finalMateria || !votoVal) { alert('Compila tutti i campi'); return; }
                   // Crea un piccolo file testo JSON e usa la stessa API materiale con sezione=VOTI
-                  const payload = { data: votoData, materia: votoMateria, voto: votoVal };
+                  const payload = { data: votoData, materia: finalMateria, voto: votoVal };
                   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-                  const file = new File([blob], `voto_${votoData}_${votoMateria}.json`, { type: 'application/json' });
+                  const file = new File([blob], `voto_${votoData}_${finalMateria}.json`, { type: 'application/json' });
                   const fd = new FormData();
                   fd.append('file', file);
-                  fd.append('titolo', `Voto ${votoVal} · ${votoMateria} · ${votoData}`);
-                  fd.append('materia', votoMateria);
+                  fd.append('titolo', `Voto ${votoVal} · ${finalMateria} · ${votoData}`);
+                  fd.append('materia', finalMateria);
                   fd.append('sezione', 'VOTI');
                   fd.append('clienteId', targetClienteId);
                   const res = await fetch('/api/materiale', { method:'POST', body: fd });
@@ -807,7 +876,7 @@ function formatDayHeader(dateStr) {
 }
 
 // COMMENTI COMPONENT
-function CommentiBox({ materialeId, lista, addCommento, user }) {
+function CommentiBox({ materialeId, lista, addCommento, user, coloreTema = "#1cb0f6" }) {
   const [testo, setTesto] = useState("");
   function submitCommento(e) {
     e.preventDefault();
@@ -816,8 +885,8 @@ function CommentiBox({ materialeId, lista, addCommento, user }) {
     setTesto("");
   }
   return (
-    <div style={streamCommentBox}>
-      <div style={{marginBottom:3,fontWeight:700,color:"#20489a",fontSize:14}}>
+    <div style={{...streamCommentBox, borderColor: `${coloreTema}20`}}>
+      <div style={{marginBottom:3,fontWeight:700,color: coloreTema,fontSize:14}}>
         Commenti ({lista.length})
       </div>
       {lista.length === 0 && (
@@ -826,7 +895,7 @@ function CommentiBox({ materialeId, lista, addCommento, user }) {
       <div>
         {lista.map((c,i)=>(
           <div key={i} style={{marginBottom:7}}>
-            <span style={{fontWeight:600,color:"#20489a",fontSize:13}}>{c.autore}</span>
+            <span style={{fontWeight:600,color: coloreTema,fontSize:13}}>{c.autore}</span>
             <span style={{color:"#8399b2",fontSize:12,marginLeft:7}}>{formatAggDate(c.createdAt)}</span>
             <div style={{fontSize:13}}>{c.testo}</div>
           </div>
@@ -835,7 +904,7 @@ function CommentiBox({ materialeId, lista, addCommento, user }) {
       {user && (
         <form onSubmit={submitCommento} style={{display:"flex",gap:8,marginTop:8}}>
           <input
-            style={streamCommentInput}
+            style={{...streamCommentInput, color: coloreTema}}
             placeholder="Aggiungi un commento..."
             value={testo}
             onChange={e=>setTesto(e.target.value)}
@@ -843,7 +912,7 @@ function CommentiBox({ materialeId, lista, addCommento, user }) {
           />
           <button
             type="submit"
-            style={{...btnPrimary,padding:"7px 15px",fontSize:15,margin:0}}
+            style={{...btnPrimary,padding:"7px 15px",fontSize:15,margin:0, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}
             disabled={!testo.trim()}
             tabIndex={0}
           >Invia</button>
@@ -937,7 +1006,7 @@ const videoLinkBox = {
   justifyContent:"center"
 };
 const videoLinkButton = {
-  background:"linear-gradient(135deg, #1cb0f6 0%, #0891d1 100%)",
+  background:"#1cb0f6",
   color:"#fff",
   border:"none",
   borderRadius:14,
