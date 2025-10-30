@@ -2456,7 +2456,8 @@ export default function LavagnaCanvas({
 
   // Resample a polyline to approximately `target` points distributed along
   // arc-length. Keeps overall shape while capping point-count for performance.
-  function resamplePoints(points, target = 1500) {
+  const MAX_STROKE_POINTS = 4000;
+  function resamplePoints(points, target = MAX_STROKE_POINTS) {
     if (!Array.isArray(points) || points.length < 2) return points || [];
     if (points.length <= target) return points.slice();
     // compute cumulative distances
@@ -2516,7 +2517,7 @@ export default function LavagnaCanvas({
     // If the subdivision produced an extremely large number of points (e.g.
     // when input was already dense), resample down to a safe cap while
     // preserving arc-length distribution so we don't lose visual detail.
-    const capped = smoothed.length > 1500 ? resamplePoints(smoothed, 1500) : smoothed;
+    const capped = smoothed.length > MAX_STROKE_POINTS ? resamplePoints(smoothed, MAX_STROKE_POINTS) : smoothed;
     return capped;
   }
 
