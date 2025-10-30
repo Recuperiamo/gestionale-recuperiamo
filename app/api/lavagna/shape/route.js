@@ -18,6 +18,12 @@ export async function POST(req) {
       x, y, w, h,
       x1, y1, x2, y2,
       colore, spessore,
+      // images
+      src, srcPreview, materialeId, nomeOriginale,
+      // links
+      url, titolo,
+      // rotation
+      rotation,
       autoreUserId: bodyAutoreUserId
     } = body || {};
 
@@ -58,6 +64,13 @@ export async function POST(req) {
         x1, y1, x2, y2,
         colore: colore ?? null,
         spessore: spessore ?? null,
+        src: src ?? null,
+        srcPreview: srcPreview ?? null,
+        materialeId: materialeId ? Number(materialeId) : null,
+        nomeOriginale: nomeOriginale ?? null,
+        url: url ?? null,
+        titolo: titolo ?? null,
+        rotation: rotation ?? null,
         autoreUserId: autoreUserId ?? null
       },
       select: {
@@ -67,6 +80,9 @@ export async function POST(req) {
         x: true, y: true, w: true, h: true,
         x1: true, y1: true, x2: true, y2: true,
         colore: true, spessore: true,
+        src: true, srcPreview: true, materialeId: true, nomeOriginale: true,
+        url: true, titolo: true,
+        rotation: true,
         autoreUserId: true,
         createdAt: true
       }

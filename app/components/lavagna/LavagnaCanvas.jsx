@@ -2230,11 +2230,11 @@ export default function LavagnaCanvas({
                     shape.h = desiredH;
                     shape.x = anchor.x - desiredW / 2;
                     shape.y = anchor.y - desiredH / 2;
-                    // update temp preview in-place to point to server URL
-                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h, x: shape.x, y: shape.y } : f));
-                    // persist shape on server and notify remote clients of server URL
+                    // update temp preview in-place to point to server URL, but keep srcPreview as fallback
+                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h, x: shape.x, y: shape.y } : f));
+                    // persist shape on server with srcPreview fallback and notify remote clients
                     try {
-                      const normalized = normalizeShape({ ...shape, id: tempId });
+                      const normalized = normalizeShape({ ...shape, id: tempId, srcPreview: savedPreview });
                       persistShape(normalized).then((s) => {
                         if (s && s.id) {
                           setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
@@ -2248,9 +2248,9 @@ export default function LavagnaCanvas({
                     drawAll();
                   };
                     img.onerror = async () => {
-                      setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
+                      setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
                       try {
-                        const normalized = normalizeShape({ ...shape, id: tempId });
+                        const normalized = normalizeShape({ ...shape, id: tempId, srcPreview: savedPreview });
                         persistShape(normalized).then((s) => {
                           if (s && s.id) {
                             setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));

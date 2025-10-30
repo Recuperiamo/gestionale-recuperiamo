@@ -317,6 +317,16 @@ model LavagnaShape {
   // Stile
   colore       String?
   spessore     Float?
+  // Immagini
+  src          String?   // URL o percorso immagine (es: /api/materiale?fileId=123)
+  srcPreview   String?   @db.Text // Base64 data URL per preview (fallback per client remoti)
+  materialeId  Int?      // ID del materiale collegato
+  nomeOriginale String?  // Nome originale del file
+  // Link
+  url          String?
+  titolo       String?
+  // Rotazione
+  rotation     Float?
   // Autore e auditing
   autoreUserId Int?
   createdAt    DateTime  @default(now())

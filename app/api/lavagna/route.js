@@ -123,6 +123,13 @@ export async function GET(req) {
             y2: true,
             colore: true,
             spessore: true,
+            src: true,
+            srcPreview: true,
+            materialeId: true,
+            nomeOriginale: true,
+            url: true,
+            titolo: true,
+            rotation: true,
             autoreUserId: true,
             createdAt: true
           }
