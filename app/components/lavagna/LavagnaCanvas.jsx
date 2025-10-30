@@ -837,6 +837,45 @@ export default function LavagnaCanvas({
             ctx.arc(lockX + shackleW / 2, lockBodyY, shackleW / 2, Math.PI, 0, false);
             ctx.stroke();
           }
+          
+          // Draw rotation button to the right of lock icon - much easier to use!
+          const rotateSize = 30 / safeZoom;
+          const rotateX = lockX + lockSize/2 + rotateSize/2 + 8 / safeZoom;
+          const rotateY = lockY + lockSize/2;
+          
+          // Rotation button background (circular)
+          ctx.fillStyle = '#2563eb';
+          ctx.beginPath();
+          ctx.arc(rotateX, rotateY, rotateSize/2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Rotation icon - circular arrow
+          ctx.strokeStyle = '#ffffff';
+          ctx.fillStyle = '#ffffff';
+          ctx.lineWidth = 2.5 / safeZoom;
+          const arcR = 9 / safeZoom;
+          const startA = Math.PI * 0.25;
+          const endA = Math.PI * 2.25;
+          ctx.beginPath();
+          ctx.arc(rotateX, rotateY, arcR, startA, endA, false);
+          ctx.stroke();
+          // Arrow head
+          const ex = rotateX + arcR * Math.cos(endA);
+          const ey = rotateY + arcR * Math.sin(endA);
+          const headLen = 6 / safeZoom;
+          const ang = Math.atan2(ey - rotateY, ex - rotateX);
+          ctx.beginPath();
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(
+            ex - headLen * Math.cos(ang) + headLen * 0.5 * Math.sin(ang),
+            ey - headLen * Math.sin(ang) - headLen * 0.5 * Math.cos(ang)
+          );
+          ctx.lineTo(
+            ex - headLen * Math.cos(ang) - headLen * 0.5 * Math.sin(ang),
+            ey - headLen * Math.sin(ang) + headLen * 0.5 * Math.cos(ang)
+          );
+          ctx.closePath();
+          ctx.fill();
         }
       }
       ctx.restore();
@@ -1367,7 +1406,8 @@ export default function LavagnaCanvas({
     previewShapeRef.current = null;
     drawingShapeRef.current = false;
     erasingRef.current = false;
-    imageCacheRef.current?.clear?.();
+    // DON'T clear image cache - keep images loaded in memory
+    // imageCacheRef.current?.clear?.();
     setSelectedItems({ tratti: [], forme: [] });
     setSelectionBox(null);
     setTratti([]);
@@ -3248,25 +3288,23 @@ export default function LavagnaCanvas({
           }
         }
         
-        // If there is already a selection and the pointer is on one of the
-        // selection corners, begin rotation around the SELECTION CENTER.
+        // Check if user clicked on rotation button (easier to use than corners!)
         if (selBounds) {
-          const corners = [
-            { x: selBounds.minX, y: selBounds.minY },
-            { x: selBounds.maxX, y: selBounds.minY },
-            { x: selBounds.minX, y: selBounds.maxY },
-            { x: selBounds.maxX, y: selBounds.maxY }
-          ];
-          const tol = Math.max(10, 12 / (zoom || 1));
-          let hitCorner = -1;
-          for (let i = 0; i < corners.length; i++) {
-            const c = corners[i];
-            const dx = p.x - c.x;
-            const dy = p.y - c.y;
-            if (Math.hypot(dx, dy) <= tol) { hitCorner = i; break; }
-          }
-          if (hitCorner >= 0) {
-            // start rotating around selection center
+          const width = selBounds.maxX - selBounds.minX;
+          const padding = 6 / (zoom || 1);
+          const lockSize = 24 / (zoom || 1);
+          const lockX = selBounds.minX + width / 2;
+          const lockY = selBounds.minY - padding - lockSize - 8 / (zoom || 1);
+          const rotateSize = 30 / (zoom || 1);
+          const rotateX = lockX + lockSize/2 + rotateSize/2 + 8 / (zoom || 1);
+          const rotateY = lockY + lockSize/2;
+          
+          const dx = p.x - rotateX;
+          const dy = p.y - rotateY;
+          const dist = Math.hypot(dx, dy);
+          
+          if (dist <= rotateSize/2) {
+            // Clicked on rotation button - start rotating!
             rotatingRef.current.active = true;
             const center = { x: (selBounds.minX + selBounds.maxX) / 2, y: (selBounds.minY + selBounds.maxY) / 2 };
             rotatingRef.current.center = center;
@@ -3278,10 +3316,12 @@ export default function LavagnaCanvas({
             }
             rotatingRef.current.originals = originals;
             try { canvas?.setPointerCapture?.(pointerId); } catch(_){}
-            try { console.log('[LAVAGNA-DBG] start-rotation around center', center); } catch(_){}
+            try { console.log('[LAVAGNA-DBG] start-rotation via button', center); } catch(_){}
             return;
           }
         }
+        
+        // REMOVED: old corner-based rotation detection (too hard to use)
 
         selectingRef.current = selectingRef.current || {};
         selectingRef.current.active = true;
