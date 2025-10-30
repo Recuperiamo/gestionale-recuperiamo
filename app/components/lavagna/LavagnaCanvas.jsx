@@ -2157,10 +2157,14 @@ export default function LavagnaCanvas({
               const tempSrc = URL.createObjectURL(file);
               const tempId = insertLocalPastedImage(tempSrc);
 
+              // Store preview for later use in updates
+              let savedPreview = null;
+
               // Immediately create and emit a preview for remote clients
               (async () => {
                 try {
                   const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
+                  savedPreview = srcPreview; // Save for later updates
                   const previewShape = {
                     id: tempId,
                     kind: 'immagine',
@@ -2180,6 +2184,9 @@ export default function LavagnaCanvas({
               // Upload in background; when done, replace temp shape with persisted one
               (async () => {
                 try {
+                  // Wait a bit for preview to be generated
+                  await new Promise(r => setTimeout(r, 100));
+                  
                   const fd = new FormData();
                   const titolo = `incollato_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'_')}`;
                   fd.append('file', file);
@@ -2233,8 +2240,8 @@ export default function LavagnaCanvas({
                           setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
                         }
                       }).catch(()=>{});
-                      // Notify remote clients that a persisted server URL is available
-                      emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, materialeId: mat.id, w: shape.w, h: shape.h, x: shape.x, y: shape.y });
+                      // Notify remote clients that a persisted server URL is available, but include preview fallback
+                      emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id, w: shape.w, h: shape.h, x: shape.x, y: shape.y });
                     } catch (_) {}
                     // revoke temp URL
                     try { URL.revokeObjectURL(tempSrc); } catch(_) {}
@@ -2249,8 +2256,8 @@ export default function LavagnaCanvas({
                             setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
                           }
                         }).catch(()=>{});
-                        // Notify remote clients that a persisted server URL is available
-                        emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, materialeId: mat.id });
+                        // Notify remote clients that a persisted server URL is available, but include preview fallback
+                        emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id });
                       } catch (_) {}
                       try { URL.revokeObjectURL(tempSrc); } catch(_) {}
                       drawAll();
@@ -3240,7 +3247,33 @@ export default function LavagnaCanvas({
             return;
           }
           
-          // Check if the user clicked on a resize handle
+          // Check rotation button FIRST (before resize handles)
+          const rotateSize = 30 / (zoom || 1);
+          const rotateX = lockX + lockSize/2 + rotateSize/2 + 8 / (zoom || 1);
+          const rotateY = lockY + lockSize/2;
+          
+          const rotDx = p.x - rotateX;
+          const rotDy = p.y - rotateY;
+          const rotDist = Math.hypot(rotDx, rotDy);
+          
+          if (rotDist <= rotateSize/2) {
+            // Clicked on rotation button - start rotating!
+            rotatingRef.current.active = true;
+            const center = { x: (selBounds.minX + selBounds.maxX) / 2, y: (selBounds.minY + selBounds.maxY) / 2 };
+            rotatingRef.current.center = center;
+            rotatingRef.current.startAngle = Math.atan2(p.y - center.y, p.x - center.x);
+            const originals = {};
+            for (const id of (selectedItems.forme || [])) {
+              const f = (forme || []).find(s => s.id === id);
+              originals[id] = (f && typeof f.rotation === 'number') ? f.rotation : 0;
+            }
+            rotatingRef.current.originals = originals;
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_){}
+            try { console.log('[LAVAGNA-DBG] start-rotation via button', center); } catch(_){}
+            return;
+          }
+          
+          // Check if the user clicked on a resize handle (after rotation button check)
           const handleSize = 10 / (zoom || 1);
           const handleTol = Math.max(handleSize, 12 / (zoom || 1));
           const height = selBounds.maxY - selBounds.minY;
@@ -3288,41 +3321,7 @@ export default function LavagnaCanvas({
           }
         }
         
-        // Check if user clicked on rotation button (easier to use than corners!)
-        if (selBounds) {
-          const width = selBounds.maxX - selBounds.minX;
-          const padding = 6 / (zoom || 1);
-          const lockSize = 24 / (zoom || 1);
-          const lockX = selBounds.minX + width / 2;
-          const lockY = selBounds.minY - padding - lockSize - 8 / (zoom || 1);
-          const rotateSize = 30 / (zoom || 1);
-          const rotateX = lockX + lockSize/2 + rotateSize/2 + 8 / (zoom || 1);
-          const rotateY = lockY + lockSize/2;
-          
-          const dx = p.x - rotateX;
-          const dy = p.y - rotateY;
-          const dist = Math.hypot(dx, dy);
-          
-          if (dist <= rotateSize/2) {
-            // Clicked on rotation button - start rotating!
-            rotatingRef.current.active = true;
-            const center = { x: (selBounds.minX + selBounds.maxX) / 2, y: (selBounds.minY + selBounds.maxY) / 2 };
-            rotatingRef.current.center = center;
-            rotatingRef.current.startAngle = Math.atan2(p.y - center.y, p.x - center.x);
-            const originals = {};
-            for (const id of (selectedItems.forme || [])) {
-              const f = (forme || []).find(s => s.id === id);
-              originals[id] = (f && typeof f.rotation === 'number') ? f.rotation : 0;
-            }
-            rotatingRef.current.originals = originals;
-            try { canvas?.setPointerCapture?.(pointerId); } catch(_){}
-            try { console.log('[LAVAGNA-DBG] start-rotation via button', center); } catch(_){}
-            return;
-          }
-        }
-        
-        // REMOVED: old corner-based rotation detection (too hard to use)
-
+        // Start selection box
         selectingRef.current = selectingRef.current || {};
         selectingRef.current.active = true;
         selectingRef.current.start = p;
