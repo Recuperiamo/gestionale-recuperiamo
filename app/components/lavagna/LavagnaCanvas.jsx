@@ -2191,7 +2191,16 @@ export default function LavagnaCanvas({
                   const titolo = `incollato_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'_')}`;
                   fd.append('file', file);
                   fd.append('titolo', titolo);
-                  if (clienteId) fd.append('clienteId', clienteId);
+                  
+                  // clienteId is required by API - log if missing
+                  if (!clienteId) {
+                    console.error('[LAVAGNA-PASTE] clienteId missing! Cannot upload image.');
+                    console.warn('[lavagna] upload pasted image failed: clienteId required');
+                    return;
+                  }
+                  fd.append('clienteId', clienteId);
+                  console.log('[LAVAGNA-PASTE] Uploading with clienteId:', clienteId);
+                  
                   const res = await fetch('/api/materiale', { method: 'POST', body: fd });
                   const js = await res.json().catch(()=>null);
                   if (!res.ok || !js || !js.materiale) {

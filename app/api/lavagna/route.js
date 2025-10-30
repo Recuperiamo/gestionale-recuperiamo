@@ -156,6 +156,7 @@ export async function GET(req) {
       lavagna: {
         id: lavagna.id,
         attivitaId: lavagna.attivitaId,
+        clienteId: att.clienteId,
         titolo: lavagna.titolo,
         titoloVisuale,
         nomeStudente,
