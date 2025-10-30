@@ -101,7 +101,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
         <div style={{marginBottom:14}}>
           <input
             type="file"
-            accept=".pdf,.doc,.docx,.xlsx,.xls,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg,.zip,.rar,.txt,.csv"
+            accept=".pdf,.doc,.docx,.xlsx,.xls,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg,.txt,.csv"
             required
             multiple
             ref={fileInputRef}
@@ -109,7 +109,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
             style={{marginBottom:10}}
           />
           <div style={{fontSize:12,color:"#5a6d90",marginTop:4}}>
-            Tipi di file supportati: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, PNG, JPG, JPEG, GIF, BMP, WEBP, SVG, ZIP, RAR, TXT, CSV
+            Tipi di file supportati: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, PNG, JPG, JPEG, GIF, BMP, WEBP, SVG, TXT, CSV
           </div>
         </div>
         <div style={{marginBottom:12}}>
@@ -254,6 +254,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [votoData, setVotoData] = useState(() => new Date().toISOString().slice(0,10));
   const [votoMateria, setVotoMateria] = useState("");
   const [votoVal, setVotoVal] = useState("");
+  const [votoArgomento, setVotoArgomento] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
@@ -476,60 +477,116 @@ export default function AulaContent({ initialClienteId = null }) {
   // ---- SIDEBAR (desktop) con ricerca e filtri spostati a sinistra ----
   const sidebar = (
     <aside style={sidebarStyle}>
-      {/* VIDEO LEZIONE - sopra tutti i box */}
-      {targetClienteId && studenteCorrente && (
-        <button
-          style={{
-            ...videoLinkButton, 
-            background: coloreTema, 
-            boxShadow: `0 6px 20px ${coloreTema}40`,
-            width:'100%', 
-            justifyContent:'center', 
-            marginBottom:18
-          }}
-          onClick={() => {
-            const link = studenteCorrente.linkVideolezione;
-            if (link) {
-              window.open(link, '_blank', 'noopener,noreferrer');
-            } else {
-              alert('Link videolezione non configurato per questo studente');
-            }
-          }}
-          title="Apri videolezione"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="23 7 16 12 23 17 23 7"></polygon>
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-          </svg>
-          <span>Apri videolezione</span>
-        </button>
-      )}
-      {/* Materie */}
+      {/* TAG UNIFICATI */}
       <div style={sidebarBox}>
-        <div style={{fontWeight:700, color: coloreTema, marginBottom:6}}>Materie</div>
-        <button 
-          style={{
-            ...sidebarBtn, 
-            background: filtroMateria === "" ? coloreTema : `${coloreTema}15`,
-            color: filtroMateria === "" ? "#fff" : coloreTema
-          }} 
-          onClick={()=>setFiltroMateria("")}
-        >Tutte</button>
-        {materieSidebar.map(materia=>
-          <button 
-            key={materia} 
-            style={{
-              ...sidebarBtn, 
-              background: filtroMateria === materia ? coloreTema : `${coloreTema}15`,
-              color: filtroMateria === materia ? "#fff" : coloreTema
-            }} 
-            onClick={()=>setFiltroMateria(materia)}
-          >{materia}</button>
+        <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Tag</div>
+        
+        {/* Sezioni */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#5a6d90",marginBottom:6}}>SEZIONI</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {["materiale", "compiti", "voti"].map(sez => {
+              const isActive = activeTab === sez;
+              return (
+                <button
+                  key={sez}
+                  onClick={() => setActiveTab(sez)}
+                  style={{
+                    ...tagButton,
+                    background: isActive ? coloreTema : `${coloreTema}15`,
+                    color: isActive ? "#fff" : coloreTema,
+                    borderColor: isActive ? coloreTema : `${coloreTema}40`
+                  }}
+                >
+                  {sez.charAt(0).toUpperCase() + sez.slice(1)}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setActiveTab("bacheca")}
+              style={{
+                ...tagButton,
+                background: activeTab === "bacheca" ? coloreTema : `${coloreTema}15`,
+                color: activeTab === "bacheca" ? "#fff" : coloreTema,
+                borderColor: activeTab === "bacheca" ? coloreTema : `${coloreTema}40`
+              }}
+            >
+              Tutto
+            </button>
+          </div>
+        </div>
+
+        {/* Materie */}
+        {materieSidebar.length > 0 && (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#5a6d90",marginBottom:6}}>MATERIE</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              <button
+                onClick={() => setFiltroMateria("")}
+                style={{
+                  ...tagButton,
+                  background: filtroMateria === "" ? coloreTema : `${coloreTema}15`,
+                  color: filtroMateria === "" ? "#fff" : coloreTema,
+                  borderColor: filtroMateria === "" ? coloreTema : `${coloreTema}40`
+                }}
+              >
+                Tutte
+              </button>
+              {materieSidebar.map(materia => (
+                <button
+                  key={materia}
+                  onClick={() => setFiltroMateria(materia)}
+                  style={{
+                    ...tagButton,
+                    background: filtroMateria === materia ? coloreTema : `${coloreTema}15`,
+                    color: filtroMateria === materia ? "#fff" : coloreTema,
+                    borderColor: filtroMateria === materia ? coloreTema : `${coloreTema}40`
+                  }}
+                >
+                  {materia}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tipi di file */}
+        {tipi.length > 0 && (
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"#5a6d90",marginBottom:6}}>TIPI FILE</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              <button
+                onClick={() => setFiltroTipo("")}
+                style={{
+                  ...tagButton,
+                  background: filtroTipo === "" ? coloreTema : `${coloreTema}15`,
+                  color: filtroTipo === "" ? "#fff" : coloreTema,
+                  borderColor: filtroTipo === "" ? coloreTema : `${coloreTema}40`
+                }}
+              >
+                Tutti
+              </button>
+              {tipi.map(tipo => (
+                <button
+                  key={tipo}
+                  onClick={() => setFiltroTipo(tipo)}
+                  style={{
+                    ...tagButton,
+                    background: filtroTipo === tipo ? coloreTema : `${coloreTema}15`,
+                    color: filtroTipo === tipo ? "#fff" : coloreTema,
+                    borderColor: filtroTipo === tipo ? coloreTema : `${coloreTema}40`
+                  }}
+                >
+                  {tipo.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
       {/* Ricerca e filtri */}
       <div style={sidebarBox}>
-        <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Ricerca e filtri</div>
+        <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Ricerca</div>
         <input
           placeholder="Cerca titolo o materia..."
           value={search}
@@ -537,49 +594,10 @@ export default function AulaContent({ initialClienteId = null }) {
           style={{...searchInput, width:'100%', borderColor: coloreTema}}
         />
         <div style={{height:10}}/>
-        <div style={{fontSize:13,fontWeight:700,color: coloreTema,marginBottom:4}}>Sezione</div>
-        <select
-          value={activeTab}
-          onChange={e=>setActiveTab(e.target.value)}
-          style={{...selectStyle, width:'100%', borderColor: coloreTema}}
-        >
-          <option value="bacheca">Bacheca (tutto)</option>
-          <option value="materiale">Materiale</option>
-          <option value="compiti">Compiti</option>
-          <option value="voti">Voti</option>
-        </select>
-        <div style={{height:10}}/>
-        <div style={{fontSize:13,fontWeight:700,color: coloreTema,marginBottom:4}}>Tipo file</div>
-        <select
-          value={filtroTipo}
-          onChange={e => setFiltroTipo(e.target.value)}
-          style={{...selectStyle, width:'100%', borderColor: coloreTema}}
-        >
-          <option value="">Tutti i tipi</option>
-          <option value="pdf">PDF</option>
-          <option value="doc">DOC</option>
-          <option value="docx">DOCX</option>
-          <option value="xls">XLS</option>
-          <option value="xlsx">XLSX</option>
-          <option value="ppt">PPT</option>
-          <option value="pptx">PPTX</option>
-          <option value="png">PNG</option>
-          <option value="jpg">JPG</option>
-          <option value="jpeg">JPEG</option>
-          <option value="gif">GIF</option>
-          <option value="bmp">BMP</option>
-          <option value="webp">WEBP</option>
-          <option value="svg">SVG</option>
-          <option value="zip">ZIP</option>
-          <option value="rar">RAR</option>
-          <option value="txt">TXT</option>
-          <option value="csv">CSV</option>
-        </select>
-        <div style={{height:6}}/>
         <button
           style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`, width:'100%'}}
           onClick={()=>{ /* i filtri sono live; bottone solo per UX */ }}
-        >Visualizza</button>
+        >Cerca</button>
       </div>
     </aside>
   );
@@ -623,16 +641,18 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           ) : (
             <>
-          {/* TABS CLASSROOM */}
+          {/* TABS CLASSROOM con bottone videolezione */}
           {targetClienteId && (
             <div style={{
               display: "flex",
-              gap: "8px",
+              justifyContent: "space-between",
+              alignItems: "center",
               marginTop: "24px",
               marginBottom: "8px",
               borderBottom: "2px solid #e0e4f0",
               paddingBottom: "0"
             }}>
+              <div style={{display: "flex", gap: "8px"}}>
                 {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
@@ -657,6 +677,36 @@ export default function AulaContent({ initialClienteId = null }) {
                     </button>
                   );
                 })}
+              </div>
+              
+              {/* Bottone videolezione allineato a destra delle tabs */}
+              {studenteCorrente && (
+                <button
+                  style={{
+                    ...videoLinkButton, 
+                    background: coloreTema, 
+                    boxShadow: `0 4px 12px ${coloreTema}40`,
+                    padding: "10px 20px",
+                    fontSize: 14,
+                    marginBottom: "-2px"
+                  }}
+                  onClick={() => {
+                    const link = studenteCorrente.linkVideolezione;
+                    if (link) {
+                      window.open(link, '_blank', 'noopener,noreferrer');
+                    } else {
+                      alert('Link videolezione non configurato per questo studente');
+                    }
+                  }}
+                  title="Apri videolezione"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                  </svg>
+                  <span>Videolezione</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -822,6 +872,16 @@ export default function AulaContent({ initialClienteId = null }) {
                 </div>
               )}
               <div>
+                <label style={{fontWeight:600,fontSize:14,color: coloreTema}}>Argomento</label>
+                <input 
+                  type="text" 
+                  placeholder="Es: Equazioni di secondo grado, Guerra Fredda..." 
+                  value={votoArgomento} 
+                  onChange={e=>setVotoArgomento(e.target.value)} 
+                  style={{...inputStyle, borderColor: coloreTema}}
+                />
+              </div>
+              <div>
                 <label style={{fontWeight:600,fontSize:14,color: coloreTema}}>Voto</label>
                 <input type="number" step="0.5" min="0" max="10" value={votoVal} onChange={e=>setVotoVal(e.target.value)} style={{...inputStyle, borderColor: coloreTema}}/>
               </div>
@@ -833,20 +893,24 @@ export default function AulaContent({ initialClienteId = null }) {
                 onClick={async ()=>{
                   if (!targetClienteId) return;
                   const finalMateria = materieSidebar.length === 1 ? materieSidebar[0] : votoMateria;
-                  if (!votoData || !finalMateria || !votoVal) { alert('Compila tutti i campi'); return; }
+                  if (!votoData || !finalMateria || !votoVal) { alert('Compila tutti i campi obbligatori'); return; }
                   // Crea un piccolo file testo JSON e usa la stessa API materiale con sezione=VOTI
-                  const payload = { data: votoData, materia: finalMateria, voto: votoVal };
+                  const payload = { data: votoData, materia: finalMateria, voto: votoVal, argomento: votoArgomento || '' };
                   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
                   const file = new File([blob], `voto_${votoData}_${finalMateria}.json`, { type: 'application/json' });
                   const fd = new FormData();
                   fd.append('file', file);
-                  fd.append('titolo', `Voto ${votoVal} · ${finalMateria} · ${votoData}`);
+                  const titoloVoto = votoArgomento 
+                    ? `Voto ${votoVal} · ${finalMateria} · ${votoArgomento} · ${votoData}`
+                    : `Voto ${votoVal} · ${finalMateria} · ${votoData}`;
+                  fd.append('titolo', titoloVoto);
                   fd.append('materia', finalMateria);
                   fd.append('sezione', 'VOTI');
                   fd.append('clienteId', targetClienteId);
                   const res = await fetch('/api/materiale', { method:'POST', body: fd });
                   if (!res.ok) { alert('Errore salvataggio voto'); return; }
                   setShowVoto(false);
+                  setVotoArgomento('');
                   fetchMateriali(targetClienteId);
                 }}
               >Salva voto</button>
@@ -1095,4 +1159,14 @@ const streamCommentInput = {
   fontSize:15,
   color:"#20489a",
   outline:"none"
+};
+const tagButton = {
+  padding:"6px 12px",
+  borderRadius:20,
+  border:"1.5px solid",
+  fontSize:13,
+  fontWeight:600,
+  cursor:"pointer",
+  transition:"all 0.2s ease",
+  whiteSpace:"nowrap"
 };
