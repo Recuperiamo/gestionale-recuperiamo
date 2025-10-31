@@ -303,70 +303,73 @@ export default function PacchettiLezioniPage() {
       doc.setFontSize(18);
       doc.setFont(undefined, 'bold');
       doc.text("Pacchetti & Lezioni", 14, y);
-      y += 10;
+      y += 12;
       
       // Informazioni filtri
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(80, 80, 80);
       
       if (isAdmin) {
         if (filtroCliente) {
           const cli = clienti.find(c => c.id === parseInt(filtroCliente));
           if (cli) {
-            doc.text(`Cliente: ${cli.nomeReferente || cli.email}`, 14, y);
-            y += 5;
+            doc.setFont(undefined, 'bold');
+            doc.text(`Cliente: `, 14, y);
+            doc.setFont(undefined, 'normal');
+            doc.text(cli.nomeReferente || cli.email, 33, y);
+            y += 6;
           }
         }
         if (filtroPacchetto) {
           const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
           if (pac) {
-            doc.text(`Pacchetto: ${pac.titolo || pac.id}`, 14, y);
-            y += 5;
+            doc.setFont(undefined, 'bold');
+            doc.text(`Nome Pacchetto: `, 14, y);
+            doc.setFont(undefined, 'normal');
+            doc.text(pac.titolo || `Pacchetto #${pac.id}`, 46, y);
+            y += 6;
           }
         }
         if (filtroAdminDa || filtroAdminA) {
-          doc.text(`Periodo: ${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 14, y);
-          y += 5;
-        }
-        if (ordinamento) {
-          doc.text(`Ordinamento: ${ordinamento}`, 14, y);
-          y += 5;
+          doc.setFont(undefined, 'bold');
+          doc.text(`Periodo: `, 14, y);
+          doc.setFont(undefined, 'normal');
+          doc.text(`${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 33, y);
+          y += 6;
         }
       } else {
         if (filtroTipologia) {
-          doc.text(`Tipologia: ${filtroTipologia}`, 14, y);
-          y += 5;
+          doc.setFont(undefined, 'bold');
+          doc.text(`Tipologia: `, 14, y);
+          doc.setFont(undefined, 'normal');
+          doc.text(filtroTipologia, 38, y);
+          y += 6;
         }
         if (filtroDataDa || filtroDataA) {
-          doc.text(`Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 14, y);
-          y += 5;
+          doc.setFont(undefined, 'bold');
+          doc.text(`Periodo: `, 14, y);
+          doc.setFont(undefined, 'normal');
+          doc.text(`${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 33, y);
+          y += 6;
         }
       }
       
       doc.setTextColor(0, 0, 0);
       y += 5;
       
+      // Funzione helper per verificare se c'è almeno una lezione riprogrammata
+      const hasRiprogrammate = (attivitaList) => {
+        return attivitaList.some(a => isModificata(a));
+      };
+      
       // Funzione helper per creare le righe della tabella
-      const createTableRows = (attivitaList) => {
+      const createTableRows = (attivitaList, includeRiprogrammata) => {
         return attivitaList.map(a => {
           const row = [];
           
           // Data/Ora
           row.push(formatDate(a));
-          
-          // Cliente (solo admin)
-          if (isAdmin) {
-            row.push(a.cliente?.nomeReferente || a.cliente?.email || "—");
-          }
-          
-          // Pacchetto
-          row.push(a.pacchetto?.titolo || "—");
-          
-          // Descrizione (solo admin)
-          if (isAdmin) {
-            row.push(a.descrizione || `Lezione #${a.id}`);
-          }
           
           // Ore
           row.push(String(a.oreConsumate ?? a.durataOre ?? "—"));
@@ -374,145 +377,107 @@ export default function PacchettiLezioniPage() {
           // Stato
           row.push(displayStato(a));
           
-          // Note riprogrammazione
-          if (isModificata(a)) {
-            row.push(`${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}`);
-          } else {
-            row.push("—");
+          // Note riprogrammazione (solo se la colonna è inclusa)
+          if (includeRiprogrammata) {
+            if (isModificata(a)) {
+              const oldDate = formatDateFromValue(a.orarioOriginale);
+              const newDate = formatDateFromValue(a.orario);
+              row.push(`${oldDate}\n→ ${newDate}`);
+            } else {
+              row.push("—");
+            }
           }
           
           return row;
         });
       };
       
-      // Headers
-      const headers = isAdmin 
-        ? ["Data/Ora", "Cliente", "Pacchetto", "Descrizione", "Ore", "Stato", "Riprogrammata"]
-        : ["Data/Ora", "Pacchetto", "Ore", "Stato", "Riprogrammata"];
+      // Funzione per creare tabella con headers dinamici
+      const createTable = (attivitaList, startY, color, sectionTitle) => {
+        const hasRipr = hasRiprogrammate(attivitaList);
+        const headers = hasRipr 
+          ? ["Data/Ora", "Ore", "Stato", "Riprogrammata"]
+          : ["Data/Ora", "Ore", "Stato"];
+        
+        if (sectionTitle) {
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(color[0], color[1], color[2]);
+          doc.text(sectionTitle, 14, startY);
+          doc.setTextColor(0, 0, 0);
+          startY += 6;
+        }
+        
+        autoTable(doc, {
+          head: [headers],
+          body: createTableRows(attivitaList, hasRipr),
+          startY: startY,
+          styles: { 
+            fontSize: 9, 
+            cellPadding: 4,
+            lineColor: [220, 220, 220],
+            lineWidth: 0.1
+          },
+          headStyles: { 
+            fillColor: color, 
+            fontStyle: 'bold', 
+            fontSize: 10,
+            textColor: [255, 255, 255]
+          },
+          columnStyles: hasRipr ? {
+            0: { cellWidth: 45 },
+            1: { cellWidth: 20, halign: 'center' },
+            2: { cellWidth: 30, halign: 'center' },
+            3: { cellWidth: 'auto' }
+          } : {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 25, halign: 'center' },
+            2: { cellWidth: 40, halign: 'center' }
+          },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: 14, right: 14 }
+        });
+        
+        return doc.lastAutoTable.finalY;
+      };
       
       // Se categoria specifica, esporta solo quella
       if (categoria === "prenotate") {
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text("Lezioni Prenotate", 14, y);
-        y += 8;
-        
-        autoTable(doc, {
-          head: [headers],
-          body: createTableRows(prenotate),
-          startY: y,
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
-          margin: { left: 14, right: 14 }
-        });
+        createTable(prenotate, y, [32, 72, 154], "LEZIONI PRENOTATE");
       } else if (categoria === "svolte") {
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text("Lezioni Svolte", 14, y);
-        y += 8;
-        
-        autoTable(doc, {
-          head: [headers],
-          body: createTableRows(svolte),
-          startY: y,
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
-          margin: { left: 14, right: 14 }
-        });
+        createTable(svolte, y, [18, 117, 58], "LEZIONI SVOLTE");
       } else if (categoria === "cancellate") {
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text("Lezioni Cancellate", 14, y);
-        y += 8;
-        
-        autoTable(doc, {
-          head: [headers],
-          body: createTableRows(cancellate),
-          startY: y,
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
-          margin: { left: 14, right: 14 }
-        });
+        createTable(cancellate, y, [153, 27, 27], "LEZIONI CANCELLATE");
       } else {
         // Export tutte le sezioni separate
         
         // Sezione Prenotate
         if (prenotate.length > 0) {
-          doc.setFontSize(12);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(32, 72, 154);
-          doc.text("LEZIONI PRENOTATE", 14, y);
-          doc.setTextColor(0, 0, 0);
-          y += 6;
-          
-          autoTable(doc, {
-            head: [headers],
-            body: createTableRows(prenotate),
-            startY: y,
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
-            alternateRowStyles: { fillColor: [245, 247, 250] },
-            margin: { left: 14, right: 14 }
-          });
-          
-          y = doc.lastAutoTable.finalY + 15;
+          y = createTable(prenotate, y, [32, 72, 154], "LEZIONI PRENOTATE");
+          y += 15;
         }
         
         // Sezione Svolte
         if (svolte.length > 0) {
           // Nuova pagina se necessario
-          if (y > 250) {
+          if (y > 240) {
             doc.addPage();
             y = 20;
           }
           
-          doc.setFontSize(12);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(18, 117, 58);
-          doc.text("LEZIONI SVOLTE", 14, y);
-          doc.setTextColor(0, 0, 0);
-          y += 6;
-          
-          autoTable(doc, {
-            head: [headers],
-            body: createTableRows(svolte),
-            startY: y,
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [18, 117, 58], fontStyle: 'bold', fontSize: 9 },
-            alternateRowStyles: { fillColor: [245, 247, 250] },
-            margin: { left: 14, right: 14 }
-          });
-          
-          y = doc.lastAutoTable.finalY + 15;
+          y = createTable(svolte, y, [18, 117, 58], "LEZIONI SVOLTE");
+          y += 15;
         }
         
         // Sezione Cancellate
         if (cancellate.length > 0) {
           // Nuova pagina se necessario
-          if (y > 250) {
+          if (y > 240) {
             doc.addPage();
             y = 20;
           }
           
-          doc.setFontSize(12);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(153, 27, 27);
-          doc.text("LEZIONI CANCELLATE", 14, y);
-          doc.setTextColor(0, 0, 0);
-          y += 6;
-          
-          autoTable(doc, {
-            head: [headers],
-            body: createTableRows(cancellate),
-            startY: y,
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [153, 27, 27], fontStyle: 'bold', fontSize: 9 },
-            alternateRowStyles: { fillColor: [245, 247, 250] },
-            margin: { left: 14, right: 14 }
-          });
+          createTable(cancellate, y, [153, 27, 27], "LEZIONI CANCELLATE");
         }
       }
       
