@@ -290,25 +290,26 @@ export default function PacchettiLezioniPage() {
     console.log("exportToPDF chiamata, categoria:", categoria);
     console.log("prenotate:", prenotate?.length, "svolte:", svolte?.length, "cancellate:", cancellate?.length);
     
-    const doc = new jsPDF();
-    let dataToExport = [];
-    let title = "Pacchetti e Lezioni";
-    
-    if (categoria === "prenotate") {
-      dataToExport = prenotate;
-      title = "Lezioni Prenotate";
-    } else if (categoria === "svolte") {
-      dataToExport = svolte;
-      title = "Lezioni Svolte";
-    } else if (categoria === "cancellate") {
-      dataToExport = cancellate;
-      title = "Lezioni Cancellate";
-    } else {
-      dataToExport = [...prenotate, ...svolte, ...cancellate];
-    }
-    
-    doc.setFontSize(16);
-    doc.text(title, 14, 15);
+    try {
+      const doc = new jsPDF();
+      let dataToExport = [];
+      let title = "Pacchetti e Lezioni";
+      
+      if (categoria === "prenotate") {
+        dataToExport = prenotate;
+        title = "Lezioni Prenotate";
+      } else if (categoria === "svolte") {
+        dataToExport = svolte;
+        title = "Lezioni Svolte";
+      } else if (categoria === "cancellate") {
+        dataToExport = cancellate;
+        title = "Lezioni Cancellate";
+      } else {
+        dataToExport = [...prenotate, ...svolte, ...cancellate];
+      }
+      
+      doc.setFontSize(16);
+      doc.text(title, 14, 15);
     
     let y = 25;
     if (isAdmin) {
@@ -361,28 +362,33 @@ export default function PacchettiLezioniPage() {
     
     const fileName = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.pdf` : `lezioni_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
+    } catch (err) {
+      console.error("Errore export PDF:", err);
+      alert("Errore durante l'export PDF: " + err.message);
+    }
   }
 
   function exportToTXT(categoria = null) {
     console.log("exportToTXT chiamata, categoria:", categoria);
     
-    let dataToExport = [];
-    let title = "Pacchetti e Lezioni";
-    
-    if (categoria === "prenotate") {
-      dataToExport = prenotate;
-      title = "Lezioni Prenotate";
-    } else if (categoria === "svolte") {
-      dataToExport = svolte;
-      title = "Lezioni Svolte";
-    } else if (categoria === "cancellate") {
-      dataToExport = cancellate;
-      title = "Lezioni Cancellate";
-    } else {
-      dataToExport = [...prenotate, ...svolte, ...cancellate];
-    }
-    
-    let text = `${title}\n${'='.repeat(title.length)}\n\n`;
+    try {
+      let dataToExport = [];
+      let title = "Pacchetti e Lezioni";
+      
+      if (categoria === "prenotate") {
+        dataToExport = prenotate;
+        title = "Lezioni Prenotate";
+      } else if (categoria === "svolte") {
+        dataToExport = svolte;
+        title = "Lezioni Svolte";
+      } else if (categoria === "cancellate") {
+        dataToExport = cancellate;
+        title = "Lezioni Cancellate";
+      } else {
+        dataToExport = [...prenotate, ...svolte, ...cancellate];
+      }
+      
+      let text = `${title}\n${'='.repeat(title.length)}\n\n`;
     
     // Aggiungi informazioni filtri
     if (isAdmin) {
@@ -427,13 +433,20 @@ export default function PacchettiLezioniPage() {
     a.download = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.txt` : `lezioni_${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Errore export TXT:", err);
+      alert("Errore durante l'export TXT: " + err.message);
+    }
   }
 
   async function exportToPNG(categoria = null) {
     console.log("exportToPNG chiamata, categoria:", categoria);
     console.log("contentRef.current:", contentRef?.current);
     
-    if (!contentRef.current) return;
+    if (!contentRef.current) {
+      alert("Errore: elemento da catturare non trovato");
+      return;
+    }
     
     try {
       const canvas = await html2canvas(contentRef.current, {
@@ -452,7 +465,7 @@ export default function PacchettiLezioniPage() {
       });
     } catch (err) {
       console.error('Errore export PNG:', err);
-      alert('Errore durante l\'export PNG');
+      alert('Errore durante l\'export PNG: ' + err.message);
     }
   }
 
@@ -489,8 +502,8 @@ export default function PacchettiLezioniPage() {
   }
 
   const colsPrenotate = isCliente
-    ? ["Data / Orario", "Ore", "Richiesta Aperta", "Stato", "Azioni"]
-    : ["Data / Orario", "Descrizione", "Ore", "Richiesta Aperta", "Stato"];
+    ? ["Data / Orario", "Ore", "Stato", "Azioni"]
+    : ["Data / Orario", "Descrizione", "Ore", "Stato"];
   const colsSvolte = isCliente
     ? ["Data / Orario", "Ore", "Stato"]
     : ["Data / Orario", "Descrizione", "Ore", "Stato"];
@@ -895,32 +908,6 @@ export default function PacchettiLezioniPage() {
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
                   cells.push(a.oreConsumate ?? a.durataOre ?? "—");
-
-                  if (openReq) {
-                    const badge = (
-                      <Badge color="#FFF3B0" text="#8C7800">
-                        {openReq.stato}
-                      </Badge>
-                    );
-                    if (isAdmin) {
-                      cells.push(
-                        <span
-                          style={{ cursor: "pointer" }}
-                          title="Gestisci richiesta"
-                          onClick={() => {
-                            setSelectedRichiesta(openReq);
-                            setShowModalApprova(true);
-                          }}
-                        >
-                          {badge}
-                        </span>
-                      );
-                    } else {
-                      cells.push(badge);
-                    }
-                  } else {
-                    cells.push("—");
-                  }
 
                   const statoEl = (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
