@@ -139,16 +139,18 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
               onChange={() => setModificaBatch("singola")}
               style={{ marginRight:6 }}
             />
-            Modifica solo questa
+            Modifica solo questa lezione
           </label>
-          <label style={{ fontWeight:500, opacity:0.5, cursor:"not-allowed" }}>
+          <label style={{ fontWeight:500 }}>
             <input
               type="radio"
+              name="modificaBatch"
               value="batch"
-              disabled
+              checked={modificaBatch === "batch"}
+              onChange={() => setModificaBatch("batch")}
               style={{ marginRight:6 }}
             />
-            Modifica ricorrenza (prossimamente)
+            Applica a tutte le lezioni della ricorrenza
           </label>
         </div>
       </div>
@@ -217,6 +219,31 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           return;
         }
         onSuccess && onSuccess(result.attivita || result);
+      } else if (isEdit && isRicorrente && modificaBatch === "batch") {
+        // Modifica batch di tutte le lezioni della ricorrenza
+        const orarioISO = new Date(`${dataSingola}T${oraInizioSingola}:00`);
+        const payload = {
+          id: initialData.id,
+          descrizione,
+          durataOre: Number(durataOreSingola),
+          orario: orarioISO.toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          modificaBatch: true,
+          ricorrenzaId: initialData.ricorrenzaId
+        };
+
+        const res = await fetch("/api/attivita", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          setErrorForm(result?.error || "Errore modifica ricorrenza");
+          setLoadingSubmit(false);
+          return;
+        }
+        onSuccess && onSuccess(result);
       } else if (!isEdit && tipoLezione === "ricorrente") {
         const res = await fetch("/api/attivita", {
           method:"POST",
@@ -244,8 +271,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           return;
         }
         onSuccess && onSuccess(result);
-      } else {
-        setErrorForm("Modifica batch ricorrenza non ancora implementata.");
       }
     } catch (err) {
       setErrorForm("Errore di rete.");

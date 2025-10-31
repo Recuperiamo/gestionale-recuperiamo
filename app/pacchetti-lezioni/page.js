@@ -173,8 +173,16 @@ export default function PacchettiLezioniPage() {
   function renderBadgeRiprogrammata(a) {
     if (!isModificata(a)) return null;
     return (
-      <span style={badgeRiprogrammata}>
-        Riprogrammata: {formatDateFromValue(a.orarioOriginale)} → {formatDateFromValue(a.orario)}
+      <span style={{
+        ...badgeRiprogrammata,
+        display: 'inline-flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        lineHeight: '1.4'
+      }}>
+        <span style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>Riprogrammata:</span>
+        <span style={{ fontSize: '10px' }}>Da: {formatDateFromValue(a.orarioOriginale)}</span>
+        <span style={{ fontSize: '10px' }}>A: {formatDateFromValue(a.orario)}</span>
       </span>
     );
   }
@@ -382,7 +390,7 @@ export default function PacchettiLezioniPage() {
             if (isModificata(a)) {
               const oldDate = formatDateFromValue(a.orarioOriginale);
               const newDate = formatDateFromValue(a.orario);
-              row.push(`${oldDate}\n→ ${newDate}`);
+              row.push(`Da: ${oldDate}\nA: ${newDate}`);
             } else {
               row.push("—");
             }

@@ -98,6 +98,7 @@ export default function DashboardPage() {
         pacchettiAttivi: pacchettiAttivi.length,
         totaleLezioni: attivitaArray.length,
         lezioniOggi: lezioniOggi.length,
+        lezioniOggiDettaglio: lezioniOggi, // Aggiungo array completo
         lezioniSettimana: lezioniSettimana.length,
         lezioniFuture: lezioniFuture.length,
         lezioniPassate: lezioniPassate.length,
@@ -184,6 +185,7 @@ export default function DashboardPage() {
                 icon="📅"
                 color="#f59e0b"
                 link="/calendario"
+                alert={stats.lezioniOggi > 0}
               />
               <StatCard
                 title="Richieste Pending"
@@ -202,13 +204,39 @@ export default function DashboardPage() {
               gap: 24,
               marginBottom: 32
             }}>
-              {/* Lezioni Overview */}
-              <Card title="Panoramica Lezioni">
-                <InfoRow label="Totale Lezioni" value={stats.totaleLezioni} />
-                <InfoRow label="Lezioni Future" value={stats.lezioniFuture} color="#10b981" />
-                <InfoRow label="Lezioni Passate" value={stats.lezioniPassate} color="#64748b" />
-                <InfoRow label="Lezioni Cancellate" value={stats.lezioniCancellate} color="#ef4444" />
-                <InfoRow label="Prossima Settimana" value={stats.lezioniSettimana} color="#3b82f6" />
+              {/* Lezioni del Giorno */}
+              <Card title="Prossime Lezioni (Oggi)">
+                {stats.lezioniOggiDettaglio && stats.lezioniOggiDettaglio.length > 0 ? (
+                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                    {stats.lezioniOggiDettaglio
+                      .sort((a, b) => new Date(a.orario) - new Date(b.orario))
+                      .map((lez, idx) => (
+                        <div key={lez.id} style={{
+                          padding: '12px',
+                          background: idx % 2 === 0 ? '#f8fafc' : '#fff',
+                          borderLeft: '3px solid #f59e0b',
+                          marginBottom: 8,
+                          borderRadius: 4
+                        }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
+                            🕐 {new Date(lez.orario).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <div style={{ fontSize: 13, color: '#64748b' }}>
+                            {lez.descrizione || `Lezione #${lez.id}`}
+                          </div>
+                          {lez.cliente && (
+                            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                              👤 {lez.cliente.nomeReferente || lez.cliente.email}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                    Nessuna lezione programmata per oggi
+                  </div>
+                )}
               </Card>
 
               {/* Ore Erogate */}
@@ -280,12 +308,13 @@ export default function DashboardPage() {
   );
 }
 
-function StatCard({ title, value, icon, color, link, highlight }) {
+function StatCard({ title, value, icon, color, link, highlight, alert }) {
   const card = (
     <div style={{
       background: '#fff',
       borderRadius: 12,
       padding: 24,
+      position: 'relative',
       boxShadow: highlight 
         ? '0 4px 6px -1px rgba(239, 68, 68, 0.2), 0 2px 4px -1px rgba(239, 68, 68, 0.1)'
         : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
@@ -294,6 +323,25 @@ function StatCard({ title, value, icon, color, link, highlight }) {
       transition: 'all 0.2s',
       ':hover': link ? { transform: 'translateY(-2px)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' } : {}
     }}>
+      {alert && (
+        <div style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          background: '#ef4444',
+          color: '#fff',
+          fontSize: 10,
+          fontWeight: 700,
+          padding: '4px 10px',
+          borderRadius: 12,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)',
+          animation: 'pulse 2s infinite'
+        }}>
+          Alert
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <div style={{ fontSize: 32 }}>{icon}</div>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

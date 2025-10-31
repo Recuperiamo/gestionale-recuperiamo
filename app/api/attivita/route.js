@@ -247,6 +247,9 @@ export async function POST(request) {
 
     try {
       const created = await prisma.$transaction(async (tx) => {
+        // Genera un ricorrenzaId univoco basato su timestamp
+        const ricorrenzaId = Date.now()
+        
         const rows = []
         for (const dt of occorrenze) {
           const att = await tx.attivita.create({
@@ -257,7 +260,8 @@ export async function POST(request) {
               oreConsumate: durataNormalizzata,
               durataOre: durataNormalizzata,
               orario: dt,
-              stato: 'Prenotata'
+              stato: 'Prenotata',
+              ricorrenzaId: ricorrenzaId
             }
           })
           rows.push(att)
@@ -352,7 +356,7 @@ export async function PATCH(request) {
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
     const body = await request.json()
-    const { id, descrizione, durataOre, oreConsumate, orario } = body
+    const { id, descrizione, durataOre, oreConsumate, orario, modificaBatch, ricorrenzaId } = body
     if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
 
     const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
@@ -360,6 +364,174 @@ export async function PATCH(request) {
     if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId))
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+    // ===== MODIFICA BATCH DI RICORRENZA =====
+    if (modificaBatch && ricorrenzaId) {
+      console.log('[PATCH /api/attivita][BATCH] Modifica batch ricorrenza', { id, ricorrenzaId })
+
+      // Verifica che l'attività appartenga davvero a questa ricorrenza
+      if (att.ricorrenzaId !== Number(ricorrenzaId)) {
+        return NextResponse.json({ error: 'ricorrenzaId non corrisponde' }, { status: 400 })
+      }
+
+      // Recupera tutte le attività della stessa ricorrenza
+      const attivitaRicorrenza = await prisma.attivita.findMany({
+        where: { ricorrenzaId: Number(ricorrenzaId) }
+      })
+
+      console.log('[PATCH /api/attivita][BATCH] Trovate', attivitaRicorrenza.length, 'attività nella ricorrenza')
+
+      if (!attivitaRicorrenza.length) {
+        return NextResponse.json({ error: 'Nessuna attività trovata per questa ricorrenza' }, { status: 404 })
+      }
+
+      // Prepara i dati da aggiornare
+      const updateData = {}
+      if (typeof descrizione === 'string') {
+        updateData.descrizione = descrizione.trim()
+      }
+
+      const durataInput = durataOre ?? oreConsumate
+      let nuovaDurata = null
+      if (durataInput !== undefined && durataInput !== null) {
+        const durataVal = Number(durataInput)
+        if (!Number.isFinite(durataVal) || durataVal <= 0) {
+          return NextResponse.json({ error: 'Durata non valida' }, { status: 400 })
+        }
+        nuovaDurata = durataVal
+        updateData.durataOre = durataVal
+        updateData.oreConsumate = durataVal
+      }
+
+      // Per le modifiche batch di orario, manteniamo lo stesso offset temporale
+      let orarioOffset = null
+      if (orario) {
+        const nuovoOrario = new Date(orario)
+        const vecchioOrario = att.orario ? new Date(att.orario) : new Date(att.createdAt)
+        
+        if (Number.isNaN(nuovoOrario.getTime())) {
+          return NextResponse.json({ error: 'Orario non valido' }, { status: 400 })
+        }
+
+        // Calcola l'offset in millisecondi
+        orarioOffset = nuovoOrario.getTime() - vecchioOrario.getTime()
+        console.log('[PATCH /api/attivita][BATCH] Offset orario:', orarioOffset / 1000 / 60, 'minuti')
+      }
+
+      // Calcola il delta ore totale per tutti gli aggiornamenti
+      const durataAttuale = att.oreConsumate ?? att.durataOre ?? 0
+      const deltaOrePerAttivita = nuovaDurata != null ? nuovaDurata - durataAttuale : 0
+      const deltaOreTotale = deltaOrePerAttivita * attivitaRicorrenza.length
+
+      console.log('[PATCH /api/attivita][BATCH] Delta ore:', {
+        perAttivita: deltaOrePerAttivita,
+        totale: deltaOreTotale,
+        attivitaDaModificare: attivitaRicorrenza.length
+      })
+
+      // Transazione per aggiornare tutte le attività della ricorrenza
+      try {
+        const result = await prisma.$transaction(async tx => {
+          let pacchettoBefore = null
+          let pacchettoAfter = null
+
+          // Verifica pacchetto se c'è cambio di ore
+          if (att.pacchettoId && deltaOreTotale !== 0) {
+            pacchettoBefore = await tx.pacchettoOre.findUnique({ where: { id: att.pacchettoId } })
+            if (!pacchettoBefore) {
+              const err = new Error('PACCHETTO_NON_TROVATO')
+              err.code = 'PACCHETTO_NON_TROVATO'
+              throw err
+            }
+
+            const nuovoResiduo = pacchettoBefore.oreResidue - deltaOreTotale
+            if (deltaOreTotale > 0 && nuovoResiduo < 0) {
+              const err = new Error('ORE_INSUFFICIENTI')
+              err.code = 'ORE_INSUFFICIENTI'
+              throw err
+            }
+
+            pacchettoAfter = await tx.pacchettoOre.update({
+              where: { id: pacchettoBefore.id },
+              data: {
+                oreResidue: nuovoResiduo,
+                stato: nuovoResiduo <= 0 ? 'esaurito' : 'attivo'
+              }
+            })
+          }
+
+          // Aggiorna tutte le attività della ricorrenza
+          const updatedAttivita = []
+          for (const attivita of attivitaRicorrenza) {
+            const dataPerAttivita = { ...updateData }
+
+            // Applica l'offset temporale se specificato
+            if (orarioOffset !== null && attivita.orario) {
+              const vecchioOrarioAttivita = new Date(attivita.orario)
+              const nuovoOrarioAttivita = new Date(vecchioOrarioAttivita.getTime() + orarioOffset)
+              dataPerAttivita.orario = nuovoOrarioAttivita
+
+              // Gestisci orarioOriginale
+              if (!attivita.orarioOriginale && vecchioOrarioAttivita.getTime() !== nuovoOrarioAttivita.getTime()) {
+                dataPerAttivita.orarioOriginale = vecchioOrarioAttivita
+              } else if (attivita.orarioOriginale && nuovoOrarioAttivita.getTime() === new Date(attivita.orarioOriginale).getTime()) {
+                dataPerAttivita.orarioOriginale = null
+              }
+            }
+
+            const updated = await tx.attivita.update({
+              where: { id: attivita.id },
+              data: dataPerAttivita
+            })
+            updatedAttivita.push(updated)
+          }
+
+          return { updatedAttivita, pacchettoBefore, pacchettoAfter }
+        })
+
+        // Log changelog se ci sono state modifiche di ore
+        if (
+          deltaOreTotale !== 0 &&
+          result.pacchettoBefore &&
+          result.pacchettoAfter &&
+          att.pacchettoId
+        ) {
+          await logPacchettoChange({
+            pacchettoId: att.pacchettoId,
+            tipoOperazione: 'modifica-ricorrenza-batch',
+            orePrima: result.pacchettoBefore.oreResidue,
+            oreDopo: result.pacchettoAfter.oreResidue,
+            attivitaId: att.id,
+            utente: session.user?.email || 'admin',
+            motivazione: `Modifica batch: ${updateData.descrizione ?? att.descrizione ?? ''} (${result.updatedAttivita.length} attività)`,
+            pacchettoDescrizione: result.pacchettoBefore.descrizione
+          })
+        }
+
+        console.log('[PATCH /api/attivita][BATCH] Aggiornate', result.updatedAttivita.length, 'attività')
+
+        return NextResponse.json({ 
+          ok: true,
+          tipo: 'batch',
+          updatedCount: result.updatedAttivita.length,
+          attivita: result.updatedAttivita,
+          pacchetto: result.pacchettoAfter ?? null
+        })
+      } catch (errTx) {
+        if (errTx?.code === 'ORE_INSUFFICIENTI') {
+          return NextResponse.json({ 
+            error: 'Ore residue insufficienti per questa modifica batch',
+            required: deltaOreTotale,
+            available: att.pacchettoId ? (await prisma.pacchettoOre.findUnique({ where: { id: att.pacchettoId } }))?.oreResidue : 0
+          }, { status: 400 })
+        }
+        if (errTx?.code === 'PACCHETTO_NON_TROVATO') {
+          return NextResponse.json({ error: 'Pacchetto collegato non trovato' }, { status: 404 })
+        }
+        throw errTx
+      }
+    }
+
+    // ===== MODIFICA SINGOLA (LOGICA ESISTENTE) =====
     const updateData = {}
 
     if (typeof descrizione === 'string') {
