@@ -84,6 +84,13 @@ export default function DashboardPage() {
         return !scadenza || scadenza > now;
       });
 
+      // Pacchetti con problemi
+      const pacchettiEsauriti = pacchettiArray.filter(p => p.oreResidue === 0);
+      const pacchettiInEsaurimento = pacchettiArray.filter(p => {
+        const sogliaAlert = p.sogliaOreResidue || 5;
+        return p.oreResidue > 0 && p.oreResidue <= sogliaAlert;
+      });
+
       // Ore totali erogate ultimo mese
       const oreMese = attivitaArray
         .filter(a => {
@@ -96,6 +103,8 @@ export default function DashboardPage() {
         totaleClienti: clientiArray.length,
         totalePacchetti: pacchettiArray.length,
         pacchettiAttivi: pacchettiAttivi.length,
+        pacchettiEsauriti: pacchettiEsauriti,
+        pacchettiInEsaurimento: pacchettiInEsaurimento,
         totaleLezioni: attivitaArray.length,
         lezioniOggi: lezioniOggi.length,
         lezioniOggiDettaglio: lezioniOggi, // Aggiungo array completo
@@ -158,6 +167,64 @@ export default function DashboardPage() {
           </div>
         ) : stats ? (
           <>
+            {/* Alert Pacchetti in Alto */}
+            {(stats.pacchettiEsauriti.length > 0 || stats.pacchettiInEsaurimento.length > 0) && (
+              <div style={{ marginBottom: 24 }}>
+                {stats.pacchettiEsauriti.length > 0 && (
+                  <div style={{
+                    background: '#fee2e2',
+                    border: '2px solid #ef4444',
+                    borderRadius: 8,
+                    padding: '16px 20px',
+                    marginBottom: 12
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <span style={{ fontSize: 24 }}>🚨</span>
+                      <h3 style={{ margin: 0, color: '#b91c1c', fontWeight: 700, fontSize: 16 }}>
+                        Pacchetti Esauriti ({stats.pacchettiEsauriti.length})
+                      </h3>
+                    </div>
+                    <div style={{ fontSize: 14, color: '#7f1d1d', lineHeight: 1.6 }}>
+                      {stats.pacchettiEsauriti.map(p => (
+                        <div key={p.id} style={{ marginBottom: 4 }}>
+                          📦 <b>{p.descrizione}</b> - Cliente: {p.cliente?.nomeReferente || p.cliente?.email}
+                        </div>
+                      ))}
+                      <div style={{ marginTop: 8, fontStyle: 'italic' }}>
+                        Contattare i referenti per rinnovo pacchetto
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {stats.pacchettiInEsaurimento.length > 0 && (
+                  <div style={{
+                    background: '#fef3c7',
+                    border: '2px solid #f59e0b',
+                    borderRadius: 8,
+                    padding: '16px 20px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <span style={{ fontSize: 24 }}>⚠️</span>
+                      <h3 style={{ margin: 0, color: '#92400e', fontWeight: 700, fontSize: 16 }}>
+                        Pacchetti in Esaurimento ({stats.pacchettiInEsaurimento.length})
+                      </h3>
+                    </div>
+                    <div style={{ fontSize: 14, color: '#78350f', lineHeight: 1.6 }}>
+                      {stats.pacchettiInEsaurimento.map(p => (
+                        <div key={p.id} style={{ marginBottom: 4 }}>
+                          📦 <b>{p.descrizione}</b> - Ore residue: <b style={{ color: '#f59e0b' }}>{p.oreResidue}</b> - Cliente: {p.cliente?.nomeReferente || p.cliente?.email}
+                        </div>
+                      ))}
+                      <div style={{ marginTop: 8, fontStyle: 'italic' }}>
+                        Ore limitate, considerare di contattare i referenti
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Statistiche Principali */}
             <div style={{
               display: 'grid',
@@ -168,7 +235,7 @@ export default function DashboardPage() {
               <StatCard
                 title="Clienti Totali"
                 value={stats.totaleClienti}
-                icon="👥"
+                icon="�"
                 color="#3b82f6"
                 link="/clienti"
               />
@@ -178,14 +245,6 @@ export default function DashboardPage() {
                 icon="📦"
                 color="#10b981"
                 link="/pacchetti"
-              />
-              <StatCard
-                title="Lezioni Oggi"
-                value={stats.lezioniOggi}
-                icon="📅"
-                color="#f59e0b"
-                link="/calendario"
-                alert={stats.lezioniOggi > 0}
               />
               <StatCard
                 title="Richieste Pending"
@@ -252,35 +311,30 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            {/* Prossime Lezioni */}
-            {stats.prossimaLezione && (
-              <Card title="Prossima Lezione">
-                <div style={{
-                  padding: 16,
-                  background: '#f1f5f9',
-                  borderRadius: 8,
-                  borderLeft: '4px solid #3b82f6'
-                }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 8 }}>
-                    {stats.prossimaLezione.descrizione || `Lezione #${stats.prossimaLezione.id}`}
-                  </div>
-                  <div style={{ fontSize: 14, color: '#64748b' }}>
-                    📅 {new Date(stats.prossimaLezione.orario).toLocaleString('it-IT', {
-                      weekday: 'long',
-                      day: '2-digit',
-                      month: 'long',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </div>
-                  {stats.prossimaLezione.cliente && (
-                    <div style={{ fontSize: 14, color: '#64748b', marginTop: 4 }}>
-                      👤 {stats.prossimaLezione.cliente.nomeReferente || stats.prossimaLezione.cliente.email}
-                    </div>
-                  )}
+            {/* Sezione Note */}
+            <Card title="Note e Promemoria">
+              <div style={{ padding: 12 }}>
+                <textarea
+                  placeholder="Aggiungi note, promemoria o informazioni importanti..."
+                  style={{
+                    width: '100%',
+                    minHeight: 120,
+                    padding: 12,
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    background: '#f8fafc'
+                  }}
+                  defaultValue={localStorage?.getItem('dashboard-notes') || ''}
+                  onChange={(e) => localStorage?.setItem('dashboard-notes', e.target.value)}
+                />
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>
+                  Le note vengono salvate automaticamente nel browser
                 </div>
-              </Card>
-            )}
+              </div>
+            </Card>
 
             {/* Link Rapidi */}
             <Card title="Azioni Rapide">

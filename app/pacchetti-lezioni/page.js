@@ -376,6 +376,16 @@ export default function PacchettiLezioniPage() {
         return attivitaList.map(a => {
           const row = [];
           
+          // Cliente
+          if (isAdmin) {
+            const cliente = a.cliente?.nomeReferente || a.cliente?.email || "—";
+            row.push(cliente);
+          }
+          
+          // Pacchetto
+          const pacchetto = a.pacchetto?.titolo || `Pacchetto #${a.pacchettoId || "?"}`;
+          row.push(pacchetto);
+          
           // Data/Ora
           row.push(formatDate(a));
           
@@ -403,9 +413,13 @@ export default function PacchettiLezioniPage() {
       // Funzione per creare tabella con headers dinamici
       const createTable = (attivitaList, startY, color, sectionTitle) => {
         const hasRipr = hasRiprogrammate(attivitaList);
-        const headers = hasRipr 
-          ? ["Data/Ora", "Ore", "Stato", "Riprogrammata"]
-          : ["Data/Ora", "Ore", "Stato"];
+        const headers = isAdmin
+          ? (hasRipr 
+              ? ["Cliente", "Pacchetto", "Data/Ora", "Ore", "Stato", "Riprogrammata"]
+              : ["Cliente", "Pacchetto", "Data/Ora", "Ore", "Stato"])
+          : (hasRipr 
+              ? ["Pacchetto", "Data/Ora", "Ore", "Stato", "Riprogrammata"]
+              : ["Pacchetto", "Data/Ora", "Ore", "Stato"]);
         
         if (sectionTitle) {
           doc.setFontSize(12);
@@ -432,16 +446,33 @@ export default function PacchettiLezioniPage() {
             fontSize: 10,
             textColor: [255, 255, 255]
           },
-          columnStyles: hasRipr ? {
-            0: { cellWidth: 45 },
-            1: { cellWidth: 20, halign: 'center' },
-            2: { cellWidth: 30, halign: 'center' },
-            3: { cellWidth: 'auto' }
-          } : {
-            0: { cellWidth: 60 },
-            1: { cellWidth: 25, halign: 'center' },
-            2: { cellWidth: 40, halign: 'center' }
-          },
+          columnStyles: isAdmin
+            ? (hasRipr ? {
+                0: { cellWidth: 35 }, // Cliente
+                1: { cellWidth: 30 }, // Pacchetto
+                2: { cellWidth: 35 }, // Data/Ora
+                3: { cellWidth: 15, halign: 'center' }, // Ore
+                4: { cellWidth: 25, halign: 'center' }, // Stato
+                5: { cellWidth: 'auto' } // Riprogrammata
+              } : {
+                0: { cellWidth: 40 }, // Cliente
+                1: { cellWidth: 35 }, // Pacchetto
+                2: { cellWidth: 40 }, // Data/Ora
+                3: { cellWidth: 20, halign: 'center' }, // Ore
+                4: { cellWidth: 30, halign: 'center' } // Stato
+              })
+            : (hasRipr ? {
+                0: { cellWidth: 40 }, // Pacchetto
+                1: { cellWidth: 40 }, // Data/Ora
+                2: { cellWidth: 20, halign: 'center' }, // Ore
+                3: { cellWidth: 25, halign: 'center' }, // Stato
+                4: { cellWidth: 'auto' } // Riprogrammata
+              } : {
+                0: { cellWidth: 50 }, // Pacchetto
+                1: { cellWidth: 50 }, // Data/Ora
+                2: { cellWidth: 25, halign: 'center' }, // Ore
+                3: { cellWidth: 35, halign: 'center' } // Stato
+              }),
           alternateRowStyles: { fillColor: [248, 250, 252] },
           margin: { left: 14, right: 14 }
         });

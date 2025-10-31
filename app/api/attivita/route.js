@@ -247,8 +247,13 @@ export async function POST(request) {
 
     try {
       const created = await prisma.$transaction(async (tx) => {
-        // Genera un ricorrenzaId univoco basato su timestamp
-        const ricorrenzaId = Date.now()
+        // Trova il prossimo ricorrenzaId disponibile
+        const lastAttivita = await tx.attivita.findFirst({
+          where: { ricorrenzaId: { not: null } },
+          orderBy: { ricorrenzaId: 'desc' },
+          select: { ricorrenzaId: true }
+        })
+        const ricorrenzaId = (lastAttivita?.ricorrenzaId || 0) + 1
         
         const rows = []
         for (const dt of occorrenze) {
