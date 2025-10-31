@@ -62,9 +62,7 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
             marginBottom: 14,
             fontWeight: 500
           }}>
-            Questa lezione fa parte di una ricorrenza.
-            <br />
-            Modifica batch delle lezioni ricorrenti disponibile <b>solo dalla schermata modifica</b>.
+            ℹ️ Questa lezione fa parte di una ricorrenza.
           </div>
         )}
 

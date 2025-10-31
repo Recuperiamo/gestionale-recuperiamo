@@ -13,7 +13,9 @@ const giorniSettimana = [
 export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const isEdit = !!initialData?.id;
   const isRicorrente = !!initialData?.ricorrenzaId;
-  const [modificaBatch, setModificaBatch] = useState(isRicorrente ? "singola" : null);
+  const [modificaBatch, setModificaBatch] = useState(null); // Rimosso default "singola"
+  const [showConfirmModal, setShowConfirmModal] = useState(false); // Nuovo stato per modale conferma
+  const [pendingData, setPendingData] = useState(null); // Dati in attesa di conferma
 
   const initialOrarioDate =
     initialData?.orario
@@ -116,57 +118,12 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
     if (!isEdit) setPacchettoId("");
   }, [clienteId, isEdit]);
 
-  function renderRicorrenzaAlert() {
-    if (!isEdit || !isRicorrente) return null;
-    return (
-      <div style={{
-        background:"#e3eaff",
-        color:"#20489a",
-        border:"1.5px solid #20489a90",
-        borderRadius:7,
-        padding:"10px 16px",
-        marginBottom:14,
-        fontWeight:500
-      }}>
-        Questa lezione fa parte di una ricorrenza.
-        <div style={{ marginTop:10 }}>
-          <label style={{ fontWeight:500, marginRight:16 }}>
-            <input
-              type="radio"
-              name="modificaBatch"
-              value="singola"
-              checked={modificaBatch === "singola"}
-              onChange={() => setModificaBatch("singola")}
-              style={{ marginRight:6 }}
-            />
-            Modifica solo questa lezione
-          </label>
-          <label style={{ fontWeight:500 }}>
-            <input
-              type="radio"
-              name="modificaBatch"
-              value="batch"
-              checked={modificaBatch === "batch"}
-              onChange={() => setModificaBatch("batch")}
-              style={{ marginRight:6 }}
-            />
-            Applica a tutte le lezioni della ricorrenza
-          </label>
-        </div>
-      </div>
-    );
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorForm(null);
 
-    if (isEdit && isRicorrente && modificaBatch === null) {
-      setErrorForm("Seleziona se vuoi modificare solo questa lezione.");
-      return;
-    }
-
-    if ((tipoLezione === "singola" || isEdit) && (!isRicorrente || modificaBatch === "singola")) {
+    // Validazione base
+    if ((tipoLezione === "singola" || isEdit) && (!isRicorrente || modificaBatch !== null)) {
       if (!descrizione || !dataSingola || !oraInizioSingola || !durataOreSingola || (!isEdit && (!pacchettoId || !clienteId))) {
         setErrorForm("Compila tutti i campi obbligatori.");
         return;
@@ -186,16 +143,35 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
       }
     }
 
+    // Se è una lezione ricorrente in modifica E non abbiamo ancora una scelta, mostriamo il modale
+    if (isEdit && isRicorrente && modificaBatch === null) {
+      const orarioISO = new Date(`${dataSingola}T${oraInizioSingola}:00`);
+      setPendingData({
+        descrizione,
+        durataOre: Number(durataOreSingola),
+        orario: orarioISO.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        id: initialData.id,
+        ricorrenzaId: initialData.ricorrenzaId
+      });
+      setShowConfirmModal(true);
+      return;
+    }
+
+    // Esegui il submit effettivo
+    executeSubmit();
+  };
+
+  const executeSubmit = async () => {
     setLoadingSubmit(true);
     try {
       if ((tipoLezione === "singola" || isEdit) && (!isRicorrente || modificaBatch === "singola")) {
-        // Compose orario ISO
+        // Modifica singola
         const orarioISO = new Date(`${dataSingola}T${oraInizioSingola}:00`);
         const payload = {
           descrizione,
           durataOre: Number(durataOreSingola),
           orario: orarioISO.toISOString(),
-          // include client timezone so server can preserve wall-clock time if needed
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
 
@@ -209,7 +185,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         const method = isEdit ? "PATCH" : "POST";
         const res = await fetch("/api/attivita", {
           method,
-            headers: { "Content-Type":"application/json" },
+          headers: { "Content-Type":"application/json" },
           body: JSON.stringify(payload)
         });
         const result = await res.json();
@@ -220,13 +196,15 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         }
         onSuccess && onSuccess(result.attivita || result);
       } else if (isEdit && isRicorrente && modificaBatch === "batch") {
-        // Modifica batch di tutte le lezioni della ricorrenza
-        const orarioISO = new Date(`${dataSingola}T${oraInizioSingola}:00`);
-        const payload = {
+        // Modifica batch - usa pendingData se disponibile
+        const payload = pendingData ? {
+          ...pendingData,
+          modificaBatch: true
+        } : {
           id: initialData.id,
           descrizione,
           durataOre: Number(durataOreSingola),
-          orario: orarioISO.toISOString(),
+          orario: new Date(`${dataSingola}T${oraInizioSingola}:00`).toISOString(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           modificaBatch: true,
           ricorrenzaId: initialData.ricorrenzaId
@@ -309,8 +287,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         <h3 style={{ color:"#1976d2", fontWeight:700, margin:0, marginBottom:18 }}>
           {isEdit ? "Modifica lezione" : "Nuova lezione"}
         </h3>
-
-        {renderRicorrenzaAlert()}
 
         {!isEdit && (
           <div style={{ marginBottom:16 }}>
@@ -528,6 +504,96 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           </button>
         </div>
       </form>
+
+      {/* Modale conferma modifica ricorrenza */}
+      {showConfirmModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.5)",
+          zIndex: 2200,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#fff",
+            borderRadius: 12,
+            padding: "28px 32px",
+            maxWidth: 480,
+            boxShadow: "0 12px 48px rgba(0,0,0,0.3)"
+          }}>
+            <h3 style={{ margin: "0 0 16px 0", color: "#1976d2", fontWeight: 600 }}>
+              Modifica lezione ricorrente
+            </h3>
+            <p style={{ margin: "0 0 24px 0", lineHeight: 1.6, color: "#333" }}>
+              Questa lezione fa parte di una ricorrenza. Vuoi applicare le modifiche:
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+              <button
+                onClick={() => {
+                  setModificaBatch("singola");
+                  setShowConfirmModal(false);
+                  executeSubmit();
+                }}
+                style={{
+                  background: "#1976d2",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 7,
+                  padding: "12px 20px",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 6px rgba(25, 118, 210, 0.3)"
+                }}
+              >
+                Solo a questa lezione
+              </button>
+              <button
+                onClick={() => {
+                  setModificaBatch("batch");
+                  setShowConfirmModal(false);
+                  executeSubmit();
+                }}
+                style={{
+                  background: "#f59e0b",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 7,
+                  padding: "12px 20px",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 6px rgba(245, 158, 11, 0.3)"
+                }}
+              >
+                A tutte le lezioni della ricorrenza
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setShowConfirmModal(false);
+                setPendingData(null);
+                setLoadingSubmit(false);
+              }}
+              style={{
+                background: "transparent",
+                color: "#666",
+                border: "1px solid #ddd",
+                borderRadius: 7,
+                padding: "8px 16px",
+                fontWeight: 500,
+                fontSize: 14,
+                cursor: "pointer",
+                width: "100%"
+              }}
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

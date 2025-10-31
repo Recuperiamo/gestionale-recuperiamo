@@ -18,6 +18,7 @@ export default function AttivitaPage() {
   const [formInitialData, setFormInitialData] = useState(null);
   const [dettaglioAttivita, setDettaglioAttivita] = useState(null);
   const [purgeLoading, setPurgeLoading] = useState(false);
+  const [batchEdit, setBatchEdit] = useState(false); // Nuovo stato per modifica batch selezione multipla
 
   // FILTRI
   const [filtroCliente, setFiltroCliente] = useState('');
@@ -107,6 +108,34 @@ export default function AttivitaPage() {
     window.alert(`Operazione completata.\nEliminate: ${success}\nFallite: ${failed}`);
     setSelectedIds(new Set());
     setMultiSelect(false);
+    fetchAttivita();
+    fetchPacchetti();
+  };
+
+  const handleBatchEdit = () => {
+    if (!selectedIds.size) return window.alert("Seleziona almeno un'attività.");
+    setBatchEdit(true);
+  };
+
+  const handleBatchEditSubmit = async (modifiche) => {
+    if (!selectedIds.size) return;
+    
+    let success = 0, failed = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch('/api/attivita', {
+          method: 'PATCH',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, ...modifiche })
+        });
+        if (res.ok) success++; else failed++;
+      } catch { failed++; }
+    }
+    
+    window.alert(`Modifica completata.\nAggiornate: ${success}\nFallite: ${failed}`);
+    setSelectedIds(new Set());
+    setMultiSelect(false);
+    setBatchEdit(false);
     fetchAttivita();
     fetchPacchetti();
   };
@@ -210,16 +239,28 @@ export default function AttivitaPage() {
           </button>
 
           {multiSelect && selectedIds.size > 0 && (
-            <button
-              onClick={handleDeleteMultiple}
-              style={{
-                background: "#c62828", color: "#fff", border: "none", borderRadius: 5,
-                padding: "8px 18px", fontWeight: 600, fontSize: "1rem", cursor: "pointer",
-                boxShadow: "0 1px 4px #c6282820"
-              }}
-            >
-              Elimina selezionate ({selectedIds.size})
-            </button>
+            <>
+              <button
+                onClick={handleBatchEdit}
+                style={{
+                  background: "#f59e0b", color: "#fff", border: "none", borderRadius: 5,
+                  padding: "8px 18px", fontWeight: 600, fontSize: "1rem", cursor: "pointer",
+                  boxShadow: "0 1px 4px rgba(245, 158, 11, 0.3)"
+                }}
+              >
+                Modifica selezionate ({selectedIds.size})
+              </button>
+              <button
+                onClick={handleDeleteMultiple}
+                style={{
+                  background: "#c62828", color: "#fff", border: "none", borderRadius: 5,
+                  padding: "8px 18px", fontWeight: 600, fontSize: "1rem", cursor: "pointer",
+                  boxShadow: "0 1px 4px #c6282820"
+                }}
+              >
+                Elimina selezionate ({selectedIds.size})
+              </button>
+            </>
           )}
 
           <button
@@ -305,7 +346,160 @@ export default function AttivitaPage() {
           onToggleAll={toggleAll}
         />
         <AttivitaDettaglioModal attivita={dettaglioAttivita} onClose={handleCloseDettaglio} onEdit={handleEdit} onDelete={handleDeleteDettaglio} />
+        
+        {/* Modale modifica batch */}
+        {batchEdit && <BatchEditModal 
+          count={selectedIds.size}
+          onClose={() => setBatchEdit(false)}
+          onSubmit={handleBatchEditSubmit}
+        />}
       </div>
     </>
+  );
+}
+
+// Componente modale per modifica batch
+function BatchEditModal({ count, onClose, onSubmit }) {
+  const [descrizione, setDescrizione] = useState('');
+  const [durataOre, setDurataOre] = useState('');
+  const [data, setData] = useState('');
+  const [ora, setOra] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    const modifiche = {};
+    if (descrizione.trim()) modifiche.descrizione = descrizione.trim();
+    if (durataOre) {
+      const val = Number(durataOre);
+      if (val > 0) {
+        modifiche.durataOre = val;
+        modifiche.oreConsumate = val;
+      }
+    }
+    if (data && ora) {
+      const orarioISO = new Date(`${data}T${ora}:00`);
+      if (!isNaN(orarioISO.getTime())) {
+        modifiche.orario = orarioISO.toISOString();
+        modifiche.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+    }
+
+    if (Object.keys(modifiche).length === 0) {
+      alert('Inserisci almeno un campo da modificare');
+      return;
+    }
+
+    if (!confirm(`Applicare le modifiche a ${count} attività?`)) return;
+    
+    onSubmit(modifiche);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      zIndex: 2100,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      <form onSubmit={handleSubmit} style={{
+        background: '#fff',
+        borderRadius: 12,
+        padding: '28px 32px',
+        maxWidth: 500,
+        width: '90%',
+        boxShadow: '0 12px 48px rgba(0,0,0,0.3)'
+      }}>
+        <h3 style={{ margin: '0 0 16px 0', color: '#1976d2', fontWeight: 600 }}>
+          Modifica {count} attività selezionate
+        </h3>
+        <p style={{ margin: '0 0 24px 0', color: '#666', fontSize: 14 }}>
+          Compila solo i campi che vuoi modificare. I campi vuoti non verranno modificati.
+        </p>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 500, fontSize: 14 }}>Descrizione</label>
+          <input 
+            type="text"
+            value={descrizione}
+            onChange={e => setDescrizione(e.target.value)}
+            placeholder="Lascia vuoto per non modificare"
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbe5fc', borderRadius: 5, background: '#f8fafd', marginTop: 4 }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontWeight: 500, fontSize: 14 }}>Durata (ore)</label>
+          <input 
+            type="number"
+            step="0.5"
+            min="0"
+            value={durataOre}
+            onChange={e => setDurataOre(e.target.value)}
+            placeholder="Lascia vuoto per non modificare"
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbe5fc', borderRadius: 5, background: '#f8fafd', marginTop: 4 }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontWeight: 500, fontSize: 14 }}>Data</label>
+            <input 
+              type="date"
+              value={data}
+              onChange={e => setData(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbe5fc', borderRadius: 5, background: '#f8fafd', marginTop: 4 }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontWeight: 500, fontSize: 14 }}>Ora</label>
+            <input 
+              type="time"
+              value={ora}
+              onChange={e => setOra(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbe5fc', borderRadius: 5, background: '#f8fafd', marginTop: 4 }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              flex: 1,
+              background: '#e0e3ea',
+              color: '#252525',
+              border: 'none',
+              borderRadius: 7,
+              padding: '10px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Annulla
+          </button>
+          <button
+            type="submit"
+            style={{
+              flex: 1,
+              background: '#f59e0b',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 7,
+              padding: '10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)'
+            }}
+          >
+            Applica modifiche
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
