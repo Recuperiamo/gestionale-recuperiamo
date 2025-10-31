@@ -33,6 +33,19 @@ export default function PacchettiLezioniPage() {
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
+  // Filtri Admin
+  const [clienti, setClienti] = useState([]);
+  const [pacchetti, setPacchetti] = useState([]);
+  const [filtroCliente, setFiltroCliente] = useState("");
+  const [filtroPacchetto, setFiltroPacchetto] = useState("");
+  const [filtroMese, setFiltroMese] = useState("");
+  const [ordinamento, setOrdinamento] = useState("cronologico"); // cronologico | alfabetico
+  
+  // Filtri Cliente
+  const [filtroTipologia, setFiltroTipologia] = useState(""); // svolta | programmata | cancellata
+  const [filtroDataDa, setFiltroDataDa] = useState("");
+  const [filtroDataA, setFiltroDataA] = useState("");
+
   const isCliente = session?.user?.role === "cliente";
   const isAdmin = !isCliente;
 
@@ -50,6 +63,32 @@ export default function PacchettiLezioniPage() {
     }
   }
 
+  async function fetchClienti() {
+    if (!isAdmin) return;
+    try {
+      const r = await fetch("/api/clienti?tipo=STUDENTE");
+      if (r.ok) {
+        const js = await r.json();
+        setClienti(Array.isArray(js.clienti) ? js.clienti : Array.isArray(js) ? js : []);
+      }
+    } catch (e) {
+      console.error("Errore caricamento clienti:", e);
+    }
+  }
+
+  async function fetchPacchetti() {
+    if (!isAdmin) return;
+    try {
+      const r = await fetch("/api/pacchetti");
+      if (r.ok) {
+        const js = await r.json();
+        setPacchetti(Array.isArray(js) ? js : []);
+      }
+    } catch (e) {
+      console.error("Errore caricamento pacchetti:", e);
+    }
+  }
+
   useEffect(() => {
     if (status === "loading") return;
     if (!session) {
@@ -57,7 +96,11 @@ export default function PacchettiLezioniPage() {
       return;
     }
     fetchAttivita();
-  }, [status, session, router]);
+    if (isAdmin) {
+      fetchClienti();
+      fetchPacchetti();
+    }
+  }, [status, session, router, isAdmin]);
 
   // Pulizia selezione quando si disattiva il multi-select
   useEffect(() => {
@@ -138,21 +181,83 @@ export default function PacchettiLezioniPage() {
   }
 
   const { prenotate, svolte, cancellate } = useMemo(() => {
+    let filtered = [...(attivita || [])];
+    
+    // Applica filtri ADMIN
+    if (isAdmin) {
+      if (filtroCliente) {
+        filtered = filtered.filter(a => String(a.clienteId) === String(filtroCliente));
+      }
+      if (filtroPacchetto) {
+        filtered = filtered.filter(a => String(a.pacchettoId) === String(filtroPacchetto));
+      }
+      if (filtroMese) {
+        const [year, month] = filtroMese.split('-').map(Number);
+        filtered = filtered.filter(a => {
+          const d = parseStart(a);
+          return d.getFullYear() === year && d.getMonth() === month - 1;
+        });
+      }
+    }
+    
+    // Applica filtri CLIENTE
+    if (isCliente) {
+      if (filtroTipologia) {
+        if (filtroTipologia === "svolta") {
+          filtered = filtered.filter(a => !isCancelled(a) && isPast(a));
+        } else if (filtroTipologia === "programmata") {
+          filtered = filtered.filter(a => !isCancelled(a) && isFuture(a));
+        } else if (filtroTipologia === "cancellata") {
+          filtered = filtered.filter(a => isCancelled(a));
+        }
+      }
+      if (filtroDataDa) {
+        const da = new Date(filtroDataDa);
+        filtered = filtered.filter(a => parseStart(a) >= da);
+      }
+      if (filtroDataA) {
+        const a = new Date(filtroDataA);
+        a.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(att => parseStart(att) <= a);
+      }
+      if (filtroMese) {
+        const [year, month] = filtroMese.split('-').map(Number);
+        filtered = filtered.filter(a => {
+          const d = parseStart(a);
+          return d.getFullYear() === year && d.getMonth() === month - 1;
+        });
+      }
+    }
+    
     const future = [];
     const past = [];
     const canc = [];
-    (attivita || []).forEach(a => {
+    filtered.forEach(a => {
       if (isCancelled(a)) {
         if (isFuture(a)) future.push(a); else canc.push(a);
       } else {
         if (isFuture(a)) future.push(a); else past.push(a);
       }
     });
-    future.sort((a, b) => parseStart(a) - parseStart(b));
-    past.sort((a, b) => parseStart(b) - parseStart(a));
-    canc.sort((a, b) => parseStart(b) - parseStart(a));
+    
+    // Ordinamento ADMIN
+    if (isAdmin && ordinamento === "alfabetico") {
+      const sortAlpha = (a, b) => {
+        const nomeA = a.cliente?.nomeReferente || a.cliente?.email || "";
+        const nomeB = b.cliente?.nomeReferente || b.cliente?.email || "";
+        return nomeA.localeCompare(nomeB);
+      };
+      future.sort(sortAlpha);
+      past.sort(sortAlpha);
+      canc.sort(sortAlpha);
+    } else {
+      future.sort((a, b) => parseStart(a) - parseStart(b));
+      past.sort((a, b) => parseStart(b) - parseStart(a));
+      canc.sort((a, b) => parseStart(b) - parseStart(a));
+    }
+    
     return { prenotate: future, svolte: past, cancellate: canc };
-  }, [attivita]);
+  }, [attivita, filtroCliente, filtroPacchetto, filtroMese, filtroTipologia, filtroDataDa, filtroDataA, ordinamento, isAdmin, isCliente]);
 
   function openDettaglio(a) { setAttivitaSelezionata(a); }
   function openRichiesta(a) {
@@ -291,6 +396,153 @@ export default function PacchettiLezioniPage() {
         <h1 style={{ fontSize: 32, fontWeight: 800, textAlign: "center", margin: "0 0 34px" }}>
           Pacchetti & Lezioni
         </h1>
+
+        {/* Filtri */}
+        {!loading && !errore && (
+          <div style={{
+            background: "#e3eefe",
+            border: "1px solid #4268b3",
+            borderRadius: 16,
+            padding: "20px 24px",
+            marginBottom: 24
+          }}>
+            {isAdmin ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+                <div style={{ flex: "1 1 200px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Cliente
+                  </label>
+                  <select
+                    value={filtroCliente}
+                    onChange={(e) => setFiltroCliente(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Tutti i clienti</option>
+                    {clienti.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nomeReferente || c.email || `Cliente #${c.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: "1 1 200px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Pacchetto
+                  </label>
+                  <select
+                    value={filtroPacchetto}
+                    onChange={(e) => setFiltroPacchetto(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Tutti i pacchetti</option>
+                    {pacchetti.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.titolo || `Pacchetto #${p.id}`} ({p.oreAcquistate}h)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Mese
+                  </label>
+                  <input
+                    type="month"
+                    value={filtroMese}
+                    onChange={(e) => setFiltroMese(e.target.value)}
+                    style={selectStyle}
+                  />
+                </div>
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Ordine
+                  </label>
+                  <select
+                    value={ordinamento}
+                    onChange={(e) => setOrdinamento(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="cronologico">Cronologico</option>
+                    <option value="alfabetico">Alfabetico (Cliente)</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => {
+                    setFiltroCliente("");
+                    setFiltroPacchetto("");
+                    setFiltroMese("");
+                    setOrdinamento("cronologico");
+                  }}
+                  style={{...btnStyle, flex: "0 0 auto"}}
+                >
+                  Reset Filtri
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Tipologia
+                  </label>
+                  <select
+                    value={filtroTipologia}
+                    onChange={(e) => setFiltroTipologia(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Tutte</option>
+                    <option value="programmata">Programmate</option>
+                    <option value="svolta">Svolte</option>
+                    <option value="cancellata">Cancellate</option>
+                  </select>
+                </div>
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Mese
+                  </label>
+                  <input
+                    type="month"
+                    value={filtroMese}
+                    onChange={(e) => setFiltroMese(e.target.value)}
+                    style={selectStyle}
+                  />
+                </div>
+                <div style={{ flex: "1 1 130px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Da
+                  </label>
+                  <input
+                    type="date"
+                    value={filtroDataDa}
+                    onChange={(e) => setFiltroDataDa(e.target.value)}
+                    style={selectStyle}
+                  />
+                </div>
+                <div style={{ flex: "1 1 130px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    A
+                  </label>
+                  <input
+                    type="date"
+                    value={filtroDataA}
+                    onChange={(e) => setFiltroDataA(e.target.value)}
+                    style={selectStyle}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    setFiltroTipologia("");
+                    setFiltroMese("");
+                    setFiltroDataDa("");
+                    setFiltroDataA("");
+                  }}
+                  style={{...btnStyle, flex: "0 0 auto"}}
+                >
+                  Reset Filtri
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div style={{ textAlign: "center", padding: 40 }}>Caricamento…</div>
@@ -825,4 +1077,26 @@ const badgeMod = {
   fontSize: 11,
   fontWeight: 700,
   lineHeight: 1
+};
+const selectStyle = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: 10,
+  border: "1px solid #4268b3",
+  background: "#fff",
+  color: "#20489a",
+  fontSize: 13,
+  fontWeight: 600,
+  fontFamily: "'Inter','Segoe UI',Arial,sans-serif"
+};
+const btnStyle = {
+  background: "#20489a",
+  color: "#fff",
+  border: "none",
+  borderRadius: 10,
+  padding: "8px 16px",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  fontFamily: "'Inter','Segoe UI',Arial,sans-serif"
 };
