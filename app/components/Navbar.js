@@ -33,9 +33,9 @@ export default function Navbar() {
   const navLinksCliente = [
     { href: "/profilo", label: "Profilo" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
-    { href: "/richieste", label: "Richieste" },
     { href: "/lavagna", label: "Lavagna" },
-    { href: "/aula", label: "Aula" }
+    { href: "/aula", label: "Aula" },
+    { href: "/richieste", label: "Richieste" }
   ];
 
   // Costruzione finale dei link: "Storico" SOLO per admin

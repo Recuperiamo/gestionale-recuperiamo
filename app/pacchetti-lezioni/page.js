@@ -4,8 +4,8 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 
 import { useRichiesteModifica } from "../components/modifiche/useRichiesteModifica";
@@ -50,6 +50,11 @@ export default function PacchettiLezioniPage() {
   const [filtroTipologia, setFiltroTipologia] = useState(""); // svolta | programmata | cancellata
   const [filtroDataDa, setFiltroDataDa] = useState("");
   const [filtroDataA, setFiltroDataA] = useState("");
+
+  // Dropdown export per sezioni
+  const [exportMenuPrenotate, setExportMenuPrenotate] = useState(false);
+  const [exportMenuSvolte, setExportMenuSvolte] = useState(false);
+  const [exportMenuCancellate, setExportMenuCancellate] = useState(false);
 
   const contentRef = useRef(null);
 
@@ -352,7 +357,7 @@ export default function PacchettiLezioniPage() {
     
     const headers = [["Data/Ora", ...(isAdmin ? ["Descrizione"] : []), "Ore", "Stato", "Modifiche"]];
     
-    doc.autoTable({
+    autoTable(doc, {
       head: headers,
       body: tableData,
       startY: y + 10,
@@ -855,13 +860,82 @@ export default function PacchettiLezioniPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <SectionTitle>Lezioni Prenotate</SectionTitle>
-              <button
-                onClick={() => exportToPDF("prenotate")}
-                style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
-                title="Esporta solo lezioni prenotate"
-              >
-                📄 Esporta
-              </button>
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setExportMenuPrenotate(!exportMenuPrenotate)}
+                  style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
+                  title="Esporta lezioni prenotate"
+                >
+                  📄 Esporta ▾
+                </button>
+                {exportMenuPrenotate && (
+                  <div style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #ddd",
+                    borderRadius: 6,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    minWidth: 120,
+                    marginTop: 4
+                  }}>
+                    <button
+                      onClick={() => { exportToPDF("prenotate"); setExportMenuPrenotate(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      📄 PDF
+                    </button>
+                    <button
+                      onClick={() => { exportToTXT("prenotate"); setExportMenuPrenotate(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      📝 TXT
+                    </button>
+                    <button
+                      onClick={() => { exportToPNG("prenotate"); setExportMenuPrenotate(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        borderRadius: "0 0 6px 6px"
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      🖼️ PNG
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <TableWrapper>
               <MainTable
@@ -932,13 +1006,82 @@ export default function PacchettiLezioniPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <SectionTitle>Lezioni Svolte</SectionTitle>
-              <button
-                onClick={() => exportToPDF("svolte")}
-                style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
-                title="Esporta solo lezioni svolte"
-              >
-                📄 Esporta
-              </button>
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setExportMenuSvolte(!exportMenuSvolte)}
+                  style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
+                  title="Esporta lezioni svolte"
+                >
+                  📄 Esporta ▾
+                </button>
+                {exportMenuSvolte && (
+                  <div style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #ddd",
+                    borderRadius: 6,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    minWidth: 120,
+                    marginTop: 4
+                  }}>
+                    <button
+                      onClick={() => { exportToPDF("svolte"); setExportMenuSvolte(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      📄 PDF
+                    </button>
+                    <button
+                      onClick={() => { exportToTXT("svolte"); setExportMenuSvolte(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      📝 TXT
+                    </button>
+                    <button
+                      onClick={() => { exportToPNG("svolte"); setExportMenuSvolte(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        borderRadius: "0 0 6px 6px"
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      🖼️ PNG
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <TableWrapper>
               <MainTable
@@ -997,13 +1140,82 @@ export default function PacchettiLezioniPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <SectionTitle>Lezioni Cancellate</SectionTitle>
-              <button
-                onClick={() => exportToPDF("cancellate")}
-                style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
-                title="Esporta solo lezioni cancellate"
-              >
-                📄 Esporta
-              </button>
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setExportMenuCancellate(!exportMenuCancellate)}
+                  style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
+                  title="Esporta lezioni cancellate"
+                >
+                  📄 Esporta ▾
+                </button>
+                {exportMenuCancellate && (
+                  <div style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #ddd",
+                    borderRadius: 6,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    minWidth: 120,
+                    marginTop: 4
+                  }}>
+                    <button
+                      onClick={() => { exportToPDF("cancellate"); setExportMenuCancellate(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      📄 PDF
+                    </button>
+                    <button
+                      onClick={() => { exportToTXT("cancellate"); setExportMenuCancellate(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      📝 TXT
+                    </button>
+                    <button
+                      onClick={() => { exportToPNG("cancellate"); setExportMenuCancellate(false); }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        borderRadius: "0 0 6px 6px"
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = "#f0f0f0"}
+                      onMouseLeave={(e) => e.target.style.background = "transparent"}
+                    >
+                      🖼️ PNG
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <TableWrapper>
               <MainTable
