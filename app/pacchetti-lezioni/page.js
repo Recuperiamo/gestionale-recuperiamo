@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import html2canvas from "html2canvas";
 
 import { useRichiesteModifica } from "../components/modifiche/useRichiesteModifica";
 import AttivitaDettaglioModal from "../components/attivita/AttivitaDettaglioModal";
@@ -38,6 +41,8 @@ export default function PacchettiLezioniPage() {
   const [pacchetti, setPacchetti] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroPacchetto, setFiltroPacchetto] = useState("");
+  const [filtroAdminDa, setFiltroAdminDa] = useState("");
+  const [filtroAdminA, setFiltroAdminA] = useState("");
   const [filtroMese, setFiltroMese] = useState("");
   const [ordinamento, setOrdinamento] = useState("cronologico"); // cronologico | alfabetico
   
@@ -45,6 +50,8 @@ export default function PacchettiLezioniPage() {
   const [filtroTipologia, setFiltroTipologia] = useState(""); // svolta | programmata | cancellata
   const [filtroDataDa, setFiltroDataDa] = useState("");
   const [filtroDataA, setFiltroDataA] = useState("");
+
+  const contentRef = useRef(null);
 
   const isCliente = session?.user?.role === "cliente";
   const isAdmin = !isCliente;
@@ -82,7 +89,14 @@ export default function PacchettiLezioniPage() {
       const r = await fetch("/api/pacchetti");
       if (r.ok) {
         const js = await r.json();
-        setPacchetti(Array.isArray(js) ? js : []);
+        const lista = Array.isArray(js) ? js : [];
+        // Ordina alfabeticamente per titolo
+        lista.sort((a, b) => {
+          const tA = (a.titolo || `Pacchetto #${a.id}`).toLowerCase();
+          const tB = (b.titolo || `Pacchetto #${b.id}`).toLowerCase();
+          return tA.localeCompare(tB);
+        });
+        setPacchetti(lista);
       }
     } catch (e) {
       console.error("Errore caricamento pacchetti:", e);
@@ -150,6 +164,15 @@ export default function PacchettiLezioniPage() {
   function isModificata(a) {
     return a?.orarioOriginale && a?.orario && a.orarioOriginale !== a.orario;
   }
+  
+  function renderBadgeRiprogrammata(a) {
+    if (!isModificata(a)) return null;
+    return (
+      <span style={badgeRiprogrammata}>
+        Riprogrammata: {formatDateFromValue(a.orarioOriginale)} → {formatDateFromValue(a.orario)}
+      </span>
+    );
+  }
 
   function getRichiestaDisplayDate(r, att) {
     if (att && ["approved", "archived"].includes(r.stato || "")) {
@@ -191,12 +214,14 @@ export default function PacchettiLezioniPage() {
       if (filtroPacchetto) {
         filtered = filtered.filter(a => String(a.pacchettoId) === String(filtroPacchetto));
       }
-      if (filtroMese) {
-        const [year, month] = filtroMese.split('-').map(Number);
-        filtered = filtered.filter(a => {
-          const d = parseStart(a);
-          return d.getFullYear() === year && d.getMonth() === month - 1;
-        });
+      if (filtroAdminDa) {
+        const da = new Date(filtroAdminDa);
+        filtered = filtered.filter(a => parseStart(a) >= da);
+      }
+      if (filtroAdminA) {
+        const a = new Date(filtroAdminA);
+        a.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(att => parseStart(att) <= a);
       }
     }
     
@@ -220,12 +245,14 @@ export default function PacchettiLezioniPage() {
         a.setHours(23, 59, 59, 999);
         filtered = filtered.filter(att => parseStart(att) <= a);
       }
-      if (filtroMese) {
-        const [year, month] = filtroMese.split('-').map(Number);
-        filtered = filtered.filter(a => {
-          const d = parseStart(a);
-          return d.getFullYear() === year && d.getMonth() === month - 1;
-        });
+      if (filtroAdminDa) {
+        const da = new Date(filtroAdminDa);
+        filtered = filtered.filter(a => parseStart(a) >= da);
+      }
+      if (filtroAdminA) {
+        const a = new Date(filtroAdminA);
+        a.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(att => parseStart(att) <= a);
       }
     }
     
@@ -257,7 +284,169 @@ export default function PacchettiLezioniPage() {
     }
     
     return { prenotate: future, svolte: past, cancellate: canc };
-  }, [attivita, filtroCliente, filtroPacchetto, filtroMese, filtroTipologia, filtroDataDa, filtroDataA, ordinamento, isAdmin, isCliente]);
+  }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, ordinamento, isAdmin, isCliente]);
+
+  function exportToPDF(categoria = null) {
+    const doc = new jsPDF();
+    let dataToExport = [];
+    let title = "Pacchetti e Lezioni";
+    
+    if (categoria === "prenotate") {
+      dataToExport = prenotate;
+      title = "Lezioni Prenotate";
+    } else if (categoria === "svolte") {
+      dataToExport = svolte;
+      title = "Lezioni Svolte";
+    } else if (categoria === "cancellate") {
+      dataToExport = cancellate;
+      title = "Lezioni Cancellate";
+    } else {
+      dataToExport = [...prenotate, ...svolte, ...cancellate];
+    }
+    
+    doc.setFontSize(16);
+    doc.text(title, 14, 15);
+    
+    let y = 25;
+    if (isAdmin) {
+      doc.setFontSize(10);
+      if (filtroCliente) {
+        const cli = clienti.find(c => c.id === parseInt(filtroCliente));
+        if (cli) doc.text(`Cliente: ${cli.nomeReferente || cli.email}`, 14, y);
+        y += 6;
+      }
+      if (filtroPacchetto) {
+        const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
+        if (pac) doc.text(`Pacchetto: ${pac.titolo || pac.id}`, 14, y);
+        y += 6;
+      }
+      if (filtroAdminDa || filtroAdminA) {
+        doc.text(`Periodo: ${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 14, y);
+        y += 6;
+      }
+    } else {
+      doc.setFontSize(10);
+      if (filtroTipologia) doc.text(`Tipologia: ${filtroTipologia}`, 14, y);
+      if (filtroMese) doc.text(`Mese: ${filtroMese}`, 14, y + 6);
+      if (filtroDataDa || filtroDataA) {
+        doc.text(`Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 14, y + 12);
+      }
+    }
+    
+    const tableData = dataToExport.map(a => {
+      const row = [formatDate(a)];
+      if (isAdmin) row.push(a.descrizione || `Lezione #${a.id}`);
+      row.push(a.oreConsumate ?? a.durataOre ?? "—");
+      row.push(displayStato(a));
+      if (isModificata(a)) {
+        row.push(`Riprogrammata: ${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}`);
+      } else {
+        row.push("");
+      }
+      return row;
+    });
+    
+    const headers = [["Data/Ora", ...(isAdmin ? ["Descrizione"] : []), "Ore", "Stato", "Modifiche"]];
+    
+    doc.autoTable({
+      head: headers,
+      body: tableData,
+      startY: y + 10,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [32, 72, 154] }
+    });
+    
+    const fileName = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.pdf` : `lezioni_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  }
+
+  function exportToTXT(categoria = null) {
+    let dataToExport = [];
+    let title = "Pacchetti e Lezioni";
+    
+    if (categoria === "prenotate") {
+      dataToExport = prenotate;
+      title = "Lezioni Prenotate";
+    } else if (categoria === "svolte") {
+      dataToExport = svolte;
+      title = "Lezioni Svolte";
+    } else if (categoria === "cancellate") {
+      dataToExport = cancellate;
+      title = "Lezioni Cancellate";
+    } else {
+      dataToExport = [...prenotate, ...svolte, ...cancellate];
+    }
+    
+    let text = `${title}\n${'='.repeat(title.length)}\n\n`;
+    
+    // Aggiungi informazioni filtri
+    if (isAdmin) {
+      if (filtroCliente) {
+        const cli = clienti.find(c => c.id === parseInt(filtroCliente));
+        if (cli) text += `Cliente: ${cli.nomeReferente || cli.email}\n`;
+      }
+      if (filtroPacchetto) {
+        const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
+        if (pac) text += `Pacchetto: ${pac.titolo || pac.id}\n`;
+      }
+      if (filtroAdminDa || filtroAdminA) {
+        text += `Periodo: ${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}\n`;
+      }
+    } else {
+      if (filtroTipologia) text += `Tipologia: ${filtroTipologia}\n`;
+      if (filtroMese) text += `Mese: ${filtroMese}\n`;
+      if (filtroDataDa || filtroDataA) {
+        text += `Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}\n`;
+      }
+    }
+    
+    text += `\nTotale lezioni: ${dataToExport.length}\n\n`;
+    
+    // Aggiungi righe dati
+    dataToExport.forEach((a, idx) => {
+      text += `${idx + 1}. ${formatDate(a)}\n`;
+      if (isAdmin) text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}\n`;
+      text += `   Ore: ${a.oreConsumate ?? a.durataOre ?? "—"}\n`;
+      text += `   Stato: ${displayStato(a)}\n`;
+      if (isModificata(a)) {
+        text += `   Riprogrammata: ${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}\n`;
+      }
+      text += '\n';
+    });
+    
+    // Download
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.txt` : `lezioni_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportToPNG(categoria = null) {
+    if (!contentRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(contentRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      });
+      
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.png` : `lezioni_${new Date().toISOString().split('T')[0]}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    } catch (err) {
+      console.error('Errore export PNG:', err);
+      alert('Errore durante l\'export PNG');
+    }
+  }
 
   function openDettaglio(a) { setAttivitaSelezionata(a); }
   function openRichiesta(a) {
@@ -382,6 +571,7 @@ export default function PacchettiLezioniPage() {
     <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
       <Navbar />
       <main
+        ref={contentRef}
         style={{
           maxWidth: 1200,
           margin: "60px auto 40px auto",
@@ -442,14 +632,25 @@ export default function PacchettiLezioniPage() {
                     ))}
                   </select>
                 </div>
-                <div style={{ flex: "1 1 150px" }}>
+                <div style={{ flex: "1 1 130px" }}>
                   <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    Mese
+                    Da
                   </label>
                   <input
-                    type="month"
-                    value={filtroMese}
-                    onChange={(e) => setFiltroMese(e.target.value)}
+                    type="date"
+                    value={filtroAdminDa}
+                    onChange={(e) => setFiltroAdminDa(e.target.value)}
+                    style={selectStyle}
+                  />
+                </div>
+                <div style={{ flex: "1 1 130px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    A
+                  </label>
+                  <input
+                    type="date"
+                    value={filtroAdminA}
+                    onChange={(e) => setFiltroAdminA(e.target.value)}
                     style={selectStyle}
                   />
                 </div>
@@ -470,12 +671,33 @@ export default function PacchettiLezioniPage() {
                   onClick={() => {
                     setFiltroCliente("");
                     setFiltroPacchetto("");
-                    setFiltroMese("");
+                    setFiltroAdminDa(""); setFiltroAdminA("");
                     setOrdinamento("cronologico");
                   }}
                   style={{...btnStyle, flex: "0 0 auto"}}
                 >
                   Reset Filtri
+                </button>
+                <button
+                  onClick={() => exportToPDF()}
+                  style={{...btnStyle, background: "#28a745", flex: "0 0 auto"}}
+                  title="Esporta in PDF"
+                >
+                  📄 PDF
+                </button>
+                <button
+                  onClick={() => exportToTXT()}
+                  style={{...btnStyle, background: "#17a2b8", flex: "0 0 auto"}}
+                  title="Esporta in TXT"
+                >
+                  📝 TXT
+                </button>
+                <button
+                  onClick={() => exportToPNG()}
+                  style={{...btnStyle, background: "#6c757d", flex: "0 0 auto"}}
+                  title="Esporta in PNG"
+                >
+                  🖼️ PNG
                 </button>
               </div>
             ) : (
@@ -495,14 +717,25 @@ export default function PacchettiLezioniPage() {
                     <option value="cancellata">Cancellate</option>
                   </select>
                 </div>
-                <div style={{ flex: "1 1 150px" }}>
+                <div style={{ flex: "1 1 130px" }}>
                   <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    Mese
+                    Da
                   </label>
                   <input
-                    type="month"
-                    value={filtroMese}
-                    onChange={(e) => setFiltroMese(e.target.value)}
+                    type="date"
+                    value={filtroAdminDa}
+                    onChange={(e) => setFiltroAdminDa(e.target.value)}
+                    style={selectStyle}
+                  />
+                </div>
+                <div style={{ flex: "1 1 130px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    A
+                  </label>
+                  <input
+                    type="date"
+                    value={filtroAdminA}
+                    onChange={(e) => setFiltroAdminA(e.target.value)}
                     style={selectStyle}
                   />
                 </div>
@@ -531,13 +764,34 @@ export default function PacchettiLezioniPage() {
                 <button
                   onClick={() => {
                     setFiltroTipologia("");
-                    setFiltroMese("");
+                    setFiltroAdminDa(""); setFiltroAdminA("");
                     setFiltroDataDa("");
                     setFiltroDataA("");
                   }}
                   style={{...btnStyle, flex: "0 0 auto"}}
                 >
                   Reset Filtri
+                </button>
+                <button
+                  onClick={() => exportToPDF()}
+                  style={{...btnStyle, background: "#28a745", flex: "0 0 auto"}}
+                  title="Esporta in PDF"
+                >
+                  📄 PDF
+                </button>
+                <button
+                  onClick={() => exportToTXT()}
+                  style={{...btnStyle, background: "#17a2b8", flex: "0 0 auto"}}
+                  title="Esporta in TXT"
+                >
+                  📝 TXT
+                </button>
+                <button
+                  onClick={() => exportToPNG()}
+                  style={{...btnStyle, background: "#6c757d", flex: "0 0 auto"}}
+                  title="Esporta in PNG"
+                >
+                  🖼️ PNG
                 </button>
               </div>
             )}
@@ -597,7 +851,16 @@ export default function PacchettiLezioniPage() {
               </div>
             )}
 
-            <SectionTitle>Lezioni Prenotate (future / prenotate)</SectionTitle>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <SectionTitle>Lezioni Prenotate</SectionTitle>
+              <button
+                onClick={() => exportToPDF("prenotate")}
+                style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
+                title="Esporta solo lezioni prenotate"
+              >
+                📄 Esporta
+              </button>
+            </div>
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione prenotata"
@@ -671,16 +934,9 @@ export default function PacchettiLezioniPage() {
                   }
 
                   const statoEl = (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span>{displayStato(a)}</span>
-                      {isModificata(a) && (
-                        <span
-                          title={`Originaria: ${formatDateFromValue(a.orarioOriginale)}`}
-                          style={badgeMod}
-                        >
-                          Modificata
-                        </span>
-                      )}
+                      {renderBadgeRiprogrammata(a)}
                     </div>
                   );
                   cells.push(statoEl);
@@ -698,7 +954,16 @@ export default function PacchettiLezioniPage() {
               />
             </TableWrapper>
 
-            <SectionTitle>Lezioni Svolte / Passate</SectionTitle>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <SectionTitle>Lezioni Svolte</SectionTitle>
+              <button
+                onClick={() => exportToPDF("svolte")}
+                style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
+                title="Esporta solo lezioni svolte"
+              >
+                📄 Esporta
+              </button>
+            </div>
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione svolta"
@@ -742,16 +1007,9 @@ export default function PacchettiLezioniPage() {
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
                   const statoEl = (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span>{displayStato(a)}</span>
-                      {isModificata(a) && (
-                        <span
-                          title={`Originaria: ${formatDateFromValue(a.orarioOriginale)}`}
-                          style={badgeMod}
-                        >
-                          Modificata
-                        </span>
-                      )}
+                      {renderBadgeRiprogrammata(a)}
                     </div>
                   );
                   cells.push(a.oreConsumate ?? a.durataOre ?? "—");
@@ -761,7 +1019,16 @@ export default function PacchettiLezioniPage() {
               />
             </TableWrapper>
 
-            <SectionTitle>Lezioni Cancellate</SectionTitle>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <SectionTitle>Lezioni Cancellate</SectionTitle>
+              <button
+                onClick={() => exportToPDF("cancellate")}
+                style={{...btnStyle, background: "#28a745", padding: "6px 12px", fontSize: 12}}
+                title="Esporta solo lezioni cancellate"
+              >
+                📄 Esporta
+              </button>
+            </div>
             <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione cancellata"
@@ -807,14 +1074,7 @@ export default function PacchettiLezioniPage() {
                   const statoEl = (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span>{displayStato(a)}</span>
-                      {isModificata(a) && (
-                        <span
-                          title={`Originaria: ${formatDateFromValue(a.orarioOriginale)}`}
-                          style={badgeMod}
-                        >
-                          Modificata
-                        </span>
-                      )}
+                      {renderBadgeRiprogrammata(a)}
                     </div>
                   );
                   cells.push(a.oreConsumate ?? a.durataOre ?? "—");
@@ -824,34 +1084,8 @@ export default function PacchettiLezioniPage() {
               />
             </TableWrapper>
 
-            {isCliente && (
-              <>
-                <SectionTitle>Richieste inviate (tutte)</SectionTitle>
-                <TableWrapper>
-                  <MainTable
-                    emptyLabel="Nessuna richiesta"
-                    columns={colsRichiesteCliente}
-                    rows={buildClienteRichiesteRows()}
-                  />
-                </TableWrapper>
-              </>
-            )}
-
-            {isAdmin && (
-              <>
-                <SectionTitle>Richieste recenti (ultimi 30 giorni)</SectionTitle>
-                <TableWrapper>
-                  <MainTable
-                    emptyLabel="Nessuna richiesta nel periodo"
-                    columns={colsRichiesteAdminRecenti}
-                    rows={buildAdminRecentiRows()}
-                  />
-                </TableWrapper>
-              </>
-            )}
-
-            <div style={{ marginTop: -12, fontSize: 11.5, color: "#5a6d90" }}>
-              <strong>Legenda:</strong> <span style={badgeMod}>Modificata</span> = lezione spostata rispetto all’orario originario.
+<div style={{ marginTop: 24, fontSize: 11.5, color: "#5a6d90" }}>
+              <strong>Legenda:</strong> <span style={badgeRiprogrammata}>Riprogrammata</span> = lezione spostata rispetto all’orario originario.
             </div>
           </>
         )}
@@ -1077,6 +1311,16 @@ const badgeMod = {
   fontSize: 11,
   fontWeight: 700,
   lineHeight: 1
+};
+const badgeRiprogrammata = {
+  background: "#FFF4E5",
+  color: "#C75400",
+  padding: "3px 8px",
+  borderRadius: 8,
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1.2,
+  whiteSpace: "nowrap"
 };
 const selectStyle = {
   width: "100%",
