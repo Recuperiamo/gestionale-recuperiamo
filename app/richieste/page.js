@@ -18,6 +18,7 @@ export default function RichiestePage() {
   const [showModalModifica, setShowModalModifica] = useState(false);
 
   const isAdmin = ["admin", "operatore"].includes(session?.user?.role);
+  const isCliente = session?.user?.role === "cliente";
 
   useEffect(() => {
     if (status === "loading") return;
@@ -25,12 +26,8 @@ export default function RichiestePage() {
       router.replace("/signin");
       return;
     }
-    if (!isAdmin) {
-      router.replace("/dashboard");
-      return;
-    }
     loadRichieste();
-  }, [status, session, router, isAdmin]);
+  }, [status, session, router]);
 
   async function loadRichieste() {
     setLoading(true);
@@ -38,12 +35,30 @@ export default function RichiestePage() {
       // Carica richieste modifica
       const resModifica = await fetch("/api/modifiche");
       const dataModifica = await resModifica.json();
-      setRichiesteModifica(Array.isArray(dataModifica.richieste) ? dataModifica.richieste : []);
+      let richiesteModificaData = Array.isArray(dataModifica.richieste) ? dataModifica.richieste : [];
+      
+      // Filtra per cliente se non admin
+      if (isCliente && session?.user?.clienteId) {
+        richiesteModificaData = richiesteModificaData.filter(r => 
+          r.attivita?.clienteId === session.user.clienteId
+        );
+      }
+      
+      setRichiesteModifica(richiesteModificaData);
 
       // Carica richieste lavagna
       const resLavagna = await fetch("/api/richieste-lavagna");
       const dataLavagna = await resLavagna.json();
-      setRichiesteLavagna(Array.isArray(dataLavagna.richieste) ? dataLavagna.richieste : []);
+      let richiesteLavagnaData = Array.isArray(dataLavagna.richieste) ? dataLavagna.richieste : [];
+      
+      // Filtra per cliente se non admin
+      if (isCliente && session?.user?.clienteId) {
+        richiesteLavagnaData = richiesteLavagnaData.filter(r => 
+          r.clienteId === session.user.clienteId
+        );
+      }
+      
+      setRichiesteLavagna(richiesteLavagnaData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -157,10 +172,11 @@ export default function RichiestePage() {
                   <RichiestaModificaCard
                     key={r.id}
                     richiesta={r}
-                    onGestisci={() => {
+                    onGestisci={isAdmin ? () => {
                       setSelectedRichiesta(r);
                       setShowModalModifica(true);
-                    }}
+                    } : undefined}
+                    readonly={!isAdmin}
                   />
                 ))}
               </div>
@@ -195,11 +211,12 @@ export default function RichiestePage() {
                   <RichiestaLavagnaCard
                     key={r.id}
                     richiesta={r}
-                    onApprova={() => handleApprovaLavagna(r.id)}
-                    onRifiuta={() => {
+                    onApprova={isAdmin ? () => handleApprovaLavagna(r.id) : undefined}
+                    onRifiuta={isAdmin ? () => {
                       const note = prompt("Motivo rifiuto (opzionale):");
                       if (note !== null) handleRifiutaLavagna(r.id, note);
-                    }}
+                    } : undefined}
+                    readonly={!isAdmin}
                   />
                 ))}
               </div>

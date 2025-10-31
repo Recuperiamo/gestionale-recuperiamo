@@ -287,6 +287,9 @@ export default function PacchettiLezioniPage() {
   }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, ordinamento, isAdmin, isCliente]);
 
   function exportToPDF(categoria = null) {
+    console.log("exportToPDF chiamata, categoria:", categoria);
+    console.log("prenotate:", prenotate?.length, "svolte:", svolte?.length, "cancellate:", cancellate?.length);
+    
     const doc = new jsPDF();
     let dataToExport = [];
     let title = "Pacchetti e Lezioni";
@@ -361,6 +364,8 @@ export default function PacchettiLezioniPage() {
   }
 
   function exportToTXT(categoria = null) {
+    console.log("exportToTXT chiamata, categoria:", categoria);
+    
     let dataToExport = [];
     let title = "Pacchetti e Lezioni";
     
@@ -425,6 +430,9 @@ export default function PacchettiLezioniPage() {
   }
 
   async function exportToPNG(categoria = null) {
+    console.log("exportToPNG chiamata, categoria:", categoria);
+    console.log("contentRef.current:", contentRef?.current);
+    
     if (!contentRef.current) return;
     
     try {
@@ -701,99 +709,80 @@ export default function PacchettiLezioniPage() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
-                <div style={{ flex: "1 1 150px" }}>
-                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    Tipologia
-                  </label>
-                  <select
-                    value={filtroTipologia}
-                    onChange={(e) => setFiltroTipologia(e.target.value)}
-                    style={selectStyle}
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+                  <div style={{ flex: "1 1 150px" }}>
+                    <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                      Tipologia
+                    </label>
+                    <select
+                      value={filtroTipologia}
+                      onChange={(e) => setFiltroTipologia(e.target.value)}
+                      style={selectStyle}
+                    >
+                      <option value="">Tutte</option>
+                      <option value="programmata">Programmate</option>
+                      <option value="svolta">Svolte</option>
+                      <option value="cancellata">Cancellate</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: "1 1 130px" }}>
+                    <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                      Da
+                    </label>
+                    <input
+                      type="date"
+                      value={filtroDataDa}
+                      onChange={(e) => setFiltroDataDa(e.target.value)}
+                      style={selectStyle}
+                    />
+                  </div>
+                  <div style={{ flex: "1 1 130px" }}>
+                    <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                      A
+                    </label>
+                    <input
+                      type="date"
+                      value={filtroDataA}
+                      onChange={(e) => setFiltroDataA(e.target.value)}
+                      style={selectStyle}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
+                  <button
+                    onClick={() => {
+                      setFiltroTipologia("");
+                      setFiltroDataDa("");
+                      setFiltroDataA("");
+                    }}
+                    style={{...btnStyle, flex: "0 0 auto"}}
                   >
-                    <option value="">Tutte</option>
-                    <option value="programmata">Programmate</option>
-                    <option value="svolta">Svolte</option>
-                    <option value="cancellata">Cancellate</option>
-                  </select>
+                    Reset Filtri
+                  </button>
+                  <button
+                    onClick={() => exportToPDF()}
+                    style={{...btnStyle, background: "#28a745", flex: "0 0 auto"}}
+                    title="Esporta in PDF"
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    onClick={() => exportToTXT()}
+                    style={{...btnStyle, background: "#17a2b8", flex: "0 0 auto"}}
+                    title="Esporta in TXT"
+                  >
+                    📝 TXT
+                  </button>
+                  <button
+                    onClick={() => exportToPNG()}
+                    style={{...btnStyle, background: "#6c757d", flex: "0 0 auto"}}
+                    title="Esporta in PNG"
+                  >
+                    🖼️ PNG
+                  </button>
                 </div>
-                <div style={{ flex: "1 1 130px" }}>
-                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    Da
-                  </label>
-                  <input
-                    type="date"
-                    value={filtroAdminDa}
-                    onChange={(e) => setFiltroAdminDa(e.target.value)}
-                    style={selectStyle}
-                  />
-                </div>
-                <div style={{ flex: "1 1 130px" }}>
-                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    A
-                  </label>
-                  <input
-                    type="date"
-                    value={filtroAdminA}
-                    onChange={(e) => setFiltroAdminA(e.target.value)}
-                    style={selectStyle}
-                  />
-                </div>
-                <div style={{ flex: "1 1 130px" }}>
-                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    Da
-                  </label>
-                  <input
-                    type="date"
-                    value={filtroDataDa}
-                    onChange={(e) => setFiltroDataDa(e.target.value)}
-                    style={selectStyle}
-                  />
-                </div>
-                <div style={{ flex: "1 1 130px" }}>
-                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
-                    A
-                  </label>
-                  <input
-                    type="date"
-                    value={filtroDataA}
-                    onChange={(e) => setFiltroDataA(e.target.value)}
-                    style={selectStyle}
-                  />
-                </div>
-                <button
-                  onClick={() => {
-                    setFiltroTipologia("");
-                    setFiltroAdminDa(""); setFiltroAdminA("");
-                    setFiltroDataDa("");
-                    setFiltroDataA("");
-                  }}
-                  style={{...btnStyle, flex: "0 0 auto"}}
-                >
-                  Reset Filtri
-                </button>
-                <button
-                  onClick={() => exportToPDF()}
-                  style={{...btnStyle, background: "#28a745", flex: "0 0 auto"}}
-                  title="Esporta in PDF"
-                >
-                  📄 PDF
-                </button>
-                <button
-                  onClick={() => exportToTXT()}
-                  style={{...btnStyle, background: "#17a2b8", flex: "0 0 auto"}}
-                  title="Esporta in TXT"
-                >
-                  📝 TXT
-                </button>
-                <button
-                  onClick={() => exportToPNG()}
-                  style={{...btnStyle, background: "#6c757d", flex: "0 0 auto"}}
-                  title="Esporta in PNG"
-                >
-                  🖼️ PNG
-                </button>
-              </div>
+              </>
             )}
           </div>
         )}
