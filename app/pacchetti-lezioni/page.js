@@ -297,73 +297,237 @@ export default function PacchettiLezioniPage() {
     
     try {
       const doc = new jsPDF();
-      let dataToExport = [];
-      let title = "Pacchetti e Lezioni";
+      let y = 20;
       
+      // Titolo principale
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.text("Pacchetti & Lezioni", 14, y);
+      y += 10;
+      
+      // Informazioni filtri
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(100, 100, 100);
+      
+      if (isAdmin) {
+        if (filtroCliente) {
+          const cli = clienti.find(c => c.id === parseInt(filtroCliente));
+          if (cli) {
+            doc.text(`Cliente: ${cli.nomeReferente || cli.email}`, 14, y);
+            y += 5;
+          }
+        }
+        if (filtroPacchetto) {
+          const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
+          if (pac) {
+            doc.text(`Pacchetto: ${pac.titolo || pac.id}`, 14, y);
+            y += 5;
+          }
+        }
+        if (filtroAdminDa || filtroAdminA) {
+          doc.text(`Periodo: ${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 14, y);
+          y += 5;
+        }
+        if (ordinamento) {
+          doc.text(`Ordinamento: ${ordinamento}`, 14, y);
+          y += 5;
+        }
+      } else {
+        if (filtroTipologia) {
+          doc.text(`Tipologia: ${filtroTipologia}`, 14, y);
+          y += 5;
+        }
+        if (filtroDataDa || filtroDataA) {
+          doc.text(`Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 14, y);
+          y += 5;
+        }
+      }
+      
+      doc.setTextColor(0, 0, 0);
+      y += 5;
+      
+      // Funzione helper per creare le righe della tabella
+      const createTableRows = (attivitaList) => {
+        return attivitaList.map(a => {
+          const row = [];
+          
+          // Data/Ora
+          row.push(formatDate(a));
+          
+          // Cliente (solo admin)
+          if (isAdmin) {
+            row.push(a.cliente?.nomeReferente || a.cliente?.email || "—");
+          }
+          
+          // Pacchetto
+          row.push(a.pacchetto?.titolo || "—");
+          
+          // Descrizione (solo admin)
+          if (isAdmin) {
+            row.push(a.descrizione || `Lezione #${a.id}`);
+          }
+          
+          // Ore
+          row.push(String(a.oreConsumate ?? a.durataOre ?? "—"));
+          
+          // Stato
+          row.push(displayStato(a));
+          
+          // Note riprogrammazione
+          if (isModificata(a)) {
+            row.push(`${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}`);
+          } else {
+            row.push("—");
+          }
+          
+          return row;
+        });
+      };
+      
+      // Headers
+      const headers = isAdmin 
+        ? ["Data/Ora", "Cliente", "Pacchetto", "Descrizione", "Ore", "Stato", "Riprogrammata"]
+        : ["Data/Ora", "Pacchetto", "Ore", "Stato", "Riprogrammata"];
+      
+      // Se categoria specifica, esporta solo quella
       if (categoria === "prenotate") {
-        dataToExport = prenotate;
-        title = "Lezioni Prenotate";
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text("Lezioni Prenotate", 14, y);
+        y += 8;
+        
+        autoTable(doc, {
+          head: [headers],
+          body: createTableRows(prenotate),
+          startY: y,
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { left: 14, right: 14 }
+        });
       } else if (categoria === "svolte") {
-        dataToExport = svolte;
-        title = "Lezioni Svolte";
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text("Lezioni Svolte", 14, y);
+        y += 8;
+        
+        autoTable(doc, {
+          head: [headers],
+          body: createTableRows(svolte),
+          startY: y,
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { left: 14, right: 14 }
+        });
       } else if (categoria === "cancellate") {
-        dataToExport = cancellate;
-        title = "Lezioni Cancellate";
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text("Lezioni Cancellate", 14, y);
+        y += 8;
+        
+        autoTable(doc, {
+          head: [headers],
+          body: createTableRows(cancellate),
+          startY: y,
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { left: 14, right: 14 }
+        });
       } else {
-        dataToExport = [...prenotate, ...svolte, ...cancellate];
+        // Export tutte le sezioni separate
+        
+        // Sezione Prenotate
+        if (prenotate.length > 0) {
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(32, 72, 154);
+          doc.text("LEZIONI PRENOTATE", 14, y);
+          doc.setTextColor(0, 0, 0);
+          y += 6;
+          
+          autoTable(doc, {
+            head: [headers],
+            body: createTableRows(prenotate),
+            startY: y,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [32, 72, 154], fontStyle: 'bold', fontSize: 9 },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { left: 14, right: 14 }
+          });
+          
+          y = doc.lastAutoTable.finalY + 15;
+        }
+        
+        // Sezione Svolte
+        if (svolte.length > 0) {
+          // Nuova pagina se necessario
+          if (y > 250) {
+            doc.addPage();
+            y = 20;
+          }
+          
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(18, 117, 58);
+          doc.text("LEZIONI SVOLTE", 14, y);
+          doc.setTextColor(0, 0, 0);
+          y += 6;
+          
+          autoTable(doc, {
+            head: [headers],
+            body: createTableRows(svolte),
+            startY: y,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [18, 117, 58], fontStyle: 'bold', fontSize: 9 },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { left: 14, right: 14 }
+          });
+          
+          y = doc.lastAutoTable.finalY + 15;
+        }
+        
+        // Sezione Cancellate
+        if (cancellate.length > 0) {
+          // Nuova pagina se necessario
+          if (y > 250) {
+            doc.addPage();
+            y = 20;
+          }
+          
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(153, 27, 27);
+          doc.text("LEZIONI CANCELLATE", 14, y);
+          doc.setTextColor(0, 0, 0);
+          y += 6;
+          
+          autoTable(doc, {
+            head: [headers],
+            body: createTableRows(cancellate),
+            startY: y,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [153, 27, 27], fontStyle: 'bold', fontSize: 9 },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { left: 14, right: 14 }
+          });
+        }
       }
       
-      doc.setFontSize(16);
-      doc.text(title, 14, 15);
-    
-    let y = 25;
-    if (isAdmin) {
-      doc.setFontSize(10);
-      if (filtroCliente) {
-        const cli = clienti.find(c => c.id === parseInt(filtroCliente));
-        if (cli) doc.text(`Cliente: ${cli.nomeReferente || cli.email}`, 14, y);
-        y += 6;
+      // Footer con data generazione
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Generato il ${new Date().toLocaleDateString('it-IT')} - Pagina ${i} di ${totalPages}`,
+          14,
+          doc.internal.pageSize.height - 10
+        );
       }
-      if (filtroPacchetto) {
-        const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
-        if (pac) doc.text(`Pacchetto: ${pac.titolo || pac.id}`, 14, y);
-        y += 6;
-      }
-      if (filtroAdminDa || filtroAdminA) {
-        doc.text(`Periodo: ${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 14, y);
-        y += 6;
-      }
-    } else {
-      doc.setFontSize(10);
-      if (filtroTipologia) doc.text(`Tipologia: ${filtroTipologia}`, 14, y);
-      if (filtroMese) doc.text(`Mese: ${filtroMese}`, 14, y + 6);
-      if (filtroDataDa || filtroDataA) {
-        doc.text(`Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 14, y + 12);
-      }
-    }
-    
-    const tableData = dataToExport.map(a => {
-      const row = [formatDate(a)];
-      if (isAdmin) row.push(a.descrizione || `Lezione #${a.id}`);
-      row.push(a.oreConsumate ?? a.durataOre ?? "—");
-      row.push(displayStato(a));
-      if (isModificata(a)) {
-        row.push(`Riprogrammata: ${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}`);
-      } else {
-        row.push("");
-      }
-      return row;
-    });
-    
-    const headers = [["Data/Ora", ...(isAdmin ? ["Descrizione"] : []), "Ore", "Stato", "Modifiche"]];
-    
-    autoTable(doc, {
-      head: headers,
-      body: tableData,
-      startY: y + 10,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [32, 72, 154] }
-    });
     
     const fileName = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.pdf` : `lezioni_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
@@ -421,7 +585,11 @@ export default function PacchettiLezioniPage() {
     // Aggiungi righe dati
     dataToExport.forEach((a, idx) => {
       text += `${idx + 1}. ${formatDate(a)}\n`;
-      if (isAdmin) text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}\n`;
+      if (isAdmin) {
+        text += `   Cliente: ${a.cliente?.nomeReferente || a.cliente?.email || "—"}\n`;
+        text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}\n`;
+      }
+      text += `   Pacchetto: ${a.pacchetto?.titolo || "—"}\n`;
       text += `   Ore: ${a.oreConsumate ?? a.durataOre ?? "—"}\n`;
       text += `   Stato: ${displayStato(a)}\n`;
       if (isModificata(a)) {
