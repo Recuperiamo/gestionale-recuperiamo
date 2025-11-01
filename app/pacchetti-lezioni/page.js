@@ -41,6 +41,7 @@ export default function PacchettiLezioniPage() {
   const [pacchetti, setPacchetti] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroPacchetto, setFiltroPacchetto] = useState("");
+  const [filtroStatoPacchetto, setFiltroStatoPacchetto] = useState(""); // attivo | sospeso | archiviato
   const [filtroAdminDa, setFiltroAdminDa] = useState("");
   const [filtroAdminA, setFiltroAdminA] = useState("");
   const [filtroMese, setFiltroMese] = useState("");
@@ -118,15 +119,14 @@ export default function PacchettiLezioniPage() {
       if (r.ok) {
         const js = await r.json();
         const lista = Array.isArray(js) ? js : [];
-        // Filtra SOLO pacchetti attivi
-        const attivi = lista.filter(p => p.stato === 'attivo');
+        // NON filtrare per stato - mostra TUTTI i pacchetti
         // Ordina alfabeticamente per descrizione
-        attivi.sort((a, b) => {
+        lista.sort((a, b) => {
           const tA = (a.descrizione || `Pacchetto #${a.id}`).toLowerCase();
           const tB = (b.descrizione || `Pacchetto #${b.id}`).toLowerCase();
           return tA.localeCompare(tB);
         });
-        setPacchetti(attivi);
+        setPacchetti(lista);
       }
     } catch (e) {
       console.error("Errore caricamento pacchetti:", e);
@@ -858,12 +858,31 @@ export default function PacchettiLezioniPage() {
                   >
                     <option value="">Tutti i pacchetti</option>
                     {pacchetti
-                      .filter(p => !filtroCliente || String(p.clienteId) === String(filtroCliente))
+                      .filter(p => {
+                        if (filtroCliente && String(p.clienteId) !== String(filtroCliente)) return false;
+                        if (filtroStatoPacchetto && p.stato !== filtroStatoPacchetto) return false;
+                        return true;
+                      })
                       .map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.descrizione || `Pacchetto #${p.id}`} ({p.oreAcquistate}h)
+                          {p.descrizione || `Pacchetto #${p.id}`} ({p.oreAcquistate}h) - {p.stato || 'N/A'}
                         </option>
                       ))}
+                  </select>
+                </div>
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Stato Pacchetto
+                  </label>
+                  <select
+                    value={filtroStatoPacchetto}
+                    onChange={(e) => setFiltroStatoPacchetto(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Tutti gli stati</option>
+                    <option value="attivo">Attivo</option>
+                    <option value="sospeso">Sospeso</option>
+                    <option value="archiviato">Archiviato</option>
                   </select>
                 </div>
                 <div style={{ flex: "1 1 130px" }}>
@@ -905,6 +924,7 @@ export default function PacchettiLezioniPage() {
                   onClick={() => {
                     setFiltroCliente("");
                     setFiltroPacchetto("");
+                    setFiltroStatoPacchetto("");
                     setFiltroAdminDa(""); setFiltroAdminA("");
                     setOrdinamento("cronologico");
                   }}
