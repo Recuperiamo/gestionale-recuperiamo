@@ -80,8 +80,12 @@ export default function PacchettiLezioniPage() {
       const p = pacchetti.find(x => String(x.id) === String(filtroPacchetto));
       if (p) return p.titolo && p.titolo.trim() ? p.titolo : `Pacchetto #${p.id}`;
     }
-    const first = (attivita && attivita.length) ? attivita[0].pacchetto : null;
-    if (first) return first.titolo && first.titolo.trim() ? first.titolo : `Pacchetto #${first.id}`;
+    const first = (attivita && attivita.length) ? attivita[0] : null;
+    if (first && first.pacchetto) {
+      return first.pacchetto.titolo && first.pacchetto.titolo.trim() 
+        ? first.pacchetto.titolo 
+        : `Pacchetto #${first.pacchetto.id}`;
+    }
     return null;
   })();
 
@@ -196,17 +200,11 @@ export default function PacchettiLezioniPage() {
   
   function renderBadgeRiprogrammata(a) {
     if (!isModificata(a)) return null;
+    const dataNew = a.orario ? new Date(a.orario).toLocaleDateString('it-IT') : '?';
     return (
-      <span style={{
-        ...badgeRiprogrammata,
-        display: 'inline-flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        lineHeight: '1.4'
-      }}>
-        <span style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>Riprogrammata:</span>
-        <span style={{ fontSize: '10px' }}>Da: {formatDateFromValue(a.orarioOriginale)}</span>
-        <span style={{ fontSize: '10px' }}>A: {formatDateFromValue(a.orario)}</span>
+      <span className="inline-flex flex-col items-center justify-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded whitespace-nowrap leading-none">
+        <span>Riprog.</span>
+        <span className="text-2xs">{dataNew}</span>
       </span>
     );
   }
@@ -347,35 +345,43 @@ export default function PacchettiLezioniPage() {
           const cli = clienti.find(c => c.id === parseInt(filtroCliente));
           if (cli) {
             doc.setFont(undefined, 'bold');
-            doc.text(`Cliente: `, 14, y);
+            const clienteLabel = `Cliente: `;
+            doc.text(clienteLabel, 14, y);
+            const labelWidth = doc.getTextWidth(clienteLabel);
             doc.setFont(undefined, 'normal');
-            doc.text(cli.nomeReferente || cli.email, 30, y);
+            doc.text(cli.nomeReferente || cli.email, 14 + labelWidth, y);
             y += 6;
           }
         }
         else if (selectedClienteLabel) {
           // Se non c'è un filtro esplicito, mostra il cliente selezionato nella UI
           doc.setFont(undefined, 'bold');
-          doc.text(`Cliente: `, 14, y);
+          const clienteLabel = `Cliente: `;
+          doc.text(clienteLabel, 14, y);
+          const labelWidth = doc.getTextWidth(clienteLabel);
           doc.setFont(undefined, 'normal');
-          doc.text(selectedClienteLabel, 30, y);
+          doc.text(selectedClienteLabel, 14 + labelWidth, y);
           y += 6;
         }
         if (filtroPacchetto) {
           const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
           if (pac) {
             doc.setFont(undefined, 'bold');
-            doc.text(`Pacchetto: `, 14, y);
+            const pacchettoLabel = `Pacchetto: `;
+            doc.text(pacchettoLabel, 14, y);
+            const labelWidth = doc.getTextWidth(pacchettoLabel);
             doc.setFont(undefined, 'normal');
-            doc.text(pac.titolo || `Pacchetto #${pac.id}`, 43, y);
+            doc.text(pac.titolo || `Pacchetto #${pac.id}`, 14 + labelWidth, y);
             y += 6;
           }
         } else if (selectedPacchettoTitle) {
           // Se non c'è filtroPacchetto esplicito, mostra il pacchetto selezionato nella UI
           doc.setFont(undefined, 'bold');
-          doc.text(`Pacchetto: `, 14, y);
+          const pacchettoLabel = `Pacchetto: `;
+          doc.text(pacchettoLabel, 14, y);
+          const labelWidth = doc.getTextWidth(pacchettoLabel);
           doc.setFont(undefined, 'normal');
-          doc.text(selectedPacchettoTitle, 43, y);
+          doc.text(selectedPacchettoTitle, 14 + labelWidth, y);
           y += 6;
         }
         if (filtroAdminDa || filtroAdminA) {

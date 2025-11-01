@@ -1655,6 +1655,8 @@ export default function LavagnaCanvas({
           if (!isAdmin) return;
           emitOrPublish('background:change', { lavagnaId, attivitaId, sfondo: sfondoRef.current });
         };
+        const pendingViewportRef = useRef(null);
+        const viewportApplyRAFRef = useRef(null);
         const onViewportUpdate = (msg) => {
           const { data } = msg || {};
           if (!data) return;
@@ -1673,7 +1675,17 @@ export default function LavagnaCanvas({
           };
           latestAdminViewportRef.current = snapshot;
           if (!isAdmin && spectatorModeRef.current) {
-            applyViewport(snapshot);
+            // Buffer viewport update and apply once per animation frame to prevent "jittering"
+            pendingViewportRef.current = snapshot;
+            if (viewportApplyRAFRef.current) {
+              cancelAnimationFrame(viewportApplyRAFRef.current);
+            }
+            viewportApplyRAFRef.current = requestAnimationFrame(() => {
+              if (pendingViewportRef.current) {
+                applyViewport(pendingViewportRef.current);
+              }
+              viewportApplyRAFRef.current = null;
+            });
           }
         };
         const onViewportRequest = () => {

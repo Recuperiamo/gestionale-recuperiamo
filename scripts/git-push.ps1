@@ -20,7 +20,7 @@ Write-Log "Working directory: $cwd"
 
 # Collect changed files (tracked and untracked)
 $status = git status --porcelain
-if ($status -eq $null) { $status = "" }
+if ($null -eq $status) { $status = "" }
 $files = @()
 if ($status.Trim() -ne "") {
   $status -split "\n" | ForEach-Object {
@@ -55,7 +55,7 @@ if ($exclude -and $exclude.Trim() -ne "") {
 
 # Pre-checks (lint + build) unless skipped
 if (-not $skipChecks) {
-  if ((Get-Command npm -ErrorAction SilentlyContinue) -ne $null) {
+  if ($null -ne (Get-Command npm -ErrorAction SilentlyContinue)) {
     if (Get-Content package.json | ConvertFrom-Json | Get-Member -Name scripts -ErrorAction SilentlyContinue) {
       $pkg = Get-Content package.json | ConvertFrom-Json
       if ($pkg.scripts.lint) {
