@@ -1312,6 +1312,7 @@ export default function PacchettiLezioniPage() {
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
                   cells.push(a.oreConsumate ?? a.durataOre ?? "—");
+
                   const statoEl = (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span>{displayStato(a)}</span>
@@ -1319,12 +1320,6 @@ export default function PacchettiLezioniPage() {
                     </div>
                   );
                   cells.push({ content: statoEl, style: { minWidth: 140 } });
-
-                  if (!isAdmin) {
-                    cells.push(
-                      <span style={{ fontSize: 12, opacity: 0.55 }}>—</span>
-                    );
-                  }
 
                   return { key: a.id, cells };
                 })}
