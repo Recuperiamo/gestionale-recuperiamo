@@ -1426,7 +1426,44 @@ export default function LavagnaCanvas({
   // Setup Ably helpers and subscriptions
   const applyViewport = useCallback((view) => {
     if (!view) return;
-    const { pan: remotePan, zoom: remoteZoom } = view;
+    const { pan: remotePan, zoom: remoteZoom, visibleRect } = view;
+    
+    // If the admin sent a visibleRect, compute a fit-to-view for spectators so
+    // they scale and center the admin's view into their own canvas (responsive).
+    if (visibleRect && visibleRect.width > 0 && visibleRect.height > 0) {
+      try {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const localW = rect.width;
+          const localH = rect.height;
+          if (localW > 0 && localH > 0) {
+            // Compute zoom to fit admin's visible rect into our canvas
+            const scaleX = localW / visibleRect.width;
+            const scaleY = localH / visibleRect.height;
+            const targetZoom = Math.min(scaleX, scaleY);
+            // Clamp zoom to allowed range
+            const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
+            // Center the admin's visible rect in our canvas
+            const centerX = visibleRect.x + visibleRect.width / 2;
+            const centerY = visibleRect.y + visibleRect.height / 2;
+            const newPan = {
+              x: centerX - (localW / 2) / clampedZoom,
+              y: centerY - (localH / 2) / clampedZoom
+            };
+            // Apply the computed fit
+            setPan((prev) => {
+              if (prev.x === newPan.x && prev.y === newPan.y) return prev;
+              return newPan;
+            });
+            setZoom((prev) => (prev === clampedZoom ? prev : clampedZoom));
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+    
+    // Fallback: if no visibleRect, apply admin pan/zoom directly (old behavior)
     if (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number') {
       setPan((prev) => {
         if (prev.x === remotePan.x && prev.y === remotePan.y) return prev;
@@ -1495,12 +1532,34 @@ export default function LavagnaCanvas({
 
   useEffect(() => {
     if (!isAdmin) return;
+    // Compute the visible world-space rectangle so spectators can scale to fit
+    const canvas = canvasRef.current;
+    let visibleRect = null;
+    let canvasSize = null;
+    if (canvas) {
+      try {
+        const rect = canvas.getBoundingClientRect();
+        const cssW = rect.width;
+        const cssH = rect.height;
+        canvasSize = { width: cssW, height: cssH };
+        const worldW = cssW / zoom;
+        const worldH = cssH / zoom;
+        visibleRect = {
+          x: pan.x,
+          y: pan.y,
+          width: worldW,
+          height: worldH
+        };
+      } catch (_) {}
+    }
     viewportBroadcastRef.current.payload = {
       lavagnaId,
       attivitaId,
       senderId: utenteId,
       pan: { x: pan.x, y: pan.y },
       zoom,
+      canvasSize,
+      visibleRect,
       ts: Date.now()
     };
     if (!viewportBroadcastRef.current.rafId) {
@@ -4059,6 +4118,24 @@ export default function LavagnaCanvas({
       const shapeToOpen = shouldOpenLink
         ? (forme || []).find((f) => f.id === pendingClick.shapeId)
         : null;
+      // If the user moved the selection, persist the final positions to server
+      if (dragInfo.moved) {
+        try {
+          const selIds = (dragInfo.selectionSnapshot && Array.isArray(dragInfo.selectionSnapshot.forme) && dragInfo.selectionSnapshot.forme.length)
+            ? dragInfo.selectionSnapshot.forme
+            : (selectedItems && Array.isArray(selectedItems.forme) ? selectedItems.forme : []);
+          for (const sid of selIds) {
+            try {
+              const s = (forme || []).find((f) => f.id === sid);
+              if (s) {
+                // Persist final shape position to server and notify remote clients
+                updateShapeLocal(s, true);
+              }
+            } catch(_) {}
+          }
+        } catch(_) {}
+      }
+
       dragInfo.active = false;
       dragInfo.lastWorld = null;
       dragInfo.moved = false;
