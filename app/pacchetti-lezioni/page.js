@@ -123,10 +123,10 @@ export default function PacchettiLezioniPage() {
       if (r.ok) {
         const js = await r.json();
         const lista = Array.isArray(js) ? js : [];
-        // Ordina alfabeticamente per titolo
+        // Ordina alfabeticamente per descrizione
         lista.sort((a, b) => {
-          const tA = (a.titolo || `Pacchetto #${a.id}`).toLowerCase();
-          const tB = (b.titolo || `Pacchetto #${b.id}`).toLowerCase();
+          const tA = (a.descrizione || `Pacchetto #${a.id}`).toLowerCase();
+          const tB = (b.descrizione || `Pacchetto #${b.id}`).toLowerCase();
           return tA.localeCompare(tB);
         });
         setPacchetti(lista);
@@ -693,7 +693,7 @@ export default function PacchettiLezioniPage() {
     ? ["Data / Orario", "Ore", "Stato", "Azioni"]
     : ["Data / Orario", "Descrizione", "Ore", "Stato"];
   const colsSvolte = isCliente
-    ? ["Data / Orario", "Ore", "Stato"]
+    ? ["Data / Orario", "Ore", "Stato", "Azioni"]
     : ["Data / Orario", "Descrizione", "Ore", "Stato"];
   const colsCancellate = colsSvolte;
   const colsRichiesteCliente = ["Data / Orario Lezione", "Orario originario", "Tipo", "Stato", "Creata"];
@@ -1293,6 +1293,13 @@ export default function PacchettiLezioniPage() {
                     </div>
                   );
                   cells.push({ content: statoEl, style: { minWidth: 140 } });
+
+                  if (!isAdmin) {
+                    cells.push(
+                      <span style={{ fontSize: 12, opacity: 0.55 }}>—</span>
+                    );
+                  }
+
                   return { key: a.id, cells };
                 })}
               />
@@ -1429,6 +1436,13 @@ export default function PacchettiLezioniPage() {
                     </div>
                   );
                   cells.push({ content: statoEl, style: { minWidth: 140 } });
+
+                  if (!isAdmin) {
+                    cells.push(
+                      <span style={{ fontSize: 12, opacity: 0.55 }}>—</span>
+                    );
+                  }
+
                   return { key: a.id, cells };
                 })}
               />
