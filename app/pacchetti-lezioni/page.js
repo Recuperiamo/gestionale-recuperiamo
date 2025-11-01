@@ -57,9 +57,33 @@ export default function PacchettiLezioniPage() {
   const [exportMenuCancellate, setExportMenuCancellate] = useState(false);
 
   const contentRef = useRef(null);
+  const contentRefPrenotate = useRef(null);
+  const contentRefSvolte = useRef(null);
+  const contentRefCancellate = useRef(null);
 
   const isCliente = session?.user?.role === "cliente";
   const isAdmin = !isCliente;
+
+  // Derived labels for the compact Cliente / Pacchetto mini summary
+  const selectedClienteLabel = (() => {
+    if (filtroCliente) {
+      const c = clienti.find(x => String(x.id) === String(filtroCliente));
+      return c ? (c.nomeReferente || c.email || `Cliente #${c.id}`) : null;
+    }
+    // fallback to first activity's cliente
+    const first = (attivita && attivita.length) ? attivita[0].cliente : null;
+    return first ? (first.nomeReferente || first.email || `Cliente #${first.id}`) : null;
+  })();
+
+  const selectedPacchettoTitle = (() => {
+    if (filtroPacchetto) {
+      const p = pacchetti.find(x => String(x.id) === String(filtroPacchetto));
+      if (p) return p.titolo && p.titolo.trim() ? p.titolo : `Pacchetto #${p.id}`;
+    }
+    const first = (attivita && attivita.length) ? attivita[0].pacchetto : null;
+    if (first) return first.titolo && first.titolo.trim() ? first.titolo : `Pacchetto #${first.id}`;
+    return null;
+  })();
 
   async function fetchAttivita() {
     try {
@@ -325,46 +349,61 @@ export default function PacchettiLezioniPage() {
             doc.setFont(undefined, 'bold');
             doc.text(`Cliente: `, 14, y);
             doc.setFont(undefined, 'normal');
-            doc.text(cli.nomeReferente || cli.email, 33, y);
+            doc.text(cli.nomeReferente || cli.email, 30, y);
             y += 6;
           }
+        }
+        else if (selectedClienteLabel) {
+          // Se non c'è un filtro esplicito, mostra il cliente selezionato nella UI
+          doc.setFont(undefined, 'bold');
+          doc.text(`Cliente: `, 14, y);
+          doc.setFont(undefined, 'normal');
+          doc.text(selectedClienteLabel, 30, y);
+          y += 6;
         }
         if (filtroPacchetto) {
           const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
           if (pac) {
             doc.setFont(undefined, 'bold');
-            doc.text(`Nome Pacchetto: `, 14, y);
+            doc.text(`Pacchetto: `, 14, y);
             doc.setFont(undefined, 'normal');
-            doc.text(pac.titolo || `Pacchetto #${pac.id}`, 46, y);
+            doc.text(pac.titolo || `Pacchetto #${pac.id}`, 43, y);
             y += 6;
           }
+        } else if (selectedPacchettoTitle) {
+          // Se non c'è filtroPacchetto esplicito, mostra il pacchetto selezionato nella UI
+          doc.setFont(undefined, 'bold');
+          doc.text(`Pacchetto: `, 14, y);
+          doc.setFont(undefined, 'normal');
+          doc.text(selectedPacchettoTitle, 43, y);
+          y += 6;
         }
         if (filtroAdminDa || filtroAdminA) {
           doc.setFont(undefined, 'bold');
           doc.text(`Periodo: `, 14, y);
           doc.setFont(undefined, 'normal');
-          doc.text(`${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 33, y);
+          doc.text(`${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}`, 30, y);
           y += 6;
         }
       } else {
         if (filtroTipologia) {
-          doc.setFont(undefined, 'bold');
-          doc.text(`Tipologia: `, 14, y);
-          doc.setFont(undefined, 'normal');
-          doc.text(filtroTipologia, 38, y);
-          y += 6;
+  doc.setFont(undefined, 'bold');
+  doc.text(`Tipologia: `, 14, y);
+  doc.setFont(undefined, 'normal');
+  doc.text(filtroTipologia, 35, y);
+  y += 6;
         }
         if (filtroDataDa || filtroDataA) {
-          doc.setFont(undefined, 'bold');
-          doc.text(`Periodo: `, 14, y);
-          doc.setFont(undefined, 'normal');
-          doc.text(`${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 33, y);
-          y += 6;
+  doc.setFont(undefined, 'bold');
+  doc.text(`Periodo: `, 14, y);
+  doc.setFont(undefined, 'normal');
+  doc.text(`${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}`, 30, y);
+  y += 6;
         }
       }
       
-      doc.setTextColor(0, 0, 0);
-      y += 5;
+  doc.setTextColor(0, 0, 0);
+  y += 5;
       
       // Funzione helper per verificare se c'è almeno una lezione riprogrammata
       const hasRiprogrammate = (attivitaList) => {
@@ -375,26 +414,12 @@ export default function PacchettiLezioniPage() {
       const createTableRows = (attivitaList, includeRiprogrammata) => {
         return attivitaList.map(a => {
           const row = [];
-          
-          // Cliente
-          if (isAdmin) {
-            const cliente = a.cliente?.nomeReferente || a.cliente?.email || "—";
-            row.push(cliente);
-          }
-          
-          // Pacchetto
-          const pacchetto = a.pacchetto?.titolo || `Pacchetto #${a.pacchettoId || "?"}`;
-          row.push(pacchetto);
-          
           // Data/Ora
           row.push(formatDate(a));
-          
           // Ore
           row.push(String(a.oreConsumate ?? a.durataOre ?? "—"));
-          
           // Stato
           row.push(displayStato(a));
-          
           // Note riprogrammazione (solo se la colonna è inclusa)
           if (includeRiprogrammata) {
             if (isModificata(a)) {
@@ -405,7 +430,6 @@ export default function PacchettiLezioniPage() {
               row.push("—");
             }
           }
-          
           return row;
         });
       };
@@ -413,13 +437,9 @@ export default function PacchettiLezioniPage() {
       // Funzione per creare tabella con headers dinamici
       const createTable = (attivitaList, startY, color, sectionTitle) => {
         const hasRipr = hasRiprogrammate(attivitaList);
-        const headers = isAdmin
-          ? (hasRipr 
-              ? ["Cliente", "Pacchetto", "Data/Ora", "Ore", "Stato", "Riprogrammata"]
-              : ["Cliente", "Pacchetto", "Data/Ora", "Ore", "Stato"])
-          : (hasRipr 
-              ? ["Pacchetto", "Data/Ora", "Ore", "Stato", "Riprogrammata"]
-              : ["Pacchetto", "Data/Ora", "Ore", "Stato"]);
+        const headers = hasRipr
+          ? ["Data/Ora", "Ore", "Stato", "Riprogrammata"]
+          : ["Data/Ora", "Ore", "Stato"];
         
         if (sectionTitle) {
           doc.setFontSize(12);
@@ -446,33 +466,16 @@ export default function PacchettiLezioniPage() {
             fontSize: 10,
             textColor: [255, 255, 255]
           },
-          columnStyles: isAdmin
-            ? (hasRipr ? {
-                0: { cellWidth: 35 }, // Cliente
-                1: { cellWidth: 30 }, // Pacchetto
-                2: { cellWidth: 35 }, // Data/Ora
-                3: { cellWidth: 15, halign: 'center' }, // Ore
-                4: { cellWidth: 25, halign: 'center' }, // Stato
-                5: { cellWidth: 'auto' } // Riprogrammata
-              } : {
-                0: { cellWidth: 40 }, // Cliente
-                1: { cellWidth: 35 }, // Pacchetto
-                2: { cellWidth: 40 }, // Data/Ora
-                3: { cellWidth: 20, halign: 'center' }, // Ore
-                4: { cellWidth: 30, halign: 'center' } // Stato
-              })
-            : (hasRipr ? {
-                0: { cellWidth: 40 }, // Pacchetto
-                1: { cellWidth: 40 }, // Data/Ora
-                2: { cellWidth: 20, halign: 'center' }, // Ore
-                3: { cellWidth: 25, halign: 'center' }, // Stato
-                4: { cellWidth: 'auto' } // Riprogrammata
-              } : {
-                0: { cellWidth: 50 }, // Pacchetto
-                1: { cellWidth: 50 }, // Data/Ora
-                2: { cellWidth: 25, halign: 'center' }, // Ore
-                3: { cellWidth: 35, halign: 'center' } // Stato
-              }),
+          columnStyles: hasRipr ? {
+            0: { cellWidth: 55 }, // Data/Ora
+            1: { cellWidth: 22, halign: 'center' }, // Ore
+            2: { cellWidth: 28, halign: 'center' }, // Stato
+            3: { cellWidth: 'auto' } // Riprogrammata
+          } : {
+            0: { cellWidth: 65 }, // Data/Ora
+            1: { cellWidth: 28, halign: 'center' }, // Ore
+            2: { cellWidth: 38, halign: 'center' } // Stato
+          },
           alternateRowStyles: { fillColor: [248, 250, 252] },
           margin: { left: 14, right: 14 }
         });
@@ -564,37 +567,34 @@ export default function PacchettiLezioniPage() {
       let text = `${title}\n${'='.repeat(title.length)}\n\n`;
     
     // Aggiungi informazioni filtri
-    if (isAdmin) {
       if (filtroCliente) {
         const cli = clienti.find(c => c.id === parseInt(filtroCliente));
         if (cli) text += `Cliente: ${cli.nomeReferente || cli.email}\n`;
+      } else if (selectedClienteLabel) {
+        text += `Cliente: ${selectedClienteLabel}\n`;
       }
       if (filtroPacchetto) {
         const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
         if (pac) text += `Pacchetto: ${pac.titolo || pac.id}\n`;
+      } else if (selectedPacchettoTitle) {
+        text += `Pacchetto: ${selectedPacchettoTitle}\n`;
       }
       if (filtroAdminDa || filtroAdminA) {
         text += `Periodo: ${filtroAdminDa || "inizio"} - ${filtroAdminA || "fine"}\n`;
       }
-    } else {
       if (filtroTipologia) text += `Tipologia: ${filtroTipologia}\n`;
       if (filtroMese) text += `Mese: ${filtroMese}\n`;
       if (filtroDataDa || filtroDataA) {
         text += `Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}\n`;
       }
-    }
     
     text += `\nTotale lezioni: ${dataToExport.length}\n\n`;
     
     // Aggiungi righe dati
     dataToExport.forEach((a, idx) => {
       text += `${idx + 1}. ${formatDate(a)}\n`;
-      if (isAdmin) {
-        text += `   Cliente: ${a.cliente?.nomeReferente || a.cliente?.email || "—"}\n`;
-        text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}\n`;
-      }
-      text += `   Pacchetto: ${a.pacchetto?.titolo || "—"}\n`;
-      text += `   Ore: ${a.oreConsumate ?? a.durataOre ?? "—"}\n`;
+  text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}`+"\n";
+  text += `   Ore: ${a.oreConsumate ?? a.durataOre ?? "—"}\n`;
       text += `   Stato: ${displayStato(a)}\n`;
       if (isModificata(a)) {
         text += `   Riprogrammata: ${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}\n`;
@@ -617,16 +617,21 @@ export default function PacchettiLezioniPage() {
   }
 
   async function exportToPNG(categoria = null) {
+    // Decide quale ref usare (se è stata passata una categoria usa il ref dedicato,
+    // altrimenti usa il ref principale che avvolge l'intero main)
     console.log("exportToPNG chiamata, categoria:", categoria);
-    console.log("contentRef.current:", contentRef?.current);
-    
-    if (!contentRef.current) {
+    const refToUse = categoria === "prenotate" ? contentRefPrenotate
+      : categoria === "svolte" ? contentRefSvolte
+      : categoria === "cancellate" ? contentRefCancellate
+      : contentRef;
+
+    if (!refToUse?.current) {
       alert("Errore: elemento da catturare non trovato");
       return;
     }
-    
+
     try {
-      const canvas = await html2canvas(contentRef.current, {
+      const canvas = await html2canvas(refToUse.current, {
         backgroundColor: '#ffffff',
         scale: 2,
         logging: false
@@ -718,6 +723,7 @@ export default function PacchettiLezioniPage() {
   }
 
   function buildAdminRecentiRows() {
+  
     return richiesteSafe
       .filter(r => {
         if (!r?.createdAt) return false;
@@ -781,9 +787,27 @@ export default function PacchettiLezioniPage() {
           color: "#20489a"
         }}
       >
-        <h1 style={{ fontSize: 32, fontWeight: 800, textAlign: "center", margin: "0 0 34px" }}>
+  <h1 style={{ fontSize: 32, fontWeight: 800, textAlign: "center", margin: "0 0 33px" }}>
           Pacchetti & Lezioni
         </h1>
+
+        {/* Compact Cliente / Pacchetto summary shown above the sections (not inside table columns) */}
+        {(selectedClienteLabel || selectedPacchettoTitle) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '12px 0 20px 0', alignItems: 'flex-start', fontSize: 18 }}>
+            {selectedClienteLabel && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontWeight: 700 }}>Cliente:</span>
+                <span>{selectedClienteLabel}</span>
+              </div>
+            )}
+            {selectedPacchettoTitle && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontWeight: 700 }}>Pacchetto:</span>
+                <span>{selectedPacchettoTitle}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filtri */}
         {!loading && !errore && (
@@ -985,51 +1009,6 @@ export default function PacchettiLezioniPage() {
           <>
             <PacchettoSummaryPanel attivita={attivita} />
 
-            {isAdmin && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 20px'
-              }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={multiSelect}
-                    onChange={(e)=> setMultiSelect(e.target.checked)}
-                  />
-                  <span style={{ fontWeight: 700 }}>Selezione multipla</span>
-                </label>
-                {multiSelect && (
-                  <button
-                    disabled={selectedIds.size === 0}
-                    onClick={async () => {
-                      if (selectedIds.size === 0) return;
-                      const count = selectedIds.size;
-                      if (!confirm(`Confermi l'eliminazione di ${count} attività selezionate?`)) return;
-                      // Elimina una ad una usando l'endpoint esistente (gestisce anche pacchetto/lavagna)
-                      const ids = Array.from(selectedIds);
-                      let ok = 0, fail = 0;
-                      for (const id of ids) {
-                        try {
-                          const r = await fetch('/api/attivita', {
-                            method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id })
-                          });
-                          if (r.ok) ok++; else fail++;
-                        } catch (_) { fail++; }
-                      }
-                      await fetchAttivita();
-                      setSelectedIds(new Set());
-                      if (fail) alert(`Eliminazione completata: ${ok} ok, ${fail} fallite.`);
-                    }}
-                    style={{
-                      background: selectedIds.size ? '#ff6464' : '#ffb3b3', color: '#fff', border: 0,
-                      borderRadius: 10, padding: '6px 12px', fontWeight: 800, cursor: selectedIds.size ? 'pointer' : 'not-allowed'
-                    }}
-                  >
-                    Elimina selezionate ({selectedIds.size})
-                  </button>
-                )}
-              </div>
-            )}
-
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <SectionTitle>Lezioni Prenotate</SectionTitle>
               <div style={{ position: "relative" }}>
@@ -1109,7 +1088,8 @@ export default function PacchettiLezioniPage() {
                 )}
               </div>
             </div>
-            <TableWrapper>
+            <div ref={contentRefPrenotate}>
+              <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione prenotata"
                 columns={(() => {
@@ -1174,7 +1154,8 @@ export default function PacchettiLezioniPage() {
                   return { key: a.id, cells };
                 })}
               />
-            </TableWrapper>
+              </TableWrapper>
+            </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <SectionTitle>Lezioni Svolte</SectionTitle>
@@ -1255,7 +1236,8 @@ export default function PacchettiLezioniPage() {
                 )}
               </div>
             </div>
-            <TableWrapper>
+            <div ref={contentRefSvolte}>
+              <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione svolta"
                 columns={(() => {
@@ -1308,7 +1290,8 @@ export default function PacchettiLezioniPage() {
                   return { key: a.id, cells };
                 })}
               />
-            </TableWrapper>
+              </TableWrapper>
+            </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <SectionTitle>Lezioni Cancellate</SectionTitle>
@@ -1389,7 +1372,8 @@ export default function PacchettiLezioniPage() {
                 )}
               </div>
             </div>
-            <TableWrapper>
+            <div ref={contentRefCancellate}>
+              <TableWrapper>
               <MainTable
                 emptyLabel="Nessuna lezione cancellata"
                 columns={(() => {
@@ -1442,7 +1426,8 @@ export default function PacchettiLezioniPage() {
                   return { key: a.id, cells };
                 })}
               />
-            </TableWrapper>
+              </TableWrapper>
+            </div>
 
 <div style={{ marginTop: 24, fontSize: 11.5, color: "#5a6d90" }}>
               <strong>Legenda:</strong> <span style={badgeRiprogrammata}>Riprogrammata</span> = lezione spostata rispetto all’orario originario.
