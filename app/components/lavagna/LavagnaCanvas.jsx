@@ -2931,7 +2931,7 @@ export default function LavagnaCanvas({
   // Coordinate helper considerando lo zoom
   const getPoint = useCallback((e) => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return { x: 0, y: 0, pressure: 1 };
     const rect = canvas.getBoundingClientRect();
     const native = e?.nativeEvent;
     let clientX;
@@ -2949,7 +2949,9 @@ export default function LavagnaCanvas({
     const currentZoom = zoomRef.current || 1;
     const x = currentPan.x + offX / currentZoom;
     const y = currentPan.y + offY / currentZoom;
-    return { x, y };
+    // Estrai pressure dalla tavoletta grafica (valore 0-1)
+    const pressure = (native && typeof native.pressure === 'number') ? native.pressure : 1;
+    return { x, y, pressure };
   }, []);
 
   // Helper: given a world point, compute expected client (viewport) coords
@@ -4029,6 +4031,30 @@ export default function LavagnaCanvas({
 
     if (strumento === 'gomma' && gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
+    }
+
+    // Filtro pressure sensitivity: ignora punti con pressione troppo bassa (<10%)
+    // per evitare ghost points dalla tavoletta grafica
+    if (punto.pressure && punto.pressure < 0.1) {
+      return;
+    }
+
+    // Filtro minima distanza per evitare micro-tratti dalla tavoletta grafica
+    // Soglia: minimo 2 px distanza nel sistema di coordinate mondo
+    const lastPoint = puntiCorrentiRef.current.length > 0 
+      ? puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1]
+      : null;
+    
+    if (lastPoint) {
+      const dx = punto.x - lastPoint.x;
+      const dy = punto.y - lastPoint.y;
+      const distance = Math.hypot(dx, dy);
+      // Soglia minima dinamica basata su zoom: più zoomato, più tollerante
+      const minDistance = Math.max(1.5, 3.0 / (zoom || 1));
+      
+      if (distance < minDistance) {
+        return; // Scarta punto troppo vicino
+      }
     }
 
     puntiCorrentiRef.current.push(punto);
