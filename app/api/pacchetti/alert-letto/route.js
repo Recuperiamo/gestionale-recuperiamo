@@ -17,11 +17,15 @@ export async function POST(req) {
       console.log("ERRORE: pacchettoId mancante!");
       return Response.json({ error: "pacchettoId obbligatorio" }, { status: 400 });
     }
-    console.log("PRISMA UPSERT userId:", session.user.id, "pacchettoId:", pacchettoId);
+    
+    // FIX: Converte userId da string a number
+    const userId = parseInt(session.user.id, 10);
+    
+    console.log("PRISMA UPSERT userId:", userId, "pacchettoId:", pacchettoId);
     const result = await prisma.pacchettoAlertLetto.upsert({
-      where: { userId_pacchettoId: { userId: session.user.id, pacchettoId } },
+      where: { userId_pacchettoId: { userId, pacchettoId } },
       update: { letto: true },
-      create: { userId: session.user.id, pacchettoId, letto: true },
+      create: { userId, pacchettoId, letto: true },
     });
     console.log("PRISMA SUCCESS result:", result);
     return Response.json({ ok: true });
@@ -40,8 +44,12 @@ export async function GET(req) {
       console.log("ERRORE: user.id mancante nella sessione!", session);
       return Response.json({ error: "Utente non autenticato o id non trovato" }, { status: 401 });
     }
+    
+    // FIX: Converte userId da string a number
+    const userId = parseInt(session.user.id, 10);
+    
     const letti = await prisma.pacchettoAlertLetto.findMany({
-      where: { userId: session.user.id, letto: true },
+      where: { userId, letto: true },
       select: { pacchettoId: true },
     });
     console.log("GET letti:", letti);

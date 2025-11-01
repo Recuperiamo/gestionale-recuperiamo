@@ -19,15 +19,21 @@ export async function PATCH(req, { params }) {
     }
 
     const dbUser = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { email: session.user.email },
+      include: { role: true }  // FIX: Include relazione role
     });
     
+    console.log('[STATO] User:', dbUser);
     console.log('[STATO] User role:', dbUser?.role);
 
-    if (!dbUser || dbUser.role !== "admin") {
+    if (!dbUser || dbUser.role?.name !== "admin") {
       return NextResponse.json({ 
         error: "Non autorizzato - Accesso riservato agli amministratori",
-        role: dbUser?.role 
+        role: dbUser?.role?.name,
+        debug: {
+          hasUser: !!dbUser,
+          roleName: dbUser?.role?.name
+        }
       }, { status: 403 });
     }
 
