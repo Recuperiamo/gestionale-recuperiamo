@@ -15,6 +15,7 @@
     "test": "jest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:watch": "jest --watch",
+    "gp": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/git-push.ps1",
     "postinstall": "prisma generate --schema=prisma/schema.prisma"
   },
   "dependencies": {

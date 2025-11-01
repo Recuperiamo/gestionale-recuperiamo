@@ -61,4 +61,11 @@ node_modules/.prisma*/
 
 # Fine .gitignore
 /src/generated/prisma
-placeholder_report.txt 
+placeholder_report.txt
+
+# Escludi sandbox e file di test non voluti
+app/pacchetti-lezioni-sandbox/
+**/__tests__/
+**/tests/
+**/*.test.*
+**/*.spec.*
