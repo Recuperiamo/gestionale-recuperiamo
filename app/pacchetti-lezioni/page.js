@@ -153,6 +153,13 @@ export default function PacchettiLezioniPage() {
     }
   }, [multiSelect, selectedIds]);
 
+  // Reset filtro pacchetto quando cambia cliente
+  useEffect(() => {
+    if (filtroCliente) {
+      setFiltroPacchetto("");
+    }
+  }, [filtroCliente]);
+
   const richiesteHook = useRichiesteModifica({ auto: isCliente || isAdmin });
   const richiesteSafe = Array.isArray(richiesteHook?.richieste) ? richiesteHook.richieste : [];
   const byAttivita = richiesteHook?.byAttivita || {};
@@ -850,11 +857,13 @@ export default function PacchettiLezioniPage() {
                     style={selectStyle}
                   >
                     <option value="">Tutti i pacchetti</option>
-                    {pacchetti.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.titolo || `Pacchetto #${p.id}`} ({p.oreAcquistate}h)
-                      </option>
-                    ))}
+                    {pacchetti
+                      .filter(p => !filtroCliente || String(p.clienteId) === String(filtroCliente))
+                      .map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.descrizione || `Pacchetto #${p.id}`} ({p.oreAcquistate}h)
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div style={{ flex: "1 1 130px" }}>
