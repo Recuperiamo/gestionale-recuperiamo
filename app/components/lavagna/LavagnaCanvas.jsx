@@ -4033,30 +4033,6 @@ export default function LavagnaCanvas({
       eraseShapesAt(punto.x, punto.y);
     }
 
-    // Filtro pressure sensitivity: ignora punti con pressione troppo bassa (<10%)
-    // per evitare ghost points dalla tavoletta grafica
-    if (punto.pressure && punto.pressure < 0.1) {
-      return;
-    }
-
-    // Filtro minima distanza per evitare micro-tratti dalla tavoletta grafica
-    // Soglia: minimo 2 px distanza nel sistema di coordinate mondo
-    const lastPoint = puntiCorrentiRef.current.length > 0 
-      ? puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1]
-      : null;
-    
-    if (lastPoint) {
-      const dx = punto.x - lastPoint.x;
-      const dy = punto.y - lastPoint.y;
-      const distance = Math.hypot(dx, dy);
-      // Soglia minima dinamica basata su zoom: più zoomato, più tollerante
-      const minDistance = Math.max(1.5, 3.0 / (zoom || 1));
-      
-      if (distance < minDistance) {
-        return; // Scarta punto troppo vicino
-      }
-    }
-
     puntiCorrentiRef.current.push(punto);
     outgoingBufferRef.current.push(punto);
     if (!outgoingRAFRef.current) {
