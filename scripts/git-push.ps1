@@ -6,6 +6,7 @@ param(
   [switch]$createPr,
   [string]$exclude = "",
   [switch]$noVerify,
+  [switch]$noEdit,
   [switch]$force
 )
 
@@ -57,8 +58,10 @@ if (-not $skipChecks) {
         if ($LASTEXITCODE -ne 0) { Write-Error "lint fallito. Abort."; exit $LASTEXITCODE }
       }
       if ($pkg.scripts.build) {
-        Write-Log "Eseguo: npm run build"
-        npm run build
+        Write-Log "Eseguo: npm run build (catturo output per i warning)"
+        # Capture build output so we can include important warnings in the commit message
+        $buildOutput = npm run build 2>&1 | Out-String
+        Write-Host $buildOutput
         if ($LASTEXITCODE -ne 0) { Write-Error "build fallita. Abort."; exit $LASTEXITCODE }
       }
     }
@@ -87,14 +90,55 @@ if (-not $staged) {
 # Build commit message (verbose by default if not provided)
 if (-not $message -or $message.Trim() -eq "") {
   $fileList = ($staged -split "\n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-  # Use safe ASCII hyphen and build the body with explicit joining to avoid parsing issues
-  $short = "chore: aggiornamento automatico - files: " + ($fileList -join ', ')
+  # Categorize changed files by folders / types for a more descriptive commit message
+  $categories = @{}
+  foreach ($f in $fileList) {
+    if ($f -match '^package(-lock)?\.json$') { $cat = 'package' }
+    elseif ($f -match '^scripts/|^scripts\\') { $cat = 'scripts' }
+    elseif ($f -match '^eslint|^\.eslintrc|eslint\.config') { $cat = 'lint/config' }
+    elseif ($f -match '^app/|^pages/|^components/') { $cat = 'ui/app' }
+    elseif ($f -match '\.ps1$') { $cat = 'ops/scripts' }
+    elseif ($f -match '^prisma/|schema\.prisma') { $cat = 'prisma/db' }
+    else { $cat = 'other' }
+    if (-not $categories.ContainsKey($cat)) { $categories[$cat] = @() }
+    $categories[$cat] += $f
+  }
+
+  $catParts = $categories.GetEnumerator() | ForEach-Object { "$($_.Key): $((($_.Value) | Measure-Object).Count)" }
+  $short = "chore: aggiornamento automatico - " + ($catParts -join ', ')
+
   $lines = $fileList | ForEach-Object { "- $_" }
   $body = "Files modificati:`n" + ($lines -join "`n")
-  $message = $short + "`n`n" + $body
+
+  # Extract notable build warnings (e.g., react18-guard or ReferenceError) if we captured build output
+  $warningsSection = ""
+  if ($buildOutput) {
+    $guardMatches = ($buildOutput -split "\n") | Where-Object { $_ -match 'react18-guard' -or $_ -match 'ReferenceError' -or $_ -match 'Detected .*canary' }
+    if ($guardMatches.Count -gt 0) {
+      $warningsSection = "`nBuild warnings / notes:`n" + ($guardMatches -join "`n")
+    }
+  }
+
+  $message = $short + "`n`n" + $body + $warningsSection
 }
 
 Write-Log "Commit message:\n$message"
+
+# If not in dryRun/CI and user didn't pass -noEdit, open Notepad for review/edit
+if (-not $dryRun -and -not $noEdit) {
+  try {
+    $tmp = [System.IO.Path]::GetTempFileName()
+    $tmpPath = "$tmp.txt"
+    Set-Content -Path $tmpPath -Value $message -Encoding UTF8
+    Write-Log "Apro Notepad per revisione commit message (chiudi Notepad per continuare)."
+    Start-Process -FilePath notepad.exe -ArgumentList $tmpPath -Wait
+    $edited = Get-Content -Path $tmpPath -Raw
+    if ($edited -and $edited.Trim() -ne "") { $message = $edited }
+    Remove-Item $tmpPath -ErrorAction SilentlyContinue
+  } catch {
+    Write-Warning "Impossibile aprire Notepad per la revisione: $_. Continuerò con il messaggio generato."
+  }
+}
 
 # Commit
 if ($noVerify) { git commit -m $message --no-verify } else { git commit -m $message }
