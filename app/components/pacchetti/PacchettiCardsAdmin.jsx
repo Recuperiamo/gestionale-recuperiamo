@@ -6,6 +6,7 @@ import PacchettoForm from "./PacchettoForm";
 import PacchettoEditForm from "./PacchettoEditForm";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import Alert from "../Alert";
+import { calcolaSottostato, getStatoCompleto, calcolaStatsPacchetto } from "../../utils/pacchettoStato";
 
 async function fetchPacchetti() {
   const res = await fetch("/api/pacchetti");
@@ -71,6 +72,27 @@ export default function PacchettiCardsAdmin() {
   async function handleHideAlert(id) {
     await segnalaAlertLetto(id);
     setAlertLetti((prev) => [...prev, id]);
+  }
+
+  async function handleCambiaStato(pacchettoId, nuovoStato) {
+    try {
+      const res = await fetch(`/api/pacchetti/${pacchettoId}/stato`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stato: nuovoStato }),
+        credentials: "include"
+      });
+      
+      if (!res.ok) {
+        throw new Error("Errore aggiornamento stato");
+      }
+      
+      // Ricarica pacchetti
+      handleCreateSuccess();
+    } catch (error) {
+      console.error("Errore cambio stato:", error);
+      alert("Errore durante il cambio di stato");
+    }
   }
 
   function handleCreateSuccess() {
@@ -158,6 +180,7 @@ export default function PacchettiCardsAdmin() {
             attivita={attivitaMap[p.id] || []}
             onEdit={() => setEditPacchetto(p)}
             onDelete={() => setDeletePacchetto(p)}
+            onCambiaStato={handleCambiaStato}
           />
         ))}
       </div>
@@ -201,7 +224,7 @@ export default function PacchettiCardsAdmin() {
   );
 }
 
-function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
+function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato }) {
   const GRACE_MS = 5 * 60 * 1000;
   const now = Date.now();
   
@@ -232,12 +255,16 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
 
   const oreRimanenti = stats.oreAcquistate - stats.orePrenotate;
   
+  // Calcola sottostato
+  const sottostato = calcolaSottostato(stats);
+  const statoCompleto = getStatoCompleto(pacchetto.stato, sottostato);
+  
   // LOGICA STATI:
   // 1. ESAURITO (priorità massima): ore_svolte >= ore_acquistate
   // 2. TUTTE LE ORE PRENOTATE: ore_prenotate >= ore_acquistate E ore_svolte < ore_acquistate (arancione strong)
   // 3. DISPONIBILITÀ LIMITATA: ore_rimanenti < 5 (arancione ocra - warning generico)
-  const isEsaurito = stats.oreSvolte >= stats.oreAcquistate;
-  const isTuttePrenotate = !isEsaurito && stats.orePrenotate >= stats.oreAcquistate;
+  const isEsaurito = sottostato === "esaurito";
+  const isTuttePrenotate = sottostato === "tutto_prenotato";
   const isDisponibilitaLimitata = !isEsaurito && !isTuttePrenotate && oreRimanenti < 5 && oreRimanenti > 0;
   
   // Determina colore bordo card
@@ -261,7 +288,7 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
             Cliente: {pacchetto.cliente?.nomeReferente || `ID ${pacchetto.clienteId}`}
           </p>
           <p style={cardSubtitleStyle}>
-            Stato: <span style={getStatoBadgeStyle(pacchetto.stato)}>{pacchetto.stato}</span>
+            Stato: <span style={getStatoBadgeStyle(pacchetto.stato)}>{statoCompleto}</span>
           </p>
         </div>
       </div>
@@ -322,6 +349,37 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete }) {
         >
           🕐 Storico
         </Link>
+      </div>
+
+      {/* Pulsanti cambio stato */}
+      <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {pacchetto.stato !== "sospeso" && (
+          <button
+            onClick={() => onCambiaStato(pacchetto.id, "sospeso")}
+            style={btnStatoStyle}
+            title="Sospendi pacchetto"
+          >
+            ⏸️ Sospendi
+          </button>
+        )}
+        {pacchetto.stato !== "archiviato" && (
+          <button
+            onClick={() => onCambiaStato(pacchetto.id, "archiviato")}
+            style={btnStatoStyle}
+            title="Archivia pacchetto"
+          >
+            📦 Archivia
+          </button>
+        )}
+        {pacchetto.stato !== "attivo" && (
+          <button
+            onClick={() => onCambiaStato(pacchetto.id, "attivo")}
+            style={{...btnStatoStyle, background: '#10B981', color: '#fff'}}
+            title="Riattiva pacchetto"
+          >
+            ▶️ Riattiva
+          </button>
+        )}
       </div>
     </div>
   );
@@ -482,4 +540,16 @@ const btnNewStyle = {
   cursor: 'pointer',
   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
   transition: 'all 0.3s',
+};
+
+const btnStatoStyle = {
+  padding: '6px 12px',
+  background: '#E5E7EB',
+  color: '#374151',
+  border: 'none',
+  borderRadius: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
 };
