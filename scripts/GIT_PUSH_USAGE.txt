@@ -1,0 +1,63 @@
+Uso dello script `gp` (git-push helper)
+
+Scopo
+- Fornire un flusso rapido e sicuro per aggiungere, generare un messaggio di commit descrittivo, eseguire i controlli (lint/build) e pushare il codice sul remote.
+
+Posizione script
+- `./scripts/git-push.ps1`
+- npm script: `npm run gp` (invoca lo script PowerShell con le stesse opzioni)
+
+Esempi rapidi
+- Preview (non commette, non push):
+  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-push.ps1 -dryRun
+  oppure (via npm):
+  npm run gp -- -dryRun
+
+- Standard flow (esegue lint/build, genera messaggio, apre Notepad per revisione, poi commit+push):
+  npm run gp
+
+- Fornire un messaggio esplicito e saltare l'editor (utile per script/CI):
+  npm run gp -- -message "fix: Risolti bug critici" -noEdit
+
+- Saltare i check (lint/build) — uso locale rapido (attenzione):
+  npm run gp -- -skipChecks -noEdit -message "chore: local test"
+
+- Creare e pushare su un nuovo branch:
+  npm run gp -- -createBranch "feature/mia-feature" -noEdit -message "feat: ..."
+
+Opzioni disponibili
+- `-dryRun` : mostra i file che verrebbero aggiunti/committati/pushati e il messaggio generato; non commette né push.
+- `-message "..."` : usa questo testo come commit message (se presente salta l'autogenerazione).
+- `-noEdit` : non aprire l'editor per la revisione del messaggio (commit diretto con il messaggio generato/fornito).
+- `-skipChecks` : non eseguire `npm run lint` e `npm run build`.
+- `-exclude "path1,path2"` : esclude percorsi espliciti dal commit (es. `app/pacchetti-lezioni-sandbox/`).
+- `-createBranch "name"` : crea un nuovo branch e push su quel branch.
+- `-createPr` : tenta di creare una PR con `gh` (se installato) o apre l'URL per crearla manualmente.
+- `-noVerify` : passa `--no-verify` al commit.
+- `-force` : forza il push (`git push --force`) — da usare con estrema cautela.
+
+Comportamento predefinito
+- Se non passi `-message`, lo script genera un titolo convenzionale (es. `Fix:`, `Feat:`, `Chore:`) basato su quali file sono stati modificati e costruisce un body con la lista dei file e note di build/warnings rilevanti.
+- Per default lo script apre Notepad con il messaggio generato così puoi modificarlo prima del commit.
+- Per default lo script esegue `npm run lint` e `npm run build` (a meno che non passi `-skipChecks`) e includerà eventuali warning importanti nel corpo del messaggio.
+
+Consigli d'uso
+- Per testare rapidamente le pagine sandbox senza toccare Git, esegui il dev server:
+  npm run dev
+- Se vuoi solo un commit locale (senza push), usa i comandi Git standard:
+  git add -A
+  git commit -m "chore: local test"
+- Usa `-dryRun` per vedere cosa farebbe lo script prima di eseguire commit/push reali.
+
+Nota su `-noPush`
+- Attualmente lo script non ha il flag `-noPush`. Se preferisci un'opzione per commettere localmente senza pushare, posso aggiungerla (è una piccola modifica). Chiedimi e la implemento.
+
+Domande o modifiche
+- Se vuoi che il template di commit o le regole heuristics cambino (es. preferire `Fix` per errori di runtime, o includere scope più precisi), dimmi le regole desiderate e le applico.
+
+File di riferimento
+- `./scripts/git-push.ps1`
+- `package.json` (script `gp`)
+
+---
+File generato automaticamente dal team helper — adattalo liberamente.

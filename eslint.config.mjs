@@ -2,6 +2,7 @@
 // Inline ESLint directives are disabled to avoid errors from missing plugins (e.g., react-hooks).
 
 import tsParser from '@typescript-eslint/parser';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 export default [
   {
@@ -18,8 +19,11 @@ export default [
       '**/*.d.ts',
     ],
     linterOptions: {
-      noInlineConfig: true,
       reportUnusedDisableDirectives: 'off',
+    },
+    // Register plugin so plugin rules referenced in inline comments are recognized
+    plugins: {
+      'react-hooks': reactHooksPlugin,
     },
   },
   {
@@ -31,6 +35,8 @@ export default [
     },
     rules: {
       'react/react-in-jsx-scope': 'off',
+      // Turn off react-hooks exhaustive deps here to avoid requiring the plugin in flat config
+      'react-hooks/exhaustive-deps': 'off',
     },
   },
   {

@@ -33,6 +33,18 @@ if ($files.Count -eq 0) {
   Write-Log "Nessuna modifica da committare. Uscita."
   exit 0
 }
+# Normalize dry-run detection: npm may surface flags as npm_config_* env vars
+$dryRunEffective = $false
+if ($dryRun) { $dryRunEffective = $true }
+elseif ($env:npm_config_dryrun -and $env:npm_config_dryrun -match 'true|1') { $dryRunEffective = $true }
+elseif ($env:NPM_CONFIG_DRYRUN -and $env:NPM_CONFIG_DRYRUN -match 'true|1') { $dryRunEffective = $true }
+elseif ($env:npm_config_dryrun -and $env:npm_config_dryrun -ne '') { $dryRunEffective = $true }
+
+if ($dryRunEffective) {
+  Write-Log "DRY RUN (detected): i seguenti file verrebbero aggiunti/committati/pushati:"
+  $files | ForEach-Object { Write-Host " - $_" }
+  exit 0
+}
 
 # Apply excludes (comma-separated list of explicit paths)
 $excludes = @()
@@ -40,12 +52,6 @@ if ($exclude -and $exclude.Trim() -ne "") {
   $excludes = $exclude -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
 }
 
-if ($dryRun) {
-  Write-Log "DRY RUN: i seguenti file verrebbero aggiunti/committati/pushati:"
-  $files | ForEach-Object { Write-Host " - $_" }
-  if ($excludes.Count -gt 0) { Write-Host "Excludes: $($excludes -join ', ')" }
-  exit 0
-}
 
 # Pre-checks (lint + build) unless skipped
 if (-not $skipChecks) {
@@ -124,8 +130,29 @@ if (-not $message -or $message.Trim() -eq "") {
 
 Write-Log "Commit message:\n$message"
 
+# Heuristic title generation: prefer a short Conventional-like title on the first line
+if (-not ($message -match "^[A-Za-z]+:\s")) {
+  $title = $null
+  # If any file mentions dashboard, pick a Fix for dashboard
+  if ($fileList | Where-Object { $_ -match 'dashboard' }) {
+    $title = "Fix: Risolti bug e miglioramenti dashboard"
+  } elseif ($categories.ContainsKey('prisma/db') -and $categories['prisma/db'].Count -gt 0) {
+    $title = "Chore: Aggiornati schema/prisma"
+  } elseif ($categories.ContainsKey('ui/app') -and $categories['ui/app'].Count -gt 0) {
+    $title = "Feat: Miglioramenti UI e layout"
+  } elseif ($categories.ContainsKey('scripts') -and $categories['scripts'].Count -gt 0 -and ($categories.Keys | Where-Object { $_ -ne 'scripts' }).Count -eq 0) {
+    $title = "Chore: Aggiornamenti script"
+  }
+
+  if ($title) {
+    # Prepend the generated title to the message body (title + blank line + body)
+    $message = $title + "`n`n" + $message
+    Write-Log "Generato titolo commit: $title"
+  }
+}
+
 # If not in dryRun/CI and user didn't pass -noEdit, open Notepad for review/edit
-if (-not $dryRun -and -not $noEdit) {
+if (-not $dryRunEffective -and -not $noEdit) {
   try {
     $tmp = [System.IO.Path]::GetTempFileName()
     $tmpPath = "$tmp.txt"
