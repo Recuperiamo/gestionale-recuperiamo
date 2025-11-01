@@ -78,12 +78,12 @@ export default function PacchettiLezioniPage() {
   const selectedPacchettoTitle = (() => {
     if (filtroPacchetto) {
       const p = pacchetti.find(x => String(x.id) === String(filtroPacchetto));
-      if (p) return p.titolo && p.titolo.trim() ? p.titolo : `Pacchetto #${p.id}`;
+      if (p) return p.descrizione && p.descrizione.trim() ? p.descrizione : `Pacchetto #${p.id}`;
     }
     const first = (attivita && attivita.length) ? attivita[0] : null;
     if (first && first.pacchetto) {
-      return first.pacchetto.titolo && first.pacchetto.titolo.trim() 
-        ? first.pacchetto.titolo 
+      return first.pacchetto.descrizione && first.pacchetto.descrizione.trim() 
+        ? first.pacchetto.descrizione 
         : `Pacchetto #${first.pacchetto.id}`;
     }
     return null;
@@ -1147,7 +1147,7 @@ export default function PacchettiLezioniPage() {
                       {renderBadgeRiprogrammata(a)}
                     </div>
                   );
-                  cells.push(statoEl);
+                  cells.push({ content: statoEl, style: { minWidth: 140 } });
 
                   if (!isAdmin) {
                     cells.push(
@@ -1285,14 +1285,14 @@ export default function PacchettiLezioniPage() {
                   }
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
+                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
                   const statoEl = (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       <span>{displayStato(a)}</span>
                       {renderBadgeRiprogrammata(a)}
                     </div>
                   );
-                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
-                  cells.push(statoEl);
+                  cells.push({ content: statoEl, style: { minWidth: 140 } });
                   return { key: a.id, cells };
                 })}
               />
@@ -1421,14 +1421,14 @@ export default function PacchettiLezioniPage() {
                   }
                   cells.push({ content: formatDate(a), clickable: true, onClick: () => openDettaglio(a) });
                   if (isAdmin) cells.push(a.descrizione || `Lezione #${a.id}`);
+                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
                   const statoEl = (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span>{displayStato(a)}</span>
                       {renderBadgeRiprogrammata(a)}
                     </div>
                   );
-                  cells.push(a.oreConsumate ?? a.durataOre ?? "—");
-                  cells.push(statoEl);
+                  cells.push({ content: statoEl, style: { minWidth: 140 } });
                   return { key: a.id, cells };
                 })}
               />
