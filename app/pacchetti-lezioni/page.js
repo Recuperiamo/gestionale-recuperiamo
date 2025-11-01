@@ -76,15 +76,10 @@ export default function PacchettiLezioniPage() {
   })();
 
   const selectedPacchettoTitle = (() => {
+    // Mostra SOLO se c'è un filtro pacchetto attivo
     if (filtroPacchetto) {
       const p = pacchetti.find(x => String(x.id) === String(filtroPacchetto));
       if (p) return p.descrizione && p.descrizione.trim() ? p.descrizione : `Pacchetto #${p.id}`;
-    }
-    const first = (attivita && attivita.length) ? attivita[0] : null;
-    if (first && first.pacchetto) {
-      return first.pacchetto.descrizione && first.pacchetto.descrizione.trim() 
-        ? first.pacchetto.descrizione 
-        : `Pacchetto #${first.pacchetto.id}`;
     }
     return null;
   })();
@@ -123,13 +118,15 @@ export default function PacchettiLezioniPage() {
       if (r.ok) {
         const js = await r.json();
         const lista = Array.isArray(js) ? js : [];
+        // Filtra SOLO pacchetti attivi
+        const attivi = lista.filter(p => p.stato === 'attivo');
         // Ordina alfabeticamente per descrizione
-        lista.sort((a, b) => {
+        attivi.sort((a, b) => {
           const tA = (a.descrizione || `Pacchetto #${a.id}`).toLowerCase();
           const tB = (b.descrizione || `Pacchetto #${b.id}`).toLowerCase();
           return tA.localeCompare(tB);
         });
-        setPacchetti(lista);
+        setPacchetti(attivi);
       }
     } catch (e) {
       console.error("Errore caricamento pacchetti:", e);
