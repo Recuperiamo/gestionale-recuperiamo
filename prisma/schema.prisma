@@ -96,6 +96,7 @@ model Client {
   pacchetti         PacchettoOre[]
   attivita          Attivita[]
   richiesteModifica RichiestaModifica[]
+  oreExtra          OreExtra[]
 
   @@index([email])
   @@index([referenteId])
@@ -116,6 +117,7 @@ model PacchettoOre {
   cliente             Client                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   pacchettoAlertLetti PacchettoAlertLetto[]
   changelog           Pacchetto_ChangeLog[]
+  oreExtra            OreExtra[]
 
   @@index([clienteId])
 }
@@ -145,6 +147,33 @@ model Pacchetto_ChangeLog {
   utente               String
   timestamp            DateTime      @default(now())
   motivazione          String?
+}
+
+/**
+ * ====================== ORE EXTRA ======================
+ * Tracciabilità ore extra per cliente, successivamente assegnabili a pacchetto
+ */
+model OreExtra {
+  id               Int        @id @default(autoincrement())
+  clienteId        Int
+  pacchettoId      Int?       // NULL finché non assegnato a pacchetto
+  ore              Float
+  descrizione      String?
+  dataTracciamento DateTime   @default(now())
+  dataAssegnamento DateTime?
+  stato            String     @default("pending") // pending | assegnato | cancellato
+  note             String?
+  tracciaDa        String?    // Email utente che ha tracciato
+  assegnatoDa      String?    // Email utente che ha assegnato
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  cliente   Client        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  pacchetto PacchettoOre? @relation(fields: [pacchettoId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId])
+  @@index([pacchettoId])
+  @@index([stato])
 }
 
 /**
