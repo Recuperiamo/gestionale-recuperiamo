@@ -4276,14 +4276,29 @@ export default function LavagnaCanvas({
   // strokes (S, E, etc.) render more naturally and jitter is reduced.
   const rawPunti = puntiCorrentiRef.current;
   const puntiFinali = simplifyAndSmooth(rawPunti);
-    if (puntiFinali.length >= 2) {
+  
+    // SUPPORTO TRATTI ULTRA-CORTI (es. puntini su i, :, ×, ÷)
+    // Se abbiamo solo 1 punto, creiamo comunque un piccolo cerchio
+    if (puntiFinali.length >= 1) {
+      let trattoFinale = puntiFinali;
+      
+      // Se c'è un solo punto, duplicalo leggermente per creare un mini-segmento
+      if (puntiFinali.length === 1) {
+        const p = puntiFinali[0];
+        // Crea un secondo punto molto vicino (0.1px di distanza)
+        trattoFinale = [
+          { x: p.x, y: p.y },
+          { x: p.x + 0.1, y: p.y + 0.1 }
+        ];
+      }
+      
       if (strumento === 'gomma' && gommaPuntuale) {
         const gommaStroke = prepareStroke({
           id: currentStreamId.current,
           strumento: 'gomma',
           colore: '#ffffff',
           spessore,
-          punti: puntiFinali,
+          punti: trattoFinale,
           autoreUserId: utenteId,
         });
         setTratti(prev => [...prev, gommaStroke]);
@@ -4296,7 +4311,7 @@ export default function LavagnaCanvas({
           strumento,
           colore,
           spessore,
-          punti: puntiFinali,
+          punti: trattoFinale,
           autoreUserId: utenteId,
         });
         setTratti(prev => [...prev, nuovoTratto]);

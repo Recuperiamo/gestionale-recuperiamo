@@ -11,6 +11,9 @@ import prisma from "../../../../../lib/prisma";
 export async function PATCH(req, { params }) {
   try {
     const session = await getServerSession(authOptions);
+    
+    console.log('[STATO] Session:', session);
+    
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
     }
@@ -18,9 +21,14 @@ export async function PATCH(req, { params }) {
     const dbUser = await prisma.user.findUnique({
       where: { email: session.user.email }
     });
+    
+    console.log('[STATO] User role:', dbUser?.role);
 
     if (!dbUser || dbUser.role !== "admin") {
-      return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
+      return NextResponse.json({ 
+        error: "Non autorizzato - Accesso riservato agli amministratori",
+        role: dbUser?.role 
+      }, { status: 403 });
     }
 
     const { id } = params;
