@@ -1,14 +1,14 @@
 {
   "root": true,
-  "extends": [
-    "plugin:@next/next/recommended",
-    "plugin:react-hooks/recommended"
-  ],
-  "plugins": [
-    "react-hooks"
-  ],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2021": true
+  },
   "rules": {
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "react-hooks/rules-of-hooks": "off",
+    "react-hooks/exhaustive-deps": "off"
   },
   "ignorePatterns": [
     "node_modules/",

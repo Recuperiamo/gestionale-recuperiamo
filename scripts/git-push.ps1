@@ -87,8 +87,10 @@ if (-not $staged) {
 # Build commit message (verbose by default if not provided)
 if (-not $message -or $message.Trim() -eq "") {
   $fileList = ($staged -split "\n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-  $short = "chore: aggiornamento automatico — files: $($fileList -join ', ')"
-  $body = "Files modificati:`n" + ($fileList | ForEach-Object { "- $_" } ) -join "`n"
+  # Use safe ASCII hyphen and build the body with explicit joining to avoid parsing issues
+  $short = "chore: aggiornamento automatico - files: " + ($fileList -join ', ')
+  $lines = $fileList | ForEach-Object { "- $_" }
+  $body = "Files modificati:`n" + ($lines -join "`n")
   $message = $short + "`n`n" + $body
 }
 
