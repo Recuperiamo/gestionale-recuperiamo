@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Lavagna - Tratti Corti</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .info {
+      background: #e3f2fd;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    canvas {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      cursor: crosshair;
+      display: block;
+      margin: 20px auto;
+      background: white;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    
+    .btn-test {
+      background: #2196F3;
+      color: white;
+    }
+    
+    .btn-test:hover {
+      background: #1976D2;
+    }
+    
+    .btn-clear {
+      background: #f44336;
+      color: white;
+    }
+    
+    .btn-clear:hover {
+      background: #d32f2f;
+    }
+    
+    .log {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .log-success {
+      color: #4CAF50;
+    }
+    
+    .log-error {
+      color: #f44336;
+    }
+    
+    .log-info {
+      color: #2196F3;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+    
+    .stat-card {
+      background: #fff3cd;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      border: 2px solid #ffc107;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ff6f00;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖊️ Test Lavagna - Tratti Corti</h1>
+    
+    <div class="info">
+      <strong>Obiettivo:</strong> Verificare che i tratti molto corti (punto su i, simboli ×÷, numeri 2/3/z) vengano catturati correttamente.<br>
+      <strong>Come funziona:</strong> Clicca sui pulsanti per simulare tratti corti. Ogni tratto verrà registrato nel log e disegnato sulla canvas.
+    </div>
+
+    <canvas id="canvas" width="800" height="500"></canvas>
+
+    <div class="controls">
+      <button class="btn-test" onclick="testPuntoI()">Test: Punto su "i"</button>
+      <button class="btn-test" onclick="testMoltiplicazione()">Test: Simbolo × (punto)</button>
+      <button class="test" onclick="testDivisione()">Test: Simbolo ÷ (due punti)</button>
+      <button class="btn-test" onclick="testNumero2()">Test: Numero "2"</button>
+      <button class="btn-test" onclick="testNumero3()">Test: Numero "3"</button>
+      <button class="btn-test" onclick="testLetteraZ()">Test: Lettera "z"</button>
+      <button class="btn-clear" onclick="clearCanvas()">🗑️ Pulisci</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="totalStrokes">0</div>
+        <div class="stat-label">Tratti totali</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalPoints">0</div>
+        <div class="stat-label">Punti catturati</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="shortStrokes">0</div>
+        <div class="stat-label">Tratti corti (&lt;10px)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="avgLength">0</div>
+        <div class="stat-label">Lunghezza media (px)</div>
+      </div>
+    </div>
+
+    <div class="log" id="log">
+      <div class="log-entry log-info">📝 Log dei tratti - Pronto per i test</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const log = document.getElementById('log');
+    
+    let currentStroke = [];
+    let allStrokes = [];
+    let totalPoints = 0;
+    let shortStrokesCount = 0;
+    let totalLength = 0;
+
+    // Simula un tratto con coordinate specifiche
+    function simulateStroke(points, label) {
+      logMessage(`🎯 Test: ${label}`, 'info');
+      logMessage(`   Punti da simulare: ${points.length}`, 'info');
+      
+      currentStroke = [];
+      
+      // Simula pointerdown
+      const firstPoint = points[0];
+      ctx.beginPath();
+      ctx.moveTo(firstPoint.x, firstPoint.y);
+      currentStroke.push(firstPoint);
+      logMessage(`   ✓ PointerDown: (${firstPoint.x}, ${firstPoint.y})`, 'success');
+      
+      // Simula pointermove per ogni punto intermedio
+      for (let i = 1; i < points.length - 1; i++) {
+        const pt = points[i];
+        ctx.lineTo(pt.x, pt.y);
+        currentStroke.push(pt);
+        logMessage(`   ✓ PointerMove: (${pt.x}, ${pt.y})`, 'success');
+      }
+      
+      // Simula pointerup
+      if (points.length > 1) {
+        const lastPoint = points[points.length - 1];
+        ctx.lineTo(lastPoint.x, lastPoint.y);
+        currentStroke.push(lastPoint);
+        logMessage(`   ✓ PointerUp: (${lastPoint.x}, ${lastPoint.y})`, 'success');
+      }
+      
+      // Disegna il tratto
+      ctx.strokeStyle = '#2196F3';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      
+      // Calcola lunghezza totale del tratto
+      let length = 0;
+      for (let i = 1; i < currentStroke.length; i++) {
+        const dx = currentStroke[i].x - currentStroke[i-1].x;
+        const dy = currentStroke[i].y - currentStroke[i-1].y;
+        length += Math.sqrt(dx*dx + dy*dy);
+      }
+      
+      const isShort = length < 10;
+      if (isShort) shortStrokesCount++;
+      
+      totalPoints += currentStroke.length;
+      totalLength += length;
+      allStrokes.push({
+        points: [...currentStroke],
+        length: length,
+        label: label
+      });
+      
+      logMessage(`   ✅ Tratto completato: ${currentStroke.length} punti, lunghezza ${length.toFixed(2)}px ${isShort ? '(CORTO!)' : ''}`, isShort ? 'error' : 'success');
+      
+      updateStats();
+      currentStroke = [];
+    }
+
+    // Test: Punto su "i" (3-5 pixel, quasi fermo)
+    function testPuntoI() {
+      const baseX = 100 + Math.random() * 600;
+      const baseY = 100 + Math.random() * 300;
+      
+      simulateStroke([
+        { x: baseX, y: baseY, pressure: 0.5 },
+        { x: baseX + 1, y: baseY + 1, pressure: 0.6 },
+        { x: baseX + 2, y: baseY + 1, pressure: 0.5 },
+      ], 'Punto su "i"');
+    }
+
+    // Test: Simbolo moltiplicazione × (punto singolo)
+    function testMoltiplicazione() {
+      const baseX = 100 + Math.random() * 600;
+      const baseY = 100 + Math.random() * 300;
+      
+      simulateStroke([
+        { x: baseX, y: baseY, pressure: 0.6 },
+        { x: baseX + 2, y: baseY + 2, pressure: 0.7 },
+        { x: baseX + 3, y: baseY + 3, pressure: 0.6 },
+      ], 'Moltiplicazione × (punto)');
+    }
+
+    // Test: Simbolo divisione ÷ (due punti)
+    function testDivisione() {
+      const baseX = 100 + Math.random() * 600;
+      const baseY = 100 + Math.random() * 300;
+      
+      // Primo punto
+      simulateStroke([
+        { x: baseX, y: baseY, pressure: 0.5 },
+        { x: baseX + 1, y: baseY + 1, pressure: 0.6 },
+      ], 'Divisione ÷ (punto sopra)');
+      
+      // Secondo punto (sotto)
+      setTimeout(() => {
+        simulateStroke([
+          { x: baseX, y: baseY + 20, pressure: 0.5 },
+          { x: baseX + 1, y: baseY + 21, pressure: 0.6 },
+        ], 'Divisione ÷ (punto sotto)');
+      }, 100);
+    }
+
+    // Test: Numero "2" (curva corta)
+    function testNumero2() {
+      const baseX = 100 + Math.random() * 600;
+      const baseY = 100 + Math.random() * 300;
+      
+      simulateStroke([
+        { x: baseX, y: baseY, pressure: 0.5 },
+        { x: baseX + 3, y: baseY + 1, pressure: 0.6 },
+        { x: baseX + 5, y: baseY + 3, pressure: 0.7 },
+        { x: baseX + 4, y: baseY + 6, pressure: 0.6 },
+        { x: baseX + 2, y: baseY + 8, pressure: 0.5 },
+      ], 'Numero "2" (curva corta)');
+    }
+
+    // Test: Numero "3" (due curve corte)
+    function testNumero3() {
+      const baseX = 100 + Math.random() * 600;
+      const baseY = 100 + Math.random() * 300;
+      
+      simulateStroke([
+        { x: baseX, y: baseY, pressure: 0.5 },
+        { x: baseX + 4, y: baseY + 1, pressure: 0.6 },
+        { x: baseX + 5, y: baseY + 4, pressure: 0.7 },
+        { x: baseX + 4, y: baseY + 7, pressure: 0.6 },
+        { x: baseX + 2, y: baseY + 8, pressure: 0.5 },
+      ], 'Numero "3" (S corta)');
+    }
+
+    // Test: Lettera "z" (zigzag corto)
+    function testLetteraZ() {
+      const baseX = 100 + Math.random() * 600;
+      const baseY = 100 + Math.random() * 300;
+      
+      simulateStroke([
+        { x: baseX, y: baseY, pressure: 0.5 },
+        { x: baseX + 6, y: baseY, pressure: 0.6 },
+        { x: baseX, y: baseY + 8, pressure: 0.7 },
+        { x: baseX + 6, y: baseY + 8, pressure: 0.6 },
+      ], 'Lettera "z" (zigzag)');
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      allStrokes = [];
+      totalPoints = 0;
+      shortStrokesCount = 0;
+      totalLength = 0;
+      updateStats();
+      log.innerHTML = '<div class="log-entry log-info">📝 Canvas pulita - Pronto per nuovi test</div>';
+    }
+
+    function logMessage(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = message;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function updateStats() {
+      document.getElementById('totalStrokes').textContent = allStrokes.length;
+      document.getElementById('totalPoints').textContent = totalPoints;
+      document.getElementById('shortStrokes').textContent = shortStrokesCount;
+      const avgLen = allStrokes.length > 0 ? (totalLength / allStrokes.length).toFixed(2) : 0;
+      document.getElementById('avgLength').textContent = avgLen;
+    }
+
+    // Test automatico all'avvio
+    setTimeout(() => {
+      logMessage('🚀 Sistema pronto! Clicca i pulsanti per testare i tratti corti.', 'info');
+    }, 500);
+  </script>
+</body>
+</html>

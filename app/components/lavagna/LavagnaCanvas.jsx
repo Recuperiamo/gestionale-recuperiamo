@@ -2560,12 +2560,10 @@ export default function LavagnaCanvas({
   function simplifyAndSmooth(rawPoints) {
     if (!Array.isArray(rawPoints) || rawPoints.length < 2) return rawPoints || [];
   const z = zoomRef.current || 1;
-  // Reduce deduplication threshold strongly so we keep more raw samples from
-  // tablet devices; value is in world units and scales with zoom. At zoom=1
-  // we accept much closer points (≈0.015) so final smoothing has more input
-  // to work on and we avoid losing small/fast letter strokes. Reduced from
-  // 0.06 to 0.03, then to 0.015 to capture even more points for complex numbers.
-  const minDist = Math.max(0.005, 0.015 / (z || 1)); // world units (lower => keep more points)
+  // COMPLETAMENTE DISABILITATO: accetta TUTTI i punti per catturare anche
+  // i tratti più corti (punti su i, simboli × ÷, numeri 2/3, lettera z)
+  // Nessun filtro di distanza minima - ogni punto catturato viene mantenuto
+  const minDist = 0; // ZERO = accetta tutto, nessun filtro
     const dedup = [];
     let last = null;
     for (const p of rawPoints) {
