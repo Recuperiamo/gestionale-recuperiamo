@@ -68,7 +68,7 @@ export default function SettingsPage() {
       <Navbar />
       <main
         style={{
-          maxWidth: 420,
+          maxWidth: 520,
           margin: "60px auto 0 auto",
           background: "#fff",
           borderRadius: 18,
@@ -77,19 +77,28 @@ export default function SettingsPage() {
           color: "#20489a",
         }}
       >
-        <h2 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: "center" }}>
-          Impostazioni
+        <h2 style={{ fontWeight: 700, fontSize: 26, marginBottom: 8, textAlign: "center" }}>
+          ⚙️ Accesso e Sicurezza
         </h2>
+        <p style={{ fontSize: 13, color: "#4268b3", textAlign: "center", marginBottom: 24 }}>
+          Gestisci i dati del tuo account
+        </p>
         
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
-            Account: {session.user?.email}
+        <div style={{ marginBottom: 30, padding: 16, background: "#f5f8ff", borderRadius: 10 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, color: "#20489a" }}>
+            📧 Informazioni Account
+          </h3>
+          <div style={{ fontSize: 14, marginBottom: 6 }}>
+            <span style={{ fontWeight: 600 }}>Nome:</span> {session.user?.name || "—"}
+          </div>
+          <div style={{ fontSize: 14 }}>
+            <span style={{ fontWeight: 600 }}>Email:</span> {session.user?.email}
           </div>
         </div>
 
         <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, marginTop: 10, marginBottom: 6 }}>
-            Cambia Password
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+            🔒 Cambia Password
           </h3>
 
           <div>
