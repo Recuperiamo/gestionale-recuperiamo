@@ -43,6 +43,11 @@ export default function PacchettiCardsAdmin() {
   const [editPacchetto, setEditPacchetto] = useState(null);
   const [deletePacchetto, setDeletePacchetto] = useState(null);
   const [alertLetti, setAlertLetti] = useState([]);
+  const [sezioneAperta, setSezioneAperta] = useState({
+    attivi: true,
+    archiviati: false,
+    sospesi: false
+  });
 
   useEffect(() => {
     async function load() {
@@ -115,12 +120,22 @@ export default function PacchettiCardsAdmin() {
 
   const alertTop = pacchetti.find(
     (p) =>
+      p.stato === 'attivo' && // Solo per pacchetti attivi
       p.sogliaOreResidue !== null &&
       p.sogliaOreResidue !== undefined &&
       Number(p.oreResidue) <= Number(p.sogliaOreResidue) &&
       Number(p.sogliaOreResidue) > 0 &&
       !alertLetti.includes(p.id)
   );
+
+  // Raggruppa pacchetti per stato
+  const pacchettiAttivi = pacchetti.filter(p => p.stato === 'attivo');
+  const pacchettiArchiviati = pacchetti.filter(p => p.stato === 'archiviato');
+  const pacchettiSospesi = pacchetti.filter(p => p.stato === 'sospeso');
+
+  const toggleSezione = (nome) => {
+    setSezioneAperta(prev => ({ ...prev, [nome]: !prev[nome] }));
+  };
 
   if (loading) {
     return (
@@ -133,7 +148,7 @@ export default function PacchettiCardsAdmin() {
   return (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 24, color: '#20489a' }}>
-        Tutti i Pacchetti
+        Gestione Pacchetti
       </h2>
 
       {alertTop && (
@@ -172,24 +187,89 @@ export default function PacchettiCardsAdmin() {
         />
       )}
 
-      <div style={gridStyle}>
-        {pacchetti.map((p) => (
-          <PacchettoCard
-            key={p.id}
-            pacchetto={p}
-            attivita={attivitaMap[p.id] || []}
-            onEdit={() => setEditPacchetto(p)}
-            onDelete={() => setDeletePacchetto(p)}
-            onCambiaStato={handleCambiaStato}
-          />
-        ))}
-      </div>
+      {/* Sezione Pacchetti Attivi */}
+      <SezioneDropdown
+        titolo="📦 Pacchetti Attivi"
+        count={pacchettiAttivi.length}
+        isOpen={sezioneAperta.attivi}
+        onToggle={() => toggleSezione('attivi')}
+        badgeColor="#10B981"
+      >
+        {pacchettiAttivi.length > 0 ? (
+          <div style={gridStyle}>
+            {pacchettiAttivi.map((p) => (
+              <PacchettoCard
+                key={p.id}
+                pacchetto={p}
+                attivita={attivitaMap[p.id] || []}
+                onEdit={() => setEditPacchetto(p)}
+                onDelete={() => setDeletePacchetto(p)}
+                onCambiaStato={handleCambiaStato}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 14 }}>
+            Nessun pacchetto attivo
+          </div>
+        )}
+      </SezioneDropdown>
 
-      {pacchetti.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-          Nessun pacchetto presente.
-        </div>
-      )}
+      {/* Sezione Pacchetti Archiviati */}
+      <SezioneDropdown
+        titolo="📁 Pacchetti Archiviati"
+        count={pacchettiArchiviati.length}
+        isOpen={sezioneAperta.archiviati}
+        onToggle={() => toggleSezione('archiviati')}
+        badgeColor="#6B7280"
+      >
+        {pacchettiArchiviati.length > 0 ? (
+          <div style={gridStyle}>
+            {pacchettiArchiviati.map((p) => (
+              <PacchettoCard
+                key={p.id}
+                pacchetto={p}
+                attivita={attivitaMap[p.id] || []}
+                onEdit={() => setEditPacchetto(p)}
+                onDelete={() => setDeletePacchetto(p)}
+                onCambiaStato={handleCambiaStato}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 14 }}>
+            Nessun pacchetto archiviato
+          </div>
+        )}
+      </SezioneDropdown>
+
+      {/* Sezione Pacchetti Sospesi */}
+      <SezioneDropdown
+        titolo="⏸️ Pacchetti Sospesi"
+        count={pacchettiSospesi.length}
+        isOpen={sezioneAperta.sospesi}
+        onToggle={() => toggleSezione('sospesi')}
+        badgeColor="#F59E0B"
+      >
+        {pacchettiSospesi.length > 0 ? (
+          <div style={gridStyle}>
+            {pacchettiSospesi.map((p) => (
+              <PacchettoCard
+                key={p.id}
+                pacchetto={p}
+                attivita={attivitaMap[p.id] || []}
+                onEdit={() => setEditPacchetto(p)}
+                onDelete={() => setDeletePacchetto(p)}
+                onCambiaStato={handleCambiaStato}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 14 }}>
+            Nessun pacchetto sospeso
+          </div>
+        )}
+      </SezioneDropdown>
 
       <button
         onClick={() => setEditPacchetto({})}
@@ -219,6 +299,62 @@ export default function PacchettiCardsAdmin() {
           onClose={() => setDeletePacchetto(null)}
           onSuccess={handleCreateSuccess}
         />
+      )}
+    </div>
+  );
+}
+
+// Componente SezioneDropdown
+function SezioneDropdown({ titolo, count, isOpen, onToggle, badgeColor, children }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px',
+          background: isOpen ? '#F8FAFC' : '#fff',
+          border: '2px solid #E2E8F0',
+          borderRadius: 12,
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          marginBottom: isOpen ? 16 : 0,
+        }}
+        onMouseOver={(e) => e.currentTarget.style.background = '#F8FAFC'}
+        onMouseOut={(e) => e.currentTarget.style.background = isOpen ? '#F8FAFC' : '#fff'}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#20489a' }}>
+            {titolo}
+          </span>
+          <span style={{
+            background: badgeColor,
+            color: '#fff',
+            padding: '4px 12px',
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 700,
+          }}>
+            {count}
+          </span>
+        </div>
+        <span style={{
+          fontSize: 18,
+          color: '#64748b',
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s',
+          display: 'inline-block',
+        }}>
+          ▼
+        </span>
+      </button>
+      {isOpen && (
+        <div style={{ marginTop: 0 }}>
+          {children}
+        </div>
       )}
     </div>
   );
@@ -427,6 +563,9 @@ function getStatoBadgeStyle(stato) {
   }
   if (stato === 'sospeso') {
     return { ...base, background: '#FEF3C7', color: '#92400E' };
+  }
+  if (stato === 'archiviato') {
+    return { ...base, background: '#E5E7EB', color: '#374151' };
   }
   return { ...base, background: '#F1F5F9', color: '#475569' };
 }
