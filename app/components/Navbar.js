@@ -13,8 +13,6 @@ export default function Navbar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
 
-  if (status === "loading") return null;
-
   const role = session?.user?.role ? String(session.user.role).toLowerCase() : undefined;
 
   const isStaff = role === "admin" || role === "operatore";
@@ -67,6 +65,8 @@ export default function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  if (status === "loading") return null;
 
   function linkStyle(active) {
     return {
