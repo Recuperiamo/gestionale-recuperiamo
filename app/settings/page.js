@@ -2,17 +2,66 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import Navbar from "../components/Navbar";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   if (status === "loading") return null;
   if (!session) {
     router.replace("/signin");
     return null;
   }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setMessage("");
+    setError("");
+
+    if (newPassword !== confirmPassword) {
+      setError("Le nuove password non coincidono");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("La nuova password deve essere di almeno 8 caratteri");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Password cambiata con successo!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        setError(data.error || "Errore nel cambio password");
+      }
+    } catch (err) {
+      setError("Errore di connessione");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#20489a" }}>
@@ -31,13 +80,129 @@ export default function SettingsPage() {
         <h2 style={{ fontWeight: 700, fontSize: 26, marginBottom: 18, textAlign: "center" }}>
           Impostazioni
         </h2>
-        <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 10 }}>
-          (Placeholder) Qui potrai modificare le impostazioni del tuo account e delle notifiche.
+        
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+            Account: {session.user?.email}
+          </div>
         </div>
-        <div style={{ fontSize: 15, color: "#4268b3", marginTop: 26 }}>
-          Funzionalità avanzate in arrivo...
-        </div>
+
+        <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginTop: 10, marginBottom: 6 }}>
+            Cambia Password
+          </h3>
+
+          <div>
+            <label style={labelStyle}>Password Attuale</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              style={inputStyle}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Nuova Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              style={inputStyle}
+              required
+              disabled={loading}
+              placeholder="Minimo 8 caratteri"
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Conferma Nuova Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={inputStyle}
+              required
+              disabled={loading}
+            />
+          </div>
+
+          {error && (
+            <div style={errorStyle}>{error}</div>
+          )}
+
+          {message && (
+            <div style={successStyle}>{message}</div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={loading ? btnDisabledStyle : btnStyle}
+          >
+            {loading ? "Aggiornamento..." : "Cambia Password"}
+          </button>
+        </form>
       </main>
     </div>
   );
 }
+
+const labelStyle = {
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: ".4px",
+  display: "block",
+  marginBottom: 4,
+};
+
+const inputStyle = {
+  border: "1.5px solid #4268b3",
+  borderRadius: 8,
+  padding: "9px 11px",
+  fontSize: 14,
+  color: "#20489a",
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+const btnStyle = {
+  background: "#1cb0f6",
+  color: "#fff",
+  border: "none",
+  fontWeight: 700,
+  padding: "10px 20px",
+  fontSize: 15,
+  borderRadius: 10,
+  cursor: "pointer",
+  marginTop: 6,
+};
+
+const btnDisabledStyle = {
+  ...btnStyle,
+  background: "#9dcfe7",
+  cursor: "wait",
+};
+
+const errorStyle = {
+  background: "#F8D7DA",
+  border: "1px solid #E58B94",
+  color: "#721C24",
+  padding: "8px 10px",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+};
+
+const successStyle = {
+  background: "#D4EDDA",
+  border: "1px solid #C3E6CB",
+  color: "#155724",
+  padding: "8px 10px",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+};
+
