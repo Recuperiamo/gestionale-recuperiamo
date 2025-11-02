@@ -1473,7 +1473,7 @@ export default function LavagnaCanvas({
     if (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom)) {
       setZoom((prev) => (prev === remoteZoom ? prev : remoteZoom));
     }
-  }, [setPan, setZoom]);
+  }, []);  // Empty deps - uses only refs and stable setters
 
   useEffect(() => {
     if (!spectatorMode || isAdmin) return;
@@ -1925,7 +1925,7 @@ export default function LavagnaCanvas({
         console.warn('[LAVAGNA-CREATE] Shape persist failed or returned no id:', s);
       }
     }).catch(err => console.error('[LAVAGNA-CREATE] Error persisting shape:', err));
-  }, [emitOrPublish, lavagnaId, persistShape]);
+  }, [emitOrPublish, lavagnaId, persistShape, utenteId]);
 
   const updateShapeLocal = useCallback((shape, emit = true) => {
     const normalized = normalizeShape(shape);
@@ -2224,128 +2224,53 @@ export default function LavagnaCanvas({
           if (it.type && it.type.indexOf('image') === 0) {
             const file = it.getAsFile();
             if (file) {
-              // Insert an immediate temporary preview using an object URL so user sees feedback
-              const tempSrc = URL.createObjectURL(file);
-              const tempId = insertLocalPastedImage(tempSrc);
-
-              // Create and emit a preview for remote clients, and save it for persistence
-              const previewPromise = (async () => {
-                try {
-                  const srcPreview = await createPreviewDataURL(file, { maxDim: 800, quality: 0.7 });
-                  console.log('[LAVAGNA-PASTE] Preview created, length:', srcPreview?.length);
-                  const previewShape = {
-                    id: tempId,
-                    kind: 'immagine',
-                    src: srcPreview,
-                    x: (pointerWorldRef.current || getWorldCenter()).x - 200 / (zoom || 1),
-                    y: (pointerWorldRef.current || getWorldCenter()).y - 150 / (zoom || 1),
-                    w: 400 / (zoom || 1),
-                    h: 300 / (zoom || 1),
-                    autoreUserId: utenteId
-                  };
-                  emitOrPublish('shape:create', { ...previewShape, lavagnaId, srcPreview });
-                  return srcPreview; // Return for later use
-                } catch (previewErr) {
-                  console.warn('[lavagna] failed to create preview', previewErr);
-                  return null;
-                }
-              })();
-
-              // Upload in background; when done, replace temp shape with persisted one
+              // Pasted images stay ONLY in the lavagna (not uploaded to materiale).
+              // Convert to data URL and store directly in the shape.
               (async () => {
                 try {
-                  // Wait for preview to be ready
-                  const savedPreview = await previewPromise;
-                  console.log('[LAVAGNA-PASTE] Upload starting, preview ready:', !!savedPreview);
+                  // Create a compressed data URL for storage and realtime sync
+                  const srcData = await createPreviewDataURL(file, { maxDim: 1200, quality: 0.8 });
+                  console.log('[LAVAGNA-PASTE] Image pasted, data URL length:', srcData?.length);
                   
-                  const fd = new FormData();
-                  const titolo = `incollato_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'_')}`;
-                  fd.append('file', file);
-                  fd.append('titolo', titolo);
-                  
-                  // clienteId is required by API - log if missing
-                  if (!clienteId) {
-                    console.error('[LAVAGNA-PASTE] clienteId missing! Cannot upload image.');
-                    console.warn('[lavagna] upload pasted image failed: clienteId required');
-                    return;
-                  }
-                  fd.append('clienteId', clienteId);
-                  console.log('[LAVAGNA-PASTE] Uploading with clienteId:', clienteId);
-                  
-                  const res = await fetch('/api/materiale', { method: 'POST', body: fd });
-                  const js = await res.json().catch(()=>null);
-                  if (!res.ok || !js || !js.materiale) {
-                    // leave temp preview and notify console
-                    console.warn('[lavagna] upload pasted image failed, kept local preview');
-                    return;
-                  }
-                  const mat = js.materiale;
-                  console.log('[LAVAGNA-PASTE] Upload successful, materiale:', mat.id);
-                  const serverSrc = `/api/materiale?fileId=${mat.id}`;
+                  const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
                   const baseWidth = 400 / (zoom || 1);
                   const baseHeight = 300 / (zoom || 1);
-                  const baseX = anchor.x - baseWidth / 2;
-                  const baseY = anchor.y - baseHeight / 2;
-
-                  const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-                  const shape = {
+                  
+                  // Create shape with embedded data URL
+                  const tempShape = {
                     id,
                     kind: 'immagine',
-                    src: serverSrc,
-                    materialeId: mat.id,
-                    nomeOriginale: mat.nomeOriginale,
-                    x: baseX,
-                    y: baseY,
+                    src: srcData,
+                    x: anchor.x - baseWidth / 2,
+                    y: anchor.y - baseHeight / 2,
                     w: baseWidth,
                     h: baseHeight,
                     autoreUserId: utenteId
                   };
-
-                  // preload to adjust size then create persisted shape and remove temp
+                  
+                  // Preload to get actual dimensions
                   const img = new Image();
-                    img.onload = async () => {
+                  img.onload = () => {
                     const aspect = img.naturalWidth / img.naturalHeight || 1;
                     const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
                     const desiredH = desiredW / aspect;
-                    shape.w = desiredW;
-                    shape.h = desiredH;
-                    shape.x = anchor.x - desiredW / 2;
-                    shape.y = anchor.y - desiredH / 2;
-                    // update temp preview in-place to point to server URL, but keep srcPreview as fallback
-                    setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id, nomeOriginale: mat.nomeOriginale, w: shape.w, h: shape.h, x: shape.x, y: shape.y } : f));
-                    // persist shape on server with srcPreview fallback and notify remote clients
-                    try {
-                      const normalized = normalizeShape({ ...shape, id: tempId, srcPreview: savedPreview });
-                      persistShape(normalized).then((s) => {
-                        if (s && s.id) {
-                          setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
-                        }
-                      }).catch(()=>{});
-                      // Notify remote clients that a persisted server URL is available, but include preview fallback
-                      emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id, w: shape.w, h: shape.h, x: shape.x, y: shape.y });
-                    } catch (_) {}
-                    // revoke temp URL
-                    try { URL.revokeObjectURL(tempSrc); } catch(_) {}
+                    tempShape.w = desiredW;
+                    tempShape.h = desiredH;
+                    tempShape.x = anchor.x - desiredW / 2;
+                    tempShape.y = anchor.y - desiredH / 2;
+                    
+                    // Create shape locally and persist to lavagna DB (not materiale!)
+                    createShapeLocal(tempShape, true);
                     drawAll();
                   };
-                    img.onerror = async () => {
-                      setForme(prev => prev.map(f => f.id === tempId ? { ...f, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id, nomeOriginale: mat.nomeOriginale } : f));
-                      try {
-                        const normalized = normalizeShape({ ...shape, id: tempId, srcPreview: savedPreview });
-                        persistShape(normalized).then((s) => {
-                          if (s && s.id) {
-                            setForme(prev => prev.map(f => f.id === tempId ? { ...f, dbId: s.id } : f));
-                          }
-                        }).catch(()=>{});
-                        // Notify remote clients that a persisted server URL is available, but include preview fallback
-                        emitOrPublish('shape:update', { id: tempId, lavagnaId, src: serverSrc, srcPreview: savedPreview, materialeId: mat.id });
-                      } catch (_) {}
-                      try { URL.revokeObjectURL(tempSrc); } catch(_) {}
-                      drawAll();
-                    };
-                  img.src = serverSrc;
+                  img.onerror = () => {
+                    // Even if preload fails, create the shape with default size
+                    createShapeLocal(tempShape, true);
+                    drawAll();
+                  };
+                  img.src = srcData;
                 } catch (err) {
-                  console.warn('[lavagna] error uploading pasted image', err);
+                  console.warn('[lavagna] error processing pasted image', err);
                 }
               })();
               e.preventDefault();
@@ -2383,39 +2308,6 @@ export default function LavagnaCanvas({
       } catch (_) {}
     }
 
-    function insertLocalPastedImage(src) {
-      try {
-        const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-        const anchor = pointerWorldRef.current || getWorldCenter();
-        const baseWidth = 400 / (zoom || 1);
-        const baseHeight = 300 / (zoom || 1);
-        const shape = {
-          id,
-          kind: 'immagine',
-          src,
-          x: anchor.x - baseWidth / 2,
-          y: anchor.y - baseHeight / 2,
-          w: baseWidth,
-          h: baseHeight,
-          autoreUserId: utenteId
-        };
-        const img = new Image();
-        img.onload = () => {
-          const aspect = img.naturalWidth / img.naturalHeight || 1;
-          const desiredW = Math.min(800, img.naturalWidth) / (zoom || 1);
-          const desiredH = desiredW / aspect;
-          shape.w = desiredW;
-          shape.h = desiredH;
-          shape.x = anchor.x - desiredW / 2;
-          shape.y = anchor.y - desiredH / 2;
-          setForme(prev => [...prev, shape]);
-          drawAll();
-        };
-        img.onerror = () => { setForme(prev => [...prev, shape]); drawAll(); };
-        img.src = src;
-        return id;
-      } catch (_) { return null; }
-    }
     window.addEventListener('paste', onPaste);
     return () => {
       window.removeEventListener('keydown', onKey);

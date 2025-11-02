@@ -1,8 +1,3 @@
-// =====================================================
-// Prisma Schema - Gestionale Recuperiamo
-// Versione: rimozione unique (attivitaId, stato) per consentire archiviazioni multiple
-// =====================================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,21 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/**
- * ====================== AUTENTICAZIONE ======================
- */
+/// *
+///  * ====================== AUTENTICAZIONE ======================
 model User {
-  id                  Int                   @id @default(autoincrement())
-  email               String                @unique
-  name                String?
-  password            String
-  roleId              Int
-  accounts            Account[]
-  sessions            Session[]
-  role                Role                  @relation(fields: [roleId], references: [id])
-  pacchettoAlertLetti PacchettoAlertLetto[]
-  LavagnaTratto       LavagnaTratto[]
-  LavagnaShape        LavagnaShape[]
+  id                     Int                      @id @default(autoincrement())
+  email                  String                   @unique
+  name                   String?
+  password               String
+  roleId                 Int
+  accounts               Account[]
+  LavagnaShape           LavagnaShape[]
+  LavagnaTratto          LavagnaTratto[]
+  pacchettoAlertLetti    PacchettoAlertLetto[]
+  sessions               Session[]
+  role                   Role                     @relation(fields: [roleId], references: [id])
+  passwordResetRequests  PasswordResetRequest[]   @relation("UserPasswordResetRequests")
+  passwordResetReviews   PasswordResetRequest[]   @relation("UserPasswordResetReviews")
 }
 
 model Role {
@@ -69,14 +65,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/**
- * ====================== CLIENTI / PACCHETTI ======================
- */
-enum ClientType {
-  REFERENTE
-  STUDENTE
-}
-
 model Client {
   id                Int                 @id @default(autoincrement())
   nomeReferente     String
@@ -86,15 +74,16 @@ model Client {
   codiceFiscale     String?             @unique
   partitaIva        String?             @unique
   note              String?
-  materie           String[]            @default([])
   tipo              ClientType          @default(REFERENTE)
   referenteId       Int?
-  coloreTema        String?             // Colore hex per tema aula (es: "#1cb0f6")
-  linkVideolezione  String?             // Link videolezione
-  referente         Client?             @relation("ReferenteStudenti", fields: [referenteId], references: [id], onDelete: SetNull)
-  studenti          Client[]            @relation("ReferenteStudenti")
-  pacchetti         PacchettoOre[]
+  materie           String[]            @default([])
+  coloreTema        String?
+  linkVideolezione  String?
   attivita          Attivita[]
+  referente         Client?             @relation("ReferenteStudenti", fields: [referenteId], references: [id])
+  studenti          Client[]            @relation("ReferenteStudenti")
+  OreExtra          OreExtra[]
+  pacchetti         PacchettoOre[]
   richiesteModifica RichiestaModifica[]
 
   @@index([email])
@@ -113,8 +102,9 @@ model PacchettoOre {
   note                String?
   sogliaOreResidue    Int?
   attivita            Attivita[]
-  cliente             Client                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  OreExtra            OreExtra[]
   pacchettoAlertLetti PacchettoAlertLetto[]
+  cliente             Client                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   changelog           Pacchetto_ChangeLog[]
 
   @@index([clienteId])
@@ -126,8 +116,8 @@ model PacchettoAlertLetto {
   pacchettoId Int
   letto       Boolean      @default(true)
   dataLetto   DateTime     @default(now())
-  user        User         @relation(fields: [userId], references: [id])
   pacchetto   PacchettoOre @relation(fields: [pacchettoId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
 
   @@unique([userId, pacchettoId])
 }
@@ -135,61 +125,41 @@ model PacchettoAlertLetto {
 model Pacchetto_ChangeLog {
   id                   Int           @id @default(autoincrement())
   pacchettoId          Int?
-  pacchetto            PacchettoOre? @relation(fields: [pacchettoId], references: [id], onDelete: SetNull)
-  pacchettoDescrizione String?
   orePrima             Float
   oreDopo              Float
   tipoOperazione       String
   attivitaId           Int?
-  attivita             Attivita?     @relation(fields: [attivitaId], references: [id], onDelete: SetNull)
   utente               String
   timestamp            DateTime      @default(now())
   motivazione          String?
+  pacchettoDescrizione String?
+  attivita             Attivita?     @relation(fields: [attivitaId], references: [id])
+  pacchetto            PacchettoOre? @relation(fields: [pacchettoId], references: [id])
 }
 
-/**
- * ====================== ATTIVITA ======================
- */
+/// *
+///  * ====================== ATTIVITA ======================
 model Attivita {
-  id           Int                   @id @default(autoincrement())
-  createdAt    DateTime              @default(now())
-  descrizione  String?
-  oreConsumate Int
-  pacchettoId  Int?
-  pacchetto    PacchettoOre?         @relation(fields: [pacchettoId], references: [id])
-  clienteId    Int
-  cliente      Client                @relation(fields: [clienteId], references: [id])
-  ricorrenzaId Int?
-  changelog    Pacchetto_ChangeLog[]
-
-  orario          DateTime?
-  orarioOriginale DateTime?
-  durataOre       Float?
-  stato           String?
-
-  richiesteModifica RichiestaModifica[]
+  id                Int                   @id @default(autoincrement())
+  createdAt         DateTime              @default(now())
+  descrizione       String?
+  oreConsumate      Int
+  pacchettoId       Int?
+  clienteId         Int
+  durataOre         Float?
+  orario            DateTime?
+  ricorrenzaId      Int?
+  stato             String?
+  orarioOriginale   DateTime?
+  cliente           Client                @relation(fields: [clienteId], references: [id])
+  pacchetto         PacchettoOre?         @relation(fields: [pacchettoId], references: [id])
   Lavagna           Lavagna?
+  changelog         Pacchetto_ChangeLog[]
+  richiesteModifica RichiestaModifica[]
 
   @@index([clienteId])
   @@index([pacchettoId])
   @@index([orario])
-}
-
-/**
- * ====================== RICHIESTE MODIFICA ======================
- */
-enum RichiestaStato {
-  pending
-  in_review
-  approved
-  rejected
-  archived
-}
-
-enum RichiestaTipo {
-  cambio_data
-  cambio_orario
-  cancellazione
 }
 
 model RichiestaModifica {
@@ -207,17 +177,15 @@ model RichiestaModifica {
   processedBy    String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-
-  attivita Attivita @relation(fields: [attivitaId], references: [id])
-  cliente  Client   @relation(fields: [clienteId], references: [id])
+  attivita       Attivita       @relation(fields: [attivitaId], references: [id])
+  cliente        Client         @relation(fields: [clienteId], references: [id])
 
   @@index([clienteId])
   @@index([attivitaId])
 }
 
-/**
- * ====================== RICHIESTE LAVAGNA ======================
- */
+/// *
+///  * ====================== RICHIESTE LAVAGNA ======================
 model RichiestaLavagna {
   id           Int            @id @default(autoincrement())
   clienteId    Int
@@ -235,32 +203,24 @@ model RichiestaLavagna {
   @@index([stato])
 }
 
-/**
- * ====================== MATERIALE DIDATTICO ======================
- */
+/// *
+///  * ====================== MATERIALE DIDATTICO ======================
 model MaterialeDidattico {
-  id            Int      @id @default(autoincrement())
+  id            Int              @id @default(autoincrement())
   clienteId     Int
   titolo        String
   materia       String?
-  // Sezione didattica: MATERIALe, COMPITI, VOTI
-  sezione       MaterialeSezione @default(MATERIALE)
   nomeOriginale String
-  blobUrl       String   // URL del file su Vercel Blob
+  blobUrl       String
   mimeType      String?
-  fileSize      Int?     // dimensione in bytes
-  uploadedBy    String?  // email o nome utente che ha caricato
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  fileSize      Int?
+  uploadedBy    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  sezione       MaterialeSezione @default(MATERIALE)
 
   @@index([clienteId])
   @@index([createdAt])
-}
-
-enum MaterialeSezione {
-  MATERIALE
-  COMPITI
-  VOTI
 }
 
 model Lavagna {
@@ -269,72 +229,136 @@ model Lavagna {
   titolo     String?         @default("Lavagna")
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
-  tratti     LavagnaTratto[]
-  shapes     LavagnaShape[]
   attivita   Attivita        @relation(fields: [attivitaId], references: [id])
+  shapes     LavagnaShape[]
+  tratti     LavagnaTratto[]
 
-  // Se vuoi un indice secondario per query future su createdAt:
   @@index([createdAt])
 }
 
 model LavagnaTratto {
   id           Int       @id @default(autoincrement())
-  streamId     String?   @unique
   lavagnaId    Int
   autoreUserId Int
-  strumento    String // "penna" | "gomma" (possibile estensione)
-  colore       String? // es. "#20489a"
-  spessore     Float? // es. 2.5
-  punti        Json // [{x:.., y:..}, ...]
+  strumento    String
+  colore       String?
+  spessore     Float?
+  punti        Json
   createdAt    DateTime  @default(now())
   deletedAt    DateTime?
-  lavagna      Lavagna   @relation(fields: [lavagnaId], references: [id])
+  streamId     String?   @unique
   autoreUser   User      @relation(fields: [autoreUserId], references: [id])
+  lavagna      Lavagna   @relation(fields: [lavagnaId], references: [id])
 
   @@index([lavagnaId])
   @@index([autoreUserId])
   @@index([createdAt])
 }
 
-/**
- * ====================== LAVAGNA SHAPES ======================
- * Forme vettoriali persistite sulla lavagna (rettangoli, cerchi, assi, ecc.)
- */
+/// *
+///  * ====================== LAVAGNA SHAPES ======================
+///  * Forme vettoriali persistite sulla lavagna (rettangoli, cerchi, assi, ecc.)
 model LavagnaShape {
-  id           Int       @id @default(autoincrement())
-  lavagnaId    Int
-  kind         String
-  // Bounding box o coordinate base
-  x            Float?
-  y            Float?
-  w            Float?
-  h            Float?
-  // Coordinate addizionali per linee/assi
-  x1           Float?
-  y1           Float?
-  x2           Float?
-  y2           Float?
-  // Stile
-  colore       String?
-  spessore     Float?
-  // Immagini
-  src          String?   // URL o percorso immagine (es: /api/materiale?fileId=123)
-  srcPreview   String?   @db.Text // Base64 data URL per preview (fallback per client remoti)
-  materialeId  Int?      // ID del materiale collegato
-  nomeOriginale String?  // Nome originale del file
-  // Link
-  url          String?
-  titolo       String?
-  // Rotazione
-  rotation     Float?
-  // Autore e auditing
-  autoreUserId Int?
-  createdAt    DateTime  @default(now())
-  deletedAt    DateTime?
-
-  lavagna    Lavagna @relation(fields: [lavagnaId], references: [id])
-  autoreUser User?   @relation(fields: [autoreUserId], references: [id])
+  id            Int       @id @default(autoincrement())
+  lavagnaId     Int
+  kind          String
+  x             Float?
+  y             Float?
+  w             Float?
+  h             Float?
+  x1            Float?
+  y1            Float?
+  x2            Float?
+  y2            Float?
+  colore        String?
+  spessore      Float?
+  autoreUserId  Int?
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
+  materialeId   Int?
+  nomeOriginale String?
+  rotation      Float?
+  src           String?
+  srcPreview    String?
+  titolo        String?
+  url           String?
+  autoreUser    User?     @relation(fields: [autoreUserId], references: [id])
+  lavagna       Lavagna   @relation(fields: [lavagnaId], references: [id])
 
   @@index([lavagnaId])
   @@index([createdAt])
+}
+
+model OreExtra {
+  id               Int           @id @default(autoincrement())
+  clienteId        Int
+  pacchettoId      Int?
+  ore              Float
+  descrizione      String?
+  dataTracciamento DateTime      @default(now())
+  dataAssegnamento DateTime?
+  stato            String        @default("pending")
+  note             String?
+  tracciaDa        String?
+  assegnatoDa      String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime
+  Client           Client        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  PacchettoOre     PacchettoOre? @relation(fields: [pacchettoId], references: [id])
+
+  @@index([clienteId])
+  @@index([pacchettoId])
+  @@index([stato])
+}
+
+/// *
+///  * ====================== CLIENTI / PACCHETTI ======================
+enum ClientType {
+  REFERENTE
+  STUDENTE
+}
+
+/// *
+///  * ====================== RICHIESTE MODIFICA ======================
+enum RichiestaStato {
+  pending
+  in_review
+  approved
+  rejected
+  archived
+}
+
+enum RichiestaTipo {
+  cambio_data
+  cambio_orario
+  cancellazione
+}
+
+enum MaterialeSezione {
+  MATERIALE
+  COMPITI
+  VOTI
+}
+
+enum PasswordResetStatus {
+  PENDING
+  REJECTED
+  COMPLETED
+}
+
+model PasswordResetRequest {
+  id              Int                  @id @default(autoincrement())
+  userId          Int
+  user            User                 @relation("UserPasswordResetRequests", fields: [userId], references: [id], onDelete: Cascade)
+  status          PasswordResetStatus  @default(PENDING)
+  reviewedBy      Int?
+  reviewer        User?                @relation("UserPasswordResetReviews", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("password_reset_requests")
 }

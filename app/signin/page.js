@@ -63,6 +63,14 @@ export default function SignInPage() {
           >
             {loading ? "Attendere..." : "Login"}
           </button>
+          <div style={{ textAlign:"center", marginTop:8 }}>
+            <a
+              href="/password-reset"
+              style={forgotLink}
+            >
+              Password dimenticata?
+            </a>
+          </div>
         </form>
         <div style={{ marginTop:20, fontSize:13, textAlign:"center" }}>
           Non hai ancora un account?{" "}
@@ -145,4 +153,10 @@ const linkBtn = {
   fontWeight:700,
   textDecoration:"underline",
   padding:0
+};
+const forgotLink = {
+  color:"#1cb0f6",
+  fontSize:13,
+  textDecoration:"none",
+  fontWeight:600
 };

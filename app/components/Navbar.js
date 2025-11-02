@@ -29,6 +29,12 @@ export default function Navbar() {
     { href: "/richieste", label: "Richieste" }
   ];
 
+  // Admin-only links
+  const adminOnlyLinks = [
+    { href: "/storico", label: "Storico" },
+    { href: "/admin/password-resets", label: "Reset Password" }
+  ];
+
   // Client links (niente "Storico")
   const navLinksCliente = [
     { href: "/profilo", label: "Profilo" },
@@ -38,8 +44,8 @@ export default function Navbar() {
     { href: "/richieste", label: "Richieste" }
   ];
 
-  // Costruzione finale dei link: "Storico" SOLO per admin
-  const links = isStaff ? [...navLinksStaffBase, ...(isAdmin ? [{ href: "/storico", label: "Storico" }] : [])] : navLinksCliente;
+  // Costruzione finale dei link: "Storico" + "Reset Password" SOLO per admin
+  const links = isStaff ? [...navLinksStaffBase, ...(isAdmin ? adminOnlyLinks : [])] : navLinksCliente;
 
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
