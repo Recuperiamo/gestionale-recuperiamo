@@ -274,8 +274,7 @@ export async function POST(request) {
         await tx.pacchettoOre.update({
           where: { id: Number(pacchettoId) },
           data: {
-            oreResidue: { decrement: requiredHours },
-            stato: pacchetto.oreResidue - requiredHours === 0 ? 'esaurito' : 'attivo'
+            oreResidue: { decrement: requiredHours }
           }
         })
         return rows
@@ -330,8 +329,7 @@ export async function POST(request) {
       prisma.pacchettoOre.update({
         where: { id: Number(pacchettoId) },
         data: {
-          oreResidue: { decrement: durataNormalizzata },
-          stato: pacchetto.oreResidue - durataNormalizzata === 0 ? 'esaurito' : 'attivo'
+          oreResidue: { decrement: durataNormalizzata }
         }
       })
     ])
@@ -458,8 +456,7 @@ export async function PATCH(request) {
             pacchettoAfter = await tx.pacchettoOre.update({
               where: { id: pacchettoBefore.id },
               data: {
-                oreResidue: nuovoResiduo,
-                stato: nuovoResiduo <= 0 ? 'esaurito' : 'attivo'
+                oreResidue: nuovoResiduo
               }
             })
           }
@@ -600,8 +597,7 @@ export async function PATCH(request) {
             pacchettoAfter = await tx.pacchettoOre.update({
               where: { id: pacchettoBefore.id },
               data: {
-                oreResidue: nuovoResiduo,
-                stato: nuovoResiduo <= 0 ? 'esaurito' : 'attivo'
+                oreResidue: nuovoResiduo
               }
             })
           } else {
@@ -738,8 +734,7 @@ export async function DELETE(request) {
         ? await tx.pacchettoOre.update({
             where: { id: pacchettoBefore.id },
             data: {
-              oreResidue: pacchettoBefore.oreResidue + att.oreConsumate,
-              stato: pacchettoBefore.oreResidue + att.oreConsumate > 0 ? 'attivo' : 'esaurito'
+              oreResidue: pacchettoBefore.oreResidue + att.oreConsumate
             }
           })
         : null

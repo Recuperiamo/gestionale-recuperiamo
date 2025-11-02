@@ -84,12 +84,11 @@ export async function DELETE(req) {
       // 3.2 Reset pacchetti (se non disabilitato)
       if (!noReset) {
         for (const p of pacchetti) {
-          // Ensure both oreResidue and stato are reset consistently
+          // Ensure both oreResidue are reset consistently
           await tx.pacchettoOre.update({
             where: { id: p.id },
             data: {
-              oreResidue: p.oreAcquistate,
-              stato: p.oreAcquistate > 0 ? 'attivo' : 'esaurito'
+              oreResidue: p.oreAcquistate
             }
           });
         }
