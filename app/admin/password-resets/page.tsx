@@ -69,7 +69,7 @@ export default function AdminPasswordResetsPage() {
         setRequests((prev) => prev.filter((req) => req.id !== requestId));
         
         if (action === 'approve') {
-          alert(`✅ ${data.message}\n\nL'utente può ora ri-registrarsi con l'email: ${data.email}`);
+          alert(`✅ ${data.message}\n\nPassword temporanea: ${data.tempPassword}\n\nComunica questa password all'utente ${data.email}`);
         } else {
           alert(`❌ Richiesta rifiutata`);
         }

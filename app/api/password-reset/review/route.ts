@@ -52,19 +52,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Richiesta rifiutata' });
     }
 
-    // Approva e ELIMINA l'utente così può ri-registrarsi
-    const userToDelete = await prisma.user.findUnique({
-      where: { id: request.userId },
-      select: { email: true, name: true },
-    });
+    // Approva e genera una password temporanea
+    const tempPassword = Math.random().toString(36).slice(-10); // Password temporanea casuale
+    const bcrypt = await import('bcryptjs');
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    if (!userToDelete) {
-      return NextResponse.json({ error: 'Utente non trovato' }, { status: 404 });
-    }
-
-    // Elimina l'utente (cascade eliminerà anche le sue relazioni)
-    await prisma.user.delete({
+    // Aggiorna la password dell'utente
+    await prisma.user.update({
       where: { id: request.userId },
+      data: { password: hashedPassword },
     });
 
     // Marca la richiesta come completata
@@ -78,9 +74,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const userInfo = await prisma.user.findUnique({
+      where: { id: request.userId },
+      select: { email: true, name: true },
+    });
+
     return NextResponse.json({ 
-      message: `Utente ${userToDelete.email} eliminato. Può ora ri-registrarsi con la stessa email.`,
-      email: userToDelete.email,
+      message: `Password resettata per ${userInfo?.email}`,
+      email: userInfo?.email,
+      tempPassword, // In produzione, invia questa via email invece di mostrarla
     });
   } catch (error) {
     console.error('Errore nella revisione richiesta:', error);

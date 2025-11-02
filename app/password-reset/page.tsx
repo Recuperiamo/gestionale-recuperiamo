@@ -47,8 +47,7 @@ export default function PasswordResetRequestPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Inserisci la tua email per richiedere il reset della password.
-            Un amministratore dovrà approvare la richiesta, dopodiché 
-            potrai ri-registrarti con la stessa email.
+            Un amministratore genererà una password temporanea che ti verrà comunicata.
           </p>
         </div>
 
