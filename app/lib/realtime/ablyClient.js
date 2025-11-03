@@ -1,118 +1,102 @@
-// Lightweight Ably client wrapper for browser usage
-// Uses server-issued token authentication via /api/ably/token (no public key exposed)
-let _client = null;
-let _loadingPromise = null;
-const _channelReady = new Map(); // name -> Promise<void>
+// Realtime client: Socket.IO only, preserving the existing Ably-like API
+let _socket = null;
+let _connectPromise = null;
 
-// Try to lazy-load the Ably client via dynamic import. We intentionally avoid
-// using static require/import so bundlers don't eagerly inline Ably into the
-// main client bundle, which can cause initialization/circular issues.
-async function loadAbly() {
+async function ensureSocket() {
   if (typeof window === 'undefined') return null;
-  if (_client) return _client;
-  if (_loadingPromise) return _loadingPromise;
-  _loadingPromise = (async () => {
-    try {
-      const mod = await import('ably');
-      const Realtime = mod.Realtime || mod.default?.Realtime || mod.default;
-      if (!Realtime) {
-        console.warn('[Ably] runtime import succeeded but Realtime not found');
-        return null;
-      }
-      try {
-        _client = new Realtime({ authUrl: '/api/ably/token', echoMessages: false, tls: true });
-      } catch (err) {
-        console.warn('[Ably] init failed, realtime features disabled', err?.message || err);
-        _client = null;
-        return null;
-      }
-      try {
-        _client.connection.on((stateChange) => {
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[Ably connection]', stateChange.current, '->', stateChange.previous || 'start');
-          }
-        });
-        _client.auth.on('failed', (err) => {
-          if (process.env.NODE_ENV !== 'production') console.error('[Ably auth failed]', err);
-        });
-      } catch (_) {}
-      return _client;
-    } catch (err) {
-      console.warn('[Ably] dynamic import failed, realtime features disabled', err?.message || err);
-      _client = null;
-      return null;
+  if (_socket) return _socket;
+  if (_connectPromise) return _connectPromise;
+
+  _connectPromise = (async () => {
+    const mod = await import('socket.io-client');
+    const io = mod.io || mod.default?.io || mod;
+    const configuredUrl = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SOCKET_URL) || '';
+    const baseUrl = configuredUrl || window.location.origin;
+    // If using local origin (no external realtime URL), hit the bootstrap API to start the lightweight Socket.IO server
+    if (!configuredUrl) {
+      try { await fetch('/api/socketio'); } catch (_) {}
     }
+    // Use the same Socket.IO path used by the server (`/api/socketio`)
+    const socket = io(baseUrl, { path: '/api/socketio', transports: ['websocket', 'polling'] });
+    await new Promise((resolve, reject) => {
+      const to = setTimeout(() => reject(new Error('socket.io connect timeout')), 8000);
+      socket.once('connect', () => { clearTimeout(to); resolve(); });
+      socket.once('connect_error', (e) => { clearTimeout(to); reject(e); });
+    });
+    _socket = socket;
+    if (process.env.NODE_ENV !== 'production') console.log('[Realtime] Socket.IO connected');
+    return _socket;
   })();
-  return _loadingPromise;
+
+  return _connectPromise;
 }
 
 export function getAblyClient() {
-  // Backwards-compatible synchronous accessor: returns client if already loaded,
-  // otherwise null. Callers that need a client should use getAblyChannelAsync/
-  // whenChannelAttachedAsync which will await loadAbly().
-  if (typeof window === 'undefined') return null;
-  return _client;
+  // Back-compat: return socket if connected
+  return _socket;
+}
+
+function createChannelWrapper(socket, name) {
+  try {
+    if (typeof name === 'string') {
+      if (name.startsWith('lavagna:')) {
+        const id = name.split(':')[1];
+        socket.emit('join:lavagna', { attivitaId: id });
+      } else if (name.startsWith('lavagne:')) {
+        const id = name.split(':')[1];
+        socket.emit('join:lavagne', { clienteId: id });
+      } else if (name.startsWith('materiale:')) {
+        const id = name.split(':')[1];
+        socket.emit('join:materiale', { clienteId: id });
+      }
+    }
+  } catch (_) {}
+
+  const listeners = new Map();
+  return {
+    state: 'attached',
+    subscribe: (event, handler) => {
+      const wrap = (msg) => handler({ data: msg });
+      listeners.set(handler, wrap);
+      socket.on(event, wrap);
+    },
+    unsubscribe: (event, handler) => {
+      const wrap = listeners.get(handler);
+      try { socket.off(event, wrap || handler); } catch (_) {}
+      listeners.delete(handler);
+    },
+    publish: (event, data, cb) => {
+      try { socket.emit(event, data); cb && cb(); } catch (e) { if (process.env.NODE_ENV !== 'production') console.error('[Realtime publish error]', e); cb && cb(e); }
+    },
+    detach: () => {
+      for (const [orig, wrap] of listeners.entries()) {
+        try { socket.off(orig, wrap); } catch (_) {}
+      }
+      listeners.clear();
+    },
+    on: () => {}
+  };
 }
 
 export async function getAblyChannelAsync(name) {
-  const client = await loadAbly();
-  if (!client) return null;
-  const ch = client.channels.get(name);
-  if (ch && ch.state === 'initialized') {
-    try { ch.attach(); } catch {}
-  }
-  return ch;
+  const socket = await ensureSocket();
+  if (!socket) return null;
+  return createChannelWrapper(socket, name);
 }
 
-export async function whenChannelAttachedAsync(name, timeoutMs = 5000) {
-  let p = _channelReady.get(name);
-  if (p) return p;
-  const ch = await getAblyChannelAsync(name);
-  if (!ch) return Promise.reject(new Error('Channel not available (no client)'));
-  if (ch.state === 'attached') return Promise.resolve();
-  p = new Promise((resolve, reject) => {
-    const to = setTimeout(() => {
-      if (process.env.NODE_ENV !== 'production') console.warn('[Ably] attach timeout', name, ch.state);
-      reject(new Error('Attach timeout: '+name));
-    }, timeoutMs);
-    const off = () => {
-      try { ch.off(listener); } catch {}
-      clearTimeout(to);
-    };
-    const listener = (stateChange) => {
-      if (stateChange.current === 'attached') {
-        off();
-        resolve();
-      } else if (['failed','suspended','detached'].includes(stateChange.current)) {
-        if (stateChange.current === 'detached') {
-          try { ch.attach(); } catch {}
-        }
-      }
-    };
-    try { ch.on(listener); } catch {}
-    try { ch.attach(); } catch {}
-  });
-  _channelReady.set(name, p);
-  p.finally(() => setTimeout(() => { _channelReady.delete(name); }, 1000));
-  return p;
+export function getAblyChannel(name) {
+  if (!_socket) return null;
+  return createChannelWrapper(_socket, name);
+}
+
+export async function whenChannelAttachedAsync() {
+  const socket = await ensureSocket();
+  if (!socket) throw new Error('Socket not available');
+  return Promise.resolve();
 }
 
 export async function withAblyChannelAsync(name, fn) {
   const ch = await getAblyChannelAsync(name);
   if (!ch) return;
-  try { fn(ch); } catch {}
-}
-
-// Keep legacy synchronous functions for minimal compatibility
-export function getAblyChannel(name) {
-  return getAblyClient() ? getAblyClient().channels.get(name) : null;
-}
-
-export function whenChannelAttached(name, timeoutMs = 5000) {
-  // Prefer async version, but keep a fallback that rejects if client not ready
-  return whenChannelAttachedAsync(name, timeoutMs);
-}
-
-export function withAblyChannel(name, fn) {
-  withAblyChannelAsync(name, fn);
+  return fn(ch);
 }

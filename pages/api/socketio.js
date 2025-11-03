@@ -39,21 +39,21 @@ export default function handler(req, res) {
         if (attivitaId) socket.join(`lavagna:${attivitaId}`);
       });
 
-      // Broadcast live stroke agli ALTRI client nella stanza
+      // Broadcast live stroke a TUTTI i client nella stanza (incluso il sender)
       socket.on("stroke:start", (msg) => {
-        if (msg?.attivitaId) socket.to(`lavagna:${msg.attivitaId}`).emit("stroke:start", msg);
+        if (msg?.attivitaId) ioServer.to(`lavagna:${msg.attivitaId}`).emit("stroke:start", msg);
       });
       socket.on("stroke:points", (msg) => {
-        if (msg?.attivitaId) socket.to(`lavagna:${msg.attivitaId}`).emit("stroke:points", msg);
+        if (msg?.attivitaId) ioServer.to(`lavagna:${msg.attivitaId}`).emit("stroke:points", msg);
       });
       socket.on("stroke:done", (msg) => {
-        if (msg?.attivitaId) socket.to(`lavagna:${msg.attivitaId}`).emit("stroke:done", msg);
+        if (msg?.attivitaId) ioServer.to(`lavagna:${msg.attivitaId}`).emit("stroke:done", msg);
       });
       socket.on("stroke:delete", (msg) => {
-        if (msg?.attivitaId) socket.to(`lavagna:${msg.attivitaId}`).emit("stroke:delete", msg);
+        if (msg?.attivitaId) ioServer.to(`lavagna:${msg.attivitaId}`).emit("stroke:delete", msg);
       });
       socket.on("cursor", (msg) => {
-        if (msg?.attivitaId) socket.to(`lavagna:${msg.attivitaId}`).emit("cursor", msg);
+        if (msg?.attivitaId) ioServer.to(`lavagna:${msg.attivitaId}`).emit("cursor", msg);
       });
 
       socket.on("clear-lavagna", ({ attivitaId }) => {

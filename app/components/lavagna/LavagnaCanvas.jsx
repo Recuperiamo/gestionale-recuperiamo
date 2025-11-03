@@ -1604,6 +1604,9 @@ export default function LavagnaCanvas({
           const { data } = msg || {};
           const { streamId, strumento, colore, spessore, start } = data || {};
           if (!streamId || !start) return;
+          if (process.env.NODE_ENV !== 'production') {
+            try { console.log('[LAVAGNA-RECV] stroke:start', { streamId, start }); } catch(_) {}
+          }
           remoteStreams.current.set(streamId, {
             strumento,
             colore,
@@ -1617,6 +1620,9 @@ export default function LavagnaCanvas({
           const { data } = msg || {};
           const { streamId, points } = data || {};
           if (!streamId || !Array.isArray(points) || points.length === 0) return;
+          if (process.env.NODE_ENV !== 'production') {
+            try { console.log('[LAVAGNA-RECV] stroke:points', { streamId, n: points.length }); } catch(_) {}
+          }
           const st = remoteStreams.current.get(streamId);
           if (!st) return;
           st.punti.push(...points);
@@ -1626,6 +1632,9 @@ export default function LavagnaCanvas({
         const onDone = (msg) => {
           const { data } = msg || {};
           const { streamId } = data || {};
+          if (process.env.NODE_ENV !== 'production') {
+            try { console.log('[LAVAGNA-RECV] stroke:done', { streamId }); } catch(_) {}
+          }
           const st = remoteStreams.current.get(streamId);
           if (st && st.punti.length >= 2) {
             const definitivo = prepareStroke({
@@ -1823,58 +1832,23 @@ export default function LavagnaCanvas({
       }
     })();
 
-    const onStart = (msg) => {
-      const { data } = msg || {};
-      const { streamId, strumento, colore, spessore, start } = data || {};
-      if (!streamId || !start) return;
-      remoteStreams.current.set(streamId, {
-        strumento,
-        colore,
-        spessore,
-        punti: [start]
-      });
-      drawAll();
+    return () => {
+      try {
+        cleanup();
+      } catch (_) {}
     };
-
-    const onPoints = (msg) => {
-      const { data } = msg || {};
-      const { streamId, points } = data || {};
-      if (!streamId || !Array.isArray(points) || points.length === 0) return;
-      const st = remoteStreams.current.get(streamId);
-      if (!st) return;
-      st.punti.push(...points);
-      drawAll();
-    };
-
-    const onDone = (msg) => {
-      const { data } = msg || {};
-      const { streamId } = data || {};
-      const st = remoteStreams.current.get(streamId);
-      if (st && st.punti.length >= 2) {
-        const definitivo = prepareStroke({
-          id: streamId,
-          strumento: st.strumento,
-          colore: st.colore,
-          spessore: st.spessore,
-          punti: st.punti,
-          autoreUserId: 'remote'
-        });
-        setTratti((prev) => [...prev, definitivo]);
-      }
-      remoteStreams.current.delete(streamId);
-      drawAll();
-    };
-
-    const onDelete = (msg) => {
-      const { data } = msg || {};
-      const { strokeId } = data || {};
-      if (!strokeId) return;
-      setTratti((prev) => prev.filter((t) => String(t.id) !== String(strokeId)));
-      drawAll();
-    };
-
-    return () => { try { cleanup(); } catch (_) {} };
-  }, [channelName, drawAll, isAdmin, emitOrPublish, lavagnaId, attivitaId, applyViewport, utenteId, ruolo, clearLavagnaState]);
+  }, [
+    channelName,
+    drawAll,
+    isAdmin,
+    emitOrPublish,
+    lavagnaId,
+    attivitaId,
+    applyViewport,
+    utenteId,
+    ruolo,
+    clearLavagnaState,
+  ]);
 
   // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());

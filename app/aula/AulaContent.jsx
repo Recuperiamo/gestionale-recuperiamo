@@ -84,6 +84,13 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
     resetForm();
     onUploaded && onUploaded();
     onClose && onClose();
+    // Emit realtime notification to other clients via Socket.IO
+    try {
+      if (clienteId) {
+        const ch = await getAblyChannelAsync(`materiale:${clienteId}`);
+        if (ch) ch.publish('new-material', { clienteId: Number(clienteId), count: files.length });
+      }
+    } catch (_) {}
     setLoading(false);
   }
 
@@ -440,6 +447,13 @@ export default function AulaContent({ initialClienteId = null }) {
       } else {
         setItems([]);
       }
+      // Emit realtime delete notification for other clients
+      try {
+        if (targetClienteId) {
+          const ch = await getAblyChannelAsync(`materiale:${targetClienteId}`);
+          if (ch) ch.publish('delete-material', { clienteId: Number(targetClienteId), materialeId: Number(fileId) });
+        }
+      } catch (_) {}
     } else {
       alert("Errore durante l'eliminazione del materiale");
     }

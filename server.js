@@ -93,6 +93,24 @@ app.prepare().then(() => {
       io.to(`lavagne:${clienteId}`).emit("new-lavagna", { lavagna });
     });
 
+    // Materiale: join stanza per cliente e forward eventi
+    socket.on("join:materiale", ({ clienteId }) => {
+      if (!clienteId) return;
+      socket.join(`materiale:${clienteId}`);
+    });
+
+    socket.on("new-material", (msg) => {
+      const clienteId = msg?.clienteId;
+      if (!clienteId) return;
+      io.to(`materiale:${clienteId}`).emit("new-material", msg);
+    });
+
+    socket.on("delete-material", (msg) => {
+      const clienteId = msg?.clienteId;
+      if (!clienteId) return;
+      io.to(`materiale:${clienteId}`).emit("delete-material", msg);
+    });
+
     socket.on("disconnect", () => {
       // Gestione pulizia se serve
     });
