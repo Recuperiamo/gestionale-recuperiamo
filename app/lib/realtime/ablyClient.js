@@ -1,77 +1,67 @@
-// Realtime client: Socket.IO only, preserving the existing Ably-like API
-let _socket = null;
+// Realtime client: Ably Realtime SDK wrapper (compat API)
+let _ably = null;
 let _connectPromise = null;
 
-async function ensureSocket() {
+function getAblyApiKey() {
+  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_ABLY_API_KEY) {
+    return process.env.NEXT_PUBLIC_ABLY_API_KEY;
+  }
+  if (typeof window !== 'undefined' && window?.__NEXT_DATA__?.env?.NEXT_PUBLIC_ABLY_API_KEY) {
+    return window.__NEXT_DATA__.env.NEXT_PUBLIC_ABLY_API_KEY;
+  }
+  if (typeof window !== 'undefined' && window?.NEXT_PUBLIC_ABLY_API_KEY) {
+    return window.NEXT_PUBLIC_ABLY_API_KEY;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const key = window.localStorage.getItem('NEXT_PUBLIC_ABLY_API_KEY');
+      if (key) return key;
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function ensureAbly() {
   if (typeof window === 'undefined') return null;
-  if (_socket) return _socket;
+  if (_ably) return _ably;
   if (_connectPromise) return _connectPromise;
 
   _connectPromise = (async () => {
-    const mod = await import('socket.io-client');
-    const io = mod.io || mod.default?.io || mod;
-    const configuredUrl = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SOCKET_URL) || '';
-    const baseUrl = configuredUrl || window.location.origin;
-    // If using local origin (no external realtime URL), hit the bootstrap API to start the lightweight Socket.IO server
-    if (!configuredUrl) {
-      try { await fetch('/api/socketio'); } catch (_) {}
-    }
-    // Use the same Socket.IO path used by the server (`/api/socketio`)
-    const socket = io(baseUrl, { path: '/api/socketio', transports: ['websocket', 'polling'] });
-    await new Promise((resolve, reject) => {
-      const to = setTimeout(() => reject(new Error('socket.io connect timeout')), 8000);
-      socket.once('connect', () => { clearTimeout(to); resolve(); });
-      socket.once('connect_error', (e) => { clearTimeout(to); reject(e); });
-    });
-    _socket = socket;
-    if (process.env.NODE_ENV !== 'production') console.log('[Realtime] Socket.IO connected');
-    return _socket;
+    const { default: Ably } = await import('ably');
+    const apiKey = getAblyApiKey();
+    if (!apiKey) throw new Error('Ably API key not found');
+    const ably = new Ably.Realtime.Promise({ key: apiKey });
+    _ably = ably;
+    if (process.env.NODE_ENV !== 'production') console.log('[Realtime] Ably connected');
+    return _ably;
   })();
 
   return _connectPromise;
 }
 
 export function getAblyClient() {
-  // Back-compat: return socket if connected
-  return _socket;
+  return _ably;
 }
 
-function createChannelWrapper(socket, name) {
-  try {
-    if (typeof name === 'string') {
-      if (name.startsWith('lavagna:')) {
-        const id = name.split(':')[1];
-        socket.emit('join:lavagna', { attivitaId: id });
-      } else if (name.startsWith('lavagne:')) {
-        const id = name.split(':')[1];
-        socket.emit('join:lavagne', { clienteId: id });
-      } else if (name.startsWith('materiale:')) {
-        const id = name.split(':')[1];
-        socket.emit('join:materiale', { clienteId: id });
-      }
-    }
-  } catch (_) {}
-
+function createChannelWrapper(channel) {
   const listeners = new Map();
   return {
-    state: 'attached',
+    state: channel.state,
     subscribe: (event, handler) => {
-      const wrap = (msg) => handler({ data: msg });
+      const wrap = (msg) => handler({ data: msg.data });
       listeners.set(handler, wrap);
-      socket.on(event, wrap);
+      channel.subscribe(event, wrap);
     },
     unsubscribe: (event, handler) => {
       const wrap = listeners.get(handler);
-      try { socket.off(event, wrap || handler); } catch (_) {}
+      try { channel.unsubscribe(event, wrap || handler); } catch (_) {}
       listeners.delete(handler);
     },
     publish: (event, data, cb) => {
-      try { socket.emit(event, data); cb && cb(); } catch (e) { if (process.env.NODE_ENV !== 'production') console.error('[Realtime publish error]', e); cb && cb(e); }
+      channel.publish(event, data).then(() => cb && cb()).catch((e) => { if (process.env.NODE_ENV !== 'production') console.error('[Ably publish error]', e); cb && cb(e); });
     },
     detach: () => {
-      for (const [orig, wrap] of listeners.entries()) {
-        try { socket.off(orig, wrap); } catch (_) {}
-      }
+      try { channel.detach(); } catch (_) {}
       listeners.clear();
     },
     on: () => {}
@@ -79,19 +69,23 @@ function createChannelWrapper(socket, name) {
 }
 
 export async function getAblyChannelAsync(name) {
-  const socket = await ensureSocket();
-  if (!socket) return null;
-  return createChannelWrapper(socket, name);
+  const ably = await ensureAbly();
+  if (!ably) return null;
+  const channel = ably.channels.get(name);
+  return createChannelWrapper(channel);
 }
 
 export function getAblyChannel(name) {
-  if (!_socket) return null;
-  return createChannelWrapper(_socket, name);
+  if (!_ably) return null;
+  const channel = _ably.channels.get(name);
+  return createChannelWrapper(channel);
 }
 
-export async function whenChannelAttachedAsync() {
-  const socket = await ensureSocket();
-  if (!socket) throw new Error('Socket not available');
+export async function whenChannelAttachedAsync(name) {
+  const ably = await ensureAbly();
+  if (!ably) throw new Error('Ably not available');
+  const channel = ably.channels.get(name);
+  await channel.attach();
   return Promise.resolve();
 }
 
