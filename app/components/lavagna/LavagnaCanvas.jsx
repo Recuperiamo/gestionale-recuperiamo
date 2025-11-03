@@ -1837,18 +1837,7 @@ export default function LavagnaCanvas({
         cleanup();
       } catch (_) {}
     };
-  }, [
-    channelName,
-    drawAll,
-    isAdmin,
-    emitOrPublish,
-    lavagnaId,
-    attivitaId,
-    applyViewport,
-    utenteId,
-    ruolo,
-    clearLavagnaState,
-  ]);
+  }, [channelName]);
 
   // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());
