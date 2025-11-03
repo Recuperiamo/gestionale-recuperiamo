@@ -197,10 +197,16 @@ export default function LavagnaCanvas({
           const ch = ablyRef.current.ch;
           if (ch) {
             try {
+              if (process.env.NODE_ENV !== 'production') {
+                try { console.log('[LAVAGNA-PUBLISH] channel=', channelName, 'event=', name, 'data=', data && (typeof data === 'object' ? JSON.parse(JSON.stringify(data)) : data)); } catch(_) { console.log('[LAVAGNA-PUBLISH] publish', name); }
+              }
               ch.publish(name, data);
             } catch (e) {
-              // Ignore realtime publish failures
+              // Log publish errors in dev to help debugging
+              if (process.env.NODE_ENV !== 'production') console.error('[LAVAGNA-PUBLISH-ERROR]', name, e);
             }
+          } else {
+            if (process.env.NODE_ENV !== 'production') console.warn('[LAVAGNA-PUBLISH] no channel available to publish', channelName, name);
           }
         })
         .catch(() => {});
