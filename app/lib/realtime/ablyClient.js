@@ -13,10 +13,11 @@ async function loadAbly() {
   if (_loadingPromise) return _loadingPromise;
   _loadingPromise = (async () => {
     try {
-      const mod = await import('ably');
-      const Realtime = mod.Realtime || mod.default?.Realtime || mod.default;
+      const mod = await import('ably/promises.js');
+      const ably = mod?.default || mod;
+      const Realtime = ably?.RealtimePromise || ably?.Realtime || ably?.default;
       if (!Realtime) {
-        console.warn('[Ably] runtime import succeeded but Realtime not found');
+        console.warn('[Ably] runtime import succeeded but RealtimePromise not found');
         return null;
       }
       try {

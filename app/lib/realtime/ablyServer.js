@@ -1,5 +1,5 @@
 // Server-side Ably client for publishing events from API routes
-import Ably from 'ably/promises';
+import Ably from 'ably/promises.js';
 
 let _restClient = null;
 

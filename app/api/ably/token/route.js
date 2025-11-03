@@ -1,4 +1,4 @@
-import Ably from 'ably/promises';
+import Ably from 'ably/promises.js';
 
 export async function GET() {
   try {
