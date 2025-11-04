@@ -1644,7 +1644,7 @@ export default function LavagnaCanvas({
             spessore,
             punti: [start]
           });
-          drawAll();
+          // Non serve ridisegnare - il primo punto sarà disegnato con stroke:points
         };
 
         const onPoints = (msg) => {
@@ -1680,7 +1680,7 @@ export default function LavagnaCanvas({
             setTratti((prev) => [...prev, definitivo]);
           }
           remoteStreams.current.delete(streamId);
-          drawAll();
+          // Non serve ridisegnare tutto - il tratto è già stato disegnato incrementalmente
         };
 
         const onDelete = (msg) => {
