@@ -1358,6 +1358,12 @@ export default function LavagnaCanvas({
       const stored = window.localStorage.getItem(spectatorStorageKey);
       if (stored === '1') {
         setSpectatorMode(true);
+      } else if (stored === '0') {
+        // Utente ha esplicitamente disattivato spectatorMode
+        setSpectatorMode(false);
+      } else {
+        // Default: attiva spectatorMode per studenti
+        setSpectatorMode(true);
       }
     } catch (_) {}
   }, [spectatorStorageKey, isAdmin]);
@@ -1365,14 +1371,16 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!spectatorStorageKey) return;
     if (typeof window === 'undefined') return;
+    if (isAdmin) return; // Admin non usa spectatorMode storage
     try {
       if (spectatorMode) {
         window.localStorage.setItem(spectatorStorageKey, '1');
       } else {
-        window.localStorage.removeItem(spectatorStorageKey);
+        // Salva '0' per ricordare che l'utente ha disattivato manualmente
+        window.localStorage.setItem(spectatorStorageKey, '0');
       }
     } catch (_) {}
-  }, [spectatorMode, spectatorStorageKey]);
+  }, [spectatorMode, spectatorStorageKey, isAdmin]);
 
   useEffect(() => {
     if (!isAdmin) return;
