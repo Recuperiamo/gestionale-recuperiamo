@@ -83,7 +83,8 @@ async function ensureAbly() {
       console.log('[Ably] Using Realtime constructor:', typeof RealtimeClient);
       
       const ably = new RealtimeClient({ 
-        key: apiKey
+        key: apiKey,
+        echoMessages: true // Enable receiving own published messages (important for local state sync)
       });
       _ably = ably;
       

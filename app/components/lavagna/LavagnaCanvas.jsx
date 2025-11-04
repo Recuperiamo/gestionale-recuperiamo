@@ -1722,6 +1722,7 @@ export default function LavagnaCanvas({
         // other subscriptions (shapes, background, viewport, spectator) – keep original names
         const onShapeCreate = (msg) => {
           const { data } = msg || {};
+          console.log('[LAVAGNA-RECV] shape:create', { hasData: !!data, kind: data?.kind, id: data?.id });
           if (!data) return;
           const normalized = normalizeShape(data);
           if (!normalized) return;
@@ -1837,6 +1838,7 @@ export default function LavagnaCanvas({
           }
         };
         const onViewportRequest = () => {
+          console.log('[LAVAGNA-RECV] viewport:request received by', { isAdmin, userId: utenteId });
           if (!isAdmin) return;
           // Calcola visibleRect come nel broadcast normale
           const canvas = canvasRef.current;
