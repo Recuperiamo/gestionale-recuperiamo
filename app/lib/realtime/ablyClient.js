@@ -71,7 +71,7 @@ async function ensureAbly() {
       const Ably = await import('ably');
       console.log('[Ably] SDK imported successfully, keys:', Object.keys(Ably));
       
-      const apiKey = getAblyApiKey();
+      const apiKey = await getAblyApiKey();
       if (!apiKey) {
         console.error('[Ably] API key not found!');
         throw new Error('Ably API key not found');
