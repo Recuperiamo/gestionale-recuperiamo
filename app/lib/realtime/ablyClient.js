@@ -1,4 +1,5 @@
 // Realtime client: Ably Realtime SDK wrapper (compat API)
+// Force rebuild to include NEXT_PUBLIC_ABLY_API_KEY in bundle
 let _ably = null;
 let _connectPromise = null;
 
