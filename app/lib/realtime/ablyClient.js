@@ -62,22 +62,46 @@ async function ensureAbly() {
   console.log('[Ably] Creating new connection promise');
   _connectPromise = (async () => {
     try {
+      console.log('[Ably] Importing Ably SDK...');
       const { default: Ably } = await import('ably');
+      console.log('[Ably] SDK imported successfully');
+      
       const apiKey = getAblyApiKey();
       if (!apiKey) {
         console.error('[Ably] API key not found!');
         throw new Error('Ably API key not found');
       }
       console.log(`[Ably] API Key found, connecting... (key starts with: ${apiKey.slice(0, 5)})`);
-      const ably = new Ably.Realtime.Promise({ key: apiKey });
+      
+      const ably = new Ably.Realtime.Promise({ 
+        key: apiKey,
+        log: { level: 4 } // Enable verbose logging
+      });
       _ably = ably;
-      console.log('[Ably] Realtime client created');
+      console.log('[Ably] Realtime client created, connection state:', ably.connection.state);
+      
+      ably.connection.on('connecting', () => {
+        console.log('[Ably] Connecting...');
+      });
       
       ably.connection.on('connected', () => {
         console.log('[Ably] Connection successful!');
       });
-      ably.connection.on('failed', (reason) => {
-        console.error('[Ably] Connection failed:', reason);
+      
+      ably.connection.on('disconnected', () => {
+        console.warn('[Ably] Disconnected');
+      });
+      
+      ably.connection.on('suspended', () => {
+        console.warn('[Ably] Connection suspended');
+      });
+      
+      ably.connection.on('failed', (stateChange) => {
+        console.error('[Ably] Connection failed:', stateChange);
+      });
+      
+      ably.connection.on('closed', () => {
+        console.warn('[Ably] Connection closed');
       });
       
       return _ably;
