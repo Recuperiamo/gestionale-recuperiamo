@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 export default function PacchettoEditForm({ pacchetto, onClose, onSuccess }) {
   const [descrizione, setDescrizione] = useState(pacchetto.descrizione || "");
+  const [oreAcquistate, setOreAcquistate] = useState(pacchetto.oreAcquistate || "");
   const [oreResidue, setOreResidue] = useState(pacchetto.oreResidue || "");
   const [sogliaOreResidue, setSogliaOreResidue] = useState(
     pacchetto.sogliaOreResidue !== null && pacchetto.sogliaOreResidue !== undefined
@@ -17,6 +18,11 @@ export default function PacchettoEditForm({ pacchetto, onClose, onSuccess }) {
     setLoading(true);
 
     // Validazione base
+    if (oreAcquistate !== "" && (isNaN(oreAcquistate) || Number(oreAcquistate) < 0)) {
+      setErrore("Ore acquistate deve essere ≥ 0");
+      setLoading(false);
+      return;
+    }
     if (oreResidue !== "" && (isNaN(oreResidue) || Number(oreResidue) < 0)) {
       setErrore("Ore residue deve essere ≥ 0");
       setLoading(false);
@@ -30,6 +36,7 @@ export default function PacchettoEditForm({ pacchetto, onClose, onSuccess }) {
 
     const payload = {
       descrizione,
+      oreAcquistate: oreAcquistate !== "" ? Number(oreAcquistate) : null,
       oreResidue: oreResidue !== "" ? Number(oreResidue) : null,
       sogliaOreResidue: sogliaOreResidue !== "" ? Number(sogliaOreResidue) : null,
     };
@@ -65,6 +72,15 @@ export default function PacchettoEditForm({ pacchetto, onClose, onSuccess }) {
               type="text"
               value={descrizione}
               onChange={(e) => setDescrizione(e.target.value)}
+            />
+          </div>
+          <div>
+            <label>Ore acquistate:</label>
+            <input
+              type="number"
+              min="0"
+              value={oreAcquistate}
+              onChange={(e) => setOreAcquistate(e.target.value)}
             />
           </div>
           <div>
