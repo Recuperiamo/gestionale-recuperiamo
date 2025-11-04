@@ -24,10 +24,18 @@ export async function DELETE(req) {
     const role = session.user.role;
     if (role === 'cliente') return NextResponse.json({ error: 'Accesso negato' }, { status: 403 });
 
+    const now = new Date();
+
     // Soft delete di tutti i tratti non già cancellati
     await prisma.lavagnaTratto.updateMany({
       where: { lavagnaId, deletedAt: null },
-      data: { deletedAt: new Date() }
+      data: { deletedAt: now }
+    });
+
+    // Soft delete di tutte le forme non già cancellate
+    await prisma.lavagnaForma.updateMany({
+      where: { lavagnaId, deletedAt: null },
+      data: { deletedAt: now }
     });
 
     return NextResponse.json({ ok: true });
