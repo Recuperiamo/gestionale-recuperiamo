@@ -63,8 +63,8 @@ async function ensureAbly() {
   _connectPromise = (async () => {
     try {
       console.log('[Ably] Importing Ably SDK...');
-      const { default: Ably } = await import('ably');
-      console.log('[Ably] SDK imported successfully');
+      const Ably = await import('ably');
+      console.log('[Ably] SDK imported successfully, keys:', Object.keys(Ably));
       
       const apiKey = getAblyApiKey();
       if (!apiKey) {
@@ -73,7 +73,11 @@ async function ensureAbly() {
       }
       console.log(`[Ably] API Key found, connecting... (key starts with: ${apiKey.slice(0, 5)})`);
       
-      const ably = new Ably.Realtime.Promise({ 
+      // Try different import patterns
+      const RealtimeClient = Ably.Realtime || Ably.default?.Realtime || Ably.default;
+      console.log('[Ably] Using Realtime constructor:', typeof RealtimeClient);
+      
+      const ably = new RealtimeClient({ 
         key: apiKey,
         log: { level: 4 } // Enable verbose logging
       });
