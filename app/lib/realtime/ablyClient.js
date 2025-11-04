@@ -1,7 +1,7 @@
 // Realtime client: Ably Realtime SDK wrapper (compat API)
-// Force rebuild to include NEXT_PUBLIC_ABLY_API_KEY in bundle
 let _ably = null;
 let _connectPromise = null;
+const _channelCache = new Map(); // Cache for channel wrappers
 
 async function getAblyApiKey() {
   console.log('[Ably Debug] Checking for API key...');
@@ -142,16 +142,30 @@ function createChannelWrapper(channel) {
 }
 
 export async function getAblyChannelAsync(name) {
+  // Check cache first
+  if (_channelCache.has(name)) {
+    return _channelCache.get(name);
+  }
+  
   const ably = await ensureAbly();
   if (!ably) return null;
   const channel = ably.channels.get(name);
-  return createChannelWrapper(channel);
+  const wrapper = createChannelWrapper(channel);
+  _channelCache.set(name, wrapper);
+  return wrapper;
 }
 
 export function getAblyChannel(name) {
+  // Check cache first
+  if (_channelCache.has(name)) {
+    return _channelCache.get(name);
+  }
+  
   if (!_ably) return null;
   const channel = _ably.channels.get(name);
-  return createChannelWrapper(channel);
+  const wrapper = createChannelWrapper(channel);
+  _channelCache.set(name, wrapper);
+  return wrapper;
 }
 
 export async function whenChannelAttachedAsync(name) {

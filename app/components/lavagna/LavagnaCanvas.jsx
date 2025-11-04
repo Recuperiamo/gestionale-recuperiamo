@@ -272,6 +272,42 @@ export default function LavagnaCanvas({
   });
   const animationFrameId = useRef(null);
 
+  // Disegno incrementale: disegna solo i nuovi punti di uno stroke remoto senza cancellare tutto
+  const drawIncrementalStroke = useCallback((streamData, newPoints) => {
+    const ctx = ctxRef.current;
+    if (!ctx || !newPoints || newPoints.length === 0) return;
+    
+    const canvas = ctx.canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const safeZoom = Math.max(zoom, 0.0001);
+    const worldScale = safeZoom * dpr;
+    
+    // Applica la stessa trasformazione world di drawAll
+    ctx.save();
+    ctx.setTransform(worldScale, 0, 0, worldScale, (-pan.x) * worldScale, (-pan.y) * worldScale);
+    
+    ctx.globalCompositeOperation = streamData.strumento === 'gomma' ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = streamData.strumento === 'gomma' ? '#fff' : streamData.colore || '#20489a';
+    ctx.lineWidth = streamData.spessore || 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // Disegna solo i nuovi segmenti
+    const allPoints = streamData.punti;
+    const startIdx = Math.max(0, allPoints.length - newPoints.length - 1);
+    
+    if (startIdx < allPoints.length) {
+      ctx.beginPath();
+      ctx.moveTo(allPoints[startIdx].x, allPoints[startIdx].y);
+      for (let i = startIdx + 1; i < allPoints.length; i++) {
+        ctx.lineTo(allPoints[i].x, allPoints[i].y);
+      }
+      ctx.stroke();
+    }
+    
+    ctx.restore();
+  }, [zoom, pan]);
+
   // Disegno completo
   const drawAll = useCallback(() => {
     const ctx = ctxRef.current;
@@ -1523,9 +1559,9 @@ export default function LavagnaCanvas({
       });
       outgoingBufferRef.current = [];
     }
-    // Continua finché si disegna
+    // Continua finché si disegna - throttle a 20/sec (50ms) invece di 60fps per evitare rate limit
     if (disegnando) {
-      outgoingRAFRef.current = requestAnimationFrame(flushOutgoing);
+      outgoingRAFRef.current = setTimeout(flushOutgoing, 50);
     } else {
       outgoingRAFRef.current = null;
     }
@@ -1621,7 +1657,8 @@ export default function LavagnaCanvas({
           const st = remoteStreams.current.get(streamId);
           if (!st) return;
           st.punti.push(...points);
-          drawAll();
+          // Disegna solo i nuovi punti invece di ridisegnare tutto
+          drawIncrementalStroke(st, points);
         };
 
         const onDone = (msg) => {
