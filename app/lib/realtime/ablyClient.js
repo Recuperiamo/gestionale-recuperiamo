@@ -22,18 +22,47 @@ function getAblyApiKey() {
 }
 
 async function ensureAbly() {
-  if (typeof window === 'undefined') return null;
-  if (_ably) return _ably;
-  if (_connectPromise) return _connectPromise;
-
-  _connectPromise = (async () => {
-    const { default: Ably } = await import('ably');
-    const apiKey = getAblyApiKey();
-    if (!apiKey) throw new Error('Ably API key not found');
-    const ably = new Ably.Realtime.Promise({ key: apiKey });
-    _ably = ably;
-    if (process.env.NODE_ENV !== 'production') console.log('[Realtime] Ably connected');
+  console.log('[Ably] ensureAbly called');
+  if (typeof window === 'undefined') {
+    console.log('[Ably] Not in browser, returning null');
+    return null;
+  }
+  if (_ably) {
+    console.log('[Ably] Returning existing instance');
     return _ably;
+  }
+  if (_connectPromise) {
+    console.log('[Ably] Returning existing promise');
+    return _connectPromise;
+  }
+
+  console.log('[Ably] Creating new connection promise');
+  _connectPromise = (async () => {
+    try {
+      const { default: Ably } = await import('ably');
+      const apiKey = getAblyApiKey();
+      if (!apiKey) {
+        console.error('[Ably] API key not found!');
+        throw new Error('Ably API key not found');
+      }
+      console.log(`[Ably] API Key found, connecting... (key starts with: ${apiKey.slice(0, 5)})`);
+      const ably = new Ably.Realtime.Promise({ key: apiKey });
+      _ably = ably;
+      console.log('[Ably] Realtime client created');
+      
+      ably.connection.on('connected', () => {
+        console.log('[Ably] Connection successful!');
+      });
+      ably.connection.on('failed', (reason) => {
+        console.error('[Ably] Connection failed:', reason);
+      });
+      
+      return _ably;
+    } catch (error) {
+      console.error('[Ably] Error in ensureAbly promise:', error);
+      _connectPromise = null; // Reset promise on failure
+      throw error;
+    }
   })();
 
   return _connectPromise;
