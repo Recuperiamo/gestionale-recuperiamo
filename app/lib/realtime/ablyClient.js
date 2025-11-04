@@ -83,34 +83,16 @@ async function ensureAbly() {
       console.log('[Ably] Using Realtime constructor:', typeof RealtimeClient);
       
       const ably = new RealtimeClient({ 
-        key: apiKey,
-        log: { level: 4 } // Enable verbose logging
+        key: apiKey
       });
       _ably = ably;
-      console.log('[Ably] Realtime client created, connection state:', ably.connection.state);
-      
-      ably.connection.on('connecting', () => {
-        console.log('[Ably] Connecting...');
-      });
       
       ably.connection.on('connected', () => {
-        console.log('[Ably] Connection successful!');
-      });
-      
-      ably.connection.on('disconnected', () => {
-        console.warn('[Ably] Disconnected');
-      });
-      
-      ably.connection.on('suspended', () => {
-        console.warn('[Ably] Connection suspended');
+        console.log('[Ably] Connected');
       });
       
       ably.connection.on('failed', (stateChange) => {
         console.error('[Ably] Connection failed:', stateChange);
-      });
-      
-      ably.connection.on('closed', () => {
-        console.warn('[Ably] Connection closed');
       });
       
       return _ably;
@@ -130,37 +112,28 @@ export function getAblyClient() {
 
 function createChannelWrapper(channel) {
   const listeners = new Map();
-  console.log(`[Ably Channel Wrapper] Creating wrapper for channel: ${channel.name}`);
   
   return {
     state: channel.state,
     subscribe: (event, handler) => {
-      console.log(`[Ably Channel] Subscribe to event: ${event} on channel: ${channel.name}`);
-      const wrap = (msg) => {
-        console.log(`[Ably Channel] Message received:`, { event, channel: channel.name, data: msg.data });
-        handler({ data: msg.data });
-      };
+      const wrap = (msg) => handler({ data: msg.data });
       listeners.set(handler, wrap);
       channel.subscribe(event, wrap);
     },
     unsubscribe: (event, handler) => {
-      console.log(`[Ably Channel] Unsubscribe from event: ${event} on channel: ${channel.name}`);
       const wrap = listeners.get(handler);
       try { channel.unsubscribe(event, wrap || handler); } catch (_) {}
       listeners.delete(handler);
     },
     publish: (event, data, cb) => {
-      console.log(`[Ably Channel] Publishing event: ${event} on channel: ${channel.name}`, data);
       channel.publish(event, data).then(() => {
-        console.log(`[Ably Channel] Publish success: ${event}`);
         cb && cb();
       }).catch((e) => { 
-        console.error('[Ably publish error]', event, e); 
+        if (process.env.NODE_ENV !== 'production') console.error('[Ably publish error]', event, e); 
         cb && cb(e); 
       });
     },
     detach: () => {
-      console.log(`[Ably Channel] Detaching channel: ${channel.name}`);
       try { channel.detach(); } catch (_) {}
       listeners.clear();
     },
