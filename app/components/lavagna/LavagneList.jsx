@@ -36,9 +36,9 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
     (async () => {
       try {
-        const ch = await getAblyChannelAsync(`lavagne:${clienteId}`);
+        const ch = await getAblyChannelAsync(`lavagna:list:${clienteId}`);
         if (ch) {
-          if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] Ably channel attached lavagne:' + clienteId);
+          if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] Ably channel attached lavagna:list:' + clienteId);
           const onNew = ({ data }) => {
             if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] received new-lavagna', data);
             const { lavagna } = data || {};
@@ -84,7 +84,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
       const res = await fetch(`/api/lavagna?id=${lavagnaId}`, { method: "DELETE" });
       if (res.ok) {
         setLavagne((prev) => prev.filter((l) => l.id !== lavagnaId));
-        const ch = getAblyChannel(`lavagne:${clienteId}`);
+        const ch = getAblyChannel(`lavagna:list:${clienteId}`);
         if (ch) {
           if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] publish delete-lavagna', { lavagnaId, clienteId });
           ch.publish("delete-lavagna", { lavagnaId, clienteId }, (err) => {
@@ -103,7 +103,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
       const res = await fetch(`/api/lavagna/bulk-delete?clienteId=${clienteId}`, { method: "DELETE" });
       if (res.ok) {
         setLavagne([]);
-        const ch = getAblyChannel(`lavagne:${clienteId}`);
+        const ch = getAblyChannel(`lavagna:list:${clienteId}`);
         if (ch) {
           if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] publish delete-all-lavagne', { clienteId });
           ch.publish("delete-all-lavagne", { clienteId }, (err) => {
@@ -201,7 +201,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
         const js = await res.json();
         setLavagne((prev) => prev.some(l => l.id === js.lavagna.id) ? prev : [...prev, js.lavagna]);
         // Notifica realtime
-        const ch = getAblyChannel(`lavagne:${clienteId}`);
+        const ch = getAblyChannel(`lavagna:list:${clienteId}`);
         if (ch) {
           if (process.env.NODE_ENV !== 'production') console.log('[LavagneList] publish new-lavagna', { lavagna: js.lavagna, clienteId });
           ch.publish("new-lavagna", { lavagna: js.lavagna, clienteId }, (err) => {
