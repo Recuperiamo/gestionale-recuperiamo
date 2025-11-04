@@ -1405,7 +1405,16 @@ export default function LavagnaCanvas({
       active: spectatorMode,
       ts: Date.now()
     });
-  }, [spectatorMode, emitOrPublish, lavagnaId, attivitaId, utenteId, ruolo]);
+    // Quando si attiva spectatorMode, richiedi viewport corrente dall'admin
+    if (spectatorMode && !isAdmin) {
+      emitOrPublish('viewport:request', {
+        lavagnaId,
+        attivitaId,
+        requesterId: utenteId,
+        ts: Date.now()
+      });
+    }
+  }, [spectatorMode, emitOrPublish, lavagnaId, attivitaId, utenteId, ruolo, isAdmin]);
 
   useEffect(() => () => {
     if (!utenteId) return;
@@ -1728,7 +1737,14 @@ export default function LavagnaCanvas({
             if (prev.find((f) => f.id === normalized.id)) return prev;
             return [...prev, normalized];
           });
-          drawAll();
+          // Per le immagini, forza ridisegno dopo un breve delay per dare tempo al caricamento
+          if (normalized.kind === 'immagine') {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => drawAll());
+            });
+          } else {
+            drawAll();
+          }
         };
         const onShapeUpdate = (msg) => {
           const { data } = msg || {};
@@ -1742,7 +1758,14 @@ export default function LavagnaCanvas({
             }
           } catch (_) {}
           setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
-          drawAll();
+          // Per le immagini, forza ridisegno dopo delay
+          if (normalized.kind === 'immagine') {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => drawAll());
+            });
+          } else {
+            drawAll();
+          }
         };
         const onShapeDelete = (msg) => {
           const { data } = msg || {};
@@ -4551,46 +4574,243 @@ export default function LavagnaCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Forza un ridisegno completo prima dell'export
+    // Calcola i bounds di tutti i contenuti
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+    
+    // Bounds dei tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      hasContent = true;
+      for (const p of t.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    
+    // Bounds delle forme
+    for (const f of forme) {
+      if (!f) continue;
+      hasContent = true;
+      const bounds = getShapeBounds(f);
+      if (bounds) {
+        if (bounds.minX < minX) minX = bounds.minX;
+        if (bounds.maxX > maxX) maxX = bounds.maxX;
+        if (bounds.minY < minY) minY = bounds.minY;
+        if (bounds.maxY > maxY) maxY = bounds.maxY;
+      }
+    }
+    
+    if (!hasContent) {
+      alert('Nessun contenuto da esportare');
+      return;
+    }
+    
+    // Aggiungi margini
+    const margin = 40;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Forza ridisegno completo
     drawAll();
     
-    // Esporta semplicemente il canvas corrente
     setTimeout(() => {
-      const url = canvas.toDataURL("image/png");
+      // Crea canvas temporaneo con dimensione esatta del contenuto
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = Math.ceil(contentWidth);
+      exportCanvas.height = Math.ceil(contentHeight);
+      const ctx = exportCanvas.getContext('2d');
+      
+      // Sfondo
+      ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
+      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      
+      // Applica trasformazione per centrare contenuto
+      ctx.save();
+      ctx.translate(-minX, -minY);
+      
+      // Disegna tutto usando il canvas principale (già renderizzato)
+      // Copia la porzione rilevante del canvas principale
+      const mainCanvas = canvasRef.current;
+      const dpr = window.devicePixelRatio || 1;
+      const safeZoom = Math.max(zoom, 0.0001);
+      
+      // Invece di copiare, ridisegniamo direttamente i tratti e forme
+      // Tratti
+      for (const t of tratti) {
+        if (!t?.punti || t.punti.length < 2) continue;
+        ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
+        ctx.strokeStyle = t.strumento === 'gomma' ? (sfondo === 'nero' ? '#000' : '#fff') : t.colore || '#20489a';
+        ctx.lineWidth = t.spessore || 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        t.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+        ctx.stroke();
+      }
+      
+      // Forme (versione semplificata - solo rettangoli, cerchi, immagini)
+      for (const f of forme) {
+        if (!f) continue;
+        ctx.save();
+        ctx.strokeStyle = f.colore || '#20489a';
+        ctx.lineWidth = f.spessore || 3;
+        
+        if (f.kind === 'rettangolo' || f.kind === 'quadrato') {
+          ctx.strokeRect(f.x, f.y, f.w, f.h);
+        } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
+          const cx = f.x + (f.w || 0) / 2;
+          const cy = f.y + (f.h || 0) / 2;
+          const rx = Math.abs(f.w || 0) / 2;
+          const ry = Math.abs(f.h || 0) / 2;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (f.kind === 'immagine' && f.src) {
+          // Disegna immagine se caricata
+          const img = new Image();
+          img.src = f.src;
+          if (img.complete) {
+            try { ctx.drawImage(img, f.x, f.y, f.w, f.h); } catch(_) {}
+          }
+        }
+        ctx.restore();
+      }
+      
+      ctx.restore();
+      
+      // Esporta
+      const url = exportCanvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.href = url;
       link.download = `lavagna-${lavagnaId}-${Date.now()}.png`;
       link.click();
-    }, 100); // Piccolo delay per assicurare che drawAll sia completo
-  }, [lavagnaId, drawAll]);
+    }, 100);
+  }, [lavagnaId, tratti, forme, sfondo, zoom, drawAll, getShapeBounds]);
 
   const esportaPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf");
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    // Forza ridisegno completo
-    drawAll();
     
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Calcola bounds contenuto
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
     
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      hasContent = true;
+      for (const p of t.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    
+    for (const f of forme) {
+      if (!f) continue;
+      hasContent = true;
+      const bounds = getShapeBounds(f);
+      if (bounds) {
+        if (bounds.minX < minX) minX = bounds.minX;
+        if (bounds.maxX > maxX) maxX = bounds.maxX;
+        if (bounds.minY < minY) minY = bounds.minY;
+        if (bounds.maxY > maxY) maxY = bounds.maxY;
+      }
+    }
+    
+    if (!hasContent) {
+      alert('Nessun contenuto da esportare');
+      return;
+    }
+    
+    const margin = 40;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Prima esporta come PNG usando stessa logica
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = Math.ceil(contentWidth);
+    exportCanvas.height = Math.ceil(contentHeight);
+    const ctx = exportCanvas.getContext('2d');
+    
+    ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    
+    ctx.save();
+    ctx.translate(-minX, -minY);
+    
+    // Disegna tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length < 2) continue;
+      ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = t.strumento === 'gomma' ? (sfondo === 'nero' ? '#000' : '#fff') : t.colore || '#20489a';
+      ctx.lineWidth = t.spessore || 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      t.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    }
+    
+    // Disegna forme semplificate
+    for (const f of forme) {
+      if (!f) continue;
+      ctx.save();
+      ctx.strokeStyle = f.colore || '#20489a';
+      ctx.lineWidth = f.spessore || 3;
+      
+      if (f.kind === 'rettangolo' || f.kind === 'quadrato') {
+        ctx.strokeRect(f.x, f.y, f.w, f.h);
+      } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
+        const cx = f.x + (f.w || 0) / 2;
+        const cy = f.y + (f.h || 0) / 2;
+        const rx = Math.abs(f.w || 0) / 2;
+        const ry = Math.abs(f.h || 0) / 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (f.kind === 'immagine' && f.src) {
+        const img = new Image();
+        img.src = f.src;
+        if (img.complete) {
+          try { ctx.drawImage(img, f.x, f.y, f.w, f.h); } catch(_) {}
+        }
+      }
+      ctx.restore();
+    }
+    
+    ctx.restore();
+    
+    // Crea PDF
     const pdf = new jsPDF({
-      orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+      orientation: contentWidth > contentHeight ? "landscape" : "portrait",
       unit: "px",
-      format: [canvas.width, canvas.height],
+      format: [exportCanvas.width, exportCanvas.height],
     });
     
     pdf.addImage(
-      canvas.toDataURL("image/png"),
+      exportCanvas.toDataURL("image/png"),
       "PNG",
       0,
       0,
-      canvas.width,
-      canvas.height
+      exportCanvas.width,
+      exportCanvas.height
     );
     
     pdf.save(`lavagna-${lavagnaId || attivitaId}-${Date.now()}.pdf`);
-  }, [lavagnaId, attivitaId, drawAll]);
+  }, [lavagnaId, attivitaId, tratti, forme, sfondo, getShapeBounds]);
 
   // == UNDO/REDO ==
 
