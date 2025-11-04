@@ -5,25 +5,42 @@ let _connectPromise = null;
 
 function getAblyApiKey() {
   console.log('[Ably Debug] Checking for API key...');
-  console.log('[Ably Debug] process.env.NEXT_PUBLIC_ABLY_API_KEY:', typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ABLY_API_KEY : 'process undefined');
-  console.log('[Ably Debug] window.__NEXT_DATA__:', typeof window !== 'undefined' && window?.__NEXT_DATA__?.env);
-  console.log('[Ably Debug] All process.env keys:', typeof process !== 'undefined' ? Object.keys(process.env).filter(k => k.includes('ABLY')) : 'none');
   
+  // Try process.env first (should work if build-time injection worked)
   if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_ABLY_API_KEY) {
+    console.log('[Ably Debug] Found in process.env');
     return process.env.NEXT_PUBLIC_ABLY_API_KEY;
   }
-  if (typeof window !== 'undefined' && window?.__NEXT_DATA__?.env?.NEXT_PUBLIC_ABLY_API_KEY) {
-    return window.__NEXT_DATA__.env.NEXT_PUBLIC_ABLY_API_KEY;
-  }
-  if (typeof window !== 'undefined' && window?.NEXT_PUBLIC_ABLY_API_KEY) {
-    return window.NEXT_PUBLIC_ABLY_API_KEY;
-  }
+  
+  // Try window injected by Next.js
   if (typeof window !== 'undefined') {
+    // Next.js runtime config
+    if (window?.__NEXT_DATA__?.env?.NEXT_PUBLIC_ABLY_API_KEY) {
+      console.log('[Ably Debug] Found in window.__NEXT_DATA__.env');
+      return window.__NEXT_DATA__.env.NEXT_PUBLIC_ABLY_API_KEY;
+    }
+    
+    // Direct window property (fallback)
+    if (window?.NEXT_PUBLIC_ABLY_API_KEY) {
+      console.log('[Ably Debug] Found in window property');
+      return window.NEXT_PUBLIC_ABLY_API_KEY;
+    }
+    
+    // localStorage fallback (manual override for testing)
     try {
       const key = window.localStorage.getItem('NEXT_PUBLIC_ABLY_API_KEY');
-      if (key) return key;
+      if (key) {
+        console.log('[Ably Debug] Found in localStorage');
+        return key;
+      }
     } catch (_) {}
   }
+  
+  console.error('[Ably Debug] API key not found in any location!');
+  console.log('[Ably Debug] process.env.NEXT_PUBLIC_ABLY_API_KEY:', typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ABLY_API_KEY : 'process undefined');
+  console.log('[Ably Debug] window.__NEXT_DATA__:', typeof window !== 'undefined' && window?.__NEXT_DATA__?.env);
+  console.log('[Ably Debug] All process.env keys with ABLY:', typeof process !== 'undefined' ? Object.keys(process.env).filter(k => k.includes('ABLY')) : 'none');
+  
   return null;
 }
 
