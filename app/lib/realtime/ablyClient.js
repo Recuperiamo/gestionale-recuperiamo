@@ -3,30 +3,11 @@
 let _ably = null;
 let _connectPromise = null;
 
-function getAblyApiKey() {
+async function getAblyApiKey() {
   console.log('[Ably Debug] Checking for API key...');
   
-  // Try process.env first (should work if build-time injection worked)
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_ABLY_API_KEY) {
-    console.log('[Ably Debug] Found in process.env');
-    return process.env.NEXT_PUBLIC_ABLY_API_KEY;
-  }
-  
-  // Try window injected by Next.js
+  // Try localStorage first (for admin/testing)
   if (typeof window !== 'undefined') {
-    // Next.js runtime config
-    if (window?.__NEXT_DATA__?.env?.NEXT_PUBLIC_ABLY_API_KEY) {
-      console.log('[Ably Debug] Found in window.__NEXT_DATA__.env');
-      return window.__NEXT_DATA__.env.NEXT_PUBLIC_ABLY_API_KEY;
-    }
-    
-    // Direct window property (fallback)
-    if (window?.NEXT_PUBLIC_ABLY_API_KEY) {
-      console.log('[Ably Debug] Found in window property');
-      return window.NEXT_PUBLIC_ABLY_API_KEY;
-    }
-    
-    // localStorage fallback (manual override for testing)
     try {
       const key = window.localStorage.getItem('NEXT_PUBLIC_ABLY_API_KEY');
       if (key) {
@@ -36,11 +17,23 @@ function getAblyApiKey() {
     } catch (_) {}
   }
   
-  console.error('[Ably Debug] API key not found in any location!');
-  console.log('[Ably Debug] process.env.NEXT_PUBLIC_ABLY_API_KEY:', typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ABLY_API_KEY : 'process undefined');
-  console.log('[Ably Debug] window.__NEXT_DATA__:', typeof window !== 'undefined' && window?.__NEXT_DATA__?.env);
-  console.log('[Ably Debug] All process.env keys with ABLY:', typeof process !== 'undefined' ? Object.keys(process.env).filter(k => k.includes('ABLY')) : 'none');
+  // Fetch from server-side endpoint
+  try {
+    console.log('[Ably Debug] Fetching API key from /api/ably-auth...');
+    const response = await fetch('/api/ably-auth');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch API key: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.apiKey) {
+      console.log('[Ably Debug] API key received from server');
+      return data.apiKey;
+    }
+  } catch (error) {
+    console.error('[Ably Debug] Error fetching API key:', error);
+  }
   
+  console.error('[Ably Debug] API key not found in any location!');
   return null;
 }
 
