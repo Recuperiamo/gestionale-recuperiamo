@@ -1898,7 +1898,14 @@ export default function LavagnaCanvas({
         setRedoStack([]);
       }
     } catch (_) {}
-    if (emit) emitOrPublish('shape:create', { ...normalized, lavagnaId });
+    if (emit) {
+      // Include srcPreview for realtime sync of pasted images
+      const payload = { ...normalized, lavagnaId };
+      if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
+        payload.srcPreview = normalized.src; // Include data URL for realtime clients
+      }
+      emitOrPublish('shape:create', payload);
+    }
     // try persist async (best-effort)
     persistShape(normalized).then((s) => {
       if (s && s.id) {
@@ -1932,7 +1939,14 @@ export default function LavagnaCanvas({
     const normalized = normalizeShape(shape);
     if (!normalized) return;
     setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, ...normalized } : f)));
-    if (emit) emitOrPublish('shape:update', { ...normalized, lavagnaId });
+    if (emit) {
+      // Include srcPreview for realtime sync of updated images
+      const payload = { ...normalized, lavagnaId };
+      if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
+        payload.srcPreview = normalized.src;
+      }
+      emitOrPublish('shape:update', payload);
+    }
     const dbId = shape.dbId || shape.id;
     console.log('[LAVAGNA-UPDATE] Updating shape:', { localId: shape.id, dbId, normalized });
     fetch(`/api/lavagna/shape/${dbId}`, {
