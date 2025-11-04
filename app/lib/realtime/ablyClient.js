@@ -117,8 +117,8 @@ function createChannelWrapper(channel) {
   return {
     state: channel.state,
     subscribe: (event, handler) => {
-      // Pass the raw Ably message data directly to the handler
-      const wrap = (msg) => handler(msg.data);
+      // Wrap Ably message to maintain Socket.IO-compatible structure
+      const wrap = (msg) => handler({ data: msg.data });
       listeners.set(handler, wrap);
       channel.subscribe(event, wrap);
     },
