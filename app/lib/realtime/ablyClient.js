@@ -9,12 +9,23 @@ async function getAblyApiKey() {
   // Try localStorage first (for admin/testing)
   if (typeof window !== 'undefined') {
     try {
-      const key = window.localStorage.getItem('NEXT_PUBLIC_ABLY_API_KEY');
+      let key = window.localStorage.getItem('NEXT_PUBLIC_ABLY_API_KEY');
       if (key) {
-        console.log('[Ably Debug] Found in localStorage');
-        return key;
+        // Parse if it's JSON, otherwise use as-is
+        try {
+          const parsed = JSON.parse(key);
+          key = parsed.apiKey || parsed;
+        } catch (_) {
+          // It's already a string, use it
+        }
+        if (typeof key === 'string' && key.trim()) {
+          console.log('[Ably Debug] Found in localStorage');
+          return key.trim();
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      console.error('[Ably Debug] Error reading localStorage:', e);
+    }
   }
   
   // Fetch from server-side endpoint
@@ -22,12 +33,13 @@ async function getAblyApiKey() {
     console.log('[Ably Debug] Fetching API key from /api/ably-auth...');
     const response = await fetch('/api/ably-auth');
     if (!response.ok) {
-      throw new Error(`Failed to fetch API key: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch API key: ${response.status} - ${errorText}`);
     }
     const data = await response.json();
-    if (data.apiKey) {
+    if (data.apiKey && typeof data.apiKey === 'string') {
       console.log('[Ably Debug] API key received from server');
-      return data.apiKey;
+      return data.apiKey.trim();
     }
   } catch (error) {
     console.error('[Ably Debug] Error fetching API key:', error);
