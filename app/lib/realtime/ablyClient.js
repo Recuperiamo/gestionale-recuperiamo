@@ -4,6 +4,11 @@ let _ably = null;
 let _connectPromise = null;
 
 function getAblyApiKey() {
+  console.log('[Ably Debug] Checking for API key...');
+  console.log('[Ably Debug] process.env.NEXT_PUBLIC_ABLY_API_KEY:', typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ABLY_API_KEY : 'process undefined');
+  console.log('[Ably Debug] window.__NEXT_DATA__:', typeof window !== 'undefined' && window?.__NEXT_DATA__?.env);
+  console.log('[Ably Debug] All process.env keys:', typeof process !== 'undefined' ? Object.keys(process.env).filter(k => k.includes('ABLY')) : 'none');
+  
   if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_ABLY_API_KEY) {
     return process.env.NEXT_PUBLIC_ABLY_API_KEY;
   }
