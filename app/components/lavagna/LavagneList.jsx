@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { io } from "socket.io-client";
 import { getAblyChannel, getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
 export default function LavagneList({ clienteId, onSelect, sessionUser }) {
@@ -33,7 +32,6 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
   useEffect(() => {
     if (!clienteId) return;
-    let socket;
     let cleanupAbly = () => {};
 
     (async () => {
@@ -69,31 +67,14 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
               ch.detach?.();
             } catch {}
           };
-          return;
         }
       } catch (err) {
-        // fall through to socket fallback
+        console.error('[LavagneList] Errore connessione Ably:', err);
       }
-
-      const base = process.env.NEXT_PUBLIC_SOCKET_URL;
-      const socketPath = base ? undefined : "/api/socketio";
-      const url = base || undefined; // undefined = stesso origin
-      if (!base) fetch("/api/socketio").catch(() => {});
-      socket = io(url, { path: socketPath, transports: ["websocket", "polling"] });
-      socket.emit("join:lavagne", { clienteId });
-
-      socket.on("new-lavagna", ({ lavagna }) => {
-        setLavagne((prev) => prev.some((l) => l.id === lavagna.id) ? prev : [...prev, lavagna]);
-      });
-      socket.on("delete-lavagna", ({ lavagnaId }) => {
-        setLavagne((prev) => prev.filter((l) => l.id !== lavagnaId));
-      });
-      socket.on("delete-all-lavagne", () => setLavagne([]));
     })();
 
     return () => {
       try { cleanupAbly(); } catch {}
-      try { socket?.disconnect(); } catch {}
     };
   }, [clienteId]);
 
@@ -109,13 +90,6 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
           ch.publish("delete-lavagna", { lavagnaId, clienteId }, (err) => {
             if (err) console.error('[LavagneList] publish error delete-lavagna', err);
           });
-        } else {
-          const base = process.env.NEXT_PUBLIC_SOCKET_URL;
-          const socketPath = base ? undefined : "/api/socketio";
-          const url = base || undefined;
-          const socket = io(url, { path: socketPath, transports: ["websocket", "polling"] });
-          socket.emit("delete-lavagna", { lavagnaId, clienteId });
-          socket.disconnect();
         }
       }
     } catch (e) {
@@ -135,13 +109,6 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
           ch.publish("delete-all-lavagne", { clienteId }, (err) => {
             if (err) console.error('[LavagneList] publish error delete-all-lavagne', err);
           });
-        } else {
-          const base = process.env.NEXT_PUBLIC_SOCKET_URL;
-          const socketPath = base ? undefined : "/api/socketio";
-          const url = base || undefined;
-          const socket = io(url, { path: socketPath, transports: ["websocket", "polling"] });
-          socket.emit("delete-all-lavagne", { clienteId });
-          socket.disconnect();
         }
       }
     } catch (e) {
@@ -240,13 +207,6 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
           ch.publish("new-lavagna", { lavagna: js.lavagna, clienteId }, (err) => {
             if (err) console.error('[LavagneList] publish error new-lavagna', err);
           });
-        } else {
-          const base = process.env.NEXT_PUBLIC_SOCKET_URL;
-          const socketPath = base ? undefined : "/api/socketio";
-          const url = base || undefined;
-          const socket = io(url, { path: socketPath, transports: ["websocket", "polling"] });
-          socket.emit("new-lavagna", { lavagna: js.lavagna, clienteId });
-          socket.disconnect();
         }
         setShowCreate(false);
         setSelectedAttivita("");
