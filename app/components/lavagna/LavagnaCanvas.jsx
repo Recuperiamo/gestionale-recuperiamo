@@ -1407,6 +1407,7 @@ export default function LavagnaCanvas({
     });
     // Quando si attiva spectatorMode, richiedi viewport corrente dall'admin
     if (spectatorMode && !isAdmin) {
+      console.log('[LAVAGNA-SPECTATOR] Requesting viewport from admin');
       emitOrPublish('viewport:request', {
         lavagnaId,
         attivitaId,
@@ -1737,11 +1738,16 @@ export default function LavagnaCanvas({
             if (prev.find((f) => f.id === normalized.id)) return prev;
             return [...prev, normalized];
           });
-          // Per le immagini, forza ridisegno dopo un breve delay per dare tempo al caricamento
-          if (normalized.kind === 'immagine') {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => drawAll());
-            });
+          // Per le immagini, precarica e ridisegna quando pronta
+          if (normalized.kind === 'immagine' && normalized.src) {
+            const img = new Image();
+            img.onload = () => {
+              drawAll();
+            };
+            img.onerror = () => {
+              drawAll(); // Disegna comunque anche se errore
+            };
+            img.src = normalized.src;
           } else {
             drawAll();
           }
@@ -1758,11 +1764,16 @@ export default function LavagnaCanvas({
             }
           } catch (_) {}
           setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
-          // Per le immagini, forza ridisegno dopo delay
-          if (normalized.kind === 'immagine') {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => drawAll());
-            });
+          // Per le immagini, precarica e ridisegna quando pronta
+          if (normalized.kind === 'immagine' && normalized.src) {
+            const img = new Image();
+            img.onload = () => {
+              drawAll();
+            };
+            img.onerror = () => {
+              drawAll();
+            };
+            img.src = normalized.src;
           } else {
             drawAll();
           }
@@ -1827,18 +1838,44 @@ export default function LavagnaCanvas({
         };
         const onViewportRequest = () => {
           if (!isAdmin) return;
+          // Calcola visibleRect come nel broadcast normale
+          const canvas = canvasRef.current;
+          let visibleRect = null;
+          let canvasSize = null;
+          if (canvas) {
+            try {
+              const rect = canvas.getBoundingClientRect();
+              const cssW = rect.width;
+              const cssH = rect.height;
+              canvasSize = { width: cssW, height: cssH };
+              const currentZoom = zoomRef.current;
+              const currentPan = panRef.current;
+              const worldW = cssW / currentZoom;
+              const worldH = cssH / currentZoom;
+              visibleRect = {
+                x: currentPan.x,
+                y: currentPan.y,
+                width: worldW,
+                height: worldH
+              };
+            } catch (_) {}
+          }
+          console.log('[LAVAGNA-VIEWPORT] Admin responding to viewport:request', { visibleRect, canvasSize });
           emitOrPublish('viewport:update', {
             lavagnaId,
             attivitaId,
             senderId: utenteId,
             pan: { x: panRef.current.x, y: panRef.current.y },
             zoom: zoomRef.current,
+            canvasSize,
+            visibleRect,
             ts: Date.now()
           });
         };
         const onSpectatorToggle = (msg) => {
           const { data } = msg || {};
           const { userId, active } = data || {};
+          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Received:', { userId, active, isAdmin });
           if (!userId) return;
           const roster = spectatorRosterRef.current;
           if (active) {
@@ -1847,6 +1884,7 @@ export default function LavagnaCanvas({
             roster.delete(userId);
           }
           setSpectatorCount(roster.size);
+          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Roster updated, count:', roster.size);
         };
         const onSpectatorRequest = () => {
           if (isAdmin) return;
