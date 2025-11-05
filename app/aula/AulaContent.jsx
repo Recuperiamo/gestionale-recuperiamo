@@ -383,13 +383,14 @@ function PDFPreviewWithControls({ src, title, coloreTema }) {
         color: '#6b7b9a',
         textAlign: 'center',
         marginBottom: 8,
-        fontStyle: 'italic'
+        fontStyle: 'italic',
+        flexShrink: 0
       }}>
         Usa i controlli sopra per navigare e ingrandire il PDF
       </div>
 
       {/* Iframe PDF */}
-      <div style={{ flex: 1, overflow: 'hidden', borderRadius: 8, border: '1px solid #e0e0e0' }}>
+      <div style={{ flex: 1, overflow: 'hidden', borderRadius: 8, border: '1px solid #e0e0e0', minHeight: 0 }}>
         <iframe
           ref={iframeRef}
           title={title || 'PDF'}
@@ -1226,16 +1227,16 @@ export default function AulaContent({ initialClienteId = null }) {
       {/* Modale upload */}
       {/* Modale preview materiale */}
       {previewItem && (
-        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100}} onClick={() => setPreviewItem(null)}>
-          <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'90%',maxHeight:'90%',width:900,overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`}}>
+        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:20}} onClick={() => setPreviewItem(null)}>
+          <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1000,height:'90vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
               <div style={{fontWeight:700,color: coloreTema}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
               <div>
                 <a href={`/api/materiale?fileId=${previewItem.id}`} style={{...btnGhost, marginRight:8}} download={previewItem.nomeOriginale}>Scarica</a>
                 <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewItem(null)}>Chiudi</button>
               </div>
             </div>
-            <div style={{padding:16,display:'flex',alignItems:'center',justifyContent:'center',height:'calc(100% - 64px)'}}>
+            <div style={{padding:16,display:'flex',alignItems:'center',justifyContent:'center',flex:1,overflow:'hidden',minHeight:0}}>
               {(() => {
                 const tipo = (previewItem.tipo || '').toLowerCase();
                 if (['jpg','jpeg','png','gif','bmp','webp'].includes(tipo)) {
