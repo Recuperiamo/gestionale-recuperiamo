@@ -4938,7 +4938,10 @@ export default function LavagnaCanvas({
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
 
     clearLavagnaState();
-    emitOrPublish('clear-lavagna', { lavagnaId, attivitaId });
+    // Pubblica solo se il channel è pronto
+    if (ablyRef.current.ch) {
+      emitOrPublish('clear-lavagna', { lavagnaId, attivitaId });
+    }
 
     fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' })
       .then((res) => {
