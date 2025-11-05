@@ -5,6 +5,407 @@ import Navbar from "../components/Navbar";
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
 import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 
+// Componente per zoom e pan delle immagini
+function ImagePreviewWithZoom({ src, alt, coloreTema }) {
+  const containerRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
+  };
+
+  const handleMouseDown = (e) => {
+    if (scale <= 1) return; // No pan if not zoomed
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const resetZoom = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const zoomIn = () => {
+    setScale(prev => Math.min(5, prev + 0.25));
+  };
+
+  const zoomOut = () => {
+    setScale(prev => Math.max(0.5, prev - 0.25));
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragStart]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+      {/* Controlli zoom */}
+      <div style={{
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        display: 'flex',
+        gap: 8,
+        zIndex: 10,
+        background: 'rgba(255,255,255,0.95)',
+        borderRadius: 8,
+        padding: '8px 12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+      }}>
+        <button
+          type="button"
+          onClick={zoomOut}
+          disabled={scale <= 0.5}
+          style={{
+            background: scale <= 0.5 ? '#e0e0e0' : coloreTema,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 12px',
+            fontSize: 16,
+            fontWeight: 700,
+            cursor: scale <= 0.5 ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          −
+        </button>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          minWidth: 60,
+          justifyContent: 'center',
+          fontSize: 13,
+          fontWeight: 600,
+          color: '#333'
+        }}>
+          {Math.round(scale * 100)}%
+        </div>
+        <button
+          type="button"
+          onClick={zoomIn}
+          disabled={scale >= 5}
+          style={{
+            background: scale >= 5 ? '#e0e0e0' : coloreTema,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 12px',
+            fontSize: 16,
+            fontWeight: 700,
+            cursor: scale >= 5 ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          +
+        </button>
+        {scale !== 1 && (
+          <button
+            type="button"
+            onClick={resetZoom}
+            style={{
+              background: '#6b7b9a',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {/* Hint per utente */}
+      {scale > 1 && (
+        <div style={{
+          position: 'absolute',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.75)',
+          color: '#fff',
+          padding: '8px 16px',
+          borderRadius: 6,
+          fontSize: 12,
+          zIndex: 10,
+          pointerEvents: 'none'
+        }}>
+          Trascina per spostare l'immagine
+        </div>
+      )}
+
+      {/* Container immagine con zoom e pan */}
+      <div
+        ref={containerRef}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+          overflow: 'hidden'
+        }}
+      >
+        <img
+          src={src}
+          alt={alt}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '80vh',
+            borderRadius: 8,
+            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+            transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+            userSelect: 'none',
+            pointerEvents: 'none'
+          }}
+          draggable={false}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Componente per visualizzazione PDF con controlli
+function PDFPreviewWithControls({ src, title, coloreTema }) {
+  const iframeRef = useRef(null);
+  const [scale, setScale] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showToolbar, setShowToolbar] = useState(true);
+
+  // Costruisce URL con parametri per controllo PDF
+  const pdfUrl = useMemo(() => {
+    const baseUrl = src;
+    const params = new URLSearchParams();
+    if (currentPage > 1) params.set('page', currentPage.toString());
+    params.set('zoom', scale.toString());
+    params.set('toolbar', showToolbar ? '1' : '0');
+    params.set('navpanes', '0'); // Nascondi sidebar
+    const query = params.toString();
+    return query ? `${baseUrl}#${query}` : baseUrl;
+  }, [src, currentPage, scale, showToolbar]);
+
+  const zoomIn = () => setScale(prev => Math.min(200, prev + 25));
+  const zoomOut = () => setScale(prev => Math.max(50, prev - 25));
+  const resetZoom = () => setScale(100);
+  const nextPage = () => setCurrentPage(prev => prev + 1);
+  const prevPage = () => setCurrentPage(prev => Math.max(1, prev - 1));
+  const toggleToolbar = () => setShowToolbar(prev => !prev);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Barra controlli PDF */}
+      <div style={{
+        display: 'flex',
+        gap: 12,
+        padding: '12px 16px',
+        background: '#f8f9fa',
+        borderRadius: 8,
+        marginBottom: 12,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      }}>
+        {/* Navigazione pagine */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={prevPage}
+            disabled={currentPage <= 1}
+            style={{
+              background: currentPage <= 1 ? '#e0e0e0' : coloreTema,
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            ← Prec
+          </button>
+          <div style={{
+            padding: '6px 12px',
+            background: '#fff',
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            minWidth: 80,
+            textAlign: 'center',
+            border: '1px solid #e0e0e0'
+          }}>
+            Pag. {currentPage}
+          </div>
+          <button
+            type="button"
+            onClick={nextPage}
+            style={{
+              background: coloreTema,
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Succ →
+          </button>
+        </div>
+
+        {/* Controlli zoom */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={zoomOut}
+            disabled={scale <= 50}
+            style={{
+              background: scale <= 50 ? '#e0e0e0' : '#6b7b9a',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: scale <= 50 ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            −
+          </button>
+          <div style={{
+            padding: '6px 12px',
+            background: '#fff',
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            minWidth: 70,
+            textAlign: 'center',
+            border: '1px solid #e0e0e0'
+          }}>
+            {scale}%
+          </div>
+          <button
+            type="button"
+            onClick={zoomIn}
+            disabled={scale >= 200}
+            style={{
+              background: scale >= 200 ? '#e0e0e0' : '#6b7b9a',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 12px',
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: scale >= 200 ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            +
+          </button>
+          {scale !== 100 && (
+            <button
+              type="button"
+              onClick={resetZoom}
+              style={{
+                background: '#f59e0b',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
+        {/* Toggle toolbar PDF nativo */}
+        <button
+          type="button"
+          onClick={toggleToolbar}
+          style={{
+            background: showToolbar ? coloreTema : '#94a3b8',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          {showToolbar ? '🔧 Barra PDF' : '🔧 Mostra barra'}
+        </button>
+      </div>
+
+      {/* Hint utente */}
+      <div style={{
+        fontSize: 11,
+        color: '#6b7b9a',
+        textAlign: 'center',
+        marginBottom: 8,
+        fontStyle: 'italic'
+      }}>
+        Usa i controlli sopra per navigare e ingrandire il PDF
+      </div>
+
+      {/* Iframe PDF */}
+      <div style={{ flex: 1, overflow: 'hidden', borderRadius: 8, border: '1px solid #e0e0e0' }}>
+        <iframe
+          ref={iframeRef}
+          title={title || 'PDF'}
+          src={pdfUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 0,
+            borderRadius: 8
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // --- COMMENTI: gestione locale (per demo, sostituire con API per DB/file persistente) ---
 function useCommenti(materiali) {
   const [commenti, setCommenti] = useState({});
@@ -838,10 +1239,10 @@ export default function AulaContent({ initialClienteId = null }) {
               {(() => {
                 const tipo = (previewItem.tipo || '').toLowerCase();
                 if (['jpg','jpeg','png','gif','bmp','webp'].includes(tipo)) {
-                  return <img src={`/api/materiale?fileId=${previewItem.id}`} alt={previewItem.titolo} style={{maxWidth:'100%',maxHeight:'80vh',borderRadius:8}} />;
+                  return <ImagePreviewWithZoom src={`/api/materiale?fileId=${previewItem.id}`} alt={previewItem.titolo} coloreTema={coloreTema} />;
                 }
                 if (tipo === 'pdf') {
-                  return <iframe title={previewItem.titolo || 'PDF'} src={`/api/materiale?fileId=${previewItem.id}`} style={{width:'100%',height:'80vh',border:0}} />;
+                  return <PDFPreviewWithControls src={`/api/materiale?fileId=${previewItem.id}`} title={previewItem.titolo} coloreTema={coloreTema} />;
                 }
                 // other files: show icon + info
                 return (
