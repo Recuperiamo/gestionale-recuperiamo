@@ -80,7 +80,8 @@ export async function GET(req) {
       nomeOriginale: m.nomeOriginale,
       tipo: m.nomeOriginale.split('.').pop()?.toLowerCase() || 'file',
       updatedAt: m.updatedAt.toISOString(),
-      mime: m.mimeType
+      mime: m.mimeType,
+      uploadBatchId: m.uploadBatchId
     }));
 
     return NextResponse.json(results);
