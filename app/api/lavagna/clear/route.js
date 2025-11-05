@@ -33,10 +33,16 @@ export async function DELETE(req) {
     });
 
     // Soft delete di tutte le forme non già cancellate
-    await prisma.lavagnaForma.updateMany({
-      where: { lavagnaId, deletedAt: null },
-      data: { deletedAt: now }
-    });
+    try {
+      if (prisma.lavagnaShape && typeof prisma.lavagnaShape.updateMany === 'function') {
+        await prisma.lavagnaShape.updateMany({
+          where: { lavagnaId, deletedAt: null },
+          data: { deletedAt: now }
+        });
+      }
+    } catch (err) {
+      console.error('[clear] Errore soft-delete forme:', err?.message || err);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
