@@ -1726,14 +1726,17 @@ export default function LavagnaCanvas({
             hasData: !!data, 
             kind: data?.kind, 
             id: data?.id, 
-            senderId: data?.autoreUserId,
-            myUserId: utenteId
+            autoreUserId: data?.autoreUserId,
+            senderId: data?.senderId,
+            myUserId: utenteId,
+            msgStructure: Object.keys(data || {})
           });
           if (!data) return;
           
-          // Con echoMessages attivo, ignora le proprie forme per evitare duplicati
-          if (data.autoreUserId === utenteId) {
-            console.log('[LAVAGNA-RECV] Ignoring own shape:create (echo)');
+          // Con echoMessages attivo, usa senderId per ignorare solo i propri messaggi echo
+          // NON usare autoreUserId perché quello indica chi ha creato la forma (può essere diverso dal sender)
+          if (data.senderId && data.senderId === utenteId) {
+            console.log('[LAVAGNA-RECV] Ignoring own shape:create (echo)', { senderId: data.senderId, myUserId: utenteId });
             return;
           }
           
@@ -1743,6 +1746,7 @@ export default function LavagnaCanvas({
           console.log('[LAVAGNA-RECV] shape:create PROCESSING', { 
             id: normalized.id, 
             kind: normalized.kind,
+            autore: normalized.autoreUserId,
             willAdd: true
           });
           
