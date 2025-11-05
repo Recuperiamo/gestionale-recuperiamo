@@ -193,12 +193,24 @@ export default function LavagnaCanvas({
   const emitOrPublish = useCallback(
     (name, data) => {
       try {
-        const ch = ablyRef.current.ch;
+        // Usa il channel salvato nella ref, altrimenti fallback a getAblyChannel sincrono
+        let ch = ablyRef.current.ch;
+        if (!ch) {
+          ch = getAblyChannel(channelName);
+        }
+        console.log('[LAVAGNA-PUBLISH-DEBUG] Attempting to publish', { 
+          channelName, 
+          event: name, 
+          hasChannel: !!ch,
+          fromRef: !!ablyRef.current.ch,
+          dataKeys: data ? Object.keys(data) : null
+        });
         if (ch) {
           if (process.env.NODE_ENV !== 'production') {
             try { console.log('[LAVAGNA-PUBLISH] channel=', channelName, 'event=', name, 'data=', data && (typeof data === 'object' ? JSON.parse(JSON.stringify(data)) : data)); } catch(_) { console.log('[LAVAGNA-PUBLISH] publish', name); }
           }
           ch.publish(name, data);
+          console.log('[LAVAGNA-PUBLISH-SUCCESS]', { event: name, channelName });
         } else {
           console.warn('[LAVAGNA-PUBLISH-NO-CHANNEL] Channel not available', { channelName, event: name });
         }
@@ -1646,12 +1658,8 @@ export default function LavagnaCanvas({
     let cleanup = () => {};
     (async () => {
       try {
-        // Ottieni il channel in modo sincrono per permettere publish immediato
-        const chSync = getAblyChannel(channelName);
-        ablyRef.current.ch = chSync;
-        
-        // Poi aspetta che sia attached per le subscription
         const ch = await getAblyChannelAsync(channelName);
+        ablyRef.current.ch = ch;
         if (!ch) {
           console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
           return;
