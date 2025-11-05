@@ -1837,9 +1837,16 @@ export default function LavagnaCanvas({
             });
           }
         };
-        const onViewportRequest = () => {
-          console.log('[LAVAGNA-RECV] viewport:request received by', { isAdmin, userId: utenteId });
+        const onViewportRequest = (msg) => {
+          const { data } = msg || {};
+          const { requesterId } = data || {};
+          console.log('[LAVAGNA-RECV] viewport:request received by', { isAdmin, userId: utenteId, requesterId });
           if (!isAdmin) return;
+          // Se echoMessages è attivo, ignora la propria richiesta
+          if (requesterId === utenteId) {
+            console.log('[LAVAGNA-RECV] Ignoring own viewport:request (echo)');
+            return;
+          }
           // Calcola visibleRect come nel broadcast normale
           const canvas = canvasRef.current;
           let visibleRect = null;
@@ -1862,7 +1869,7 @@ export default function LavagnaCanvas({
               };
             } catch (_) {}
           }
-          console.log('[LAVAGNA-VIEWPORT] Admin responding to viewport:request', { visibleRect, canvasSize });
+          console.log('[LAVAGNA-VIEWPORT] Admin responding to viewport:request from', requesterId, { visibleRect, canvasSize });
           emitOrPublish('viewport:update', {
             lavagnaId,
             attivitaId,
@@ -1877,8 +1884,13 @@ export default function LavagnaCanvas({
         const onSpectatorToggle = (msg) => {
           const { data } = msg || {};
           const { userId, active } = data || {};
-          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Received:', { userId, active, isAdmin });
+          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Received:', { userId, active, isAdmin, myUserId: utenteId });
           if (!userId) return;
+          // Ignora il proprio toggle (echoMessages attivo)
+          if (userId === utenteId) {
+            console.log('[LAVAGNA-SPECTATOR-TOGGLE] Ignoring own toggle (echo)');
+            return;
+          }
           const roster = spectatorRosterRef.current;
           if (active) {
             roster.add(userId);
