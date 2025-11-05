@@ -2018,15 +2018,29 @@ export default function LavagnaCanvas({
           });
         };
 
-        ch.subscribe('shape:create', onShapeCreate);
-        ch.subscribe('shape:update', onShapeUpdate);
-        ch.subscribe('shape:delete', onShapeDelete);
-        ch.subscribe('background:change', onBackgroundChange);
-        ch.subscribe('background:request', onBackgroundRequest);
-        ch.subscribe('viewport:update', onViewportUpdate);
-        ch.subscribe('viewport:request', onViewportRequest);
-        ch.subscribe('spectator:toggle', onSpectatorToggle);
-        ch.subscribe('spectator:request', onSpectatorRequest);
+        try {
+          console.log('[LAVAGNA-SUB] Subscribing to stroke events...');
+          ch.subscribe('shape:create', onShapeCreate);
+          console.log('[LAVAGNA-SUB] shape:create OK');
+          ch.subscribe('shape:update', onShapeUpdate);
+          console.log('[LAVAGNA-SUB] shape:update OK');
+          ch.subscribe('shape:delete', onShapeDelete);
+          console.log('[LAVAGNA-SUB] shape:delete OK');
+          ch.subscribe('background:change', onBackgroundChange);
+          console.log('[LAVAGNA-SUB] background:change OK');
+          ch.subscribe('background:request', onBackgroundRequest);
+          console.log('[LAVAGNA-SUB] background:request OK');
+          ch.subscribe('viewport:update', onViewportUpdate);
+          console.log('[LAVAGNA-SUB] viewport:update OK');
+          ch.subscribe('viewport:request', onViewportRequest);
+          console.log('[LAVAGNA-SUB] viewport:request OK');
+          ch.subscribe('spectator:toggle', onSpectatorToggle);
+          console.log('[LAVAGNA-SUB] spectator:toggle OK');
+          ch.subscribe('spectator:request', onSpectatorRequest);
+          console.log('[LAVAGNA-SUB] spectator:request OK');
+        } catch (subscribeError) {
+          console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
+        }
         
         console.log('[LAVAGNA-SUBSCRIPTION] All subscriptions registered', {
           channelName,
