@@ -1562,6 +1562,8 @@ export default function LavagnaCanvas({
       backgroundRequestKeyRef.current = key;
     }
     if (backgroundRequestedRef.current) return;
+    // Aspetta che il channel sia pronto
+    if (!ablyRef.current.ch) return;
     backgroundRequestedRef.current = true;
     emitOrPublish('background:request', { lavagnaId, attivitaId });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId]);
@@ -1569,6 +1571,8 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!isAdmin) return;
     if (!utenteId) return;
+    // Aspetta che il channel sia pronto
+    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:request', { lavagnaId, attivitaId, requesterId: utenteId, ts: Date.now() });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId, utenteId]);
 
@@ -1631,6 +1635,8 @@ export default function LavagnaCanvas({
         const pending = viewportBroadcastRef.current.payload;
         viewportBroadcastRef.current.rafId = null;
         if (pending) {
+          // Aspetta che il channel sia pronto
+          if (!ablyRef.current.ch) return;
           emitOrPublish('viewport:update', pending);
         }
       });
