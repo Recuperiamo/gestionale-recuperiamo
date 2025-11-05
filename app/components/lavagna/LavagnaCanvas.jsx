@@ -2027,6 +2027,13 @@ export default function LavagnaCanvas({
         ch.subscribe('viewport:request', onViewportRequest);
         ch.subscribe('spectator:toggle', onSpectatorToggle);
         ch.subscribe('spectator:request', onSpectatorRequest);
+        
+        console.log('[LAVAGNA-SUBSCRIPTION] All subscriptions registered', {
+          channelName,
+          events: ['stroke:start', 'stroke:points', 'stroke:done', 'stroke:delete', 'clear-lavagna', 
+                   'shape:create', 'shape:update', 'shape:delete', 'background:change', 'background:request',
+                   'viewport:update', 'viewport:request', 'spectator:toggle', 'spectator:request']
+        });
 
         cleanup = () => {
           try {
