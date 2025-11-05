@@ -25,7 +25,7 @@ export default function LavagnaCanvas({
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const overlayRef = useRef(null);
-  const ablyRef = useRef({ ch: null, buffer: [] });
+  const ablyRef = useRef({ ch: null });
 
   const [strumento, setStrumento] = useState("penna"); // penna|gomma|mano|selezione|shape-tools
   // Default color: if this is a new lavagna, start with Grafite (#111827),
@@ -49,8 +49,6 @@ export default function LavagnaCanvas({
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
   const [enablePinchZoom, setEnablePinchZoom] = useState(true);
   const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
-  const showTopRightBar = topRightPlacement !== 'external';
-  const showInCanvasActions = topRightPlacement === 'in-canvas';
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const sfondoRef = useRef(sfondo);
@@ -104,8 +102,6 @@ export default function LavagnaCanvas({
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
-  const spectatorIndicatorVisible = spectatorMode && !isAdmin;
-  const zoomDisabled = spectatorMode && !isAdmin;
   const latestAdminViewportRef = useRef(null);
   const viewportBroadcastRef = useRef({ rafId: null, payload: null });
   const pointerWorldRef = useRef(null);
@@ -197,20 +193,32 @@ export default function LavagnaCanvas({
   const emitOrPublish = useCallback(
     (name, data) => {
       try {
-        const ch = ablyRef.current.ch;
-        
+        // Usa il channel salvato nella ref, altrimenti fallback a getAblyChannel sincrono
+        let ch = ablyRef.current.ch;
+        if (!ch) {
+          ch = getAblyChannel(channelName);
+        }
+        console.log('[LAVAGNA-PUBLISH-DEBUG] Attempting to publish', { 
+          channelName, 
+          event: name, 
+          hasChannel: !!ch,
+          fromRef: !!ablyRef.current.ch,
+          dataKeys: data ? Object.keys(data) : null
+        });
         if (ch) {
-          console.log('[LAVAGNA-PUBLISH] Publishing directly', { event: name });
+          if (process.env.NODE_ENV !== 'production') {
+            try { console.log('[LAVAGNA-PUBLISH] channel=', channelName, 'event=', name, 'data=', data && (typeof data === 'object' ? JSON.parse(JSON.stringify(data)) : data)); } catch(_) { console.log('[LAVAGNA-PUBLISH] publish', name); }
+          }
           ch.publish(name, data);
+          console.log('[LAVAGNA-PUBLISH-SUCCESS]', { event: name, channelName });
         } else {
-          console.log('[LAVAGNA-PUBLISH] Channel not ready, buffering message', { event: name });
-          ablyRef.current.buffer.push({ name, data });
+          console.warn('[LAVAGNA-PUBLISH-NO-CHANNEL] Channel not available', { channelName, event: name });
         }
       } catch (e) {
         console.error('[LAVAGNA-PUBLISH-ERROR]', { event: name, error: e.message || e });
       }
     },
-    []
+    [channelName]
   );
 
   // Shapes and selection
@@ -1042,6 +1050,98 @@ export default function LavagnaCanvas({
             ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - hw, cy + hh); ctx.stroke();
             break;
           }
+          case 'triangolo': {
+            ctx.beginPath();
+            ctx.moveTo(minX + w / 2, minY);
+            ctx.lineTo(minX, minY + h);
+            ctx.lineTo(minX + w, minY + h);
+            ctx.closePath();
+            ctx.stroke();
+            break;
+          }
+          case 'rombo': {
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(minX + w, cy);
+            ctx.lineTo(cx, minY + h);
+            ctx.lineTo(minX, cy);
+            ctx.closePath();
+            ctx.stroke();
+            break;
+          }
+          case 'assi2d': {
+            // 2D axes, arrowheads only on positive semiaxes (right for X, up for Y)
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
+
+            // X axis
+            ctx.beginPath(); ctx.moveTo(minX, cy); ctx.lineTo(minX + w, cy); ctx.stroke();
+            // right head
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(minX + w, cy);
+            ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
+            ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
+            ctx.closePath(); ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+
+            // Y axis
+            ctx.beginPath(); ctx.moveTo(cx, minY); ctx.lineTo(cx, minY + h); ctx.stroke();
+            // top head
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
+            ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
+            ctx.closePath(); ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            break;
+          }
+          case 'assi3d': {
+            // 3D axes: arrowheads only on positive semiaxes (X right, Y up, Z to SW)
+            const cx = minX + w / 2;
+            const cy = minY + h / 2;
+            const arrowSize = Math.max(8, (ps.spessore || 2) * 2.5) / safeZoom;
+
+            // X axis
+            ctx.beginPath(); ctx.moveTo(minX, cy); ctx.lineTo(minX + w, cy); ctx.stroke();
+            ctx.setLineDash([]);
+            // right head
+            ctx.beginPath(); ctx.moveTo(minX + w, cy);
+            ctx.lineTo(minX + w - arrowSize, cy - arrowSize * 0.5);
+            ctx.lineTo(minX + w - arrowSize, cy + arrowSize * 0.5);
+            ctx.closePath(); ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+
+            // Y axis
+            ctx.beginPath(); ctx.moveTo(cx, minY); ctx.lineTo(cx, minY + h); ctx.stroke();
+            ctx.setLineDash([]);
+            // top head
+            ctx.beginPath(); ctx.moveTo(cx, minY);
+            ctx.lineTo(cx - arrowSize * 0.5, minY + arrowSize);
+            ctx.lineTo(cx + arrowSize * 0.5, minY + arrowSize);
+            ctx.closePath(); ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+
+            // Z axis diagonal NE <-> SW
+            const dx1 = minX + w; const dy1 = minY; // NE
+            const dx2 = minX; const dy2 = minY + h; // SW
+            ctx.beginPath(); ctx.moveTo(dx1, dy1); ctx.lineTo(dx2, dy2); ctx.stroke();
+            ctx.setLineDash([]);
+            // SW head
+            ctx.beginPath();
+            ctx.moveTo(dx2, dy2);
+            ctx.lineTo(dx2 + arrowSize * 0.8, dy2 - arrowSize * 0.3);
+            ctx.lineTo(dx2 + arrowSize * 0.3, dy2 - arrowSize * 0.8);
+            ctx.closePath(); ctx.stroke();
+            ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
+            break;
+          }
+          default:
+            break;
         }
         ctx.setLineDash([]);
         ctx.restore();
@@ -1306,6 +1406,8 @@ export default function LavagnaCanvas({
 
   useEffect(() => {
     if (!utenteId) return;
+    // Aspetta che il channel Ably sia pronto prima di pubblicare
+    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:toggle', {
       lavagnaId,
       attivitaId,
@@ -1329,6 +1431,8 @@ export default function LavagnaCanvas({
   useEffect(() => () => {
     if (!utenteId) return;
     if (!spectatorModeRef.current) return;
+    // Aspetta che il channel sia pronto
+    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:toggle', {
       lavagnaId,
       attivitaId,
@@ -1401,26 +1505,28 @@ export default function LavagnaCanvas({
           const rect = canvas.getBoundingClientRect();
           const localW = rect.width;
           const localH = rect.height;
-          // Compute zoom to fit admin's visible rect into our canvas
-          const scaleX = localW / visibleRect.width;
-          const scaleY = localH / visibleRect.height;
-          const targetZoom = Math.min(scaleX, scaleY);
-          // Clamp zoom to allowed range
-          const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
-          // Center the admin's visible rect in our canvas
-          const centerX = visibleRect.x + visibleRect.width / 2;
-          const centerY = visibleRect.y + visibleRect.height / 2;
-          const newPan = {
-            x: centerX - (localW / 2) / clampedZoom,
-            y: centerY - (localH / 2) / clampedZoom
-          };
-          // Apply the computed fit
-          setPan((prev) => {
-            if (prev.x === newPan.x && prev.y === newPan.y) return prev;
-            return newPan;
-          });
-          setZoom((prev) => (prev === clampedZoom ? prev : clampedZoom));
-          return;
+          if (localW > 0 && localH > 0) {
+            // Compute zoom to fit admin's visible rect into our canvas
+            const scaleX = localW / visibleRect.width;
+            const scaleY = localH / visibleRect.height;
+            const targetZoom = Math.min(scaleX, scaleY);
+            // Clamp zoom to allowed range
+            const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
+            // Center the admin's visible rect in our canvas
+            const centerX = visibleRect.x + visibleRect.width / 2;
+            const centerY = visibleRect.y + visibleRect.height / 2;
+            const newPan = {
+              x: centerX - (localW / 2) / clampedZoom,
+              y: centerY - (localH / 2) / clampedZoom
+            };
+            // Apply the computed fit
+            setPan((prev) => {
+              if (prev.x === newPan.x && prev.y === newPan.y) return prev;
+              return newPan;
+            });
+            setZoom((prev) => (prev === clampedZoom ? prev : clampedZoom));
+            return;
+          }
         }
       } catch (_) {}
     }
@@ -1460,6 +1566,8 @@ export default function LavagnaCanvas({
       backgroundRequestKeyRef.current = key;
     }
     if (backgroundRequestedRef.current) return;
+    // Aspetta che il channel sia pronto
+    if (!ablyRef.current.ch) return;
     backgroundRequestedRef.current = true;
     emitOrPublish('background:request', { lavagnaId, attivitaId });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId]);
@@ -1467,6 +1575,8 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!isAdmin) return;
     if (!utenteId) return;
+    // Aspetta che il channel sia pronto
+    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:request', { lavagnaId, attivitaId, requesterId: utenteId, ts: Date.now() });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId, utenteId]);
 
@@ -1529,6 +1639,8 @@ export default function LavagnaCanvas({
         const pending = viewportBroadcastRef.current.payload;
         viewportBroadcastRef.current.rafId = null;
         if (pending) {
+          // Aspetta che il channel sia pronto
+          if (!ablyRef.current.ch) return;
           emitOrPublish('viewport:update', pending);
         }
       });
@@ -1548,21 +1660,6 @@ export default function LavagnaCanvas({
       try {
         const ch = await getAblyChannelAsync(channelName);
         ablyRef.current.ch = ch;
-
-        // Flush buffer
-        if (ablyRef.current.buffer.length > 0) {
-          console.log(`[LAVAGNA-PUBLISH] Channel is ready, flushing ${ablyRef.current.buffer.length} buffered messages.`);
-          ablyRef.current.buffer.forEach(msg => {
-            try {
-              ch.publish(msg.name, msg.data);
-              console.log(`[LAVAGNA-PUBLISH] Flushed message: ${msg.name}`);
-            } catch (e) {
-              console.error(`[LAVAGNA-PUBLISH] Error flushing message ${msg.name}:`, e);
-            }
-          });
-          ablyRef.current.buffer = []; // Clear buffer
-        }
-
         if (!ch) {
           console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
           return;
@@ -2610,26 +2707,2846 @@ export default function LavagnaCanvas({
     return capped;
   }
 
-  // == STROKE PREVIEW ==
-  const previewStroke = useCallback((p1, p2) => {
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const safeZoom = Math.max(zoom, 0.0001);
-    const worldScale = safeZoom * dpr;
+  function getShapeBounds(shape) {
+    if (!shape) return null;
+    const kind = shape.kind;
+    if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
+      const x1 = Number(shape.x1 ?? shape.x ?? 0);
+      const y1 = Number(shape.y1 ?? shape.y ?? 0);
+      const x2 = Number(shape.x2 ?? shape.x1 ?? x1);
+      const y2 = Number(shape.y2 ?? shape.y1 ?? y1);
+      return {
+        minX: Math.min(x1, x2),
+        maxX: Math.max(x1, x2),
+        minY: Math.min(y1, y2),
+        maxY: Math.max(y1, y2)
+      };
+    }
+    const baseX = Number(shape.x ?? 0);
+    const baseY = Number(shape.y ?? 0);
+    const width = Number(shape.w ?? (shape.x2 != null ? shape.x2 - baseX : 0));
+    const height = Number(shape.h ?? (shape.y2 != null ? shape.y2 - baseY : 0));
+    
+    // If shape has rotation, calculate rotated bounding box
+    const rotation = Number(shape.rotation ?? 0);
+    if (rotation !== 0) {
+      // Calculate center of unrotated shape
+      const cx = baseX + width / 2;
+      const cy = baseY + height / 2;
+      
+      // Calculate 4 corners of unrotated rectangle
+      const corners = [
+        { x: baseX, y: baseY },
+        { x: baseX + width, y: baseY },
+        { x: baseX + width, y: baseY + height },
+        { x: baseX, y: baseY + height }
+      ];
+      
+      // Rotate each corner around center
+      const rotatedCorners = corners.map(corner => {
+        const dx = corner.x - cx;
+        const dy = corner.y - cy;
+        return {
+          x: cx + dx * Math.cos(rotation) - dy * Math.sin(rotation),
+          y: cy + dx * Math.sin(rotation) + dy * Math.cos(rotation)
+        };
+      });
+      
+      // Find min/max of rotated corners
+      const xs = rotatedCorners.map(c => c.x);
+      const ys = rotatedCorners.map(c => c.y);
+      return {
+        minX: Math.min(...xs),
+        maxX: Math.max(...xs),
+        minY: Math.min(...ys),
+        maxY: Math.max(...ys)
+      };
+    }
+    
+    const minX = Math.min(baseX, baseX + width);
+    const maxX = Math.max(baseX, baseX + width);
+    const minY = Math.min(baseY, baseY + height);
+    const maxY = Math.max(baseY, baseY + height);
+    return { minX, minY, maxX, maxY };
+  }
+
+  function hitTestShape(shape, x, y, tolerance = 12) {
+    if (!shape) return false;
+    const kind = shape.kind;
+    // Explicit link hit-test: use shape.w/h defaults if needed
+    if (kind === 'link') {
+      const baseX = Number(shape.x ?? 0);
+      const baseY = Number(shape.y ?? 0);
+      const width = Number(shape.w ?? 160);
+      const height = Number(shape.h ?? 28);
+      const minX = Math.min(baseX, baseX + width);
+      const maxX = Math.max(baseX, baseX + width);
+      const minY = Math.min(baseY, baseY + height);
+      const maxY = Math.max(baseY, baseY + height);
+      const withinX = x >= minX - tolerance && x <= maxX + tolerance;
+      const withinY = y >= minY - tolerance && y <= maxY + tolerance;
+      return !!(withinX && withinY);
+    }
+    if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
+      const x1 = shape.x1 ?? shape.x ?? 0;
+      const y1 = shape.y1 ?? shape.y ?? 0;
+      const x2 = shape.x2 ?? shape.x1 ?? x1;
+      const y2 = shape.y2 ?? shape.y1 ?? y1;
+      if (distPointToSegment(x, y, x1, y1, x2, y2) <= tolerance) return true;
+      if (kind === 'freccia') {
+        // Arrow head triangle hit test
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLength = Math.max(12, tolerance * 1.2);
+               const headWidth = headLength * 0.8;
+        const hx = x2;
+        const hy = y2;
+        const left = {
+          x: hx - headLength * Math.cos(angle) + headWidth * Math.sin(angle),
+          y: hy - headLength * Math.sin(angle) - headWidth * Math.cos(angle)
+        };
+        const right = {
+          x: hx - headLength * Math.cos(angle) - headWidth * Math.sin(angle),
+          y: hy - headLength * Math.sin(angle) + headWidth * Math.cos(angle)
+        };
+        if (pointInTriangle({ x, y }, { x: hx, y: hy }, left, right)) return true;
+      }
+      return false;
+    }
+    const bounds = getShapeBounds(shape);
+    if (!bounds) return false;
+    const { minX, maxX, minY, maxY } = bounds;
+    const withinX = x >= minX - tolerance && x <= maxX + tolerance;
+    const withinY = y >= minY - tolerance && y <= maxY + tolerance;
+    if (!withinX || !withinY) return false;
+    if (kind === 'rettangolo' || kind === 'quadrato') {
+      return true;
+    }
+    if (kind === 'cerchio' || kind === 'ellisse') {
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = (maxX - minX) / 2;
+      const ry = (maxY - minY) / 2 || tolerance;
+      if (rx <= 0 || ry <= 0) return false;
+      const norm = ((x - cx) * (x - cx)) / ((rx + tolerance) * (rx + tolerance)) + ((y - cy) * (y - cy)) / ((ry + tolerance) * (ry + tolerance));
+      return norm <= 1;
+    }
+    if (kind === 'triangolo') {
+      const top = { x: (minX + maxX) / 2, y: minY };
+      const left = { x: minX, y: maxY };
+      const right = { x: maxX, y: maxY };
+      // Edge hit-test (so touching the outline also counts)
+      if (
+        distPointToSegment(x, y, top.x, top.y, left.x, left.y) <= tolerance ||
+        distPointToSegment(x, y, left.x, left.y, right.x, right.y) <= tolerance ||
+        distPointToSegment(x, y, right.x, right.y, top.x, top.y) <= tolerance
+      ) return true;
+      // Interior hit-test with slight tolerance expansion
+      if (pointInTriangle({ x, y }, top, left, right)) return true;
+      return pointInTriangle(
+        { x, y },
+        { x: top.x, y: top.y - tolerance },
+        { x: left.x - tolerance, y: left.y + tolerance },
+        { x: right.x + tolerance, y: right.y + tolerance }
+      );
+    }
+    if (kind === 'rombo') {
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const top = { x: cx, y: minY };
+      const bottom = { x: cx, y: maxY };
+      const left = { x: minX, y: cy };
+      const right = { x: maxX, y: cy };
+      // Edge hit-test on diamond outline
+      if (
+        distPointToSegment(x, y, top.x, top.y, right.x, right.y) <= tolerance ||
+        distPointToSegment(x, y, right.x, right.y, bottom.x, bottom.y) <= tolerance ||
+        distPointToSegment(x, y, bottom.x, bottom.y, left.x, left.y) <= tolerance ||
+        distPointToSegment(x, y, left.x, left.y, top.x, top.y) <= tolerance
+      ) return true;
+      // Interior hit-test via two triangles
+      return (
+        pointInTriangle({ x, y }, top, left, right) ||
+        pointInTriangle({ x, y }, bottom, left, right)
+      );
+    }
+  if (kind === 'assi2d' || kind === 'assi2' || kind === 'assi3d' || kind === 'assi3') {
+      // Hit-test axes by checking proximity to their shaft segments and arrowhead triangles
+      const baseX = Number(shape.x ?? 0);
+      const baseY = Number(shape.y ?? 0);
+      const width = Number(shape.w ?? 0);
+      const height = Number(shape.h ?? 0);
+      const cx = baseX + width / 2;
+      const cy = baseY + height / 2;
+      const arrowLen = Math.max(12, tolerance * 1.2);
+      const arrowW = arrowLen * 0.8;
+      const tri = (hx, hy, angle) => {
+        const ux = Math.cos(angle);
+        const uy = Math.sin(angle);
+        return [
+          { x: hx, y: hy },
+          { x: hx - arrowLen * ux + arrowW * uy, y: hy - arrowLen * uy - arrowW * ux },
+          { x: hx - arrowLen * ux - arrowW * uy, y: hy - arrowLen * uy + arrowW * ux }
+        ];
+      };
+      // Always test the horizontal and vertical shafts (for all axis types)
+      if (distPointToSegment(x, y, baseX, cy, baseX + width, cy) <= tolerance) return true;
+      if (distPointToSegment(x, y, cx, baseY, cx, baseY + height) <= tolerance) return true;
+      // Arrowheads: only on positive semiaxes for assi2d/assi3d (X right, Y up, Z SW).
+      // Legacy: assi2 -> right/top; assi3 -> SW only for diagonal.
+      const testTri = (p1, p2, p3) => pointInTriangle({ x, y }, p1, p2, p3);
+      // X axis heads
+      const headsX = [];
+      // right (positive X)
+      headsX.push(tri(baseX + width, cy, 0));
+      for (const [p1, p2, p3] of headsX) { if (testTri(p1, p2, p3)) return true; }
+      // Y axis heads
+      const headsY = [];
+      // up (positive Y)
+      headsY.push(tri(cx, baseY, -Math.PI / 2));
+      for (const [p1, p2, p3] of headsY) { if (testTri(p1, p2, p3)) return true; }
+      // Z diagonal for 3-axis variants
+      if (kind === 'assi3' || kind === 'assi3d') {
+        // In both cases, we draw a NE <-> SW diagonal (top-right to bottom-left)
+        const dx1 = baseX + width; const dy1 = baseY;
+        const dx2 = baseX; const dy2 = baseY + height;
+        if (distPointToSegment(x, y, dx1, dy1, dx2, dy2) <= tolerance) return true;
+        const headsZ = [];
+        // Only SW head (positive for our projection), for both assi3 and assi3d
+        headsZ.push(tri(dx2, dy2, (3 * Math.PI) / 4));
+        for (const [p1, p2, p3] of headsZ) { if (testTri(p1, p2, p3)) return true; }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  function pointInTriangle(p, a, b, c) {
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    if (area === 0) return false;
+    const s = ((a.y - c.y) * (p.x - c.x) + (c.x - a.x) * (p.y - c.y)) / area;
+    const t = ((c.y - b.y) * (p.x - c.x) + (b.x - c.x) * (p.y - c.y)) / area;
+    const u = 1 - s - t;
+    return s >= 0 && t >= 0 && u >= 0;
+  }
+
+  function normalizeShape(rawShape) {
+    if (!rawShape) return null;
+    const shape = { ...rawShape };
+    const kind = shape.kind;
+  // Provide sane defaults for link shapes so hit-testing and selection work
+    if (kind === 'link') {
+      // keep values in world units; if missing, provide a default visible size
+      if (shape.w == null) shape.w = 160;
+      if (shape.h == null) shape.h = 28;
+    }
+    if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
+      const startX = Number(shape.x1 ?? shape.x ?? shape.startX ?? 0);
+      const startY = Number(shape.y1 ?? shape.y ?? shape.startY ?? 0);
+      const endX = Number(shape.x2 ?? shape.endX ?? startX);
+      const endY = Number(shape.y2 ?? shape.endY ?? startY);
+      shape.x1 = startX;
+      shape.y1 = startY;
+      shape.x2 = endX;
+      shape.y2 = endY;
+      delete shape.x;
+      delete shape.y;
+      delete shape.w;
+      delete shape.h;
+    } else {
+      const startX = Number(shape.x ?? shape.x1 ?? shape.startX ?? 0);
+      const startY = Number(shape.y ?? shape.y1 ?? shape.startY ?? 0);
+      let width = Number(shape.w ?? (shape.x2 != null ? shape.x2 - startX : 0));
+      let height = Number(shape.h ?? (shape.y2 != null ? shape.y2 - startY : 0));
+      let x = startX;
+      let y = startY;
+      if (width < 0) {
+        x = startX + width;
+        width = Math.abs(width);
+      }
+      if (height < 0) {
+        y = startY + height;
+        height = Math.abs(height);
+      }
+      shape.x = x;
+      shape.y = y;
+      shape.w = width;
+      shape.h = height;
+    }
+    shape._bb = getShapeBounds(shape);
+    return shape;
+  }
+
+  function getSelectionBoundsForIds(ids) {
+    if (!ids || !ids.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of ids) {
+      const f = (forme || []).find(s => s.id === id);
+      if (!f) continue;
+      const b = f._bb ?? getShapeBounds(f);
+      if (!b) continue;
+      if (b.minX < minX) minX = b.minX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.maxY > maxY) maxY = b.maxY;
+    }
+    if (minX === Infinity) return null;
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+  }
+
+  function translateShape(shape, dx, dy) {
+    if (!shape) return shape;
+    const next = { ...shape };
+    if (typeof next.x === 'number') next.x += dx;
+    if (typeof next.y === 'number') next.y += dy;
+    if (typeof next.x1 === 'number') next.x1 += dx;
+    if (typeof next.y1 === 'number') next.y1 += dy;
+    if (typeof next.x2 === 'number') next.x2 += dx;
+    if (typeof next.y2 === 'number') next.y2 += dy;
+    if (next._bb) {
+      next._bb = {
+        minX: next._bb.minX + dx,
+        maxX: next._bb.maxX + dx,
+        minY: next._bb.minY + dy,
+        maxY: next._bb.maxY + dy
+      };
+    } else {
+      next._bb = getShapeBounds(next);
+    }
+    return next;
+  }
+
+  function shapeFromPreview(ps) {
+    if (!ps) return null;
+    const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const startX = ps.xStart ?? ps.x ?? 0;
+    const startY = ps.yStart ?? ps.y ?? 0;
+    const endX = ps.x2 ?? startX;
+    const endY = ps.y2 ?? startY;
+    const base = {
+      id,
+      kind: ps.kind,
+      colore: ps.colore,
+      spessore: ps.spessore,
+      autoreUserId: ps.autoreUserId ?? utenteId
+    };
+    if (ps.kind === 'linea' || ps.kind === 'freccia') {
+      return normalizeShape({ ...base, x1: startX, y1: startY, x2: endX, y2: endY });
+    }
+    if (ps.kind === 'triangolo' || ps.kind === 'rombo' || ps.kind === 'rettangolo' || ps.kind === 'cerchio' || ps.kind === 'ellisse') {
+      const kind = ps.kind === 'cerchio' && Math.abs(endX - startX) !== Math.abs(endY - startY)
+        ? 'ellisse'
+        : ps.kind;
+      const x = Math.min(startX, endX);
+      const y = Math.min(startY, endY);
+      const w = Math.max(1, Math.abs(endX - startX));
+      const h = Math.max(1, Math.abs(endY - startY));
+      return normalizeShape({ ...base, kind, x, y, w, h });
+    }
+    return normalizeShape({ ...base, x: Math.min(startX, endX), y: Math.min(startY, endY), w: Math.abs(endX - startX), h: Math.abs(endY - startY) });
+  }
+
+  // Coordinate helper considerando lo zoom
+  const getPoint = useCallback((e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0, pressure: 1 };
+    const rect = canvas.getBoundingClientRect();
+    const native = e?.nativeEvent;
+    let clientX;
+    let clientY;
+    if (native && typeof native.clientX === 'number' && typeof native.clientY === 'number') {
+      clientX = native.clientX;
+      clientY = native.clientY;
+    } else {
+      clientX = typeof e?.clientX === 'number' ? e.clientX : 0;
+      clientY = typeof e?.clientY === 'number' ? e.clientY : 0;
+    }
+    const offX = clientX - rect.left;
+    const offY = clientY - rect.top;
+    const currentPan = panRef.current || { x: 0, y: 0 };
+    const currentZoom = zoomRef.current || 1;
+    const x = currentPan.x + offX / currentZoom;
+    const y = currentPan.y + offY / currentZoom;
+    // Estrai pressure dalla tavoletta grafica (valore 0-1)
+    const pressure = (native && typeof native.pressure === 'number') ? native.pressure : 1;
+    return { x, y, pressure };
+  }, []);
+
+  // Helper: given a world point, compute expected client (viewport) coords
+  const screenFromWorld = useCallback((point) => {
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas || !point) return null;
+      const rect = canvas.getBoundingClientRect();
+      const currentPan = panRef.current || { x: 0, y: 0 };
+      const currentZoom = zoomRef.current || 1;
+      const sx = (point.x - currentPan.x) * currentZoom + rect.left;
+      const sy = (point.y - currentPan.y) * currentZoom + rect.top;
+      return { clientX: sx, clientY: sy, rect };
+    } catch (err) {
+      return null;
+    }
+  }, []);
+
+  // == RESIZE & REDRAW ==
+  useEffect(() => {
+    function resize() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const parent = canvas.parentElement;
+      const dpr = window.devicePixelRatio || 1;
+      const w = parent.clientWidth;
+      const h = altezza;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctxRef.current = ctx;
+      drawAll();
+    }
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tratti, altezza]);
+
+  // Zoom via rotella mouse
+  const handleWheel = useCallback((event) => {
+    if (spectatorModeRef.current && !isAdmin) {
+      event.preventDefault();
+      return;
+    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const offX = event.clientX - rect.left;
+    const offY = event.clientY - rect.top;
+    const worldBefore = { x: pan.x + offX / zoom, y: pan.y + offY / zoom };
+    const factor = event.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(2, Math.max(0.2, Math.round((zoom * factor) * 100) / 100));
+    const newPan = {
+      x: worldBefore.x - offX / newZoom,
+      y: worldBefore.y - offY / newZoom,
+    };
+    setZoom(newZoom);
+    setPan(newPan);
+    zoomRef.current = newZoom;
+    panRef.current = newPan;
+    setTimeout(drawAll, 0);
+  }, [isAdmin, pan.x, pan.y, zoom, drawAll]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleWheel]);
+
+  const applyZoomAt = useCallback((factor, pivot) => {
+    if (spectatorModeRef.current && !isAdmin) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const offX = pivot?.x ?? rect.width / 2;
+    const offY = pivot?.y ?? rect.height / 2;
+    const currentZoom = zoomRef.current;
+    const currentPan = panRef.current;
+    const worldBefore = {
+      x: currentPan.x + offX / currentZoom,
+      y: currentPan.y + offY / currentZoom
+    };
+    const candidate = Math.round((currentZoom * factor) * 100) / 100;
+    const newZoom = Math.min(2, Math.max(0.2, candidate));
+    if (Math.abs(newZoom - currentZoom) < 0.001) return;
+    const newPan = {
+      x: worldBefore.x - offX / newZoom,
+      y: worldBefore.y - offY / newZoom
+    };
+    zoomRef.current = newZoom;
+    panRef.current = newPan;
+    setZoom(newZoom);
+    setPan(newPan);
+    setTimeout(drawAll, 0);
+  }, [drawAll, isAdmin]);
+
+  const handleZoomIn = useCallback(() => applyZoomAt(1.1), [applyZoomAt]);
+  const handleZoomOut = useCallback(() => applyZoomAt(0.9), [applyZoomAt]);
+
+  const handleResetZoom = useCallback(() => {
+    if (spectatorModeRef.current && !isAdmin) return;
+    const nextPan = { x: 0, y: 0 };
+    panRef.current = nextPan;
+    zoomRef.current = 1;
+    setPan(nextPan);
+    setZoom(1);
+    setTimeout(drawAll, 0);
+  }, [drawAll, isAdmin]);
+
+  // == CANCELLAZIONE INTERO TRATTO ==
+  const eraseStrokeAt = useCallback(
+    (x, y) => {
+      let removed = false;
+      for (let i = tratti.length - 1; i >= 0; i--) {
+        const st = tratti[i];
+        if (eraseSessionRef.current.strokeIds.has(st.id)) continue;
+        if (!isAdmin && st.autoreUserId && st.autoreUserId !== utenteId) continue;
+        if (hitTestStroke(x, y, st)) {
+          removed = true;
+          setTratti((prev) => prev.filter((_, idx) => idx !== i));
+          eraseSessionRef.current.strokeIds.add(st.id);
+          setUndoStack((prev) => [...prev, { type: "delete", stroke: st }]);
+          setRedoStack([]);
+
+          emitOrPublish("stroke:delete", { attivitaId, strokeId: st.id });
+
+          const delId = st.dbId ?? st.id;
+          fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
+        }
+      }
+      if (removed) {
+        drawAll();
+      }
+      return removed;
+    },
+    [tratti, drawAll, attivitaId, emitOrPublish, isAdmin, utenteId]
+  );
+
+  const eraseShapesAt = useCallback(
+    (x, y) => {
+      const tolerance = 14 / zoom;
+      const toDelete = [];
+      for (const shape of forme) {
+        if (eraseSessionRef.current.shapeIds.has(shape.id)) continue;
+        if (hitTestShape(shape, x, y, tolerance)) {
+          if (isAdmin || !shape.autoreUserId || shape.autoreUserId === utenteId) {
+            toDelete.push(shape.id);
+          }
+        }
+      }
+      if (!toDelete.length) return false;
+      console.log('[LAVAGNA-ERASE] Erasing shapes:', toDelete);
+      toDelete.forEach((id) => {
+        eraseSessionRef.current.shapeIds.add(id);
+        console.log('[LAVAGNA-ERASE] Calling deleteShapeLocal for id:', id);
+        deleteShapeLocal(id, true);
+      });
+      drawAll();
+      return true;
+    },
+    [forme, zoom, deleteShapeLocal, drawAll, isAdmin, utenteId]
+  );
+
+  // == POINTER EVENTS ==
+  function pointerDown(e) {
+    try {
+      const native = e?.nativeEvent;
+      if (!native) return;
+      const btn = native?.button;
+      const pointerId = native?.pointerId;
+      const canvas = canvasRef.current;
+      const spectatorLocked = spectatorModeRef.current && !isAdmin;
+      selectionClickRef.current = null;
+
+      let cachedPoint = null;
+      const getPointerWorld = () => {
+        if (!cachedPoint) {
+          cachedPoint = getPoint(e);
+          if (!cachedPoint) return null;
+        }
+        pointerWorldRef.current = cachedPoint;
+        return cachedPoint;
+      };
+
+    if (btn === 2) {
+      // Right-click: start context panning. If the current tool is not 'mano',
+      // temporarily switch to 'mano' so the user can pan with right-drag and
+      // see the hand cursor. We'll restore the previous tool on pointer up/cancel.
+      e.preventDefault();
+      if (spectatorLocked) {
+        return;
+      }
+      try {
+        // If not already the hand tool, remember current and switch to 'mano'
+        if (strumento !== 'mano') {
+          contextTempToolRef.current = strumento;
+          setStrumento('mano');
+        }
+      } catch (_) {}
+      try {
+        canvas?.setPointerCapture?.(pointerId);
+      } catch (_) {}
+      panningRef.current.active = true;
+      panningRef.current.viaContext = true;
+      panningRef.current.lastX = native.clientX;
+      panningRef.current.lastY = native.clientY;
+      setContextPanning(true);
+      setIsPanning(true);
+      // hide any overlay while context panning starts
+      try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
+      return;
+    }
+
+    if (native?.pointerType === 'touch') {
+      touchesRef.current.set(pointerId, { x: native.clientX, y: native.clientY });
+    }
+
+    // Single-click on link shapes when using the hand tool: open URL and consume event
+    try {
+      if (btn === 0 && strumento === 'mano') {
+        const p = getPoint(e);
+        if (p) {
+          for (const f of (forme || [])) {
+            if (f.kind !== 'link') continue;
+            if (hitTestShape(f, p.x, p.y, 12)) {
+              openLinkShape(f);
+              return;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+      // Single-click on link shapes when using selection tool: open URL
+      try {
+        if (btn === 0 && strumento === 'selezione') {
+          const p = getPointerWorld();
+          if (p) {
+            for (const f of (forme || [])) {
+              if (f.kind !== 'link') continue;
+              if (hitTestShape(f, p.x, p.y, 12)) {
+                openLinkShape(f);
+                e.preventDefault();
+                return;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // If user clicked with the selection tool, begin a rectangular selection
+      // (the 'lazo' rectangular mode). This restores expected selection behavior
+      // which was previously inactive.
+      if (strumento === 'selezione') {
+        const p = getPointerWorld();
+        if (!p) {
+          console.warn('[lavagna] selection: invalid point');
+          return;
+        }
+        // If there is no current selection but the user clicked on a shape,
+        // select that shape and begin dragging immediately. We search from
+        // the topmost shape backwards so visual stacking is respected.
+        try {
+          const tolForHit = Math.max(8, 12 / (zoom || 1));
+          let hitShape = null;
+          for (let i = (forme || []).length - 1; i >= 0; i--) {
+            const candidate = forme[i];
+            if (!candidate) continue;
+            if (hitTestShape(candidate, p.x, p.y, tolForHit)) {
+              hitShape = candidate;
+              break;
+            }
+          }
+          if (hitShape && !(selectedItems && selectedItems.forme && selectedItems.forme.includes(hitShape.id))) {
+            // select the hit shape
+            setSelectedItems({ forme: [hitShape.id], tratti: [] });
+            // start dragging the newly selected shape
+            draggingSelectionRef.current.active = true;
+            draggingSelectionRef.current.lastWorld = p;
+            draggingSelectionRef.current.pointerId = pointerId;
+            draggingSelectionRef.current.pointerTool = 'selezione';
+            draggingSelectionRef.current.moved = false;
+            draggingSelectionRef.current.primaryShapeId = hitShape.id;
+            draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify({ forme: [hitShape.id], tratti: [] }));
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select)', hitShape.id); } catch(_){}
+            return;
+          }
+        } catch (_) {}
+        // If the user clicks inside the current selection (or on any selected
+        // shape), start a drag of the selection instead of starting a new
+        // rectangular selection box. This enables move-by-drag for selected
+        // items.
+        try {
+          // Begin dragging when the user clicks anywhere inside the
+          // current selection bounding box — this keeps dragging
+          // independent from shape rotation and from per-shape hit tests.
+          if (selectedItems && selectedItems.forme && selectedItems.forme.length) {
+            const selBoundsLocal = getSelectionBoundsForIds(selectedItems.forme || []);
+            if (selBoundsLocal) {
+              const pad = Math.max(6 / (zoom || 1), 0);
+              const inside = p.x >= selBoundsLocal.minX - pad && p.x <= selBoundsLocal.maxX + pad && p.y >= selBoundsLocal.minY - pad && p.y <= selBoundsLocal.maxY + pad;
+              if (inside) {
+                draggingSelectionRef.current.active = true;
+                draggingSelectionRef.current.lastWorld = p;
+                draggingSelectionRef.current.pointerId = pointerId;
+                draggingSelectionRef.current.pointerTool = 'selezione';
+                draggingSelectionRef.current.moved = false;
+                draggingSelectionRef.current.primaryShapeId = selectedItems.forme[0];
+                draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
+                try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems.forme[0]); } catch(_){}
+                selectionClickRef.current = {
+                  pointerId,
+                  pointerTool: 'selezione',
+                  openCandidate: false,
+                  metaClick: !!(native?.ctrlKey || native?.metaKey),
+                  doubleTap: false,
+                  aborted: false,
+                  shapeId: selectedItems.forme[0]
+                };
+                return;
+              }
+            }
+          }
+        } catch (_) {}
+        
+        // Check if user clicked on the proportional resize lock icon
+        const selBounds = getSelectionBoundsForIds(selectedItems.forme || []);
+        if (selBounds && selectedItems.forme && selectedItems.forme.length > 0) {
+          const padding = 6 / (zoom || 1);
+          const lockSize = 24 / (zoom || 1);
+          const width = selBounds.maxX - selBounds.minX;
+          const lockX = selBounds.minX + width / 2;
+          const lockY = selBounds.minY - padding - lockSize - 8 / (zoom || 1);
+          
+          // Check if click is within lock icon bounds
+          if (p.x >= lockX - lockSize/2 && p.x <= lockX + lockSize/2 &&
+              p.y >= lockY && p.y <= lockY + lockSize) {
+            // Toggle proportional resize
+            setProportionalResize(prev => !prev);
+            drawAll();
+            return;
+          }
+          
+          // Check rotation button FIRST (before resize handles)
+          const rotateSize = 30 / (zoom || 1);
+          const rotateX = lockX + lockSize/2 + rotateSize/2 + 8 / (zoom || 1);
+          const rotateY = lockY + lockSize/2;
+          
+          const rotDx = p.x - rotateX;
+          const rotDy = p.y - rotateY;
+          const rotDist = Math.hypot(rotDx, rotDy);
+          
+          if (rotDist <= rotateSize/2) {
+            // Clicked on rotation button - start rotating!
+            rotatingRef.current.active = true;
+            const center = { x: (selBounds.minX + selBounds.maxX) / 2, y: (selBounds.minY + selBounds.maxY) / 2 };
+            rotatingRef.current.center = center;
+            rotatingRef.current.startAngle = Math.atan2(p.y - center.y, p.x - center.x);
+            const originals = {};
+            for (const id of (selectedItems.forme || [])) {
+              const f = (forme || []).find(s => s.id === id);
+              originals[id] = (f && typeof f.rotation === 'number') ? f.rotation : 0;
+            }
+            rotatingRef.current.originals = originals;
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_){}
+            try { console.log('[LAVAGNA-DBG] start-rotation via button', center); } catch(_){}
+            return;
+          }
+          
+          // Check if the user clicked on a resize handle (after rotation button check)
+          const handleSize = 10 / (zoom || 1);
+          const handleTol = Math.max(handleSize, 12 / (zoom || 1));
+          const height = selBounds.maxY - selBounds.minY;
+          
+          const handles = {
+            'top-left': { x: selBounds.minX, y: selBounds.minY },
+            'top-right': { x: selBounds.maxX, y: selBounds.minY },
+            'bottom-left': { x: selBounds.minX, y: selBounds.maxY },
+            'bottom-right': { x: selBounds.maxX, y: selBounds.maxY },
+            'top': { x: selBounds.minX + width / 2, y: selBounds.minY },
+            'bottom': { x: selBounds.minX + width / 2, y: selBounds.maxY },
+            'left': { x: selBounds.minX, y: selBounds.minY + height / 2 },
+            'right': { x: selBounds.maxX, y: selBounds.minY + height / 2 },
+          };
+          
+          let hitHandle = null;
+          for (const [name, pos] of Object.entries(handles)) {
+            const dx = p.x - pos.x;
+            const dy = p.y - pos.y;
+            if (Math.hypot(dx, dy) <= handleTol) {
+              hitHandle = name;
+              break;
+            }
+          }
+          
+          if (hitHandle) {
+            // Start resizing - save original shapes for proper scaling
+            const originalShapes = {};
+            for (const shapeId of selectedItems.forme || []) {
+              const shape = forme.find(s => s.id === shapeId);
+              if (shape) {
+                originalShapes[shapeId] = JSON.parse(JSON.stringify(shape));
+              }
+            }
+            
+            resizingSelectionRef.current.active = true;
+            resizingSelectionRef.current.handle = hitHandle;
+            resizingSelectionRef.current.originalBounds = { ...selBounds };
+            resizingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
+            resizingSelectionRef.current.originalShapes = originalShapes;
+            resizingSelectionRef.current.startPoint = { x: p.x, y: p.y };
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+            try { console.log('[LAVAGNA-DBG-RESIZE] start', hitHandle); } catch(_) {}
+            return;
+          }
+        }
+        
+        // Start selection box
+        selectingRef.current = selectingRef.current || {};
+        selectingRef.current.active = true;
+        selectingRef.current.start = p;
+        setSelectionBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+        try {
+          canvas?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        selectionClickRef.current = {
+          pointerId,
+          pointerTool: 'selezione',
+          openCandidate: false,
+          metaClick: !!(native?.ctrlKey || native?.metaKey),
+          doubleTap: false,
+          aborted: false,
+          shapeId: null
+        };
+        return;
+      }
+
+      // Shift + Penna = Linea retta (shape)
+      if (strumento === 'penna' && native?.shiftKey) {
+        const p = getPointerWorld();
+        if (!p) {
+          console.warn('[lavagna] shift+pen: invalid point');
+          return;
+        }
+        previewShapeRef.current = {
+          kind: 'linea',
+          x: p.x,
+          y: p.y,
+          xStart: p.x,
+          yStart: p.y,
+          x2: p.x,
+          y2: p.y,
+          colore,
+          spessore,
+          autoreUserId: utenteId
+        };
+        drawingShapeRef.current = true;
+        try {
+          canvas?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        drawAll();
+        return;
+      }
+
+      if (['rettangolo', 'cerchio', 'linea', 'triangolo', 'rombo', 'freccia', 'assi2', 'assi3', 'assi2d', 'assi3d'].includes(strumento)) {
+      const p = getPointerWorld();
+      if (!p) {
+        console.warn('[lavagna] shape tool: invalid point');
+        return;
+      }
+      previewShapeRef.current = {
+        kind: strumento,
+        x: p.x,
+        y: p.y,
+        xStart: p.x,
+        yStart: p.y,
+        x2: p.x,
+        y2: p.y,
+        colore,
+        spessore,
+        autoreUserId: utenteId
+      };
+      drawingShapeRef.current = true;
+      try {
+        canvas?.setPointerCapture?.(pointerId);
+      } catch (_) {}
+      drawAll();
+      return;
+    }
+
+    // Single-finger pan if enabled (except when drawing with penna/gomma)
+    // Only activate on mobile/touch devices, not mouse/pen input
+    if (enableSingleFingerPanRef.current && native?.pointerType === 'touch' && touchesRef.current.size === 1) {
+      if (!['penna', 'gomma'].includes(strumento)) {
+        if (spectatorLocked) {
+          return;
+        }
+        getPointerWorld();
+        try {
+          canvas?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        panningRef.current.active = true;
+        panningRef.current.lastX = native.clientX;
+        panningRef.current.lastY = native.clientY;
+        panningRef.current.viaContext = false;
+        setContextPanning(false);
+        setIsPanning(true);
+        return;
+      }
+    }
+
+    if (strumento === 'mano') {
+      if (spectatorLocked) {
+        return;
+      }
+      getPointerWorld();
+      try {
+        canvas?.setPointerCapture?.(pointerId);
+      } catch (_) {}
+      panningRef.current.active = true;
+  try { console.log('[LAVAGNA-STATE] panningRef.active = true (mano)'); } catch(_){}
+      panningRef.current.lastX = native.clientX;
+      panningRef.current.lastY = native.clientY;
+      panningRef.current.viaContext = false;
+      setContextPanning(false);
+      setIsPanning(true);
+      return;
+    }
+
+    setDisegnando(true);
+    const punto = getPointerWorld();
+    if (!punto) {
+      console.warn('[lavagna] pointerDown: invalid point, aborting');
+      return;
+    }
+    if (strumento === 'gomma' && gommaPuntuale) {
+      eraseShapesAt(punto.x, punto.y);
+    }
+    // For non-puntuale eraser (intero-tratto) mark erasing active so the
+    // dedicated erasing branch runs and pointer-up will properly release state.
+    if (strumento === 'gomma' && !gommaPuntuale) {
+      erasingRef.current = true;
+    }
+    puntiCorrentiRef.current = [punto];
+       animationFrameId.current = requestAnimationFrame(renderLoop);
+    const streamId = `${utenteId}-${Date.now()}`;
+    currentStreamId.current = streamId;
+    const strokeColor = strumento === 'gomma' ? '#ffffff' : colore;
+    try {
+      canvas?.setPointerCapture?.(pointerId);
+    } catch (_) {}
+    emitOrPublish('stroke:start', {
+      streamId,
+      strumento,
+      colore: strokeColor,
+      spessore,
+      start: punto,
+    });
+    // ensure overlay visible and positioned on pointer down (support eraser only)
+    try {
+      const ov = overlayRef.current;
+      const canvas = canvasRef.current;
+      if (ov && canvas && strumento === 'gomma') {
+        // Align overlay to world->screen computed position (avoids drift with zoom/pan)
+        const expected = screenFromWorld(punto) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+        const clientX = expected.clientX;
+        const clientY = expected.clientY;
+        ov.style.display = 'block';
+        ov.style.left = `${clientX}px`;
+        ov.style.top = `${clientY}px`;
+        ov.style.width = `${overlaySize}px`;
+        ov.style.height = `${overlaySize}px`;
+        ov.style.borderRadius = '50%';
+        // Eraser visual: translucent fill with dashed border
+        ov.style.background = 'rgba(255,255,255,0.06)';
+        try { console.log('[LAVAGNA-STATE] erasingRef = true (gomma intero-tratto)'); } catch(_){ }
+        ov.style.opacity = '1';
+        ov.style.boxShadow = 'none';
+        const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+        ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+        ov.style.transform = 'translate(-50%, -50%)';
+      }
+    } catch (_) {}
+
+    // Diagnostic: ensure computed world->screen mapping matches pointer client coords
+    try {
+      const lastPoint = punto;
+      const expected = screenFromWorld(lastPoint);
+      if (expected) {
+        const dx = Math.abs(expected.clientX - (e.nativeEvent.clientX));
+        const dy = Math.abs(expected.clientY - (e.nativeEvent.clientY));
+        const dist = Math.hypot(dx, dy);
+        if (dist > 8) {
+          // If mismatch present, log rich details for debugging
+          console.warn('[lavagna][diag] pointerDown mismatch', {
+            distPx: Math.round(dist * 10) / 10,
+            dx: Math.round(dx * 10) / 10,
+            dy: Math.round(dy * 10) / 10,
+            client: { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY },
+            expected: { x: expected.clientX, y: expected.clientY },
+            pan: { ...pan },
+            zoom
+          });
+        }
+      }
+    } catch (_) {}
+    } catch (err) {
+      console.error('[lavagna] pointerDown error:', err);
+    }
+  }
+
+  function pointerMove(e) {
+    const spectatorLocked = spectatorModeRef.current && !isAdmin;
+    // If panning active (hand) update pan
+    if (panningRef.current.active) {
+      if (spectatorLocked) {
+        panningRef.current.active = false;
+        setIsPanning(false);
+        setContextPanning(false);
+        return;
+      }
+      // ensure overlay hidden while panning
+      try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
+      const dx = e.nativeEvent.clientX - panningRef.current.lastX;
+      const dy = e.nativeEvent.clientY - panningRef.current.lastY;
+      panningRef.current.lastX = e.nativeEvent.clientX;
+      panningRef.current.lastY = e.nativeEvent.clientY;
+      setPan((p) => {
+        const nuovo = { x: p.x - dx / zoom, y: p.y - dy / zoom };
+        setTimeout(drawAll, 0);
+        return nuovo;
+      });
+      if (!isPanning) setIsPanning(true);
+      return;
+    }
+
+    // If we're dragging a selected shape(s), move them incrementally
+    if (draggingSelectionRef.current && draggingSelectionRef.current.active) {
+      try {
+        const p = getPoint(e);
+        pointerWorldRef.current = p;
+        const dragInfo = draggingSelectionRef.current;
+        if (p && dragInfo.lastWorld) {
+          const last = dragInfo.lastWorld;
+          const dx = p.x - last.x;
+          const dy = p.y - last.y;
+          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+            const selectionSnapshot = dragInfo.selectionSnapshot || selectedItems;
+            moveSelectionBy(dx, dy, true, selectionSnapshot);
+            dragInfo.lastWorld = p;
+            if (!dragInfo.moved) {
+              const delta = Math.max(Math.abs(dx), Math.abs(dy));
+              if (delta > 0.35) {
+                dragInfo.moved = true;
+              }
+            }
+            if (selectionClickRef.current && selectionClickRef.current.pointerId === dragInfo.pointerId) {
+              selectionClickRef.current.aborted = true;
+            }
+            drawAll();
+          }
+        }
+      } catch (_) {}
+      return;
+    }
+
+    // If we're resizing, update the selected shapes
+    if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
+      try {
+        const p = getPoint(e);
+        pointerWorldRef.current = p;
+        const resizeInfo = resizingSelectionRef.current;
+        const origBounds = resizeInfo.originalBounds;
+        const handle = resizeInfo.handle;
+        const startPoint = resizeInfo.startPoint;
+        
+        if (!origBounds || !handle || !startPoint || !p) return;
+        
+        const dx = p.x - startPoint.x;
+        const dy = p.y - startPoint.y;
+        
+        let newBounds = { ...origBounds };
+        
+        // Update bounds based on which handle is being dragged
+        if (handle.includes('left')) {
+          newBounds.minX = origBounds.minX + dx;
+        }
+        if (handle.includes('right')) {
+          newBounds.maxX = origBounds.maxX + dx;
+        }
+        if (handle.includes('top')) {
+          newBounds.minY = origBounds.minY + dy;
+        }
+        if (handle.includes('bottom')) {
+          newBounds.maxY = origBounds.maxY + dy;
+        }
+        
+        // Calculate scale factors
+        const origWidth = origBounds.maxX - origBounds.minX;
+        const origHeight = origBounds.maxY - origBounds.minY;
+        let newWidth = newBounds.maxX - newBounds.minX;
+        let newHeight = newBounds.maxY - newBounds.minY;
+        
+        if (origWidth <= 0 || origHeight <= 0 || newWidth <= 0 || newHeight <= 0) return;
+        
+        let scaleX = newWidth / origWidth;
+        let scaleY = newHeight / origHeight;
+        
+        // If proportional resize is enabled, use uniform scaling
+        if (proportionalResize) {
+          // Use the scale factor with the larger absolute change
+          const scale = Math.abs(scaleX - 1) > Math.abs(scaleY - 1) ? scaleX : scaleY;
+          scaleX = scale;
+          scaleY = scale;
+          
+          // Recalculate bounds to maintain aspect ratio
+          newWidth = origWidth * scale;
+          newHeight = origHeight * scale;
+          
+          // Adjust bounds based on handle position
+          if (handle.includes('left')) {
+            newBounds.minX = origBounds.maxX - newWidth;
+          } else if (handle.includes('right')) {
+            newBounds.maxX = origBounds.minX + newWidth;
+          }
+          
+          if (handle.includes('top')) {
+            newBounds.minY = origBounds.maxY - newHeight;
+          } else if (handle.includes('bottom')) {
+            newBounds.maxY = origBounds.minY + newHeight;
+          }
+        }
+        
+        // Determine the anchor point (opposite corner/side from the handle being dragged)
+        let anchorX, anchorY;
+        
+        if (handle === 'top-left') {
+          anchorX = origBounds.maxX;
+          anchorY = origBounds.maxY;
+        } else if (handle === 'top-right') {
+          anchorX = origBounds.minX;
+          anchorY = origBounds.maxY;
+        } else if (handle === 'bottom-left') {
+          anchorX = origBounds.maxX;
+          anchorY = origBounds.minY;
+        } else if (handle === 'bottom-right') {
+          anchorX = origBounds.minX;
+          anchorY = origBounds.minY;
+        } else if (handle === 'top') {
+          anchorX = origBounds.minX + origWidth / 2;
+          anchorY = origBounds.maxY;
+        } else if (handle === 'bottom') {
+          anchorX = origBounds.minX + origWidth / 2;
+          anchorY = origBounds.minY;
+        } else if (handle === 'left') {
+          anchorX = origBounds.maxX;
+          anchorY = origBounds.minY + origHeight / 2;
+        } else if (handle === 'right') {
+          anchorX = origBounds.minX;
+          anchorY = origBounds.minY + origHeight / 2;
+        } else {
+          // Fallback to center if handle not recognized
+          anchorX = origBounds.minX + origWidth / 2;
+          anchorY = origBounds.minY + origHeight / 2;
+        }
+        
+        // Apply scaling to all selected shapes relative to the anchor point
+        const selectionSnapshot = resizeInfo.selectionSnapshot || selectedItems;
+        setForme(prev => prev.map(f => {
+          if (!selectionSnapshot.forme.includes(f.id)) return f;
+          
+          // Get the original shape from the snapshot
+          const originalShape = resizeInfo.originalShapes?.[f.id] || f;
+          
+          // Calculate offset from anchor point for each coordinate
+          const updated = { ...f };
+          
+          // Scale x, y coordinates (top-left of the shape)
+          if (typeof originalShape.x === 'number') {
+            const offsetX = originalShape.x - anchorX;
+            updated.x = anchorX + offsetX * scaleX;
+          }
+          if (typeof originalShape.y === 'number') {
+            const offsetY = originalShape.y - anchorY;
+            updated.y = anchorY + offsetY * scaleY;
+          }
+          
+          // Scale width and height
+          // For images, preserve aspect ratio by using only scaleX
+          if (originalShape.kind === 'immagine') {
+            if (typeof originalShape.w === 'number') {
+              updated.w = originalShape.w * scaleX;
+            }
+            if (typeof originalShape.h === 'number') {
+              // Preserve aspect ratio for images
+              updated.h = originalShape.h * scaleX;
+            }
+          } else {
+            // For other shapes, scale independently
+            if (typeof originalShape.w === 'number') {
+              updated.w = originalShape.w * scaleX;
+            }
+            if (typeof originalShape.h === 'number') {
+              updated.h = originalShape.h * scaleY;
+            }
+          }
+          
+          // Handle shapes with x1, y1, x2, y2 (lines, arrows, etc.)
+          if (typeof originalShape.x1 === 'number') {
+            const offsetX1 = originalShape.x1 - anchorX;
+            updated.x1 = anchorX + offsetX1 * scaleX;
+          }
+          if (typeof originalShape.y1 === 'number') {
+            const offsetY1 = originalShape.y1 - anchorY;
+            updated.y1 = anchorY + offsetY1 * scaleY;
+          }
+          if (typeof originalShape.x2 === 'number') {
+            const offsetX2 = originalShape.x2 - anchorX;
+            updated.x2 = anchorX + offsetX2 * scaleX;
+          }
+          if (typeof originalShape.y2 === 'number') {
+            const offsetY2 = originalShape.y2 - anchorY;
+            updated.y2 = anchorY + offsetY2 * scaleY;
+          }
+          
+          return updated;
+        }));
+        
+        drawAll();
+      } catch (_) {}
+      return;
+    }
+
+    // Continuous erase while dragging in intero-tratto mode
+    if (erasingRef.current) {
+      const p = getPoint(e);
+      pointerWorldRef.current = p;
+      eraseShapesAt(p.x, p.y);
+      eraseStrokeAt(p.x, p.y);
+      // Update overlay position so the visual eraser follows the real input
+      try {
+        const ov = overlayRef.current;
+        const canvas = canvasRef.current;
+        if (ov && canvas) {
+          const expected = screenFromWorld(p) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+          const clientX = expected.clientX;
+          const clientY = expected.clientY;
+          // Only show overlay for eraser, not pen
+          const shouldShow = (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+          if (shouldShow) {
+            ov.style.display = 'block';
+            ov.style.left = `${clientX}px`;
+            ov.style.top = `${clientY}px`;
+            ov.style.width = `${overlaySize}px`;
+            ov.style.height = `${overlaySize}px`;
+            ov.style.borderRadius = '50%';
+            const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+            ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+            ov.style.background = 'rgba(255,255,255,0.06)';
+            ov.style.transform = 'translate(-50%, -50%)';
+          } else {
+            ov.style.display = 'none';
+          }
+        }
+      } catch (_) {}
+      return;
+    }
+
+    // Multitouch pan/zoom
+    if (e.nativeEvent.pointerType === 'touch') {
+      touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
+      if (spectatorLocked) {
+        return;
+      }
+      // Only handle pinch if enabled
+      if (enablePinchZoomRef.current && touchesRef.current.size === 2) {
+        const pts = Array.from(touchesRef.current.values());
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const dist = Math.hypot(dx, dy);
+        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        const rect = canvasRef.current.getBoundingClientRect();
+        const midOff = { x: mid.x - rect.left, y: mid.y - rect.top };
+        
+        // Initialize gesture on first detection
+        if (gestureRef.current.mode !== 'panzoom') {
+          const midWorld = { x: pan.x + midOff.x / zoom, y: pan.y + midOff.y / zoom };
+          gestureRef.current = { mode: 'panzoom', startZoom: zoom, startPan: { ...pan }, startDist: dist, startMidWorld: midWorld };
+          setDisegnando(false);
+        } else {
+          // Apply pinch-to-zoom
+          const g = gestureRef.current;
+          const scale = dist / g.startDist;
+          let newZoom = g.startZoom * scale;
+          newZoom = Math.max(0.1, Math.min(5, newZoom)); // Clamp between 0.1x and 5x
+          
+          // Keep the midpoint fixed in world coordinates
+          const newPan = {
+            x: g.startMidWorld.x - midOff.x / newZoom,
+            y: g.startMidWorld.y - midOff.y / newZoom
+          };
+          
+          setZoom(newZoom);
+          setPan(newPan);
+        }
+        return;
+      }
+    }
+
+    // Update shape preview if drawing a shape (or right-click line in pen mode)
+    if ((drawingShapeRef.current || rightClickLineRef.current.active) && previewShapeRef.current) {
+      const p = getPoint(e);
+      pointerWorldRef.current = p;
+      previewShapeRef.current.x2 = p.x; previewShapeRef.current.y2 = p.y;
+      drawAll();
+      return;
+    }
+
+    // Rotation in-progress: compute new rotation and apply to selected shapes
+    if (rotatingRef.current.active) {
+      try {
+        const p = getPoint(e);
+        pointerWorldRef.current = p;
+        const center = rotatingRef.current.center;
+        const currentAngle = Math.atan2(p.y - center.y, p.x - center.x);
+        const delta = currentAngle - rotatingRef.current.startAngle;
+        // apply delta to each selected shape starting from its original rotation
+        setForme((prev) => prev.map((f) => {
+          if (!selectedItems.forme.includes(f.id)) return f;
+          const orig = rotatingRef.current.originals[f.id] ?? 0;
+          const next = { ...f, rotation: (orig + delta) };
+          next._bb = getShapeBounds(next);
+          return next;
+        }));
+        drawAll();
+      } catch (_) {}
+      return;
+    }
+
+    // Update selection box when the selection tool is dragging
+    if (selectingRef.current.active) {
+      const p = getPoint(e);
+      pointerWorldRef.current = p;
+      setSelectionBox({ x1: selectingRef.current.start.x, y1: selectingRef.current.start.y, x2: p.x, y2: p.y });
+      return;
+    }
+
+    // Update cursor when hovering over resize handles
+    if (strumento === 'selezione' && selectedItems.forme && selectedItems.forme.length > 0) {
+      try {
+        const p = getPoint(e);
+        const selBounds = getSelectionBoundsForIds(selectedItems.forme);
+        if (selBounds) {
+          const handleSize = 10 / (zoom || 1);
+          const handleTol = Math.max(handleSize, 12 / (zoom || 1));
+          const width = selBounds.maxX - selBounds.minX;
+          const height = selBounds.maxY - selBounds.minY;
+          
+          const handles = {
+            'top-left': { x: selBounds.minX, y: selBounds.minY },
+            'top-right': { x: selBounds.maxX, y: selBounds.minY },
+            'bottom-left': { x: selBounds.minX, y: selBounds.maxY },
+            'bottom-right': { x: selBounds.maxX, y: selBounds.maxY },
+            'top': { x: selBounds.minX + width / 2, y: selBounds.minY },
+            'bottom': { x: selBounds.minX + width / 2, y: selBounds.maxY },
+            'left': { x: selBounds.minX, y: selBounds.minY + height / 2 },
+            'right': { x: selBounds.maxX, y: selBounds.minY + height / 2 },
+          };
+          
+          let hoveredHandle = null;
+          for (const [name, pos] of Object.entries(handles)) {
+            const dx = p.x - pos.x;
+            const dy = p.y - pos.y;
+            if (Math.hypot(dx, dy) <= handleTol) {
+              hoveredHandle = name;
+              break;
+            }
+          }
+          
+          const canvas = canvasRef.current;
+          if (canvas) {
+            if (hoveredHandle) {
+              canvas.style.cursor = getResizeCursor(hoveredHandle);
+            } else {
+              canvas.style.cursor = 'default';
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // If not drawing stroke, nothing to do
+    // update overlay cursor position even when not drawing
+    let memoPoint = null;
+    const ensurePoint = () => {
+      if (memoPoint) return memoPoint;
+      memoPoint = getPoint(e);
+      pointerWorldRef.current = memoPoint;
+      return memoPoint;
+    };
+    try {
+      const ov = overlayRef.current;
+      // Only show overlay while actively erasing (avoid persistent overlay after release)
+      // Show overlay while pointer is over the canvas and the active tool is
+      // the eraser. Hide it while panning (mano) or when the pointer is
+      // over the toolbar. Pen uses the CSS cursor so we don't render the DOM overlay.
+      if (ov) {
+        const shouldShow = (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+        if (shouldShow) {
+          const worldPoint = ensurePoint();
+          const expected = screenFromWorld(worldPoint) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
+          const clientX = expected.clientX;
+          const clientY = expected.clientY;
+          ov.style.display = 'block';
+          ov.style.left = `${clientX}px`;
+          ov.style.top = `${clientY}px`;
+          ov.style.width = `${overlaySize}px`;
+          ov.style.height = `${overlaySize}px`;
+          ov.style.borderRadius = '50%';
+          ov.style.background = 'rgba(255,255,255,0.06)';
+          ov.style.opacity = '1';
+          ov.style.boxShadow = 'none';
+          const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+          ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+          ov.style.transform = 'translate(-50%, -50%)';
+        } else {
+          ov.style.display = 'none';
+        }
+      }
+    } catch (_) {}
+
+    // Occasional diagnostic: compare expected screen position for the last point
+    try {
+      if (disegnando) {
+        const currentWorld = ensurePoint();
+        const expected = screenFromWorld(currentWorld);
+        if (expected) {
+          const dx = expected.clientX - e.nativeEvent.clientX;
+          const dy = expected.clientY - e.nativeEvent.clientY;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 8) {
+            console.warn('[lavagna][diag] pointerMove mismatch', {
+              distPx: Math.round(dist * 10) / 10,
+              dx: Math.round(dx * 10) / 10,
+              dy: Math.round(dy * 10) / 10,
+              client: { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY },
+              expected: { x: expected.clientX, y: expected.clientY },
+              pan: { ...pan },
+              zoom
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (!disegnando) return;
+
+    const punto = ensurePoint();
+    if (strumento === 'gomma' && !gommaPuntuale) {
+      eraseShapesAt(punto.x, punto.y);
+      eraseStrokeAt(punto.x, punto.y);
+      return;
+    }
+
+    if (strumento === 'gomma' && gommaPuntuale) {
+      eraseShapesAt(punto.x, punto.y);
+    }
+
+    puntiCorrentiRef.current.push(punto);
+    outgoingBufferRef.current.push(punto);
+    if (!outgoingRAFRef.current) {
+      outgoingRAFRef.current = requestAnimationFrame(flushOutgoing);
+    }
+  }
+
+  function pointerUp(e) {
+    const pointerId = e?.nativeEvent?.pointerId;
+    const pendingClick = selectionClickRef.current;
+    const dragInfo = draggingSelectionRef.current;
+    // (no-op) -- overlay visibility will be reconciled below depending on
+    // whether the pointer remains over the canvas and current tool.
+    // finalize any selection drag
+    if (dragInfo && dragInfo.active) {
+      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
+      const shouldOpenLink = (() => {
+        if (!pendingClick) return false;
+        if (dragInfo.pointerTool !== 'selezione') return false;
+        if (pendingClick.pointerId !== pointerId) return false;
+        if (pendingClick.aborted) return false;
+        if (dragInfo.moved) return false;
+        if (!pendingClick.openCandidate) return false;
+        return pendingClick.doubleTap || pendingClick.metaClick;
+      })();
+      const shapeToOpen = shouldOpenLink
+        ? (forme || []).find((f) => f.id === pendingClick.shapeId)
+        : null;
+      // If the user moved the selection, persist the final positions to server
+      if (dragInfo.moved) {
+        try {
+          const selIds = (dragInfo.selectionSnapshot && Array.isArray(dragInfo.selectionSnapshot.forme) && dragInfo.selectionSnapshot.forme.length)
+            ? dragInfo.selectionSnapshot.forme
+            : (selectedItems && Array.isArray(selectedItems.forme) ? selectedItems.forme : []);
+          for (const sid of selIds) {
+            try {
+              const s = (forme || []).find((f) => f.id === sid);
+              if (s) {
+                // Persist final shape position to server and notify remote clients
+                updateShapeLocal(s, true);
+              }
+            } catch(_) {}
+          }
+        } catch(_) {}
+      }
+
+      dragInfo.active = false;
+      dragInfo.lastWorld = null;
+      dragInfo.moved = false;
+      dragInfo.pointerTool = null;
+      dragInfo.pointerId = null;
+      dragInfo.primaryShapeId = null;
+  dragInfo.primaryStrokeIndex = null;
+      dragInfo.selectionSnapshot = null;
+      selectionClickRef.current = null;
+      drawAll();
+      if (shapeToOpen) {
+        openLinkShape(shapeToOpen);
+      }
+      return;
+    }
+    // finalize rotation if active
+    if (rotatingRef.current && rotatingRef.current.active) {
+      rotatingRef.current.active = false;
+      rotatingRef.current.center = null;
+      rotatingRef.current.startAngle = 0;
+      rotatingRef.current.originals = {};
+      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
+      drawAll();
+      return;
+    }
+    
+    // Finalize resize if active
+    if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
+      try {
+        // Save current state to undo stack before finishing
+        const selectionSnapshot = resizingSelectionRef.current.selectionSnapshot || selectedItems;
+        const originalShapes = resizingSelectionRef.current.originalShapes || {};
+        const currentShapes = {};
+        
+        for (const shapeId of selectionSnapshot.forme) {
+          const shape = forme.find(f => f.id === shapeId);
+          if (shape) {
+            currentShapes[shapeId] = { ...shape };
+          }
+        }
+        
+        // Add to undo stack
+        setUndoStack(prev => [...prev, {
+          type: 'resize',
+          shapes: Object.entries(originalShapes).map(([id, shape]) => ({
+            id,
+            before: shape,
+            after: currentShapes[id]
+          }))
+        }]);
+        setRedoStack([]);
+        
+        // Emit shape:update events for all resized shapes
+        for (const shapeId of selectionSnapshot.forme) {
+          const shape = forme.find(f => f.id === shapeId);
+          if (shape) {
+            emitOrPublish('shape:update', { ...shape, lavagnaId });
+            // Also persist to database
+            fetch(`/api/lavagna/shape/${shape.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(shape)
+            }).catch(() => {});
+          }
+        }
+      } catch (_) {}
+      
+      resizingSelectionRef.current.active = false;
+      resizingSelectionRef.current.handle = null;
+      resizingSelectionRef.current.originalBounds = null;
+      resizingSelectionRef.current.selectionSnapshot = null;
+      resizingSelectionRef.current.originalShapes = null;
+      resizingSelectionRef.current.startPoint = null;
+      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
+      try { console.log('[LAVAGNA-DBG-RESIZE] finished'); } catch(_) {}
+      drawAll();
+      return;
+    }
+    
+    if (panningRef.current.active) {
+      try {
+        canvasRef.current?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      panningRef.current.active = false;
+      try { console.log('[LAVAGNA-STATE] panningRef.active = false'); } catch(_){}
+      panningRef.current.viaContext = false;
+      setIsPanning(false);
+      setContextPanning(false);
+      // restore original tool if we temporarily switched on right-click
+      try {
+        if (contextTempToolRef.current) {
+          setStrumento(contextTempToolRef.current);
+          contextTempToolRef.current = null;
+        }
+      } catch (_) {}
+      return; // non proseguire con logica disegno quando si rilascia pan
+    }
+    // Touch end handling is in pointerCancel/pointerUp below
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
+    if (outgoingRAFRef.current) {
+      cancelAnimationFrame(outgoingRAFRef.current);
+      outgoingRAFRef.current = null;
+    }
+    // stop erasing drag
+    if (erasingRef.current) {
+      erasingRef.current = false;
+      // ensure we release any pointer capture held during erasing; do not forcibly
+      // hide overlay here because pointer may still be hovering the canvas and
+      // the cursor preview should remain visible while the user is over the board.
+      try {
+        canvasRef.current?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      try { console.log('[LAVAGNA-STATE] erasing finished -> released capture'); } catch(_){}
+    }
+
+    // If currently drawing a shape, finalize it
+    if (drawingShapeRef.current && previewShapeRef.current) {
+      const ps = previewShapeRef.current;
+      const shapeObj = shapeFromPreview(ps);
+      if (shapeObj) {
+        createShapeLocal(shapeObj, true);
+      }
+      previewShapeRef.current = null; drawingShapeRef.current = false; rightClickLineRef.current = { active: false, start: null };
+      try {
+        canvasRef.current?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      drawAll();
+      return;
+    }
+
+    // If finishing a selection drag, compute selected items (INTERSECTION, not full containment)
+    if (selectingRef.current.active) {
+      selectingRef.current.active = false;
+      const sb = selectionBox;
+      if (sb) {
+        const x1 = Math.min(sb.x1, sb.x2), x2 = Math.max(sb.x1, sb.x2);
+        const y1 = Math.min(sb.y1, sb.y2), y2 = Math.max(sb.y1, sb.y2);
+        // select strokes whose bbox intersects the selection rect
+        const selTratti = tratti.map((t, i) => {
+          const b = t._bb ?? getShapeBounds(t);
+          if (!b) return null;
+          const intersects = !(b.maxX < x1 || b.minX > x2 || b.maxY < y1 || b.minY > y2);
+          return intersects ? i : null;
+        }).filter(i => i !== null);
+        // select shapes whose bbox intersects the selection rect
+        const selForme = (forme || []).map((f) => {
+          const bounds = f._bb ?? getShapeBounds(f);
+          if (!bounds) return null;
+          const intersects = !(bounds.maxX < x1 || bounds.minX > x2 || bounds.maxY < y1 || bounds.minY > y2);
+          return intersects ? f.id : null;
+        }).filter(i => i !== null);
+        setSelectedItems({ tratti: selTratti, forme: selForme });
+      }
+      setSelectionBox(null);
+      selectionClickRef.current = null;
+      try {
+        canvasRef.current?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      return;
+    }
+
+    if (!disegnando) {
+      try {
+        canvasRef.current?.releasePointerCapture?.(pointerId);
+      } catch (_) {}
+      eraseSessionRef.current.strokeIds.clear();
+      eraseSessionRef.current.shapeIds.clear();
+      // Reconcile overlay: if pointer is still over the canvas and the active
+      // tool is pen/gomma, keep the preview visible; otherwise hide it.
+      try {
+        const ov = overlayRef.current;
+        const canvas = canvasRef.current;
+        if (ov && canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const cx = e?.nativeEvent?.clientX;
+          const cy = e?.nativeEvent?.clientY;
+          const inside = typeof cx === 'number' && typeof cy === 'number' && cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom;
+          const shouldShow = inside && (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
+          if (shouldShow) {
+            // position overlay at pointer location
+            ov.style.display = 'block';
+            ov.style.left = `${cx}px`;
+            ov.style.top = `${cy}px`;
+            ov.style.width = `${overlaySize}px`;
+            ov.style.height = `${overlaySize}px`;
+            ov.style.borderRadius = '50%';
+            // Only eraser styling here (pen uses CSS cursor)
+            ov.style.background = 'rgba(255,255,255,0.06)';
+            ov.style.opacity = '1';
+            ov.style.boxShadow = 'none';
+            const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
+            ov.style.border = `${borderPx}px dashed rgba(15,31,83,0.95)`;
+            ov.style.transform = 'translate(-50%, -50%)';
+          } else {
+            ov.style.display = 'none';
+          }
+        }
+      } catch (_) {}
+      return;
+    }
+    setDisegnando(false);
+    // Flush finale di eventuali punti in buffer
+    if (outgoingBufferRef.current.length) {
+      emitOrPublish('stroke:points', {
+        streamId: currentStreamId.current,
+        points: outgoingBufferRef.current,
+      });
+      outgoingBufferRef.current = [];
+    }
+
+  // Apply lightweight smoothing to the collected points so handwriting
+  // strokes (S, E, etc.) render more naturally and jitter is reduced.
+  const rawPunti = puntiCorrentiRef.current;
+  const puntiFinali = simplifyAndSmooth(rawPunti);
+  
+    // SUPPORTO TRATTI ULTRA-CORTI (es. puntini su i, :, ×, ÷)
+    // Se abbiamo solo 1 punto, creiamo comunque un piccolo cerchio
+    if (puntiFinali.length >= 1) {
+      let trattoFinale = puntiFinali;
+      
+      // Se c'è un solo punto, duplicalo leggermente per creare un mini-segmento
+      if (puntiFinali.length === 1) {
+        const p = puntiFinali[0];
+        // Crea un secondo punto molto vicino (0.1px di distanza)
+        trattoFinale = [
+          { x: p.x, y: p.y },
+          { x: p.x + 0.1, y: p.y + 0.1 }
+        ];
+      }
+      
+      if (strumento === 'gomma' && gommaPuntuale) {
+        const gommaStroke = prepareStroke({
+          id: currentStreamId.current,
+          strumento: 'gomma',
+          colore: '#ffffff',
+          spessore,
+          punti: trattoFinale,
+          autoreUserId: utenteId,
+        });
+        setTratti(prev => [...prev, gommaStroke]);
+        setUndoStack(prev => [...prev, { type: 'add', stroke: gommaStroke }]);
+        setRedoStack([]);
+        salvaTratto(gommaStroke);
+      } else if (strumento !== 'gomma') {
+        const nuovoTratto = prepareStroke({
+          id: currentStreamId.current, // Usa l'ID dello stream per coerenza
+          strumento,
+          colore,
+          spessore,
+          punti: trattoFinale,
+          autoreUserId: utenteId,
+        });
+        setTratti(prev => [...prev, nuovoTratto]);
+        setUndoStack(prev => [...prev, { type: 'add', stroke: nuovoTratto }]);
+        setRedoStack([]);
+        salvaTratto(nuovoTratto);
+      }
+    }
+
+    emitOrPublish('stroke:done', { streamId: currentStreamId.current });
+
+    try {
+      canvasRef.current?.releasePointerCapture?.(pointerId);
+    } catch (_) {}
+
+    puntiCorrentiRef.current = [];
+    currentStreamId.current = null;
+    eraseSessionRef.current.strokeIds.clear();
+    eraseSessionRef.current.shapeIds.clear();
+    drawAll(); // Chiamata finale per pulire il tratto locale
+  }
+
+  function pointerCancel(e) {
+    if (panningRef.current.active) {
+      panningRef.current.active = false;
+      panningRef.current.viaContext = false;
+      setIsPanning(false);
+      setContextPanning(false);
+      // restore original tool if we temporarily switched on right-click
+      try {
+        if (contextTempToolRef.current) {
+          setStrumento(contextTempToolRef.current);
+          contextTempToolRef.current = null;
+        }
+      } catch (_) {}
+      try { console.log('[LAVAGNA-STATE] pointerCancel: panningRef reset'); } catch(_){}
+    }
+    if (e?.nativeEvent?.pointerType === 'touch') {
+      touchesRef.current.delete(e.nativeEvent.pointerId);
+      if (touchesRef.current.size < 2 && gestureRef.current.mode === 'panzoom') {
+        gestureRef.current.mode = 'none';
+      }
+    }
+    if (draggingSelectionRef.current) {
+      draggingSelectionRef.current.active = false;
+      draggingSelectionRef.current.lastWorld = null;
+      draggingSelectionRef.current.moved = false;
+      draggingSelectionRef.current.pointerTool = null;
+      draggingSelectionRef.current.pointerId = null;
+      draggingSelectionRef.current.primaryShapeId = null;
+      draggingSelectionRef.current.primaryStrokeIndex = null;
+      draggingSelectionRef.current.selectionSnapshot = null;
+    }
+    // cancel any rotation in progress
+    if (rotatingRef.current && rotatingRef.current.active) {
+      rotatingRef.current.active = false;
+      rotatingRef.current.center = null;
+      rotatingRef.current.startAngle = 0;
+      rotatingRef.current.originals = {};
+    }
+    selectionClickRef.current = null;
+    erasingRef.current = false;
+    eraseSessionRef.current.strokeIds.clear();
+    eraseSessionRef.current.shapeIds.clear();
+    // Reset drawing/preview state
+    if (drawingShapeRef.current) {
+      drawingShapeRef.current = false;
+      previewShapeRef.current = null;
+      setTimeout(drawAll, 0);
+    }
+    if (selectingRef.current.active) {
+      selectingRef.current.active = false;
+      setSelectionBox(null);
+      setTimeout(drawAll, 0);
+    }
+    // hide overlay on cancel
+    try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
+  }
+
+  // == SALVATAGGIO STROKE ==
+  async function salvaTratto(t) {
+    try {
+      // mark saving without triggering re-render
+      salvandoRef.current = true;
+      if (utenteId === undefined || utenteId === null) {
+        console.warn("Salvataggio stroke annullato: utenteId assente.");
+        return;
+      }
+      const res = await fetch("/api/lavagna/tratto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: t.id, // Invia l'ID univoco
+          lavagnaId,
+          strumento: t.strumento,
+          colore: t.colore,
+          spessore: t.spessore,
+          punti: t.punti
+        })
+      });
+      const js = await res.json();
+      if (res.ok) {
+        const definitivo = prepareStroke({
+          ...js.tratto,
+          dbId: js.tratto.id,
+          id: t.id, // mantieni lo streamId come id locale coerente
+        });
+        setTratti((prev) =>
+          prev.map((s) => (s.id === t.id ? definitivo : s))
+        );
+        setUndoStack((prev) =>
+          prev.map((a) =>
+            a.type === "add" && a.stroke.id === t.id
+              ? { ...a, stroke: definitivo }
+              : a
+          )
+        );
+      } else {
+        console.error("Errore creazione tratto API:", js.error);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      salvandoRef.current = false;
+      drawAll();
+    }
+  }
+
+  // == UNDO / REDO ==
+  function undo() {
+    if (!undoStack.length) return;
+    const last = undoStack[undoStack.length - 1];
+    setUndoStack((u) => u.slice(0, -1));
+    setRedoStack((r) => [last, ...r]);
+
+    if (last.type === "add") {
+      const sid = last.stroke.id; // streamId
+      setTratti((prev) => prev.filter((s) => s.id !== sid));
+      const delId = last.stroke.dbId ?? sid;
+      if (isAdmin || last.stroke.autoreUserId === utenteId) {
+        fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
+        emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
+      }
+    } else if (last.type === "delete") {
+      setTratti((prev) => [...prev, last.stroke]);
+    }
+    else if (last.type === 'add-shape') {
+      // remove the shape that was added
+      const sid = last.shape.id;
+      setForme((prev) => prev.filter((s) => s.id !== sid));
+      if (last.shape.dbId && (isAdmin || last.shape.autoreUserId === utenteId)) {
+        fetch(`/api/lavagna/shape/${last.shape.dbId}`, { method: 'DELETE' }).catch(() => {});
+      }
+      emitOrPublish('shape:delete', { id: sid, lavagnaId });
+    } else if (last.type === 'delete-shape') {
+      // restore deleted shape
+      const shp = last.shape;
+      setForme((prev) => [...prev, shp]);
+      try {
+        const normalized = normalizeShape(shp);
+        emitOrPublish('shape:create', { ...normalized, lavagnaId });
+        // try persist again
+        persistShape(normalized).then((s) => {
+          if (s && s.id) {
+            setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+          }
+        }).catch(() => {});
+      } catch(_) {}
+    } else if (last.type === 'resize') {
+      // restore shapes to their state before resize
+      setForme((prev) => prev.map((f) => {
+        const resized = last.shapes.find(s => s.id === f.id);
+        if (resized && resized.before) {
+          // Emit update and persist
+          emitOrPublish('shape:update', { ...resized.before, lavagnaId });
+          fetch(`/api/lavagna/shape/${resized.before.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resized.before)
+          }).catch(() => {});
+          return resized.before;
+        }
+        return f;
+      }));
+    }
+    drawAll();
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    const action = redoStack[0];
+    setRedoStack((r) => r.slice(1));
+    setUndoStack((u) => [...u, action]);
+
+    if (action.type === "add") {
+      setTratti((prev) => [...prev, action.stroke]);
+    } else if (action.type === "delete") {
+      const sid = action.stroke.id; // streamId
+      setTratti((prev) => prev.filter((s) => s.id !== sid));
+      const delId = action.stroke.dbId ?? sid;
+      fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
+      emitOrPublish("stroke:delete", { attivitaId, strokeId: sid });
+    }
+    else if (action.type === 'add-shape') {
+      // redo add: re-add shape
+      const shp = action.shape;
+      setForme((prev) => [...prev, shp]);
+      try {
+        const normalized = normalizeShape(shp);
+        emitOrPublish('shape:create', { ...normalized, lavagnaId });
+        persistShape(normalized).then((s) => {
+          if (s && s.id) setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
+        }).catch(() => {});
+      } catch(_) {}
+    } else if (action.type === 'delete-shape') {
+      // redo delete: remove shape
+      const id = action.shape.id;
+      setForme((prev) => prev.filter((f) => f.id !== id));
+      emitOrPublish('shape:delete', { id, lavagnaId });
+      if (action.shape.dbId && (isAdmin || action.shape.autoreUserId === utenteId)) {
+        fetch(`/api/lavagna/shape/${action.shape.dbId}`, { method: 'DELETE' }).catch(() => {});
+      }
+    } else if (action.type === 'resize') {
+      // redo resize: apply the 'after' state
+      setForme((prev) => prev.map((f) => {
+        const resized = action.shapes.find(s => s.id === f.id);
+        if (resized && resized.after) {
+          // Emit update and persist
+          emitOrPublish('shape:update', { ...resized.after, lavagnaId });
+          fetch(`/api/lavagna/shape/${resized.after.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resized.after)
+          }).catch(() => {});
+          return resized.after;
+        }
+        return f;
+      }));
+    }
+    drawAll();
+  }
+
+  // == EXPORT ==
+  const esportaPNG = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    // Calcola i bounds di tutti i contenuti
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+    
+    // Bounds dei tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      hasContent = true;
+      for (const p of t.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    
+    // Bounds delle forme
+    for (const f of forme) {
+      if (!f) continue;
+      hasContent = true;
+      const bounds = getShapeBounds(f);
+      if (bounds) {
+        if (bounds.minX < minX) minX = bounds.minX;
+        if (bounds.maxX > maxX) maxX = bounds.maxX;
+        if (bounds.minY < minY) minY = bounds.minY;
+        if (bounds.maxY > maxY) maxY = bounds.maxY;
+      }
+    }
+    
+    if (!hasContent) {
+      alert('Nessun contenuto da esportare');
+      return;
+    }
+    
+    // Aggiungi margini
+    const margin = 40;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Forza ridisegno completo
+    drawAll();
+    
+    setTimeout(() => {
+      // Crea canvas temporaneo con dimensione esatta del contenuto
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = Math.ceil(contentWidth);
+      exportCanvas.height = Math.ceil(contentHeight);
+      const ctx = exportCanvas.getContext('2d');
+      
+      // Sfondo
+      ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
+      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      
+      // Applica trasformazione per centrare contenuto
+      ctx.save();
+      ctx.translate(-minX, -minY);
+      
+      // Disegna tutto usando il canvas principale (già renderizzato)
+      // Copia la porzione rilevante del canvas principale
+      const mainCanvas = canvasRef.current;
+      const dpr = window.devicePixelRatio || 1;
+      const safeZoom = Math.max(zoom, 0.0001);
+      
+      // Invece di copiare, ridisegniamo direttamente i tratti e forme
+      // Tratti
+      for (const t of tratti) {
+        if (!t?.punti || t.punti.length < 2) continue;
+        ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
+        ctx.strokeStyle = t.strumento === 'gomma' ? (sfondo === 'nero' ? '#000' : '#fff') : t.colore || '#20489a';
+        ctx.lineWidth = t.spessore || 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        t.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+        ctx.stroke();
+      }
+      
+      // Forme (versione semplificata - solo rettangoli, cerchi, immagini)
+      for (const f of forme) {
+        if (!f) continue;
+        ctx.save();
+        ctx.strokeStyle = f.colore || '#20489a';
+        ctx.lineWidth = f.spessore || 3;
+        
+        if (f.kind === 'rettangolo' || f.kind === 'quadrato') {
+          ctx.strokeRect(f.x, f.y, f.w, f.h);
+        } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
+          const cx = f.x + (f.w || 0) / 2;
+          const cy = f.y + (f.h || 0) / 2;
+          const rx = Math.abs(f.w || 0) / 2;
+          const ry = Math.abs(f.h || 0) / 2;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (f.kind === 'immagine' && f.src) {
+          // Disegna immagine se caricata
+          const img = new Image();
+          img.src = f.src;
+          if (img.complete) {
+            try { ctx.drawImage(img, f.x, f.y, f.w, f.h); } catch(_) {}
+          }
+        }
+        ctx.restore();
+      }
+      
+      ctx.restore();
+      
+      // Esporta
+      const url = exportCanvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lavagna-${lavagnaId}-${Date.now()}.png`;
+      link.click();
+    }, 100);
+  }, [lavagnaId, tratti, forme, sfondo, zoom, drawAll, getShapeBounds]);
+
+  const esportaPDF = useCallback(async () => {
+    const { jsPDF } = await import("jspdf");
+    
+    // Calcola bounds contenuto
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+    
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length === 0) continue;
+      hasContent = true;
+      for (const p of t.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    
+    for (const f of forme) {
+      if (!f) continue;
+      hasContent = true;
+      const bounds = getShapeBounds(f);
+      if (bounds) {
+        if (bounds.minX < minX) minX = bounds.minX;
+        if (bounds.maxX > maxX) maxX = bounds.maxX;
+        if (bounds.minY < minY) minY = bounds.minY;
+        if (bounds.maxY > maxY) maxY = bounds.maxY;
+      }
+    }
+    
+    if (!hasContent) {
+      alert('Nessun contenuto da esportare');
+      return;
+    }
+    
+    const margin = 40;
+    minX -= margin;
+    minY -= margin;
+    maxX += margin;
+    maxY += margin;
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    
+    // Prima esporta come PNG usando stessa logica
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = Math.ceil(contentWidth);
+    exportCanvas.height = Math.ceil(contentHeight);
+    const ctx = exportCanvas.getContext('2d');
+    
+    ctx.fillStyle = sfondo === 'nero' ? '#000' : '#fff';
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    
     ctx.save();
-    ctx.setTransform(worldScale, 0, 0, worldScale, (-pan.x) * worldScale, (-pan.y) * worldScale);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = colore;
-    ctx.lineWidth = spessore;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
+    ctx.translate(-minX, -minY);
+    
+    // Disegna tratti
+    for (const t of tratti) {
+      if (!t?.punti || t.punti.length < 2) continue;
+      ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = t.strumento === 'gomma' ? (sfondo === 'nero' ? '#000' : '#fff') : t.colore || '#20489a';
+      ctx.lineWidth = t.spessore || 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      t.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    }
+    
+    // Disegna forme semplificate
+    for (const f of forme) {
+      if (!f) continue;
+      ctx.save();
+      ctx.strokeStyle = f.colore || '#20489a';
+      ctx.lineWidth = f.spessore || 3;
+      
+      if (f.kind === 'rettangolo' || f.kind === 'quadrato') {
+        ctx.strokeRect(f.x, f.y, f.w, f.h);
+      } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
+        const cx = f.x + (f.w || 0) / 2;
+        const cy = f.y + (f.h || 0) / 2;
+        const rx = Math.abs(f.w || 0) / 2;
+        const ry = Math.abs(f.h || 0) / 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (f.kind === 'immagine' && f.src) {
+        const img = new Image();
+        img.src = f.src;
+        if (img.complete) {
+          try { ctx.drawImage(img, f.x, f.y, f.w, f.h); } catch(_) {}
+        }
+      }
+      ctx.restore();
+    }
+    
     ctx.restore();
-  }, [colore, spessore, zoom, pan]);
+    
+    // Crea PDF
+    const pdf = new jsPDF({
+      orientation: contentWidth > contentHeight ? "landscape" : "portrait",
+      unit: "px",
+      format: [exportCanvas.width, exportCanvas.height],
+    });
+    
+    pdf.addImage(
+      exportCanvas.toDataURL("image/png"),
+      "PNG",
+      0,
+      0,
+      exportCanvas.width,
+      exportCanvas.height
+    );
+    
+    pdf.save(`lavagna-${lavagnaId || attivitaId}-${Date.now()}.pdf`);
+  }, [lavagnaId, attivitaId, tratti, forme, sfondo, getShapeBounds]);
+
+  // == UNDO/REDO ==
+
+  // == CLEAR ==
+  const pulisciLavagna = useCallback(() => {
+    if (!isAdmin) return;
+    if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
+
+    clearLavagnaState();
+    // Pubblica solo se il channel è pronto
+    if (ablyRef.current.ch) {
+      emitOrPublish('clear-lavagna', { lavagnaId, attivitaId });
+    }
+
+    fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' })
+      .then((res) => {
+        if (!res.ok) {
+          console.error('[handleClear] Errore API nel pulire la lavagna:', res.statusText);
+        }
+      })
+      .catch((error) => {
+        console.error('[handleClear] Eccezione nella chiamata API per pulire la lavagna:', error);
+      });
+  }, [isAdmin, clearLavagnaState, emitOrPublish, lavagnaId, attivitaId]);
+
+  const handleChangeSfondo = useCallback((next) => {
+    if (!isAdmin) return;
+    setSfondo(next);
+    emitOrPublish('background:change', { lavagnaId, attivitaId, sfondo: next });
+    requestAnimationFrame(() => drawAll());
+  }, [isAdmin, lavagnaId, attivitaId, emitOrPublish, drawAll]);
+
+  // == TOOLBAR ==
+  const toolbar = useMemo(() => {
+    if (!showTools) return null;
+    if (!isAdmin && spectatorMode) return null;
+
+    // Responsive button styles
+    const iconBtn = (active) => ({
+      width: isMobile ? 40 : 36,
+      height: isMobile ? 40 : 36,
+      minWidth: isMobile ? 40 : 36,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: isMobile ? 10 : 12,
+      border: active ? '1px solid rgba(27,102,220,0.2)' : '1px solid rgba(212,223,246,0.9)',
+      background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(248,251,255,0.96)',
+      color: active ? '#fff' : '#20489a',
+      boxShadow: active ? '0 14px 26px rgba(28,125,247,0.28)' : '0 8px 20px rgba(15,42,105,0.15)',
+      cursor: 'pointer',
+      transition: 'transform .15s ease, box-shadow .2s ease',
+      fontWeight: 700,
+      fontSize: 18
+    });
+
+    const shapeBtn = (active) => ({
+      width: isMobile ? 42 : 46,
+      height: isMobile ? 42 : 46,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: isMobile ? 10 : 12,
+      border: active ? '1.5px solid rgba(27,102,220,0.3)' : '1px solid rgba(212,223,246,0.9)',
+      background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(255,255,255,0.9)',
+      color: active ? '#fff' : '#20489a',
+      boxShadow: active ? '0 8px 18px rgba(28,125,247,0.25)' : '0 2px 8px rgba(15,42,105,0.1)',
+      cursor: 'pointer',
+      transition: 'all .15s ease',
+      padding: 0
+    });
+
+    // Responsive toolbar styles
+    const bottomToolbarDock = {
+      position: "absolute",
+      left: isMobile ? 0 : "50%",
+      bottom: isMobile ? 8 : 18,
+      transform: isMobile ? "none" : "translateX(-50%)",
+      zIndex: 3,
+      ...(isMobile && {
+        right: 0,
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '0 8px'
+      })
+    };
+
+    const commandBar = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: isMobile ? 6 : 10,
+      padding: isMobile ? '8px 10px' : '10px 14px',
+      borderRadius: isMobile ? 14 : 16,
+      background: 'rgba(255,255,255,0.92)',
+      border: '1px solid #d4dff6',
+      boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
+      backdropFilter: 'blur(8px)',
+      userSelect: 'none',
+      ...(isMobile && {
+        flexWrap: 'wrap',
+        maxWidth: '100%',
+        justifyContent: 'center'
+      })
+    };
+
+  const shapeActive = ['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3','assi2d','assi3d'].includes(strumento);
+    const shapeButtonActive = shapeActive || showShapesPopover;
+    const undoDisabled = !undoStack.length;
+    const redoAvailable = redoStack.length > 0;
+    const isCustomPenColor = !penPalette.some(entry => entry.value === colore);
+
+    return (
+      <div style={bottomToolbarDock}>
+        <div ref={toolbarRef} style={commandBar}>
+          <button
+            type="button"
+            style={undoButtonStyle(undoDisabled, 'undo')}
+            onClick={() => { if (!undoDisabled) undo(); }}
+            disabled={undoDisabled}
+            title={'Annulla'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M7.5 8.5l-4 4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 12.5h6.5c3.59 0 6.5 2.91 6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            {!isMobile && <span style={st.undoLabel}>Undo</span>}
+          </button>
+
+          {redoAvailable && (
+            <button
+              type="button"
+              style={undoButtonStyle(false, 'redo')}
+              onClick={() => { redo(); }}
+              title={'Ripristina'}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M16.5 8.5l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M17 12.5H10.5C6.91 12.5 4 9.59 4 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              {!isMobile && <span style={st.undoLabel}>Redo</span>}
+            </button>
+          )}
+
+          <span style={st.commandDivider} aria-hidden />
+
+          <div style={st.toolGroup}>
+            <button
+              type="button"
+              style={iconBtn(strumento === 'selezione')}
+              onClick={() => {
+                setStrumento('selezione');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Selezione / Lazo"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3l6.8 6.4 3-3.4 3.7 11.8-11.8-3.7 3.4-3-6.4-6.8z" stroke={strumento==='selezione' ? '#fff' : '#20489a'} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" fill={strumento==='selezione' ? '#fff' : 'none'} />
+              </svg>
+            </button>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(strumento === 'mano')}
+                onClick={() => {
+                  setStrumento('mano');
+                  setShowPenPopover(false);
+                  setShowMoreMenu(false);
+                  setShowShapesPopover(false);
+                  setShowExportMenu(false);
+                }}
+                title="Sposta"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </button>
+            </div>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(strumento === 'penna' || showPenPopover)}
+                onClick={() => {
+                  // If user is switching to the pen tool, set default color and
+                  // do not immediately open the color popover. If the pen is
+                  // already active, toggle the color popover.
+                  if (strumento !== 'penna') {
+                    setStrumento('penna');
+                    // Do not override `colore` here: keep the last selected color.
+                    setShowPenPopover(false);
+                    setShowShapesPopover(false);
+                    setShowMoreMenu(false);
+                    setShowExportMenu(false);
+                  } else {
+                    setShowPenPopover((v) => !v);
+                    setShowShapesPopover(false);
+                    setShowMoreMenu(false);
+                    setShowExportMenu(false);
+                  }
+                }}
+                title="Penna"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  style={{ transform: 'scale(0.92)' }}
+                >
+                  <defs>
+                    <linearGradient id="pen-body-gradient" x1="20.828" y1="3.172" x2="12.343" y2="11.657" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#FEFEFE" />
+                      <stop offset="1" stopColor="#D7D7D7" />
+                    </linearGradient>
+                    <linearGradient id="pen-tip-gradient" x1="12.343" y1="11.657" x2="3.172" y2="20.828" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#4A4A4A" />
+                      <stop offset="1" stopColor="#1A1A1A" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M20.828 3.172a4.09 4.09 0 0 1 0 5.784L9.13 20.654a2.06 2.06 0 0 1-1.23.595l-4.425.885a.5.5 0 0 1-.575-.575l.885-4.425a2.06 2.06 0 0 1 .595-1.23L15.043 3.172a4.09 4.09 0 0 1 5.785 0Z" fill="url(#pen-body-gradient)"/>
+                  <path d="M15.043 3.172 3.345 14.87a2.06 2.06 0 0 0-.595 1.23l-.885 4.425a.5.5 0 0 0 .575.575l4.425-.885a2.06 2.06 0 0 0 1.23-.595L19.828 8.956a4.09 4.09 0 0 0 0-5.784L15.043 3.172Z" fill="url(#pen-tip-gradient)"/>
+                  <path d="M19.121 4.586a2.061 2.061 0 0 1 0 2.916L7.424 19.199a1 1 0 0 1-.598.29l-2.212.442a.25.25 0 0 1-.288-.288l.442-2.212a1 1 0 0 1 .29-.598L16.205 4.586a2.061 2.061 0 0 1 2.916 0Z" fill="#111"/>
+                  <path d="M6.01 17.785l-1.53 1.53a.5.5 0 0 0 0 .707l.823.823a.5.5 0 0 0 .707 0l1.53-1.53-1.53-1.53Z" fill="#4A4A4A"/>
+                </svg>
+                {/* pen scribble: always visible on the pen button (helps preview). */}
+                <div style={{ position: 'absolute', right: 6, bottom: 6, pointerEvents: 'none', transform: 'scale(0.92)' }}>
+                  <svg width="22" height="10" viewBox="0 0 22 10" fill="none" aria-hidden>
+                    {/* path starts near left and is shorter so it visually emerges from the pen tip */}
+                    <path d="M2 7c2-3 4 1 7-2 3-3 6 1 11-1" stroke={colore} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />
+                  </svg>
+                </div>
+              </button>
+              {showPenPopover && (
+                <div style={st.penPopover}>
+                  <div style={st.penTray}>
+                    {penPalette.map((entry) => {
+                      const selected = entry.value === colore;
+                      return (
+                        <button
+                          key={entry.value}
+                          type="button"
+                          onClick={() => setColore(entry.value)}
+                          title={entry.label}
+                          style={{
+                            ...st.penSwatch,
+                            boxShadow: selected ? '0 0 0 2px #fff, 0 0 0 4px rgba(28,125,247,0.45)' : st.penSwatch.boxShadow,
+                            borderColor: selected ? '#1c7df7' : 'rgba(212,223,246,0.75)'
+                          }}
+                        >
+                          <span
+                            style={{
+                              ...st.penSwatchIcon,
+                              background: entry.preview || entry.value
+                            }}
+                          />
+                        </button>
+                      );
+                    })}
+                    <input
+                      ref={colorInputRef}
+                      type="color"
+                      value={colore}
+                      onChange={(e) => setColore(e.target.value)}
+                      style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => colorInputRef.current?.click()}
+                      title="Selettore colore"
+                      style={{
+                        ...st.penSwatch,
+                        boxShadow: isCustomPenColor ? '0 0 0 2px #fff, 0 0 0 4px rgba(28,125,247,0.45)' : st.penSwatch.boxShadow,
+                        borderColor: isCustomPenColor ? '#1c7df7' : 'rgba(212,223,246,0.75)'
+                      }}
+                    >
+                      <span
+                        style={{
+                          ...st.penSwatchIcon,
+                          background: 'conic-gradient(red,orange,yellow,green,cyan,blue,violet,red)'
+                        }}
+                      />
+                    </button>
+                  </div>
+                  <div style={st.penOptionsRow}>
+                    <span style={st.sizeLabel}>{spessore}px</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={25}
+                      value={spessore}
+                      onChange={(e) => setSpessore(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: '#1c7df7' }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(shapeButtonActive)}
+                onClick={() => {
+                  setShowShapesPopover(v => !v);
+                  setShowPenPopover(false);
+                  setShowMoreMenu(false);
+                  setShowExportMenu(false);
+                }}
+                title="Forme"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="8" height="8" rx="1" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none"/>
+                  <circle cx="17" cy="17" r="4" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none"/>
+                  <path d="M13 7 L17 3 L21 7 Z" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {showShapesPopover && (
+                <div style={st.shapesPopover}>
+                  <div style={st.shapesGrid}>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'rettangolo')}
+                      onClick={() => {
+                        setStrumento('rettangolo');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Rettangolo"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <rect x="4" y="7" width="16" height="10" rx="1" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'cerchio')}
+                      onClick={() => {
+                        setStrumento('cerchio');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Cerchio"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'triangolo')}
+                      onClick={() => {
+                        setStrumento('triangolo');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Triangolo"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 5 L20 19 L4 19 Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'linea')}
+                      onClick={() => {
+                        setStrumento('linea');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Linea"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 19 L19 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'freccia')}
+                      onClick={() => {
+                        setStrumento('freccia');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Freccia"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12 L19 12 M14 7 L19 12 L14 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'rombo')}
+                      onClick={() => {
+                        setStrumento('rombo');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Rombo"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 4 L20 12 L12 20 L4 12 Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'assi2d')}
+                      onClick={() => {
+                        setStrumento('assi2d');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Assi Cartesiani 2D"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 12 L20 12 M12 4 L12 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        <path d="M20 12 L17 9 M20 12 L17 15 M12 4 L9 7 M12 4 L15 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      style={shapeBtn(strumento === 'assi3d')}
+                      onClick={() => {
+                        setStrumento('assi3d');
+                        setShowShapesPopover(false);
+                      }}
+                      title="Assi Cartesiani 3D"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 12 L20 12 M12 4 L12 20 M12 12 L18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        <path d="M20 12 L17 9 M20 12 L17 15 M12 4 L9 7 M12 4 L15 7 M18 18 L16 20 M18 18 L20 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              style={iconBtn(strumento === 'gomma')}
+              onClick={() => {
+                setStrumento('gomma');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Gomma"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4.9 14.1l6.8-6.8a2.4 2.4 0 0 1 3.4 0l3.8 3.8a2.4 2.4 0 0 1 0 3.4l-6.8 6.8H9.5a2.4 2.4 0 0 1-1.7-.7l-2.9-2.9a2.4 2.4 0 0 1 0-3.4z"
+                  fill={strumento==='gomma' ? '#ffffff' : '#fde7ef'}
+                  stroke={strumento==='gomma' ? '#0f1f53' : '#20489a'}
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M10.3 6.2l7.5 7.5-2.6 2.6-7.5-7.5z"
+                  fill={strumento==='gomma' ? '#ffe5ed' : '#fbd1dd'}
+                  opacity="0.85"
+                />
+                <path
+                  d="M4.2 18.9h9.6"
+                  stroke={strumento==='gomma' ? '#0f1f53' : '#20489a'}
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  opacity="0.55"
+                />
+              </svg>
+            </button>
+            <div style={{ position:'relative' }}>
+              <button
+                type="button"
+                style={iconBtn(showMoreMenu)}
+                onClick={()=> {
+                  setShowMoreMenu(v=>!v);
+                  setShowPenPopover(false);
+                  setShowShapesPopover(false);
+                  setShowExportMenu(false);
+                }}
+                title="Altro"
+              >
+                ...
+              </button>
+              {showMoreMenu && (
+                <div style={st.popover}>
+                  {isAdmin ? (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <label style={{ fontSize:12, color:'#20489a', fontWeight:600 }}>Sfondo</label>
+                      <select value={sfondo} onChange={(e)=>handleChangeSfondo(e.target.value)} style={{ padding:'6px 8px', borderRadius:8 }}>
+                        <option value="bianco">Bianco</option>
+                        <option value="nero">Nero</option>
+                        <option value="righe">Righe</option>
+                        <option value="quadretti">Quadretti</option>
+                        <option value="punti">Punti</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div style={st.readOnlyRow}>
+                      <span style={st.toggleLbl}>Sfondo</span>
+                      <span style={st.readOnlyValue}>{sfondoLabels[sfondo] || sfondo}</span>
+                    </div>
+                  )}
+                  <div style={{ ...st.toggleWrap, marginBottom:8 }}>
+                    <input
+                      id="gomma-puntuale-toggle"
+                      type="checkbox"
+                      checked={gommaPuntuale}
+                      onChange={(e)=>setGommaPuntuale(e.target.checked)}
+                      style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
+                    />
+                    <label htmlFor="gomma-puntuale-toggle" style={st.toggleLbl}>Gomma puntuale</label>
+                  </div>
+                  {!isAdmin && (
+                    <div style={{ ...st.toggleWrap, marginBottom:8 }}>
+                      <input
+                        id={spectatorToggleId}
+                        type="checkbox"
+                        checked={spectatorMode}
+                        onChange={(e)=>setSpectatorMode(e.target.checked)}
+                        style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
+                      />
+                      <label htmlFor={spectatorToggleId} style={st.toggleLbl}>Modalità spettatore</label>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }, [
+    showTools,
+    isAdmin,
+    spectatorMode,
+    strumento,
+    showShapesPopover,
+    showPenPopover,
+    showMoreMenu,
+    showExportMenu,
+    penPalette,
+    colore,
+    spessore,
+    gommaPuntuale,
+    sfondo,
+    sfondoLabels,
+    handleChangeSfondo,
+    spectatorToggleId,
+    pulisciLavagna,
+    undoStack,
+    redoStack,
+    undo,
+    redo,
+    setStrumento,
+    setShowPenPopover,
+    setShowMoreMenu,
+    setShowShapesPopover,
+    setShowExportMenu,
+    isMobile
+  ]);
+
+  const canvasCursor = useMemo(() => {
+    if (contextPanning || (strumento === 'mano' && isPanning)) return 'grabbing';
+    if (strumento === 'mano') return 'grab';
+    if (strumento === 'gomma') {
+      if (eraserCursor) {
+        const hotspot = Math.round(eraserCursor.hotspot);
+        return `url(${eraserCursor.url}) ${hotspot} ${hotspot}, auto`;
+      }
+      return 'crosshair';
+    }
+  if (strumento === 'selezione') return 'default';
+  if (['rettangolo','cerchio','linea','triangolo','rombo','freccia','assi2','assi3'].includes(strumento)) {
+      return 'crosshair';
+    }
+    if (!penCursor) return 'crosshair';
+    const hotspot = Math.round(penCursor.hotspot);
+    return `url(${penCursor.url}) ${hotspot} ${hotspot}, auto`;
+  }, [contextPanning, strumento, isPanning, penCursor, eraserCursor]);
+
+  const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
+  const spectatorIndicatorTitle = isAdmin
+    ? (spectatorCount > 0 ? `Modalità spettatore attiva (${spectatorCount})` : '')
+    : 'Modalità spettatore attiva';
+  const showInCanvasActions = topRightPlacement === 'in-canvas' && (!spectatorMode || isAdmin);
+  const showTopRightBar = showInCanvasActions || spectatorIndicatorVisible;
+  const zoomDisabled = spectatorMode && !isAdmin;
+  const canZoomOut = zoom > 0.21;
+  const canZoomIn = zoom < 1.99;
+  const canResetView = zoom < 0.99 || zoom > 1.01 || Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5;
+  const zoomLabel = `${Math.round(zoom * 100)}%`;
+
+  useEffect(() => {
+    if (topRightPlacement !== "external" || !onActionsChange) return;
+    const openNewWindowHandler = openInNewWindow && attivitaId
+      ? () => window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank")
+      : null;
+    onActionsChange({
+      esportaPNG,
+      esportaPDF,
+      openNewWindow: openNewWindowHandler
+    });
+    return () => {
+      onActionsChange?.(null);
+    };
+  }, [
+    topRightPlacement,
+    onActionsChange,
+    esportaPNG,
+    esportaPDF,
+    openInNewWindow,
+    attivitaId
+  ]);
 
   // == RENDER ==
   return (
