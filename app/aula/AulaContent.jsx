@@ -199,7 +199,6 @@ function PDFPreviewWithControls({ src, title, coloreTema }) {
   const iframeRef = useRef(null);
   const [scale, setScale] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showToolbar, setShowToolbar] = useState(true);
 
   // Costruisce URL con parametri per controllo PDF
   const pdfUrl = useMemo(() => {
@@ -207,18 +206,15 @@ function PDFPreviewWithControls({ src, title, coloreTema }) {
     const params = new URLSearchParams();
     if (currentPage > 1) params.set('page', currentPage.toString());
     params.set('zoom', scale.toString());
-    params.set('toolbar', showToolbar ? '1' : '0');
-    params.set('navpanes', '0'); // Nascondi sidebar
     const query = params.toString();
     return query ? `${baseUrl}#${query}` : baseUrl;
-  }, [src, currentPage, scale, showToolbar]);
+  }, [src, currentPage, scale]);
 
   const zoomIn = () => setScale(prev => Math.min(200, prev + 25));
   const zoomOut = () => setScale(prev => Math.max(50, prev - 25));
   const resetZoom = () => setScale(100);
   const nextPage = () => setCurrentPage(prev => prev + 1);
   const prevPage = () => setCurrentPage(prev => Math.max(1, prev - 1));
-  const toggleToolbar = () => setShowToolbar(prev => !prev);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -356,25 +352,6 @@ function PDFPreviewWithControls({ src, title, coloreTema }) {
             </button>
           )}
         </div>
-
-        {/* Toggle toolbar PDF nativo */}
-        <button
-          type="button"
-          onClick={toggleToolbar}
-          style={{
-            background: showToolbar ? coloreTema : '#94a3b8',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            padding: '6px 12px',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          {showToolbar ? '🔧 Barra PDF' : '🔧 Mostra barra'}
-        </button>
       </div>
 
       {/* Hint utente */}
