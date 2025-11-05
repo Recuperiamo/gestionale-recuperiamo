@@ -193,12 +193,16 @@ export default function LavagnaCanvas({
   const emitOrPublish = useCallback(
     (name, data) => {
       try {
-        // Usa il channel salvato nella ref invece di getAblyChannel (sincrono)
-        const ch = ablyRef.current.ch;
+        // Usa il channel salvato nella ref, altrimenti fallback a getAblyChannel sincrono
+        let ch = ablyRef.current.ch;
+        if (!ch) {
+          ch = getAblyChannel(channelName);
+        }
         console.log('[LAVAGNA-PUBLISH-DEBUG] Attempting to publish', { 
           channelName, 
           event: name, 
           hasChannel: !!ch,
+          fromRef: !!ablyRef.current.ch,
           dataKeys: data ? Object.keys(data) : null
         });
         if (ch) {
