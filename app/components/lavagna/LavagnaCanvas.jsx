@@ -1402,6 +1402,8 @@ export default function LavagnaCanvas({
 
   useEffect(() => {
     if (!utenteId) return;
+    // Aspetta che il channel Ably sia pronto prima di pubblicare
+    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:toggle', {
       lavagnaId,
       attivitaId,
@@ -1425,6 +1427,8 @@ export default function LavagnaCanvas({
   useEffect(() => () => {
     if (!utenteId) return;
     if (!spectatorModeRef.current) return;
+    // Aspetta che il channel sia pronto
+    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:toggle', {
       lavagnaId,
       attivitaId,
