@@ -49,6 +49,8 @@ export default function LavagnaCanvas({
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
   const [enablePinchZoom, setEnablePinchZoom] = useState(true);
   const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
+  const showTopRightBar = topRightPlacement !== 'external';
+  const showInCanvasActions = topRightPlacement === 'in-canvas';
   const [showTools, setShowTools] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const sfondoRef = useRef(sfondo);
