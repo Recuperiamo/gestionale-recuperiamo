@@ -1838,10 +1838,19 @@ export default function LavagnaCanvas({
           }
         };
         const onViewportRequest = (msg) => {
+          console.log('[LAVAGNA-RECV] viewport:request RAW MESSAGE:', msg);
           const { data } = msg || {};
           const { requesterId } = data || {};
-          console.log('[LAVAGNA-RECV] viewport:request received by', { isAdmin, userId: utenteId, requesterId });
-          if (!isAdmin) return;
+          console.log('[LAVAGNA-RECV] viewport:request PARSED:', { 
+            isAdmin, 
+            myUserId: utenteId, 
+            requesterId,
+            willRespond: isAdmin && requesterId !== utenteId
+          });
+          if (!isAdmin) {
+            console.log('[LAVAGNA-RECV] Not admin, ignoring viewport:request');
+            return;
+          }
           // Se echoMessages è attivo, ignora la propria richiesta
           if (requesterId === utenteId) {
             console.log('[LAVAGNA-RECV] Ignoring own viewport:request (echo)');
@@ -1882,9 +1891,16 @@ export default function LavagnaCanvas({
           });
         };
         const onSpectatorToggle = (msg) => {
+          console.log('[LAVAGNA-SPECTATOR-TOGGLE] RAW MESSAGE:', msg);
           const { data } = msg || {};
           const { userId, active } = data || {};
-          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Received:', { userId, active, isAdmin, myUserId: utenteId });
+          console.log('[LAVAGNA-SPECTATOR-TOGGLE] PARSED:', { 
+            userId, 
+            active, 
+            isAdmin, 
+            myUserId: utenteId,
+            willProcess: userId && userId !== utenteId
+          });
           if (!userId) return;
           // Ignora il proprio toggle (echoMessages attivo)
           if (userId === utenteId) {
@@ -1893,12 +1909,14 @@ export default function LavagnaCanvas({
           }
           const roster = spectatorRosterRef.current;
           if (active) {
+            console.log('[LAVAGNA-SPECTATOR-TOGGLE] Adding user to roster:', userId);
             roster.add(userId);
           } else {
+            console.log('[LAVAGNA-SPECTATOR-TOGGLE] Removing user from roster:', userId);
             roster.delete(userId);
           }
           setSpectatorCount(roster.size);
-          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Roster updated, count:', roster.size);
+          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Roster updated, count:', roster.size, 'roster:', Array.from(roster));
         };
         const onSpectatorRequest = () => {
           if (isAdmin) return;

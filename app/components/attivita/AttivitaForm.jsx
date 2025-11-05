@@ -486,6 +486,115 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
         {errorForm && <div style={{ color:"red", marginBottom:12 }}>{errorForm}</div>}
 
+        {/* Pulsanti rapidi di accesso - solo in modifica quando abbiamo un ID attività */}
+        {isEdit && initialData?.id && (
+          <div style={{ 
+            marginBottom: 20, 
+            paddingTop: 16, 
+            borderTop: "1px solid #e0e0e0" 
+          }}>
+            <p style={{ 
+              fontSize: 13, 
+              fontWeight: 600, 
+              color: "#666", 
+              marginBottom: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px"
+            }}>
+              Accesso rapido
+            </p>
+            <div style={{ 
+              display: "flex", 
+              gap: 10, 
+              flexWrap: "wrap" 
+            }}>
+              {initialData.clienteId && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`/aula?clienteId=${initialData.clienteId}`, '_blank')}
+                  style={{
+                    flex: "1 1 calc(33.333% - 7px)",
+                    minWidth: 100,
+                    background: "#10b981",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "10px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    transition: "all 0.2s",
+                    boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)"
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = "#059669"}
+                  onMouseOut={e => e.currentTarget.style.background = "#10b981"}
+                >
+                  <span>📚</span>
+                  <span>Aula</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => window.open(`/attivita/${initialData.id}`, '_blank')}
+                style={{
+                  flex: "1 1 calc(33.333% - 7px)",
+                  minWidth: 100,
+                  background: "#3b82f6",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  transition: "all 0.2s",
+                  boxShadow: "0 2px 4px rgba(59, 130, 246, 0.2)"
+                }}
+                onMouseOver={e => e.currentTarget.style.background = "#2563eb"}
+                onMouseOut={e => e.currentTarget.style.background = "#3b82f6"}
+              >
+                <span>🎥</span>
+                <span>Videolezione</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(`/lavagna?attivitaId=${initialData.id}`, '_blank')}
+                style={{
+                  flex: "1 1 calc(33.333% - 7px)",
+                  minWidth: 100,
+                  background: "#8b5cf6",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  transition: "all 0.2s",
+                  boxShadow: "0 2px 4px rgba(139, 92, 246, 0.2)"
+                }}
+                onMouseOver={e => e.currentTarget.style.background = "#7c3aed"}
+                onMouseOut={e => e.currentTarget.style.background = "#8b5cf6"}
+              >
+                <span>✏️</span>
+                <span>Lavagna</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ textAlign:"right" }}>
           <button
             type="button"
