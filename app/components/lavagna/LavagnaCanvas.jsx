@@ -2078,7 +2078,7 @@ export default function LavagnaCanvas({
         cleanup();
       } catch (_) {}
     };
-  }, [channelName]);
+  }, [channelName, utenteId, ruolo, isAdmin, lavagnaId, attivitaId, emitOrPublish, normalizeShape, clearLavagnaState, drawAll, drawIncrementalStroke, prepareStroke, applyViewport, setTratti, setForme, setSfondo]);
 
   // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());
