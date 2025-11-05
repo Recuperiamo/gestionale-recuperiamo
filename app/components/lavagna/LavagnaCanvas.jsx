@@ -1365,12 +1365,9 @@ export default function LavagnaCanvas({
       const stored = window.localStorage.getItem(spectatorStorageKey);
       if (stored === '1') {
         setSpectatorMode(true);
-      } else if (stored === '0') {
-        // Utente ha esplicitamente disattivato spectatorMode
-        setSpectatorMode(false);
       } else {
-        // Default: attiva spectatorMode per studenti
-        setSpectatorMode(true);
+        // Default: modalità spettatore DISABILITATA (da rifare da capo)
+        setSpectatorMode(false);
       }
     } catch (_) {}
   }, [spectatorStorageKey, isAdmin]);
