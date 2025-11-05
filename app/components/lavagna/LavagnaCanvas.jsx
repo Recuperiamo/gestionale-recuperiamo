@@ -1722,10 +1722,30 @@ export default function LavagnaCanvas({
         // other subscriptions (shapes, background, viewport, spectator) – keep original names
         const onShapeCreate = (msg) => {
           const { data } = msg || {};
-          console.log('[LAVAGNA-RECV] shape:create', { hasData: !!data, kind: data?.kind, id: data?.id });
+          console.log('[LAVAGNA-RECV] shape:create RAW', { 
+            hasData: !!data, 
+            kind: data?.kind, 
+            id: data?.id, 
+            senderId: data?.autoreUserId,
+            myUserId: utenteId
+          });
           if (!data) return;
+          
+          // Con echoMessages attivo, ignora le proprie forme per evitare duplicati
+          if (data.autoreUserId === utenteId) {
+            console.log('[LAVAGNA-RECV] Ignoring own shape:create (echo)');
+            return;
+          }
+          
           const normalized = normalizeShape(data);
           if (!normalized) return;
+          
+          console.log('[LAVAGNA-RECV] shape:create PROCESSING', { 
+            id: normalized.id, 
+            kind: normalized.kind,
+            willAdd: true
+          });
+          
           // If the creator included an inline data URL fallback (srcData), prefer it
           // for immediate rendering on clients that cannot fetch /api/materiale.
           try {
@@ -1736,7 +1756,11 @@ export default function LavagnaCanvas({
             }
           } catch (_) {}
           setForme((prev) => {
-            if (prev.find((f) => f.id === normalized.id)) return prev;
+            if (prev.find((f) => f.id === normalized.id)) {
+              console.log('[LAVAGNA-RECV] Shape already exists, skipping:', normalized.id);
+              return prev;
+            }
+            console.log('[LAVAGNA-RECV] Adding new shape:', normalized.id);
             return [...prev, normalized];
           });
           // Per le immagini, precarica e ridisegna quando pronta
@@ -2001,10 +2025,15 @@ export default function LavagnaCanvas({
     } catch (_) {}
     if (emit) {
       // Include srcPreview for realtime sync of pasted images
-      const payload = { ...normalized, lavagnaId };
+      const payload = { ...normalized, lavagnaId, senderId: utenteId };
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
         payload.srcPreview = normalized.src; // Include data URL for realtime clients
       }
+      console.log('[LAVAGNA-SEND] Publishing shape:create', { 
+        id: normalized.id, 
+        kind: normalized.kind,
+        senderId: utenteId
+      });
       emitOrPublish('shape:create', payload);
     }
     // try persist async (best-effort)
