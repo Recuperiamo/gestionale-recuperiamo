@@ -52,6 +52,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
   const [clienti, setClienti] = useState([]);
   const [pacchetti, setPacchetti] = useState([]);
+  const [clienteData, setClienteData] = useState(null); // Dati completi del cliente per link videolezione
   const [loadingClienti, setLoadingClienti] = useState(false);
   const [loadingPacchetti, setLoadingPacchetti] = useState(false);
   const [errorClienti, setErrorClienti] = useState(null);
@@ -91,6 +92,16 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         .finally(() => setLoadingClienti(false));
     }
   }, [isEdit]);
+
+  // Carica dati completi del cliente in modalità edit per avere linkVideolezione
+  useEffect(() => {
+    if (isEdit && initialData?.clienteId) {
+      fetch(`/api/clienti/${initialData.clienteId}`)
+        .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+        .then(data => setClienteData(data))
+        .catch(() => setClienteData(null));
+    }
+  }, [isEdit, initialData?.clienteId]);
 
   useEffect(() => {
     if (!isEdit && clienteId) {
@@ -511,7 +522,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
               {initialData.clienteId && (
                 <button
                   type="button"
-                  onClick={() => window.open(`/aula?clienteId=${initialData.clienteId}`, '_blank')}
+                  onClick={() => window.open(`/aula/${initialData.clienteId}`, '_blank')}
                   style={{
                     flex: "1 1 calc(33.333% - 7px)",
                     minWidth: 100,
@@ -537,33 +548,35 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
                   <span>Aula</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => window.open(`/attivita/${initialData.id}`, '_blank')}
-                style={{
-                  flex: "1 1 calc(33.333% - 7px)",
-                  minWidth: 100,
-                  background: "#3b82f6",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: "10px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  transition: "all 0.2s",
-                  boxShadow: "0 2px 4px rgba(59, 130, 246, 0.2)"
-                }}
-                onMouseOver={e => e.currentTarget.style.background = "#2563eb"}
-                onMouseOut={e => e.currentTarget.style.background = "#3b82f6"}
-              >
-                <span>🎥</span>
-                <span>Videolezione</span>
-              </button>
+              {clienteData?.linkVideolezione && (
+                <button
+                  type="button"
+                  onClick={() => window.open(clienteData.linkVideolezione, '_blank')}
+                  style={{
+                    flex: "1 1 calc(33.333% - 7px)",
+                    minWidth: 100,
+                    background: "#3b82f6",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "10px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    transition: "all 0.2s",
+                    boxShadow: "0 2px 4px rgba(59, 130, 246, 0.2)"
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = "#2563eb"}
+                  onMouseOut={e => e.currentTarget.style.background = "#3b82f6"}
+                >
+                  <span>🎥</span>
+                  <span>Videolezione</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => window.open(`/lavagna?attivitaId=${initialData.id}`, '_blank')}
