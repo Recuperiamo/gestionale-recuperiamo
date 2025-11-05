@@ -197,8 +197,16 @@ export default function LavagnaCanvas({
     (name, data) => {
       try {
         let ch = ablyRef.current.ch;
+        console.log('[LAVAGNA-EMIT-DEBUG]', {
+          event: name,
+          hasRefChannel: !!ch,
+          channelName,
+          timestamp: Date.now()
+        });
+        
         if (!ch) {
           ch = getAblyChannel(channelName);
+          console.log('[LAVAGNA-EMIT-DEBUG] Tried getAblyChannel (sync):', { hasChannel: !!ch });
         }
         
         if (ch) {
@@ -206,9 +214,10 @@ export default function LavagnaCanvas({
             try { console.log('[LAVAGNA-PUBLISH] channel=', channelName, 'event=', name, 'data=', data && (typeof data === 'object' ? JSON.parse(JSON.stringify(data)) : data)); } catch(_) { console.log('[LAVAGNA-PUBLISH] publish', name); }
           }
           ch.publish(name, data);
+          console.log('[LAVAGNA-PUBLISH-SUCCESS]', { event: name });
         } else {
           // Channel non pronto, accoda il messaggio
-          console.warn('[LAVAGNA-PUBLISH-QUEUED] Channel not ready, queueing message', { channelName, event: name });
+          console.warn('[LAVAGNA-PUBLISH-QUEUED] Channel not ready, queueing message', { channelName, event: name, queueLength: pendingMessages.current.length + 1 });
           pendingMessages.current.push({ name, data });
         }
       } catch (e) {
@@ -1655,7 +1664,9 @@ export default function LavagnaCanvas({
     let cleanup = () => {};
     (async () => {
       try {
+        console.log('[LAVAGNA-CHANNEL-INIT] Starting channel initialization for:', channelName);
         const ch = await getAblyChannelAsync(channelName);
+        console.log('[LAVAGNA-CHANNEL-INIT] Channel obtained:', { hasChannel: !!ch, channelName });
         ablyRef.current.ch = ch;
         if (!ch) {
           console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
@@ -1667,13 +1678,18 @@ export default function LavagnaCanvas({
           console.log('[LAVAGNA-QUEUE] Flushing pending messages:', pendingMessages.current.length);
           pendingMessages.current.forEach(({ name, data }) => {
             try {
+              console.log('[LAVAGNA-QUEUE-FLUSH]', { event: name, data });
               ch.publish(name, data);
             } catch (e) {
               console.error('[LAVAGNA-QUEUE-ERROR]', { event: name, error: e.message || e });
             }
           });
           pendingMessages.current = [];
+        } else {
+          console.log('[LAVAGNA-QUEUE] No pending messages to flush');
         }
+        
+        console.log('[LAVAGNA-CHANNEL-INIT] Channel ready, subscribing to events');
         
         whenChannelAttachedAsync(channelName).catch((err) => {
           console.warn('[LavagnaCanvas] channel attach failed', err?.message);
