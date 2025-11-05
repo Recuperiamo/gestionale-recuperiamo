@@ -194,16 +194,23 @@ export default function LavagnaCanvas({
     (name, data) => {
       try {
         const ch = getAblyChannel(channelName);
+        console.log('[LAVAGNA-PUBLISH-DEBUG] Attempting to publish', { 
+          channelName, 
+          event: name, 
+          hasChannel: !!ch,
+          dataKeys: data ? Object.keys(data) : null
+        });
         if (ch) {
           if (process.env.NODE_ENV !== 'production') {
             try { console.log('[LAVAGNA-PUBLISH] channel=', channelName, 'event=', name, 'data=', data && (typeof data === 'object' ? JSON.parse(JSON.stringify(data)) : data)); } catch(_) { console.log('[LAVAGNA-PUBLISH] publish', name); }
           }
           ch.publish(name, data);
+          console.log('[LAVAGNA-PUBLISH-SUCCESS]', { event: name, channelName });
         } else {
-          if (process.env.NODE_ENV !== 'production') console.warn('[LAVAGNA-PUBLISH] no channel available to publish', channelName, name);
+          console.warn('[LAVAGNA-PUBLISH-NO-CHANNEL] Channel not available', { channelName, event: name });
         }
       } catch (e) {
-        if (process.env.NODE_ENV !== 'production') console.error('[LAVAGNA-PUBLISH-ERROR]', name, e);
+        console.error('[LAVAGNA-PUBLISH-ERROR]', { event: name, error: e.message || e });
       }
     },
     [channelName]
