@@ -119,6 +119,30 @@ export default function LavagnaCanvas({
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
+  
+  // Refs for callback access to latest values (avoid re-creating subscriptions)
+  const utenteIdRef = useRef(utenteId);
+  const ruoloRef = useRef(ruolo);
+  const isAdminRef = useRef(false);
+  const lavagnaIdRef = useRef(lavagnaId);
+  const attivitaIdRef = useRef(attivitaId);
+  
+  useEffect(() => {
+    utenteIdRef.current = utenteId;
+  }, [utenteId]);
+  
+  useEffect(() => {
+    ruoloRef.current = ruolo;
+    isAdminRef.current = String(ruolo || "").toLowerCase() === "admin";
+  }, [ruolo]);
+  
+  useEffect(() => {
+    lavagnaIdRef.current = lavagnaId;
+  }, [lavagnaId]);
+  
+  useEffect(() => {
+    attivitaIdRef.current = attivitaId;
+  }, [attivitaId]);
 
   // Mobile responsive hook
   const [isMobile, setIsMobile] = useState(false);
@@ -1774,7 +1798,7 @@ export default function LavagnaCanvas({
             id: data?.id, 
             autoreUserId: data?.autoreUserId,
             senderId: data?.senderId,
-            myUserId: utenteId,
+            myUserId: utenteIdRef.current,
             msgStructure: Object.keys(data || {}),
             fullData: data
           });
@@ -1785,15 +1809,15 @@ export default function LavagnaCanvas({
           
           // Con echoMessages attivo, usa senderId per ignorare solo i propri messaggi echo
           // NON usare autoreUserId perché quello indica chi ha creato la forma (può essere diverso dal sender)
-          if (data.senderId && data.senderId === utenteId) {
-            console.log('[LAVAGNA-RECV] Ignoring own shape:create (echo)', { senderId: data.senderId, myUserId: utenteId });
+          if (data.senderId && data.senderId === utenteIdRef.current) {
+            console.log('[LAVAGNA-RECV] Ignoring own shape:create (echo)', { senderId: data.senderId, myUserId: utenteIdRef.current });
             return;
           }
           
           console.log('[LAVAGNA-RECV] shape:create WILL PROCESS (not echo)', { 
             senderId: data.senderId, 
-            myUserId: utenteId,
-            different: data.senderId !== utenteId
+            myUserId: utenteIdRef.current,
+            different: data.senderId !== utenteIdRef.current
           });
           
           const normalized = normalizeShape(data);
@@ -1888,15 +1912,15 @@ export default function LavagnaCanvas({
           }
         };
         const onBackgroundRequest = () => {
-          if (!isAdmin) return;
-          emitOrPublish('background:change', { lavagnaId, attivitaId, sfondo: sfondoRef.current });
+          if (!isAdminRef.current) return;
+          emitOrPublish('background:change', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current, sfondo: sfondoRef.current });
         };
         const pendingViewportRef = useRef(null);
         const viewportApplyRAFRef = useRef(null);
         const onViewportUpdate = (msg) => {
           const { data } = msg || {};
           if (!data) return;
-          if (data.senderId && data.senderId === utenteId) return;
+          if (data.senderId && data.senderId === utenteIdRef.current) return;
           const remotePan = data.pan;
           const remoteZoom = data.zoom;
           if (!remotePan && typeof remoteZoom !== 'number') return;
@@ -1910,7 +1934,7 @@ export default function LavagnaCanvas({
             ts: data.ts || Date.now()
           };
           latestAdminViewportRef.current = snapshot;
-          if (!isAdmin && spectatorModeRef.current) {
+          if (!isAdminRef.current && spectatorModeRef.current) {
             // Buffer viewport update and apply once per animation frame to prevent "jittering"
             pendingViewportRef.current = snapshot;
             if (viewportApplyRAFRef.current) {
@@ -1929,17 +1953,17 @@ export default function LavagnaCanvas({
           const { data } = msg || {};
           const { requesterId } = data || {};
           console.log('[LAVAGNA-RECV] viewport:request PARSED:', { 
-            isAdmin, 
-            myUserId: utenteId, 
+            isAdmin: isAdminRef.current, 
+            myUserId: utenteIdRef.current, 
             requesterId,
-            willRespond: isAdmin && requesterId !== utenteId
+            willRespond: isAdminRef.current && requesterId !== utenteIdRef.current
           });
-          if (!isAdmin) {
+          if (!isAdminRef.current) {
             console.log('[LAVAGNA-RECV] Not admin, ignoring viewport:request');
             return;
           }
           // Se echoMessages è attivo, ignora la propria richiesta
-          if (requesterId === utenteId) {
+          if (requesterId === utenteIdRef.current) {
             console.log('[LAVAGNA-RECV] Ignoring own viewport:request (echo)');
             return;
           }
@@ -1967,9 +1991,9 @@ export default function LavagnaCanvas({
           }
           console.log('[LAVAGNA-VIEWPORT] Admin responding to viewport:request from', requesterId, { visibleRect, canvasSize });
           emitOrPublish('viewport:update', {
-            lavagnaId,
-            attivitaId,
-            senderId: utenteId,
+            lavagnaId: lavagnaIdRef.current,
+            attivitaId: attivitaIdRef.current,
+            senderId: utenteIdRef.current,
             pan: { x: panRef.current.x, y: panRef.current.y },
             zoom: zoomRef.current,
             canvasSize,
@@ -1984,13 +2008,13 @@ export default function LavagnaCanvas({
           console.log('[LAVAGNA-SPECTATOR-TOGGLE] PARSED:', { 
             userId, 
             active, 
-            isAdmin, 
-            myUserId: utenteId,
-            willProcess: userId && userId !== utenteId
+            isAdmin: isAdminRef.current, 
+            myUserId: utenteIdRef.current,
+            willProcess: userId && userId !== utenteIdRef.current
           });
           if (!userId) return;
           // Ignora il proprio toggle (echoMessages attivo)
-          if (userId === utenteId) {
+          if (userId === utenteIdRef.current) {
             console.log('[LAVAGNA-SPECTATOR-TOGGLE] Ignoring own toggle (echo)');
             return;
           }
@@ -2006,13 +2030,13 @@ export default function LavagnaCanvas({
           console.log('[LAVAGNA-SPECTATOR-TOGGLE] Roster updated, count:', roster.size, 'roster:', Array.from(roster));
         };
         const onSpectatorRequest = () => {
-          if (isAdmin) return;
+          if (isAdminRef.current) return;
           if (!spectatorModeRef.current) return;
           emitOrPublish('spectator:toggle', {
-            lavagnaId,
-            attivitaId,
-            userId: utenteId,
-            ruolo,
+            lavagnaId: lavagnaIdRef.current,
+            attivitaId: attivitaIdRef.current,
+            userId: utenteIdRef.current,
+            ruolo: ruoloRef.current,
             active: true,
             ts: Date.now()
           });
@@ -2069,7 +2093,7 @@ export default function LavagnaCanvas({
         };
       } catch (e) {
         // If something went wrong loading ably, we simply won't attach realtime handlers.
-        ablyRef.current.ch = null;
+          ablyRef.current.ch = null;
       }
     })();
 
@@ -2078,9 +2102,9 @@ export default function LavagnaCanvas({
         cleanup();
       } catch (_) {}
     };
-  }, [channelName, utenteId, ruolo, isAdmin, lavagnaId, attivitaId, emitOrPublish, normalizeShape, clearLavagnaState, drawAll, drawIncrementalStroke, prepareStroke, applyViewport, setTratti, setForme, setSfondo]);
-
-  // Remote shapes ref (for in-flight updates)
+    // Only channelName in dependencies - other values accessed via refs/closures
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelName]);  // Remote shapes ref (for in-flight updates)
   const remoteShapes = useRef(new Map());
 
   // Shape CRUD helpers (local + realtime + persist)
