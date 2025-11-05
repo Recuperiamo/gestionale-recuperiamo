@@ -121,6 +121,8 @@ export async function POST(req) {
   const materia = formData.get("materia") || "";
   let sezione = (formData.get("sezione") || "MATERIALE").toString().trim().toUpperCase();
   if (!['MATERIALE','COMPITI','VOTI'].includes(sezione)) sezione = 'MATERIALE';
+  
+  const uploadBatchId = formData.get("uploadBatchId") || null;
 
   try {
     // Upload to Vercel Blob
@@ -140,7 +142,8 @@ export async function POST(req) {
         blobUrl: blob.url,
         mimeType: file.type || 'application/octet-stream',
         fileSize: file.size,
-        uploadedBy: user.email || 'unknown'
+        uploadedBy: user.email || 'unknown',
+        uploadBatchId: uploadBatchId
       }
     });
 

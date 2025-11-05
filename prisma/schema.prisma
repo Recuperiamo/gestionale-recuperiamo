@@ -215,12 +215,14 @@ model MaterialeDidattico {
   mimeType      String?
   fileSize      Int?
   uploadedBy    String?
+  uploadBatchId String?          // ID batch per raggruppare file caricati insieme
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   sezione       MaterialeSezione @default(MATERIALE)
 
   @@index([clienteId])
   @@index([createdAt])
+  @@index([uploadBatchId])
 }
 
 model Lavagna {

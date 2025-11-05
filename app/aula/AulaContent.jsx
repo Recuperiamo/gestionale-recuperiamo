@@ -438,6 +438,10 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
     }
     setLoading(true);
     const errors = [];
+    
+    // Genera uploadBatchId solo se ci sono più file
+    const uploadBatchId = files.length > 1 ? `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : null;
+    
     for (const file of files) {
       try {
         const titolo = nome.trim() ? nome.trim() : getDatalogString();
@@ -447,6 +451,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
   if (materia) formData.append("materia", materia);
   if (sezione) formData.append("sezione", sezione);
         formData.append("clienteId", clienteId);
+        if (uploadBatchId) formData.append("uploadBatchId", uploadBatchId);
         const res = await fetch("/api/materiale", { method: "POST", body: formData });
         if (!res.ok) {
           let msg = `Errore caricamento ${file.name}`;
@@ -611,7 +616,7 @@ function FileIcon({ tipo }) {
   return <span style={{...badgeTipo("altro"), background:"#bdbdbd", color:"#20489a"}}>{t.toUpperCase()}</span>;
 }
 
-// --- GROUP BY DAY ---
+// --- GROUP BY DAY AND BATCH ---
 function groupByDay(list) {
   const days = {};
   for (const item of list) {
@@ -621,8 +626,35 @@ function groupByDay(list) {
     days[dayKey].push(item);
   }
   // Ordina per giorno decrescente
-  return Object.entries(days)
-    .sort((a,b)=>b[0].localeCompare(a[0]));
+  const sortedDays = Object.entries(days).sort((a,b)=>b[0].localeCompare(a[0]));
+  
+  // Raggruppa per uploadBatchId all'interno di ogni giorno
+  return sortedDays.map(([day, items]) => {
+    const batches = {};
+    const singles = [];
+    
+    for (const item of items) {
+      if (item.uploadBatchId) {
+        if (!batches[item.uploadBatchId]) batches[item.uploadBatchId] = [];
+        batches[item.uploadBatchId].push(item);
+      } else {
+        singles.push(item);
+      }
+    }
+    
+    // Crea array con batch (se > 1 file) e singoli
+    const grouped = [];
+    Object.values(batches).forEach(batchItems => {
+      if (batchItems.length > 1) {
+        grouped.push({ isBatch: true, items: batchItems });
+      } else {
+        grouped.push(...batchItems);
+      }
+    });
+    grouped.push(...singles);
+    
+    return [day, grouped];
+  });
 }
 
 // --- MAIN PAGE ---
@@ -1129,12 +1161,136 @@ export default function AulaContent({ initialClienteId = null }) {
             <div style={emptyBox}>Nessun materiale trovato.</div>
           )}
 
-          {/* STREAM stile classroom con giorni */}
+          {/* STREAM stile classroom con giorni e batch */}
           <div style={streamWrap}>
-            {grouped.map(([giorno, materiali]) => (
+            {grouped.map(([giorno, items]) => (
               <React.Fragment key={giorno}>
                 <div style={{...dayHeaderStyle, color: coloreTema}}>{formatDayHeader(giorno)}</div>
-                {materiali.map(m => (
+                {items.map((item, idx) => {
+                  // Batch di file multipli
+                  if (item.isBatch) {
+                    const batchItems = item.items;
+                    const firstItem = batchItems[0];
+                    return (
+                      <div key={`batch-${firstItem.uploadBatchId}`} style={streamCard}>
+                        <div style={streamCardHead}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <h3 style={{...streamCardTitle, color: coloreTema}}>{firstItem.titolo}</h3>
+                            {firstItem.sezione && (
+                              <span style={{...badgeTipo(firstItem.sezione), background: coloreTema}}>
+                                {String(firstItem.sezione).toUpperCase()}
+                              </span>
+                            )}
+                            <span style={{fontSize:13,color:"#5a6d90"}}>({batchItems.length} file)</span>
+                          </div>
+                          {isAdmin && (
+                            <button
+                              style={streamMenuBtn}
+                              title="Elimina tutti"
+                              onClick={() => {
+                                if (window.confirm(`Eliminare tutti i ${batchItems.length} file?`)) {
+                                  batchItems.forEach(m => handleDeleteMateriale(m.id));
+                                }
+                              }}
+                            >✕</button>
+                          )}
+                        </div>
+                        <div style={streamCardBody}>
+                          {/* Griglia immagini batch */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: batchItems.length === 2 ? 'repeat(2, 1fr)' : batchItems.length === 3 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(150px, 1fr))',
+                            gap: 10,
+                            marginBottom: 12
+                          }}>
+                            {batchItems.slice(0, 4).map((m) => {
+                              const isImage = ["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase());
+                              return (
+                                <div 
+                                  key={m.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setPreviewItem(m)}
+                                  onKeyDown={(e)=>{ if(e.key==='Enter') setPreviewItem(m); }}
+                                  style={{
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    aspectRatio: '1',
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                    background: '#f5f7fa',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: '1px solid #e0e0e0'
+                                  }}
+                                >
+                                  {isImage ? (
+                                    <img
+                                      src={`/api/materiale?fileId=${m.id}`}
+                                      alt={m.nomeOriginale}
+                                      style={{width:'100%',height:'100%',objectFit:'cover'}}
+                                    />
+                                  ) : (
+                                    <div style={{textAlign:'center',padding:10}}>
+                                      <FileIcon tipo={m.tipo} />
+                                      <div style={{fontSize:11,color:'#5a6d90',marginTop:5,wordBreak:'break-word'}}>
+                                        {m.nomeOriginale}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {batchItems.length > 4 && (
+                              <div style={{
+                                cursor: 'pointer',
+                                position: 'relative',
+                                aspectRatio: '1',
+                                borderRadius: 8,
+                                background: '#f5f7fa',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '1px solid #e0e0e0',
+                                fontSize: 24,
+                                fontWeight: 700,
+                                color: coloreTema
+                              }}>
+                                +{batchItems.length - 4}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                            {firstItem.materia && <span style={{...categoria, background: `${coloreTema}20`, color: coloreTema}}>{firstItem.materia}</span>}
+                            {isAdmin && <span style={clientePill}>{getStudenteLabel(firstItem.clienteId)}</span>}
+                          </div>
+                          <div style={{fontSize:13,color:"#5a6d90",marginBottom:7}}>
+                            Caricato il {formatAggDate(firstItem.updatedAt)}
+                          </div>
+                          <div style={{ display:"flex", gap:10, marginBottom:12 }}>
+                            <button type="button" style={btnGhost} onClick={() => setPreviewItem(batchItems[0])}>
+                              Vedi file
+                            </button>
+                          </div>
+                          
+                          {/* Commenti batch */}
+                          <CommentiBox
+                            materialeId={firstItem.id}
+                            lista={commenti[firstItem.id] || []}
+                            user={session?.user}
+                            addCommento={addCommento}
+                            coloreTema={coloreTema}
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // File singolo
+                  const m = item;
+                  return (
                   <div key={m.id} style={streamCard}>
                     <div style={streamCardHead}>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1193,7 +1349,8 @@ export default function AulaContent({ initialClienteId = null }) {
                       />
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </React.Fragment>
             ))}
           </div>
