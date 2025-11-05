@@ -5023,16 +5023,16 @@ export default function LavagnaCanvas({
 
   // == CLEAR ==
   const pulisciLavagna = useCallback(() => {
-    if (!isAdmin) return;
+    if (!isAdminRef.current) return;
     if (!window.confirm("Sei sicuro di voler cancellare tutto ciò che è stato scritto nella lavagna? Questa operazione è irreversibile.")) return;
 
     clearLavagnaState();
     // Pubblica solo se il channel è pronto
     if (ablyRef.current.ch) {
-      emitOrPublish('clear-lavagna', { lavagnaId, attivitaId });
+      emitOrPublish('clear-lavagna', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current });
     }
 
-    fetch(`/api/lavagna/clear?lavagnaId=${lavagnaId}`, { method: 'DELETE' })
+    fetch(`/api/lavagna/clear?lavagnaId=${lavagnaIdRef.current}`, { method: 'DELETE' })
       .then((res) => {
         if (!res.ok) {
           console.error('[handleClear] Errore API nel pulire la lavagna:', res.statusText);
@@ -5041,14 +5041,14 @@ export default function LavagnaCanvas({
       .catch((error) => {
         console.error('[handleClear] Eccezione nella chiamata API per pulire la lavagna:', error);
       });
-  }, [isAdmin, clearLavagnaState, emitOrPublish, lavagnaId, attivitaId]);
+  }, [clearLavagnaState, emitOrPublish]);
 
   const handleChangeSfondo = useCallback((next) => {
-    if (!isAdmin) return;
+    if (!isAdminRef.current) return;
     setSfondo(next);
-    emitOrPublish('background:change', { lavagnaId, attivitaId, sfondo: next });
+    emitOrPublish('background:change', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current, sfondo: next });
     requestAnimationFrame(() => drawAll());
-  }, [isAdmin, lavagnaId, attivitaId, emitOrPublish, drawAll]);
+  }, [emitOrPublish, drawAll]);
 
   // == TOOLBAR ==
   const toolbar = useMemo(() => {

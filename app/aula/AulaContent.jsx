@@ -8,10 +8,12 @@ import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 // Componente per zoom e pan delle immagini
 function ImagePreviewWithZoom({ src, alt, coloreTema }) {
   const containerRef = useRef(null);
+  const imageRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
 
   const handleWheel = (e) => {
     e.preventDefault();
@@ -19,8 +21,17 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
     setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
   };
 
+  const isPannable = () => {
+    if (!containerRef.current || !imageDimensions.width || !imageDimensions.height) return false;
+    const container = containerRef.current.getBoundingClientRect();
+    const scaledWidth = imageDimensions.width * scale;
+    const scaledHeight = imageDimensions.height * scale;
+    // Allow pan if image is larger than container in either dimension
+    return scaledWidth > container.width || scaledHeight > container.height;
+  };
+
   const handleMouseDown = (e) => {
-    if (scale <= 1) return; // No pan if not zoomed
+    if (!isPannable()) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
@@ -142,7 +153,7 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
       </div>
 
       {/* Hint per utente */}
-      {scale > 1 && (
+      {isPannable() && (
         <div style={{
           position: 'absolute',
           bottom: 16,
@@ -171,13 +182,20 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+          cursor: isPannable() ? (isDragging ? 'grabbing' : 'grab') : 'default',
           overflow: 'hidden'
         }}
       >
         <img
+          ref={imageRef}
           src={src}
           alt={alt}
+          onLoad={(e) => {
+            setImageDimensions({
+              width: e.target.naturalWidth,
+              height: e.target.naturalHeight
+            });
+          }}
           style={{
             maxWidth: '100%',
             maxHeight: '80vh',
