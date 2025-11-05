@@ -1775,9 +1775,13 @@ export default function LavagnaCanvas({
             autoreUserId: data?.autoreUserId,
             senderId: data?.senderId,
             myUserId: utenteId,
-            msgStructure: Object.keys(data || {})
+            msgStructure: Object.keys(data || {}),
+            fullData: data
           });
-          if (!data) return;
+          if (!data) {
+            console.warn('[LAVAGNA-RECV] shape:create NO DATA');
+            return;
+          }
           
           // Con echoMessages attivo, usa senderId per ignorare solo i propri messaggi echo
           // NON usare autoreUserId perché quello indica chi ha creato la forma (può essere diverso dal sender)
@@ -1786,8 +1790,17 @@ export default function LavagnaCanvas({
             return;
           }
           
+          console.log('[LAVAGNA-RECV] shape:create WILL PROCESS (not echo)', { 
+            senderId: data.senderId, 
+            myUserId: utenteId,
+            different: data.senderId !== utenteId
+          });
+          
           const normalized = normalizeShape(data);
-          if (!normalized) return;
+          if (!normalized) {
+            console.warn('[LAVAGNA-RECV] shape:create NORMALIZATION FAILED', { data });
+            return;
+          }
           
           console.log('[LAVAGNA-RECV] shape:create PROCESSING', { 
             id: normalized.id, 
