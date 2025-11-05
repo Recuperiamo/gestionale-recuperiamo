@@ -105,6 +105,7 @@ export default function LavagnaCanvas({
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
   const spectatorIndicatorVisible = spectatorMode && !isAdmin;
+  const zoomDisabled = spectatorMode && !isAdmin;
   const latestAdminViewportRef = useRef(null);
   const viewportBroadcastRef = useRef({ rafId: null, payload: null });
   const pointerWorldRef = useRef(null);
