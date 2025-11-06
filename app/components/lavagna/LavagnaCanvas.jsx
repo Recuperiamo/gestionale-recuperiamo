@@ -1719,6 +1719,8 @@ export default function LavagnaCanvas({
           console.warn('[LavagnaCanvas] channel attach failed', err?.message);
         });
 
+        console.log('[LAVAGNA-SUB] Defining stroke callback functions...');
+        
         const onStart = (msg) => {
           const { data } = msg || {};
           const { streamId, strumento, colore, spessore, start } = data || {};
@@ -1782,12 +1784,32 @@ export default function LavagnaCanvas({
         const onClear = () => {
           clearLavagnaState();
         };
+        
+        console.log('[LAVAGNA-SUB] Stroke callbacks defined successfully');
 
-        ch.subscribe('stroke:start', onStart);
-        ch.subscribe('stroke:points', onPoints);
-        ch.subscribe('stroke:done', onDone);
-        ch.subscribe('stroke:delete', onDelete);
-        ch.subscribe('clear-lavagna', onClear);
+        try {
+          console.log('[LAVAGNA-SUB] Subscribing to stroke:start...');
+          ch.subscribe('stroke:start', onStart);
+          console.log('[LAVAGNA-SUB] stroke:start OK');
+          
+          console.log('[LAVAGNA-SUB] Subscribing to stroke:points...');
+          ch.subscribe('stroke:points', onPoints);
+          console.log('[LAVAGNA-SUB] stroke:points OK');
+          
+          console.log('[LAVAGNA-SUB] Subscribing to stroke:done...');
+          ch.subscribe('stroke:done', onDone);
+          console.log('[LAVAGNA-SUB] stroke:done OK');
+          
+          console.log('[LAVAGNA-SUB] Subscribing to stroke:delete...');
+          ch.subscribe('stroke:delete', onDelete);
+          console.log('[LAVAGNA-SUB] stroke:delete OK');
+          
+          console.log('[LAVAGNA-SUB] Subscribing to clear-lavagna...');
+          ch.subscribe('clear-lavagna', onClear);
+          console.log('[LAVAGNA-SUB] clear-lavagna OK');
+        } catch (strokeSubError) {
+          console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe to stroke events:', strokeSubError);
+        }
 
         // other subscriptions (shapes, background, viewport, spectator) – keep original names
         const onShapeCreate = (msg) => {
@@ -2041,9 +2063,11 @@ export default function LavagnaCanvas({
             ts: Date.now()
           });
         };
+        
+        console.log('[LAVAGNA-SUB] All shape callbacks defined successfully');
 
         try {
-          console.log('[LAVAGNA-SUB] Subscribing to stroke events...');
+          console.log('[LAVAGNA-SUB] Subscribing to shape events...');
           ch.subscribe('shape:create', onShapeCreate);
           console.log('[LAVAGNA-SUB] shape:create OK');
           ch.subscribe('shape:update', onShapeUpdate);
