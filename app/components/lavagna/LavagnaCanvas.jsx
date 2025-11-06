@@ -103,6 +103,8 @@ export default function LavagnaCanvas({
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
   const latestAdminViewportRef = useRef(null);
+  const pendingViewportRef = useRef(null);
+  const viewportApplyRAFRef = useRef(null);
   const viewportBroadcastRef = useRef({ rafId: null, payload: null });
   const pointerWorldRef = useRef(null);
   const spectatorStorageKey = useMemo(() => {
@@ -143,6 +145,14 @@ export default function LavagnaCanvas({
   useEffect(() => {
     attivitaIdRef.current = attivitaId;
   }, [attivitaId]);
+  
+  // Refs for callback functions to avoid recreating subscriptions
+  const drawAllRef = useRef(null);
+  const drawIncrementalStrokeRef = useRef(null);
+  const prepareStrokeRef = useRef(null);
+  const applyViewportRef = useRef(null);
+  const normalizeShapeRef = useRef(null);
+  const clearLavagnaStateRef = useRef(null);
 
   // Mobile responsive hook
   const [isMobile, setIsMobile] = useState(false);
@@ -1812,6 +1822,7 @@ export default function LavagnaCanvas({
         }
 
         // other subscriptions (shapes, background, viewport, spectator) – keep original names
+        console.log('[LAVAGNA-SUB] Defining shape callback: onShapeCreate...');
         const onShapeCreate = (msg) => {
           const { data } = msg || {};
           console.log('[LAVAGNA-RECV] shape:create RAW', { 
@@ -1886,6 +1897,8 @@ export default function LavagnaCanvas({
             drawAll();
           }
         };
+        console.log('[LAVAGNA-SUB] onShapeCreate defined');
+        
         const onShapeUpdate = (msg) => {
           const { data } = msg || {};
           if (!data || !data.id) return;
@@ -1912,6 +1925,8 @@ export default function LavagnaCanvas({
             drawAll();
           }
         };
+        console.log('[LAVAGNA-SUB] onShapeUpdate defined');
+        
         const onShapeDelete = (msg) => {
           const { data } = msg || {};
           if (!data || !data.id) return;
@@ -1920,6 +1935,8 @@ export default function LavagnaCanvas({
           setForme((prev) => prev.filter((f) => f.id !== data.id));
           drawAll();
         };
+        console.log('[LAVAGNA-SUB] onShapeDelete defined');
+        
         const onBackgroundChange = (msg) => {
           const { data } = msg || {};
           if (!data || !data.sfondo) return;
@@ -1933,12 +1950,14 @@ export default function LavagnaCanvas({
             setTimeout(drawAll, 0);
           }
         };
+        console.log('[LAVAGNA-SUB] onBackgroundChange defined');
+        
         const onBackgroundRequest = () => {
           if (!isAdminRef.current) return;
           emitOrPublish('background:change', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current, sfondo: sfondoRef.current });
         };
-        const pendingViewportRef = useRef(null);
-        const viewportApplyRAFRef = useRef(null);
+        console.log('[LAVAGNA-SUB] onBackgroundRequest defined');
+        
         const onViewportUpdate = (msg) => {
           const { data } = msg || {};
           if (!data) return;
