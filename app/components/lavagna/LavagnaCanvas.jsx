@@ -231,27 +231,15 @@ export default function LavagnaCanvas({
     (name, data) => {
       try {
         let ch = ablyRef.current.ch;
-        console.log('[LAVAGNA-EMIT-DEBUG]', {
-          event: name,
-          hasRefChannel: !!ch,
-          channelName,
-          timestamp: Date.now()
-        });
         
         if (!ch) {
           ch = getAblyChannel(channelName);
-          console.log('[LAVAGNA-EMIT-DEBUG] Tried getAblyChannel (sync):', { hasChannel: !!ch });
         }
         
         if (ch) {
-          if (process.env.NODE_ENV !== 'production') {
-            try { console.log('[LAVAGNA-PUBLISH] channel=', channelName, 'event=', name, 'data=', data && (typeof data === 'object' ? JSON.parse(JSON.stringify(data)) : data)); } catch(_) { console.log('[LAVAGNA-PUBLISH] publish', name); }
-          }
           ch.publish(name, data);
-          console.log('[LAVAGNA-PUBLISH-SUCCESS]', { event: name });
         } else {
           // Channel non pronto, accoda il messaggio
-          console.warn('[LAVAGNA-PUBLISH-QUEUED] Channel not ready, queueing message', { channelName, event: name, queueLength: pendingMessages.current.length + 1 });
           pendingMessages.current.push({ name, data });
         }
       } catch (e) {
@@ -1698,9 +1686,7 @@ export default function LavagnaCanvas({
     let cleanup = () => {};
     (async () => {
       try {
-        console.log('[LAVAGNA-CHANNEL-INIT] Starting channel initialization for:', channelName);
         const ch = await getAblyChannelAsync(channelName);
-        console.log('[LAVAGNA-CHANNEL-INIT] Channel obtained:', { hasChannel: !!ch, channelName });
         ablyRef.current.ch = ch;
         if (!ch) {
           console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
@@ -1709,64 +1695,45 @@ export default function LavagnaCanvas({
         
         // Svuota la queue dei messaggi pendenti
         if (pendingMessages.current.length > 0) {
-          console.log('[LAVAGNA-QUEUE] Flushing pending messages:', pendingMessages.current.length);
           pendingMessages.current.forEach(({ name, data }) => {
             try {
-              console.log('[LAVAGNA-QUEUE-FLUSH]', { event: name, data });
               ch.publish(name, data);
             } catch (e) {
               console.error('[LAVAGNA-QUEUE-ERROR]', { event: name, error: e.message || e });
             }
           });
           pendingMessages.current = [];
-        } else {
-          console.log('[LAVAGNA-QUEUE] No pending messages to flush');
         }
-        
-        console.log('[LAVAGNA-CHANNEL-INIT] Channel ready, subscribing to events');
         
         whenChannelAttachedAsync(channelName).catch((err) => {
           console.warn('[LavagnaCanvas] channel attach failed', err?.message);
         });
 
-        console.log('[LAVAGNA-SUB] Defining stroke callback functions...');
-        
         const onStart = (msg) => {
           const { data } = msg || {};
           const { streamId, strumento, colore, spessore, start } = data || {};
           if (!streamId || !start) return;
-          if (process.env.NODE_ENV !== 'production') {
-            try { console.log('[LAVAGNA-RECV] stroke:start', { streamId, start }); } catch(_) {}
-          }
           remoteStreams.current.set(streamId, {
             strumento,
             colore,
             spessore,
             punti: [start]
           });
-          // Non serve ridisegnare - il primo punto sarà disegnato con stroke:points
         };
 
         const onPoints = (msg) => {
           const { data } = msg || {};
           const { streamId, points } = data || {};
           if (!streamId || !Array.isArray(points) || points.length === 0) return;
-          if (process.env.NODE_ENV !== 'production') {
-            try { console.log('[LAVAGNA-RECV] stroke:points', { streamId, n: points.length }); } catch(_) {}
-          }
           const st = remoteStreams.current.get(streamId);
           if (!st) return;
           st.punti.push(...points);
-          // Disegna solo i nuovi punti invece di ridisegnare tutto
           drawIncrementalStroke(st, points);
         };
 
         const onDone = (msg) => {
           const { data } = msg || {};
           const { streamId } = data || {};
-          if (process.env.NODE_ENV !== 'production') {
-            try { console.log('[LAVAGNA-RECV] stroke:done', { streamId }); } catch(_) {}
-          }
           const st = remoteStreams.current.get(streamId);
           if (st && st.punti.length >= 2) {
             const definitivo = prepareStroke({
@@ -1780,7 +1747,6 @@ export default function LavagnaCanvas({
             setTratti((prev) => [...prev, definitivo]);
           }
           remoteStreams.current.delete(streamId);
-          // Non serve ridisegnare tutto - il tratto è già stato disegnato incrementalmente
         };
 
         const onDelete = (msg) => {
@@ -1794,110 +1760,50 @@ export default function LavagnaCanvas({
         const onClear = () => {
           clearLavagnaState();
         };
-        
-        console.log('[LAVAGNA-SUB] Stroke callbacks defined successfully');
 
         try {
-          console.log('[LAVAGNA-SUB] Subscribing to stroke:start...');
           ch.subscribe('stroke:start', onStart);
-          console.log('[LAVAGNA-SUB] stroke:start OK');
-          
-          console.log('[LAVAGNA-SUB] Subscribing to stroke:points...');
           ch.subscribe('stroke:points', onPoints);
-          console.log('[LAVAGNA-SUB] stroke:points OK');
-          
-          console.log('[LAVAGNA-SUB] Subscribing to stroke:done...');
           ch.subscribe('stroke:done', onDone);
-          console.log('[LAVAGNA-SUB] stroke:done OK');
-          
-          console.log('[LAVAGNA-SUB] Subscribing to stroke:delete...');
           ch.subscribe('stroke:delete', onDelete);
-          console.log('[LAVAGNA-SUB] stroke:delete OK');
-          
-          console.log('[LAVAGNA-SUB] Subscribing to clear-lavagna...');
           ch.subscribe('clear-lavagna', onClear);
-          console.log('[LAVAGNA-SUB] clear-lavagna OK');
         } catch (strokeSubError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe to stroke events:', strokeSubError);
         }
 
-        // other subscriptions (shapes, background, viewport, spectator) – keep original names
-        console.log('[LAVAGNA-SUB] Defining shape callback: onShapeCreate...');
         const onShapeCreate = (msg) => {
           const { data } = msg || {};
-          console.log('[LAVAGNA-RECV] shape:create RAW', { 
-            hasData: !!data, 
-            kind: data?.kind, 
-            id: data?.id, 
-            autoreUserId: data?.autoreUserId,
-            senderId: data?.senderId,
-            myUserId: utenteIdRef.current,
-            msgStructure: Object.keys(data || {}),
-            fullData: data
-          });
-          if (!data) {
-            console.warn('[LAVAGNA-RECV] shape:create NO DATA');
-            return;
-          }
+          if (!data) return;
           
           // Con echoMessages attivo, usa senderId per ignorare solo i propri messaggi echo
-          // NON usare autoreUserId perché quello indica chi ha creato la forma (può essere diverso dal sender)
-          if (data.senderId && data.senderId === utenteIdRef.current) {
-            console.log('[LAVAGNA-RECV] Ignoring own shape:create (echo)', { senderId: data.senderId, myUserId: utenteIdRef.current });
-            return;
-          }
-          
-          console.log('[LAVAGNA-RECV] shape:create WILL PROCESS (not echo)', { 
-            senderId: data.senderId, 
-            myUserId: utenteIdRef.current,
-            different: data.senderId !== utenteIdRef.current
-          });
+          if (data.senderId && data.senderId === utenteIdRef.current) return;
           
           const normalized = normalizeShape(data);
-          if (!normalized) {
-            console.warn('[LAVAGNA-RECV] shape:create NORMALIZATION FAILED', { data });
-            return;
-          }
-          
-          console.log('[LAVAGNA-RECV] shape:create PROCESSING', { 
-            id: normalized.id, 
-            kind: normalized.kind,
-            autore: normalized.autoreUserId,
-            willAdd: true
-          });
+          if (!normalized) return;
           
           // If the creator included an inline data URL fallback (srcData), prefer it
-          // for immediate rendering on clients that cannot fetch /api/materiale.
           try {
-            // accept either srcData (older) or srcPreview (preferred small preview)
             const preview = data.srcPreview || data.srcData;
             if (preview && normalized.kind === 'immagine') {
               normalized.src = preview;
             }
           } catch (_) {}
+          
           setForme((prev) => {
-            if (prev.find((f) => f.id === normalized.id)) {
-              console.log('[LAVAGNA-RECV] Shape already exists, skipping:', normalized.id);
-              return prev;
-            }
-            console.log('[LAVAGNA-RECV] Adding new shape:', normalized.id);
+            if (prev.find((f) => f.id === normalized.id)) return prev;
             return [...prev, normalized];
           });
+          
           // Per le immagini, precarica e ridisegna quando pronta
           if (normalized.kind === 'immagine' && normalized.src) {
             const img = new Image();
-            img.onload = () => {
-              drawAll();
-            };
-            img.onerror = () => {
-              drawAll(); // Disegna comunque anche se errore
-            };
+            img.onload = () => drawAll();
+            img.onerror = () => drawAll();
             img.src = normalized.src;
           } else {
             drawAll();
           }
         };
-        console.log('[LAVAGNA-SUB] onShapeCreate defined');
         
         const onShapeUpdate = (msg) => {
           const { data } = msg || {};
@@ -1925,7 +1831,6 @@ export default function LavagnaCanvas({
             drawAll();
           }
         };
-        console.log('[LAVAGNA-SUB] onShapeUpdate defined');
         
         const onShapeDelete = (msg) => {
           const { data } = msg || {};
@@ -1935,7 +1840,6 @@ export default function LavagnaCanvas({
           setForme((prev) => prev.filter((f) => f.id !== data.id));
           drawAll();
         };
-        console.log('[LAVAGNA-SUB] onShapeDelete defined');
         
         const onBackgroundChange = (msg) => {
           const { data } = msg || {};
@@ -1950,13 +1854,11 @@ export default function LavagnaCanvas({
             setTimeout(drawAll, 0);
           }
         };
-        console.log('[LAVAGNA-SUB] onBackgroundChange defined');
         
         const onBackgroundRequest = () => {
           if (!isAdminRef.current) return;
           emitOrPublish('background:change', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current, sfondo: sfondoRef.current });
         };
-        console.log('[LAVAGNA-SUB] onBackgroundRequest defined');
         
         const onViewportUpdate = (msg) => {
           const { data } = msg || {};
@@ -1990,25 +1892,11 @@ export default function LavagnaCanvas({
           }
         };
         const onViewportRequest = (msg) => {
-          console.log('[LAVAGNA-RECV] viewport:request RAW MESSAGE:', msg);
           const { data } = msg || {};
           const { requesterId } = data || {};
-          console.log('[LAVAGNA-RECV] viewport:request PARSED:', { 
-            isAdmin: isAdminRef.current, 
-            myUserId: utenteIdRef.current, 
-            requesterId,
-            willRespond: isAdminRef.current && requesterId !== utenteIdRef.current
-          });
-          if (!isAdminRef.current) {
-            console.log('[LAVAGNA-RECV] Not admin, ignoring viewport:request');
-            return;
-          }
-          // Se echoMessages è attivo, ignora la propria richiesta
-          if (requesterId === utenteIdRef.current) {
-            console.log('[LAVAGNA-RECV] Ignoring own viewport:request (echo)');
-            return;
-          }
-          // Calcola visibleRect come nel broadcast normale
+          if (!isAdminRef.current) return;
+          if (requesterId === utenteIdRef.current) return;
+          
           const canvas = canvasRef.current;
           let visibleRect = null;
           let canvasSize = null;
@@ -2030,7 +1918,6 @@ export default function LavagnaCanvas({
               };
             } catch (_) {}
           }
-          console.log('[LAVAGNA-VIEWPORT] Admin responding to viewport:request from', requesterId, { visibleRect, canvasSize });
           emitOrPublish('viewport:update', {
             lavagnaId: lavagnaIdRef.current,
             attivitaId: attivitaIdRef.current,
@@ -2043,32 +1930,18 @@ export default function LavagnaCanvas({
           });
         };
         const onSpectatorToggle = (msg) => {
-          console.log('[LAVAGNA-SPECTATOR-TOGGLE] RAW MESSAGE:', msg);
           const { data } = msg || {};
           const { userId, active } = data || {};
-          console.log('[LAVAGNA-SPECTATOR-TOGGLE] PARSED:', { 
-            userId, 
-            active, 
-            isAdmin: isAdminRef.current, 
-            myUserId: utenteIdRef.current,
-            willProcess: userId && userId !== utenteIdRef.current
-          });
           if (!userId) return;
-          // Ignora il proprio toggle (echoMessages attivo)
-          if (userId === utenteIdRef.current) {
-            console.log('[LAVAGNA-SPECTATOR-TOGGLE] Ignoring own toggle (echo)');
-            return;
-          }
+          if (userId === utenteIdRef.current) return;
+          
           const roster = spectatorRosterRef.current;
           if (active) {
-            console.log('[LAVAGNA-SPECTATOR-TOGGLE] Adding user to roster:', userId);
             roster.add(userId);
           } else {
-            console.log('[LAVAGNA-SPECTATOR-TOGGLE] Removing user from roster:', userId);
             roster.delete(userId);
           }
           setSpectatorCount(roster.size);
-          console.log('[LAVAGNA-SPECTATOR-TOGGLE] Roster updated, count:', roster.size, 'roster:', Array.from(roster));
         };
         const onSpectatorRequest = () => {
           if (isAdminRef.current) return;
@@ -2082,40 +1955,21 @@ export default function LavagnaCanvas({
             ts: Date.now()
           });
         };
-        
-        console.log('[LAVAGNA-SUB] All shape callbacks defined successfully');
 
         try {
-          console.log('[LAVAGNA-SUB] Subscribing to shape events...');
           ch.subscribe('shape:create', onShapeCreate);
-          console.log('[LAVAGNA-SUB] shape:create OK');
           ch.subscribe('shape:update', onShapeUpdate);
-          console.log('[LAVAGNA-SUB] shape:update OK');
           ch.subscribe('shape:delete', onShapeDelete);
-          console.log('[LAVAGNA-SUB] shape:delete OK');
           ch.subscribe('background:change', onBackgroundChange);
-          console.log('[LAVAGNA-SUB] background:change OK');
           ch.subscribe('background:request', onBackgroundRequest);
-          console.log('[LAVAGNA-SUB] background:request OK');
           ch.subscribe('viewport:update', onViewportUpdate);
-          console.log('[LAVAGNA-SUB] viewport:update OK');
           ch.subscribe('viewport:request', onViewportRequest);
-          console.log('[LAVAGNA-SUB] viewport:request OK');
           ch.subscribe('spectator:toggle', onSpectatorToggle);
-          console.log('[LAVAGNA-SUB] spectator:toggle OK');
           ch.subscribe('spectator:request', onSpectatorRequest);
-          console.log('[LAVAGNA-SUB] spectator:request OK');
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
         
-        console.log('[LAVAGNA-SUBSCRIPTION] All subscriptions registered', {
-          channelName,
-          events: ['stroke:start', 'stroke:points', 'stroke:done', 'stroke:delete', 'clear-lavagna', 
-                   'shape:create', 'shape:update', 'shape:delete', 'background:change', 'background:request',
-                   'viewport:update', 'viewport:request', 'spectator:toggle', 'spectator:request']
-        });
-
         cleanup = () => {
           try {
             ch.unsubscribe('stroke:start', onStart);
@@ -2178,42 +2032,22 @@ export default function LavagnaCanvas({
       // Include srcPreview for realtime sync of pasted images
       const payload = { ...normalized, lavagnaId, senderId: utenteId };
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
-        payload.srcPreview = normalized.src; // Include data URL for realtime clients
+        payload.srcPreview = normalized.src;
       }
-      console.log('[LAVAGNA-SEND] Publishing shape:create', { 
-        id: normalized.id, 
-        kind: normalized.kind,
-        senderId: utenteId
-      });
       emitOrPublish('shape:create', payload);
     }
     // try persist async (best-effort)
     persistShape(normalized).then((s) => {
       if (s && s.id) {
-        console.log('[LAVAGNA-CREATE] Shape persisted, mapping dbId:', { localId: normalized.id, dbId: s.id, kind: normalized.kind });
-        setForme((prev) => {
-          const found = prev.find((f) => f.id === normalized.id);
-          console.log('[LAVAGNA-CREATE] setForme mapping:', { localId: normalized.id, foundInState: !!found });
-          return prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f));
-        });
+        setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
         // If this shape was queued for deletion before dbId arrived, delete now
-        console.log('[LAVAGNA-CREATE] Checking pendingDeletions:', { 
-          localId: normalized.id, 
-          hasPending: pendingDeletions.current.has(normalized.id),
-          queueSize: pendingDeletions.current.size,
-          queueKeys: Array.from(pendingDeletions.current.keys())
-        });
         if (pendingDeletions.current.has(normalized.id)) {
           pendingDeletions.current.delete(normalized.id);
-          console.log('[LAVAGNA-DELAYED-DELETE] Shape was deleted before persist, deleting now with dbId:', { localId: normalized.id, dbId: s.id, kind: normalized.kind });
           fetch(`/api/lavagna/shape/${s.id}`, { method: 'DELETE' })
-            .then(res => console.log('[LAVAGNA-DELAYED-DELETE] DELETE response:', res.status))
-            .catch(err => console.error('[LAVAGNA-DELAYED-DELETE] DELETE error:', err));
+            .catch(err => console.error('[LAVAGNA] Error deleting delayed shape:', err));
         }
-      } else {
-        console.warn('[LAVAGNA-CREATE] Shape persist failed or returned no id:', s);
       }
-    }).catch(err => console.error('[LAVAGNA-CREATE] Error persisting shape:', err));
+    }).catch(err => console.error('[LAVAGNA] Error persisting shape:', err));
   }, [emitOrPublish, lavagnaId, persistShape, utenteId]);
 
   const updateShapeLocal = useCallback((shape, emit = true) => {
