@@ -122,6 +122,11 @@ export default function LavagnaCanvas({
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
   
+  // Laser pointer refs for spectator mode
+  const laserLayerRef = useRef(null);
+  const laserDotsRef = useRef(new Map()); // userId -> dot element
+  const myLaserActiveRef = useRef(false);
+  
   // Refs for callback access to latest values (avoid re-creating subscriptions)
   const utenteIdRef = useRef(utenteId);
   const ruoloRef = useRef(ruolo);
@@ -1682,6 +1687,45 @@ export default function LavagnaCanvas({
     }
   }, []);
 
+  // Render laser dot for spectator pointer
+  const renderLaserDot = useCallback((userId, worldX, worldY, active) => {
+    if (!laserLayerRef.current) return;
+
+    // Convert world coords to screen coords
+    const screenX = (worldX - pan.x) * zoom;
+    const screenY = (worldY - pan.y) * zoom;
+    
+    let dot = laserDotsRef.current.get(userId);
+    
+    if (!active) {
+      // Remove dot if exists
+      if (dot) {
+        dot.remove();
+        laserDotsRef.current.delete(userId);
+      }
+      return;
+    }
+    
+    // Create or update dot
+    if (!dot) {
+      dot = document.createElement('div');
+      dot.style.position = 'absolute';
+      dot.style.width = '20px';
+      dot.style.height = '20px';
+      dot.style.borderRadius = '50%';
+      dot.style.background = 'radial-gradient(circle, rgba(255,0,0,0.9) 0%, rgba(255,0,0,0.4) 70%, rgba(255,0,0,0) 100%)';
+      dot.style.pointerEvents = 'none';
+      dot.style.transform = 'translate(-50%, -50%)';
+      dot.style.zIndex = '1000';
+      dot.style.transition = 'left 0.05s, top 0.05s';
+      laserLayerRef.current.appendChild(dot);
+      laserDotsRef.current.set(userId, dot);
+    }
+    
+    dot.style.left = `${screenX}px`;
+    dot.style.top = `${screenY}px`;
+  }, [pan, zoom]);
+
   useEffect(() => {
     let cleanup = () => {};
     (async () => {
@@ -1956,6 +2000,14 @@ export default function LavagnaCanvas({
           });
         };
 
+        const onLaserUpdate = (msg) => {
+          const { data } = msg || {};
+          if (!data) return;
+          const { userId, worldX, worldY, active } = data;
+          if (!userId || userId === utenteIdRef.current) return;
+          renderLaserDot(userId, worldX, worldY, active);
+        };
+
         try {
           ch.subscribe('shape:create', onShapeCreate);
           ch.subscribe('shape:update', onShapeUpdate);
@@ -1966,6 +2018,7 @@ export default function LavagnaCanvas({
           ch.subscribe('viewport:request', onViewportRequest);
           ch.subscribe('spectator:toggle', onSpectatorToggle);
           ch.subscribe('spectator:request', onSpectatorRequest);
+          ch.subscribe('laser:update', onLaserUpdate);
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
@@ -1986,6 +2039,7 @@ export default function LavagnaCanvas({
             ch.unsubscribe('viewport:request', onViewportRequest);
             ch.unsubscribe('spectator:toggle', onSpectatorToggle);
             ch.unsubscribe('spectator:request', onSpectatorRequest);
+            ch.unsubscribe('laser:update', onLaserUpdate);
           } catch (_) {}
         };
       } catch (e) {
@@ -3226,6 +3280,24 @@ export default function LavagnaCanvas({
         return cachedPoint;
       };
 
+    // Spectator laser pointer mode (replace drawing with laser indicator)
+    if (btn === 0 && spectatorLocked) {
+      const p = getPointerWorld();
+      if (p) {
+        myLaserActiveRef.current = true;
+        // Render locally so the spectator sees their own pointer
+        renderLaserDot(utenteId, p.x, p.y, true);
+        // Broadcast to others
+        emitOrPublish('laser:update', {
+          userId: utenteId,
+          worldX: p.x,
+          worldY: p.y,
+          active: true
+        });
+      }
+      return;
+    }
+
     if (btn === 2) {
       // Right-click: start context panning. If the current tool is not 'mano',
       // temporarily switch to 'mano' so the user can pan with right-drag and
@@ -3657,6 +3729,24 @@ export default function LavagnaCanvas({
 
   function pointerMove(e) {
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
+    
+    // Spectator laser pointer continuous update
+    if (spectatorLocked && myLaserActiveRef.current) {
+      const p = getPoint(e);
+      if (p) {
+        // Update local dot
+        renderLaserDot(utenteId, p.x, p.y, true);
+        // Broadcast
+        emitOrPublish('laser:update', {
+          userId: utenteId,
+          worldX: p.x,
+          worldY: p.y,
+          active: true
+        });
+      }
+      return;
+    }
+    
     // If panning active (hand) update pan
     if (panningRef.current.active) {
       if (spectatorLocked) {
@@ -4121,8 +4211,28 @@ export default function LavagnaCanvas({
 
   function pointerUp(e) {
     const pointerId = e?.nativeEvent?.pointerId;
+    const spectatorLocked = spectatorModeRef.current && !isAdmin;
     const pendingClick = selectionClickRef.current;
     const dragInfo = draggingSelectionRef.current;
+
+    // Spectator laser pointer deactivate
+    if (spectatorLocked && myLaserActiveRef.current) {
+      myLaserActiveRef.current = false;
+      // Remove local dot
+      const dot = laserDotsRef.current.get(utenteId);
+      if (dot) {
+        try { dot.remove(); } catch(_) {}
+        laserDotsRef.current.delete(utenteId);
+      }
+      emitOrPublish('laser:update', {
+        userId: utenteId,
+        worldX: 0,
+        worldY: 0,
+        active: false
+      });
+      return;
+    }
+    
     // (no-op) -- overlay visibility will be reconciled below depending on
     // whether the pointer remains over the canvas and current tool.
     // finalize any selection drag
@@ -5683,6 +5793,19 @@ export default function LavagnaCanvas({
             ...st.canvas,
             // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
             cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'gomma') ? 'none' : canvasCursor))
+          }}
+        />
+        {/* Laser overlay layer (no pointer events, sits above canvas) */}
+        <div
+          ref={laserLayerRef}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'none',
+            zIndex: 2
           }}
         />
       </div>

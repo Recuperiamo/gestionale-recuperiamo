@@ -36,6 +36,8 @@ const stubShapeResponse = (body) => {
 
 export default function LavagnaSandboxPage() {
   const [mounted, setMounted] = useState(false);
+  const [ruolo, setRuolo] = useState('admin');
+  const [spectatorWanted, setSpectatorWanted] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -86,20 +88,29 @@ export default function LavagnaSandboxPage() {
     };
   }, []);
 
-  const props = useMemo(
-    () => ({
-      lavagnaId: "sandbox-lavagna",
-      attivitaId: "sandbox-attivita",
-      trattiIniziali: [],
-      utenteId: "sandbox-user",
-      clienteId: "sandbox-cliente",
-      ruolo: "admin",
-      altezza: 640,
-      openInNewWindow: false,
-      isNewLavagna: true
-    }),
-    []
-  );
+  // Aggiorna localStorage spectator sulla modifica
+  useEffect(() => {
+    const key = `lavagna:spectator:sandbox-attivita:sandbox-user`;
+    try {
+      if (ruolo !== 'admin' && spectatorWanted) {
+        localStorage.setItem(key, '1');
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch(_) {}
+  }, [ruolo, spectatorWanted]);
+
+  const props = useMemo(() => ({
+    lavagnaId: "sandbox-lavagna",
+    attivitaId: "sandbox-attivita",
+    trattiIniziali: [],
+    utenteId: "sandbox-user",
+    clienteId: "sandbox-cliente",
+    ruolo,
+    altezza: 640,
+    openInNewWindow: false,
+    isNewLavagna: true
+  }), [ruolo]);
 
   if (!mounted) {
     return (
@@ -116,6 +127,23 @@ export default function LavagnaSandboxPage() {
       <p style={styles.subtitle}>
         Test locale dell&apos;interazione canvas senza backend o realtime.
       </p>
+      <div style={styles.controls}>
+        <label style={styles.ctrlLabel}>Ruolo:
+          <select value={ruolo} onChange={(e)=>setRuolo(e.target.value)} style={styles.select}>
+            <option value="admin">admin</option>
+            <option value="studente">studente</option>
+          </select>
+        </label>
+        <label style={styles.ctrlLabel}>
+          <input
+            type="checkbox"
+            disabled={ruolo==='admin'}
+            checked={spectatorWanted}
+            onChange={(e)=>setSpectatorWanted(e.target.checked)}
+          /> modalità spettatore
+        </label>
+        <small style={styles.hint}>In modalità spettatore (studente) il click mostra il puntatore laser.</small>
+      </div>
       <div style={styles.canvasContainer}>
         <LavagnaCanvas {...props} />
       </div>
@@ -149,5 +177,37 @@ const styles = {
     padding: 24,
     borderRadius: 18,
     boxShadow: "0 22px 48px rgba(15,52,135,0.18)"
+  }
+  ,controls: {
+    maxWidth: 1200,
+    margin: '0 auto 20px',
+    background: '#fff',
+    padding: '16px 20px',
+    borderRadius: 16,
+    boxShadow: '0 10px 28px rgba(15,52,135,0.12)',
+    display: 'flex',
+    gap: 20,
+    alignItems: 'center',
+    flexWrap: 'wrap'
+  },
+  ctrlLabel: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#1f3d7a',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8
+  },
+  select: {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: '1px solid #c9d9f3',
+    background: '#f8fbff',
+    fontWeight: 600
+  },
+  hint: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: '#3559a8'
   }
 };
