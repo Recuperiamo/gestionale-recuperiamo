@@ -22,6 +22,22 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
     setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
   };
 
+  // Aggiungi event listener nativo per bloccare lo scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const wheelHandler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
+    };
+    
+    container.addEventListener('wheel', wheelHandler, { passive: false });
+    return () => container.removeEventListener('wheel', wheelHandler);
+  }, []);
+
   const isPannable = () => {
     if (!containerRef.current || !imageDimensions.width || !imageDimensions.height) return false;
     const container = containerRef.current.getBoundingClientRect();
@@ -175,7 +191,6 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
       {/* Container immagine con zoom e pan */}
       <div
         ref={containerRef}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         style={{
           width: '100%',
