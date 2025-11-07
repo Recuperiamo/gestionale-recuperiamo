@@ -1380,7 +1380,7 @@ export default function AulaContent({ initialClienteId = null }) {
       {/* Modale upload */}
       {/* Modale preview materiale */}
       {previewItem && (
-        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:20}} onClick={() => setPreviewItem(null)}>
+        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:20}} onClick={() => setPreviewItem(null)} onWheel={(e) => e.stopPropagation()}>
           <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1000,height:'90vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
               <div style={{fontWeight:700,color: coloreTema}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
