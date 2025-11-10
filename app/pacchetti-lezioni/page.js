@@ -375,7 +375,7 @@ export default function PacchettiLezioniPage() {
             doc.text(pacchettoLabel, 14, y);
             const labelWidth = doc.getTextWidth(pacchettoLabel);
             doc.setFont(undefined, 'normal');
-            doc.text(pac.titolo || `Pacchetto #${pac.id}`, 14 + labelWidth, y);
+            doc.text(pac.descrizione && pac.descrizione.trim() ? pac.descrizione : `Pacchetto #${pac.id}`, 14 + labelWidth, y);
             y += 6;
           }
         } else if (selectedPacchettoTitle) {
@@ -585,7 +585,7 @@ export default function PacchettiLezioniPage() {
       }
       if (filtroPacchetto) {
         const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
-        if (pac) text += `Pacchetto: ${pac.titolo || pac.id}\n`;
+        if (pac) text += `Pacchetto: ${pac.descrizione && pac.descrizione.trim() ? pac.descrizione : `Pacchetto #${pac.id}`}\n`;
       } else if (selectedPacchettoTitle) {
         text += `Pacchetto: ${selectedPacchettoTitle}\n`;
       }
