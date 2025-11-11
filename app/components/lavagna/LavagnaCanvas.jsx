@@ -1543,41 +1543,29 @@ export default function LavagnaCanvas({
           const localW = rect.width;
           const localH = rect.height;
           if (localW > 0 && localH > 0) {
-            // Add padding: 10% on mobile, 8% on desktop to prevent content touching edges
-            const isMobileSpectator = localW <= 768;
-            const paddingFactor = isMobileSpectator ? 0.9 : 0.92;
-
-            // Compute base zoom to fit admin's rect, then apply paddingFactor
+            // Compute zoom to exactly fit admin's visible rect with minimal safety margin
             const fitScaleX = localW / visibleRect.width;
             const fitScaleY = localH / visibleRect.height;
-            const baseZoom = Math.min(fitScaleX, fitScaleY);
-            const targetZoom = baseZoom * paddingFactor;
-            const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
-
-            // Compute padding in pixels for the fitted content
-            const fittedW = visibleRect.width * clampedZoom;
-            const fittedH = visibleRect.height * clampedZoom;
-            const paddingX = (localW - fittedW) / 2;
-            const paddingY = (localH - fittedH) / 2;
+            const targetZoom = Math.min(fitScaleX, fitScaleY);
+            
+            // Add tiny margin (0.1%) to prevent edge cropping due to rounding
+            const safetyFactor = 0.999;
+            const clampedZoom = Math.max(0.1, Math.min(5, targetZoom * safetyFactor));
 
             // Debug spectator viewport
             console.log('[SPECTATOR] Viewport calc:', {
               localW, localH,
               visibleRect,
-              paddingFactor,
-              fitScaleX, fitScaleY, baseZoom, targetZoom, clampedZoom,
-              fittedW, fittedH,
-              paddingX, paddingY
+              fitScaleX, fitScaleY, targetZoom, safetyFactor, clampedZoom
             });
             
-            // Position the admin's visible rect centered with padding offset
-            // Use center to minimize rounding error drift; add epsilon to avoid edge cropping
+            // Position the admin's visible rect centered
+            // Center alignment ensures content is fully visible and symmetric
             const centerX = visibleRect.x + visibleRect.width / 2;
             const centerY = visibleRect.y + visibleRect.height / 2;
-            const epsilon = 1.5; // world pixels safety margin
             const newPan = {
-              x: centerX - (localW / 2) / clampedZoom - (epsilon / clampedZoom),
-              y: centerY - (localH / 2) / clampedZoom - (epsilon / clampedZoom)
+              x: centerX - (localW / 2) / clampedZoom,
+              y: centerY - (localH / 2) / clampedZoom
             };
             
             console.log('[SPECTATOR] New pan:', newPan, 'vs visibleRect:', visibleRect);
@@ -1657,9 +1645,9 @@ export default function LavagnaCanvas({
       });
       outgoingBufferRef.current = [];
     }
-    // Continua finché si disegna - throttle a 20/sec (50ms) invece di 60fps per evitare rate limit
+    // Continua finché si disegna - throttle a 60fps (16ms) per cattura più reattiva
     if (disegnando) {
-      outgoingRAFRef.current = setTimeout(flushOutgoing, 50);
+      outgoingRAFRef.current = setTimeout(flushOutgoing, 16);
     } else {
       outgoingRAFRef.current = null;
     }
@@ -2753,10 +2741,9 @@ export default function LavagnaCanvas({
   function simplifyAndSmooth(rawPoints) {
     if (!Array.isArray(rawPoints) || rawPoints.length < 2) return rawPoints || [];
   const z = zoomRef.current || 1;
-  // COMPLETAMENTE DISABILITATO: accetta TUTTI i punti per catturare anche
-  // i tratti più corti (punti su i, simboli × ÷, numeri 2/3, lettera z)
-  // Nessun filtro di distanza minima - ogni punto catturato viene mantenuto
-  const minDist = 0; // ZERO = accetta tutto, nessun filtro
+  // minDist = 1 world px per filtrare jitter tavoletta mantenendo dettaglio
+  // Accetta simboli piccoli (punti, virgole) ma elimina rumore sub-pixel
+  const minDist = 1; // 1 px world coordinate
     const dedup = [];
     let last = null;
     for (const p of rawPoints) {
@@ -2771,9 +2758,8 @@ export default function LavagnaCanvas({
     
     if (dedup.length < 2) return dedup;
     // apply Chaikin smoothing to reduce jitter.
-    // Keep iterations moderate — more iterations increase density but also
-    // can oversmooth small features. 4 iterations is a good balance.
-    const smoothed = chaikinSubdivision(dedup, 4);
+    // Ridotto a 2 iterazioni per mantenere fedeltà input tablet
+    const smoothed = chaikinSubdivision(dedup, 2);
     // If the subdivision produced an extremely large number of points (e.g.
     // when input was already dense), resample down to a safe cap while
     // preserving arc-length distribution so we don't lose visual detail.
