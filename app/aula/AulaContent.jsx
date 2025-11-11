@@ -715,6 +715,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [items, setItems] = useState([]);
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMateria, setFiltroMateria] = useState("");
+  const [filtroSottocategoria, setFiltroSottocategoria] = useState("");
   const [search, setSearch] = useState("");
   // Stato modale Voti
   const [showVoto, setShowVoto] = useState(false);
@@ -849,6 +850,9 @@ export default function AulaContent({ initialClienteId = null }) {
     if (filtroMateria) {
       list = list.filter(it => it.materia === filtroMateria);
     }
+    if (filtroSottocategoria) {
+      list = list.filter(it => it.sottocategoria === filtroSottocategoria);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(it =>
@@ -857,7 +861,7 @@ export default function AulaContent({ initialClienteId = null }) {
       );
     }
     return list.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  }, [items, filtroTipo, filtroMateria, search, activeTab]);
+  }, [items, filtroTipo, filtroMateria, filtroSottocategoria, search, activeTab]);
 
   // Tipi di file mostrati come tag in ordine fisso
   const TIPI_TAG_ORDER = [
@@ -1088,6 +1092,45 @@ export default function AulaContent({ initialClienteId = null }) {
                   {tipo.toUpperCase()}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+        {/* Filtro Sottocategoria (solo se ci sono materiali con sottocategorie) */}
+        {hasTarget && items.some(it => it.sottocategoria) && (
+          <div style={{...sidebarBox, marginTop: 0}}>
+            <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Tipo materiale</div>
+            <div style={{display:"flex", flexWrap:"wrap", gap:"8px"}}>
+              <button
+                onClick={() => setFiltroSottocategoria("")}
+                style={{
+                  ...tagButton,
+                  background: filtroSottocategoria === "" ? coloreTema : `${coloreTema}15`,
+                  color: filtroSottocategoria === "" ? "#fff" : coloreTema,
+                  borderColor: filtroSottocategoria === "" ? coloreTema : `${coloreTema}40`
+                }}
+              >
+                Tutti
+              </button>
+              {['TEORIA', 'SIMULAZIONI', 'ESERCIZI'].map(sottocat => {
+                const hasItems = items.some(it => it.sottocategoria === sottocat);
+                if (!hasItems) return null;
+                const label = sottocat === 'TEORIA' ? 'Teoria' : 
+                             sottocat === 'SIMULAZIONI' ? 'Simulazioni' : 'Esercizi';
+                return (
+                  <button
+                    key={sottocat}
+                    onClick={() => setFiltroSottocategoria(sottocat)}
+                    style={{
+                      ...tagButton,
+                      background: filtroSottocategoria === sottocat ? coloreTema : `${coloreTema}15`,
+                      color: filtroSottocategoria === sottocat ? "#fff" : coloreTema,
+                      borderColor: filtroSottocategoria === sottocat ? coloreTema : `${coloreTema}40`
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

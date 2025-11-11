@@ -1540,9 +1540,9 @@ export default function LavagnaCanvas({
           const localW = rect.width;
           const localH = rect.height;
           if (localW > 0 && localH > 0) {
-            // Add padding for mobile: keep margin so content doesn't touch edges
+            // Add padding: 10% on mobile, 5% on desktop to prevent content touching edges
             const isMobileSpectator = localW <= 768;
-            const paddingFactor = isMobileSpectator ? 0.9 : 0.95; // 10% padding on mobile, 5% on desktop
+            const paddingFactor = isMobileSpectator ? 0.9 : 0.95;
             
             // Compute zoom to fit admin's visible rect into our canvas (with padding)
             const scaleX = (localW * paddingFactor) / visibleRect.width;
@@ -1551,9 +1551,13 @@ export default function LavagnaCanvas({
             // Clamp zoom to allowed range
             const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
             
-            // Calculate padding in canvas pixels
-            const paddingX = (localW - localW * paddingFactor) / 2;
-            const paddingY = (localH - localH * paddingFactor) / 2;
+            // Calculate the fitted content dimensions after zoom
+            const fittedW = visibleRect.width * clampedZoom;
+            const fittedH = visibleRect.height * clampedZoom;
+            
+            // Calculate padding in canvas pixels (centering offset)
+            const paddingX = (localW - fittedW) / 2;
+            const paddingY = (localH - fittedH) / 2;
             
             // Position the admin's visible rect with padding offset
             // pan represents top-left corner of the viewport in world coordinates
@@ -3333,6 +3337,12 @@ export default function LavagnaCanvas({
       const pointerId = native?.pointerId;
       const canvas = canvasRef.current;
       const spectatorLocked = spectatorModeRef.current && !isAdmin;
+      
+      // Block all interactions in spectator mode (except eye button handled in UI)
+      if (spectatorLocked) {
+        return;
+      }
+      
       selectionClickRef.current = null;
 
       let cachedPoint = null;
@@ -3350,9 +3360,6 @@ export default function LavagnaCanvas({
       // temporarily switch to 'mano' so the user can pan with right-drag and
       // see the hand cursor. We'll restore the previous tool on pointer up/cancel.
       e.preventDefault();
-      if (spectatorLocked) {
-        return;
-      }
       try {
         // If not already the hand tool, remember current and switch to 'mano'
         if (strumento !== 'mano') {
@@ -4610,10 +4617,14 @@ export default function LavagnaCanvas({
           punti: trattoFinale,
           autoreUserId: utenteId,
         });
-        setTratti(prev => [...prev, gommaStroke]);
+        setTratti(prev => {
+          const updated = [...prev, gommaStroke];
+          // Pass updated array to salvaTratto to avoid race condition
+          salvaTratto(gommaStroke, updated);
+          return updated;
+        });
         setUndoStack(prev => [...prev, { type: 'add', stroke: gommaStroke }]);
         setRedoStack([]);
-        salvaTratto(gommaStroke);
       } else if (strumento !== 'gomma') {
         const nuovoTratto = prepareStroke({
           id: currentStreamId.current, // Usa l'ID dello stream per coerenza
@@ -4623,10 +4634,14 @@ export default function LavagnaCanvas({
           punti: trattoFinale,
           autoreUserId: utenteId,
         });
-        setTratti(prev => [...prev, nuovoTratto]);
+        setTratti(prev => {
+          const updated = [...prev, nuovoTratto];
+          // Pass updated array to salvaTratto to avoid race condition
+          salvaTratto(nuovoTratto, updated);
+          return updated;
+        });
         setUndoStack(prev => [...prev, { type: 'add', stroke: nuovoTratto }]);
         setRedoStack([]);
-        salvaTratto(nuovoTratto);
       }
     }
 
@@ -4703,7 +4718,7 @@ export default function LavagnaCanvas({
   }
 
   // == SALVATAGGIO STROKE ==
-  async function salvaTratto(t) {
+  async function salvaTratto(t, currentTrattiArray = null) {
     try {
       // mark saving without triggering re-render
       salvandoRef.current = true;
@@ -4715,7 +4730,9 @@ export default function LavagnaCanvas({
       // CRITICAL: Use current punti from state, not the original ones
       // This fixes the bug where moving a stroke immediately after drawing
       // would create a duplicate because the original coordinates were saved
-      const currentStroke = tratti.find(s => s.id === t.id);
+      // Use provided array if available (for immediate saves), otherwise use state
+      const trattiToSearch = currentTrattiArray || tratti;
+      const currentStroke = trattiToSearch.find(s => s.id === t.id);
       const puntiToSave = currentStroke ? currentStroke.punti : t.punti;
       
       // If stroke already has dbId, UPDATE it instead of creating a new one
