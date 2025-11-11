@@ -476,13 +476,11 @@ export default function LavagnaCanvas({
         try {
           const rot = Number(f.rotation) || 0;
           if (rot && isFinite(rot)) {
-            const bb = f._bb ?? getShapeBounds(f) ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-            // rotate around the top-left corner of the shape's bounding box
-            const px = bb.minX;
-            const py = bb.minY;
-            ctx.translate(px, py);
+            // Rotate around the shape center for correct visual/selection alignment
+            const c = getShapeCenter(f);
+            ctx.translate(c.x, c.y);
             ctx.rotate(rot);
-            ctx.translate(-px, -py);
+            ctx.translate(-c.x, -c.y);
           }
         } catch(_) {}
 
@@ -2861,6 +2859,23 @@ export default function LavagnaCanvas({
     return { minX, minY, maxX, maxY };
   }
 
+  function getShapeCenter(shape) {
+    if (!shape) return { x: 0, y: 0 };
+    const kind = shape.kind;
+    if (kind === 'linea' || kind === 'segmento' || kind === 'freccia') {
+      const x1 = Number(shape.x1 ?? shape.x ?? 0);
+      const y1 = Number(shape.y1 ?? shape.y ?? 0);
+      const x2 = Number(shape.x2 ?? shape.x1 ?? x1);
+      const y2 = Number(shape.y2 ?? shape.y1 ?? y1);
+      return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+    }
+    const baseX = Number(shape.x ?? 0);
+    const baseY = Number(shape.y ?? 0);
+    const width = Number(shape.w ?? (shape.x2 != null ? shape.x2 - baseX : 0));
+    const height = Number(shape.h ?? (shape.y2 != null ? shape.y2 - baseY : 0));
+    return { x: baseX + width / 2, y: baseY + height / 2 };
+  }
+
   function hitTestShape(shape, x, y, tolerance = 12) {
     if (!shape) return false;
     const kind = shape.kind;
@@ -3596,11 +3611,11 @@ export default function LavagnaCanvas({
           const rotDist = Math.hypot(rotDx, rotDy);
           
           if (rotDist <= rotateSize/2) {
-            // Clicked on rotation button - start rotating!
-            // Instead of free rotate start, perform a 90° clockwise snap rotate immediately (usable quick action)
-            rotateSelectionQuarter(1);
+            // Quick controls: clockwise +90° on click, counterclockwise on Shift+click
+            const direction = native?.shiftKey ? -1 : 1;
+            rotateSelectionQuarter(direction);
             drawAll();
-            return;            
+            return;
           }
           
           // Check if the user clicked on a resize handle (after rotation button check)
