@@ -34,10 +34,9 @@ export default function LavagnaCanvas({
     }
     return 'penna';
   }); // penna|gomma|mano|selezione|shape-tools
-  // Default color: if this is a new lavagna, start with Grafite (#111827),
-  // otherwise keep the historical default (Blu) until the user changes it.
-  const [colore, setColore] = useState(() => (isNewLavagna ? '#111827' : '#20489a'));
-  const [spessore, setSpessore] = useState(3);
+  // Default color: Nero puro e spessore sottile
+  const [colore, setColore] = useState('#000000');
+  const [spessore, setSpessore] = useState(1); // default sottile
   const [tratti, setTratti] = useState(() =>
     (trattiIniziali || []).map((s) =>
       prepareStroke({
@@ -333,9 +332,9 @@ export default function LavagnaCanvas({
     ctx.save();
     ctx.setTransform(worldScale, 0, 0, worldScale, (-pan.x) * worldScale, (-pan.y) * worldScale);
     
-    ctx.globalCompositeOperation = streamData.strumento === 'gomma' ? 'destination-out' : 'source-over';
-    ctx.strokeStyle = streamData.strumento === 'gomma' ? '#fff' : streamData.colore || '#20489a';
-    ctx.lineWidth = streamData.spessore || 3;
+  ctx.globalCompositeOperation = streamData.strumento === 'gomma' ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = streamData.strumento === 'gomma' ? '#fff' : streamData.colore || '#111827';
+  ctx.lineWidth = streamData.spessore || 1;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
@@ -440,9 +439,9 @@ export default function LavagnaCanvas({
     // Disegno forme preesistenti (prima dei tratti)
     for (const f of forme) {
       ctx.save();
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = f.colore || '#20489a';
-      ctx.lineWidth = f.spessore || 3;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = f.colore || '#111827';
+  ctx.lineWidth = f.spessore || 1;
         // If the shape carries a rotation, apply a world-space transform so
         // rendering rotates around the shape's center. We keep this minimal
         // (rotation only affects visual rendering), bounding boxes/hit-tests
@@ -967,8 +966,8 @@ export default function LavagnaCanvas({
     tratti.forEach((t) => {
       if (!t.punti || t.punti.length < 2) return;
       ctx.globalCompositeOperation = t.strumento === 'gomma' ? 'destination-out' : 'source-over';
-      ctx.strokeStyle = t.strumento === 'gomma' ? '#fff' : t.colore || '#20489a';
-      ctx.lineWidth = t.spessore || 3;
+  ctx.strokeStyle = t.strumento === 'gomma' ? '#fff' : t.colore || '#111827';
+  ctx.lineWidth = t.spessore || 1;
       ctx.beginPath();
       t.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
       ctx.stroke();
@@ -978,8 +977,8 @@ export default function LavagnaCanvas({
     for (const st of remoteStreams.current.values()) {
       if (!st.punti || st.punti.length < 2) continue;
       ctx.globalCompositeOperation = st.strumento === 'gomma' ? 'destination-out' : 'source-over';
-      ctx.strokeStyle = st.strumento === 'gomma' ? '#fff' : st.colore || '#20489a';
-      ctx.lineWidth = st.spessore || 3;
+  ctx.strokeStyle = st.strumento === 'gomma' ? '#fff' : st.colore || '#111827';
+  ctx.lineWidth = st.spessore || 1;
       ctx.beginPath();
       st.punti.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
       ctx.stroke();
@@ -989,8 +988,8 @@ export default function LavagnaCanvas({
     const puntiLocali = puntiCorrentiRef.current;
     if (puntiLocali.length >= 2) {
       ctx.globalCompositeOperation = (strumento === 'gomma' && gommaPuntuale) ? 'destination-out' : 'source-over';
-      ctx.strokeStyle = strumento === 'gomma' ? '#fff' : colore;
-      ctx.lineWidth = spessore;
+  ctx.strokeStyle = strumento === 'gomma' ? '#fff' : colore;
+  ctx.lineWidth = spessore;
       ctx.beginPath();
       puntiLocali.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
       ctx.stroke();
@@ -1000,8 +999,8 @@ export default function LavagnaCanvas({
       const ps = previewShapeRef.current;
       if (ps) {
         ctx.save();
-  ctx.strokeStyle = ps.colore || '#20489a';
-  ctx.lineWidth = (ps.spessore || 2) / safeZoom;
+  ctx.strokeStyle = ps.colore || '#111827';
+  ctx.lineWidth = (ps.spessore || 1) / safeZoom;
   ctx.setLineDash([6 / safeZoom, 4 / safeZoom]);
         const startX = ps.xStart ?? ps.x;
         const startY = ps.yStart ?? ps.y;

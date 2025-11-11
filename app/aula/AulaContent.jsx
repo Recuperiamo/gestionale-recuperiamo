@@ -715,7 +715,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [items, setItems] = useState([]);
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMateria, setFiltroMateria] = useState("");
-  const [filtroSottocategoria, setFiltroSottocategoria] = useState("");
+  const [filtroSottocategoria, setFiltroSottocategoria] = useState(null); // obbligatoria
   const [search, setSearch] = useState("");
   // Stato modale Voti
   const [showVoto, setShowVoto] = useState(false);
@@ -726,7 +726,7 @@ export default function AulaContent({ initialClienteId = null }) {
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
-  const [activeTab, setActiveTab] = useState("bacheca"); // bacheca, compiti, materiale, voti
+  const [activeTab, setActiveTab] = useState("materiale"); // imposta default obbligatorio (materiale o compiti)
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
   const myClienteId = session?.user?.clienteId ? String(session.user.clienteId) : "";
@@ -850,8 +850,12 @@ export default function AulaContent({ initialClienteId = null }) {
     if (filtroMateria) {
       list = list.filter(it => it.materia === filtroMateria);
     }
+    const hasAnySotto = items.some(it => it.sottocategoria);
     if (filtroSottocategoria) {
       list = list.filter(it => it.sottocategoria === filtroSottocategoria);
+    } else if (hasAnySotto) {
+      // se ci sono sottocategorie ma non è selezionata: vuoto (obbligatoria)
+      list = [];
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -904,6 +908,23 @@ export default function AulaContent({ initialClienteId = null }) {
   
   // Colore tema dello studente (default blu se non impostato)
   const coloreTema = studenteCorrente?.coloreTema || "#1cb0f6";
+
+  // Enforce mandatory sottocategoria selection when available for current section (materiale/compiti)
+  useEffect(() => {
+    const sez = (activeTab || '').toUpperCase();
+    if (sez !== 'MATERIALE' && sez !== 'COMPITI') return;
+    const cats = Array.from(new Set(items
+      .filter(it => (it.sezione || '').toUpperCase() === sez)
+      .map(it => it.sottocategoria)
+      .filter(Boolean)));
+    if (cats.length === 0) {
+      if (filtroSottocategoria !== null) setFiltroSottocategoria(null);
+      return;
+    }
+    if (!cats.includes(filtroSottocategoria)) {
+      setFiltroSottocategoria(cats[0]);
+    }
+  }, [items, activeTab]);
 
   async function handleDeleteMateriale(fileId) {
     if (!window.confirm("Sei sicuro di voler eliminare questo materiale?")) return;
@@ -997,7 +1018,7 @@ export default function AulaContent({ initialClienteId = null }) {
         <div style={{marginBottom:14}}>
           <div style={{fontSize:12,fontWeight:600,color:"#5a6d90",marginBottom:6}}>SEZIONI</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {["materiale", "compiti", "voti"].map(sez => {
+            {["materiale", "compiti"].map(sez => {
               const isActive = activeTab === sez;
               return (
                 <button
@@ -1014,17 +1035,7 @@ export default function AulaContent({ initialClienteId = null }) {
                 </button>
               );
             })}
-            <button
-              onClick={() => setActiveTab("bacheca")}
-              style={{
-                ...tagButton,
-                background: activeTab === "bacheca" ? coloreTema : `${coloreTema}15`,
-                color: activeTab === "bacheca" ? "#fff" : coloreTema,
-                borderColor: activeTab === "bacheca" ? coloreTema : `${coloreTema}40`
-              }}
-            >
-              Tutto
-            </button>
+            {/* Rimosso 'Tutto' per rendere obbligatoria la selezione materiale/compiti */}
           </div>
         </div>
 
@@ -1095,22 +1106,11 @@ export default function AulaContent({ initialClienteId = null }) {
             </div>
           </div>
         )}
-        {/* Filtro Sottocategoria (solo se ci sono materiali con sottocategorie) */}
+        {/* Filtro Sottocategoria (obbligatorio se presenti sottocategorie) */}
         {hasTarget && items.some(it => it.sottocategoria) && (
           <div style={{...sidebarBox, marginTop: 0}}>
             <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Tipo materiale</div>
             <div style={{display:"flex", flexWrap:"wrap", gap:"8px"}}>
-              <button
-                onClick={() => setFiltroSottocategoria("")}
-                style={{
-                  ...tagButton,
-                  background: filtroSottocategoria === "" ? coloreTema : `${coloreTema}15`,
-                  color: filtroSottocategoria === "" ? "#fff" : coloreTema,
-                  borderColor: filtroSottocategoria === "" ? coloreTema : `${coloreTema}40`
-                }}
-              >
-                Tutti
-              </button>
               {['TEORIA', 'SIMULAZIONI', 'ESERCIZI'].map(sottocat => {
                 const hasItems = items.some(it => it.sottocategoria === sottocat);
                 if (!hasItems) return null;
