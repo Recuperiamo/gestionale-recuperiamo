@@ -1783,7 +1783,15 @@ export default function LavagnaCanvas({
             const updated = { ...t };
             if (data.punti) {
               updated.punti = data.punti;
-              updated._bb = getShapeBounds(updated);
+              // Recalculate bounding box for stroke (not shape!)
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              for (const p of updated.punti) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+              }
+              updated._bb = { minX, maxX, minY, maxY };
             }
             if (data.colore) updated.colore = data.colore;
             if (data.spessore) updated.spessore = data.spessore;
@@ -2345,8 +2353,15 @@ export default function LavagnaCanvas({
         ...t,
         punti: t.punti.map(p => ({ x: p.x + dx, y: p.y + dy }))
       };
-      // Update bounding box
-      movedStroke._bb = getShapeBounds(movedStroke);
+      // Update bounding box for stroke
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of movedStroke.punti) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      movedStroke._bb = { minX, maxX, minY, maxY };
       updatedStrokes.push(movedStroke);
       return movedStroke;
     }));
