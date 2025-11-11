@@ -1757,6 +1757,26 @@ export default function LavagnaCanvas({
           drawAll();
         };
 
+        const onStrokeUpdate = (msg) => {
+          const { data } = msg || {};
+          if (!data || !data.id) return;
+          // Ignore own updates (echo)
+          if (data.senderId && data.senderId === utenteIdRef.current) return;
+          
+          setTratti((prev) => prev.map((t) => {
+            if (String(t.id) !== String(data.id) && String(t.id) !== String(data.streamId)) return t;
+            const updated = { ...t };
+            if (data.punti) {
+              updated.punti = data.punti;
+              updated._bb = getShapeBounds(updated);
+            }
+            if (data.colore) updated.colore = data.colore;
+            if (data.spessore) updated.spessore = data.spessore;
+            return updated;
+          }));
+          drawAll();
+        };
+
         const onClear = () => {
           clearLavagnaState();
         };
@@ -1766,6 +1786,7 @@ export default function LavagnaCanvas({
           ch.subscribe('stroke:points', onPoints);
           ch.subscribe('stroke:done', onDone);
           ch.subscribe('stroke:delete', onDelete);
+          ch.subscribe('stroke:update', onStrokeUpdate);
           ch.subscribe('clear-lavagna', onClear);
         } catch (strokeSubError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe to stroke events:', strokeSubError);
@@ -1976,6 +1997,7 @@ export default function LavagnaCanvas({
             ch.unsubscribe('stroke:points', onPoints);
             ch.unsubscribe('stroke:done', onDone);
             ch.unsubscribe('stroke:delete', onDelete);
+            ch.unsubscribe('stroke:update', onStrokeUpdate);
             ch.unsubscribe('clear-lavagna', onClear);
             ch.unsubscribe('shape:create', onShapeCreate);
             ch.unsubscribe('shape:update', onShapeUpdate);
@@ -2292,17 +2314,51 @@ export default function LavagnaCanvas({
     const selection = selectionOverride || selectedItems;
     if (!selection) return;
     const updatedShapes = [];
+    const updatedStrokes = [];
+    
     setForme(prev => prev.map(f => {
       if (!selection.forme.includes(f.id)) return f;
       const moved = translateShape(f, dx, dy);
       updatedShapes.push(moved);
       return moved;
     }));
-    // Move strokes (shift points)
-    setTratti(prev => prev.map((t, idx) => selection.tratti.includes(idx) ? ({ ...t, punti: t.punti.map(p => ({ x: p.x + dx, y: p.y + dy })) }) : t));
+    
+    // Move strokes (shift points) and update bounding boxes
+    setTratti(prev => prev.map((t, idx) => {
+      if (!selection.tratti.includes(idx)) return t;
+      const movedStroke = {
+        ...t,
+        punti: t.punti.map(p => ({ x: p.x + dx, y: p.y + dy }))
+      };
+      // Update bounding box
+      movedStroke._bb = getShapeBounds(movedStroke);
+      updatedStrokes.push(movedStroke);
+      return movedStroke;
+    }));
+    
     if (emit) {
+      // Emit shape updates
       updatedShapes.forEach((shape) => {
         emitOrPublish('shape:update', { ...shape, lavagnaId });
+      });
+      
+      // Emit stroke updates (realtime sync)
+      updatedStrokes.forEach((stroke) => {
+        emitOrPublish('stroke:update', {
+          id: stroke.id,
+          streamId: stroke.id,
+          punti: stroke.punti,
+          lavagnaId
+        });
+        
+        // Save to database (async, don't block)
+        if (stroke.dbId) {
+          fetch(`/api/lavagna/tratto/${stroke.dbId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ punti: stroke.punti })
+          }).catch(err => console.error('[LAVAGNA] Error saving moved stroke:', err));
+        }
       });
     }
     drawAll();
@@ -4211,6 +4267,7 @@ export default function LavagnaCanvas({
       // If the user moved the selection, persist the final positions to server
       if (dragInfo.moved) {
         try {
+          // Persist shapes
           const selIds = (dragInfo.selectionSnapshot && Array.isArray(dragInfo.selectionSnapshot.forme) && dragInfo.selectionSnapshot.forme.length)
             ? dragInfo.selectionSnapshot.forme
             : (selectedItems && Array.isArray(selectedItems.forme) ? selectedItems.forme : []);
@@ -4220,6 +4277,31 @@ export default function LavagnaCanvas({
               if (s) {
                 // Persist final shape position to server and notify remote clients
                 updateShapeLocal(s, true);
+              }
+            } catch(_) {}
+          }
+          
+          // Persist strokes
+          const selStrokeIndexes = (dragInfo.selectionSnapshot && Array.isArray(dragInfo.selectionSnapshot.tratti) && dragInfo.selectionSnapshot.tratti.length)
+            ? dragInfo.selectionSnapshot.tratti
+            : (selectedItems && Array.isArray(selectedItems.tratti) ? selectedItems.tratti : []);
+          for (const idx of selStrokeIndexes) {
+            try {
+              const stroke = tratti[idx];
+              if (stroke && stroke.dbId) {
+                // Final emit to ensure sync
+                emitOrPublish('stroke:update', {
+                  id: stroke.id,
+                  streamId: stroke.id,
+                  punti: stroke.punti,
+                  lavagnaId
+                });
+                // Persist to DB
+                fetch(`/api/lavagna/tratto/${stroke.dbId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ punti: stroke.punti })
+                }).catch(err => console.error('[LAVAGNA] Error persisting stroke position:', err));
               }
             } catch(_) {}
           }
@@ -4391,6 +4473,14 @@ export default function LavagnaCanvas({
     }
 
     if (!disegnando) {
+      // Clean up touch tracking and gesture mode
+      if (e?.nativeEvent?.pointerType === 'touch') {
+        touchesRef.current.delete(e.nativeEvent.pointerId);
+        if (touchesRef.current.size < 2 && gestureRef.current.mode === 'panzoom') {
+          gestureRef.current.mode = 'none';
+        }
+      }
+      
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}
@@ -5002,13 +5092,13 @@ export default function LavagnaCanvas({
 
     // Responsive button styles
     const iconBtn = (active) => ({
-      width: isMobile ? 40 : 36,
-      height: isMobile ? 40 : 36,
-      minWidth: isMobile ? 40 : 36,
+      width: isMobile ? 32 : 36,
+      height: isMobile ? 32 : 36,
+      minWidth: isMobile ? 32 : 36,
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: isMobile ? 10 : 12,
+      borderRadius: isMobile ? 8 : 12,
       border: active ? '1px solid rgba(27,102,220,0.2)' : '1px solid rgba(212,223,246,0.9)',
       background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(248,251,255,0.96)',
       color: active ? '#fff' : '#20489a',
@@ -5016,23 +5106,25 @@ export default function LavagnaCanvas({
       cursor: 'pointer',
       transition: 'transform .15s ease, box-shadow .2s ease',
       fontWeight: 700,
-      fontSize: 18
+      fontSize: isMobile ? 16 : 18,
+      touchAction: isMobile ? 'manipulation' : 'auto'
     });
 
     const shapeBtn = (active) => ({
-      width: isMobile ? 42 : 46,
-      height: isMobile ? 42 : 46,
+      width: isMobile ? 36 : 46,
+      height: isMobile ? 36 : 46,
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: isMobile ? 10 : 12,
+      borderRadius: isMobile ? 8 : 12,
       border: active ? '1.5px solid rgba(27,102,220,0.3)' : '1px solid rgba(212,223,246,0.9)',
       background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(255,255,255,0.9)',
       color: active ? '#fff' : '#20489a',
       boxShadow: active ? '0 8px 18px rgba(28,125,247,0.25)' : '0 2px 8px rgba(15,42,105,0.1)',
       cursor: 'pointer',
       transition: 'all .15s ease',
-      padding: 0
+      padding: 0,
+      touchAction: isMobile ? 'manipulation' : 'auto'
     });
 
     // Responsive toolbar styles
@@ -5054,9 +5146,9 @@ export default function LavagnaCanvas({
     const commandBar = {
       display: 'flex',
       alignItems: 'center',
-      gap: isMobile ? 6 : 10,
-      padding: isMobile ? '8px 10px' : '10px 14px',
-      borderRadius: isMobile ? 14 : 16,
+      gap: isMobile ? 4 : 10,
+      padding: isMobile ? '6px 8px' : '10px 14px',
+      borderRadius: isMobile ? 12 : 16,
       background: 'rgba(255,255,255,0.92)',
       border: '1px solid #d4dff6',
       boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
@@ -5080,12 +5172,12 @@ export default function LavagnaCanvas({
         <div ref={toolbarRef} style={commandBar}>
           <button
             type="button"
-            style={undoButtonStyle(undoDisabled, 'undo')}
+            style={undoButtonStyle(undoDisabled, 'undo', isMobile)}
             onClick={() => { if (!undoDisabled) undo(); }}
             disabled={undoDisabled}
             title={'Annulla'}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <svg width={isMobile ? "18" : "20"} height={isMobile ? "18" : "20"} viewBox="0 0 24 24" fill="none">
               <path d="M7.5 8.5l-4 4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M7 12.5h6.5c3.59 0 6.5 2.91 6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
@@ -5095,11 +5187,11 @@ export default function LavagnaCanvas({
           {redoAvailable && (
             <button
               type="button"
-              style={undoButtonStyle(false, 'redo')}
+              style={undoButtonStyle(false, 'redo', isMobile)}
               onClick={() => { redo(); }}
               title={'Ripristina'}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <svg width={isMobile ? "18" : "20"} height={isMobile ? "18" : "20"} viewBox="0 0 24 24" fill="none">
                 <path d="M16.5 8.5l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M17 12.5H10.5C6.91 12.5 4 9.59 4 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
@@ -5107,9 +5199,9 @@ export default function LavagnaCanvas({
             </button>
           )}
 
-          <span style={st.commandDivider} aria-hidden />
+          <span style={{...st.commandDivider, ...(isMobile && { margin: '0 4px' })}} aria-hidden />
 
-          <div style={st.toolGroup}>
+          <div style={{...st.toolGroup, ...(isMobile && { gap: 4, padding: '0 2px' })}}>
             <button
               type="button"
               style={iconBtn(strumento === 'selezione')}
@@ -5676,7 +5768,8 @@ export default function LavagnaCanvas({
           ...st.zoomControls,
           ...(isMobile && {
             right: 8,
-            bottom: 80,
+            top: 8,
+            bottom: 'auto',
             padding: '6px 6px 6px 8px',
             gap: 4,
             borderRadius: 12
@@ -6072,10 +6165,10 @@ const st = {
   }
 };
 
-const undoButtonStyle = (disabled, mode) => ({
-  width: 44,
-  height: 44,
-  borderRadius: 14,
+const undoButtonStyle = (disabled, mode, isMobile) => ({
+  width: isMobile ? 36 : 44,
+  height: isMobile ? 36 : 44,
+  borderRadius: isMobile ? 10 : 14,
   border: 'none',
   display: 'inline-flex',
   alignItems: 'center',
@@ -6090,7 +6183,8 @@ const undoButtonStyle = (disabled, mode) => ({
   color: disabled ? '#9ca9c5' : mode === 'undo' ? '#15357a' : '#0c5a8a',
   boxShadow: disabled ? 'none' : '0 12px 26px rgba(20,53,120,0.18)',
   cursor: disabled ? 'not-allowed' : 'pointer',
-  transition: 'transform .15s ease, box-shadow .2s ease'
+  transition: 'transform .15s ease, box-shadow .2s ease',
+  touchAction: isMobile ? 'manipulation' : 'auto'
 });
 
 const btn = (active) => ({
