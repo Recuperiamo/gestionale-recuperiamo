@@ -1543,40 +1543,41 @@ export default function LavagnaCanvas({
           const localW = rect.width;
           const localH = rect.height;
           if (localW > 0 && localH > 0) {
-            // Add padding: 10% on mobile, 5% on desktop to prevent content touching edges
+            // Add padding: 10% on mobile, 8% on desktop to prevent content touching edges
             const isMobileSpectator = localW <= 768;
-            const paddingFactor = isMobileSpectator ? 0.9 : 0.95;
-            
-            // Compute zoom to fit admin's visible rect into our canvas (with padding)
-            const scaleX = (localW * paddingFactor) / visibleRect.width;
-            const scaleY = (localH * paddingFactor) / visibleRect.height;
-            const targetZoom = Math.min(scaleX, scaleY);
-            // Clamp zoom to allowed range
+            const paddingFactor = isMobileSpectator ? 0.9 : 0.92;
+
+            // Compute base zoom to fit admin's rect, then apply paddingFactor
+            const fitScaleX = localW / visibleRect.width;
+            const fitScaleY = localH / visibleRect.height;
+            const baseZoom = Math.min(fitScaleX, fitScaleY);
+            const targetZoom = baseZoom * paddingFactor;
             const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
-            
-            // Calculate the fitted content dimensions after zoom
+
+            // Compute padding in pixels for the fitted content
             const fittedW = visibleRect.width * clampedZoom;
             const fittedH = visibleRect.height * clampedZoom;
-            
-            // Calculate padding in canvas pixels (centering offset)
             const paddingX = (localW - fittedW) / 2;
             const paddingY = (localH - fittedH) / 2;
-            
+
             // Debug spectator viewport
             console.log('[SPECTATOR] Viewport calc:', {
               localW, localH,
               visibleRect,
               paddingFactor,
-              scaleX, scaleY, targetZoom, clampedZoom,
+              fitScaleX, fitScaleY, baseZoom, targetZoom, clampedZoom,
               fittedW, fittedH,
               paddingX, paddingY
             });
             
-            // Position the admin's visible rect with padding offset
-            // pan represents top-left corner of the viewport in world coordinates
+            // Position the admin's visible rect centered with padding offset
+            // Use center to minimize rounding error drift; add epsilon to avoid edge cropping
+            const centerX = visibleRect.x + visibleRect.width / 2;
+            const centerY = visibleRect.y + visibleRect.height / 2;
+            const epsilon = 1.5; // world pixels safety margin
             const newPan = {
-              x: visibleRect.x - paddingX / clampedZoom,
-              y: visibleRect.y - paddingY / clampedZoom
+              x: centerX - (localW / 2) / clampedZoom - (epsilon / clampedZoom),
+              y: centerY - (localH / 2) / clampedZoom - (epsilon / clampedZoom)
             };
             
             console.log('[SPECTATOR] New pan:', newPan, 'vs visibleRect:', visibleRect);
