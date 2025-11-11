@@ -2955,6 +2955,39 @@ export default function LavagnaCanvas({
     return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
   }
 
+  // Get bounding box for selection including both shapes and strokes
+  function getSelectionBoundsWithStrokes(selection) {
+    if (!selection || (!selection.forme?.length && !selection.tratti?.length)) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    // Include shapes
+    for (const id of (selection.forme || [])) {
+      const f = (forme || []).find(s => s.id === id);
+      if (!f) continue;
+      const b = f._bb ?? getShapeBounds(f);
+      if (!b) continue;
+      if (b.minX < minX) minX = b.minX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.maxY > maxY) maxY = b.maxY;
+    }
+    
+    // Include strokes
+    for (const idx of (selection.tratti || [])) {
+      const stroke = tratti[idx];
+      if (!stroke) continue;
+      const b = stroke._bb ?? getShapeBounds(stroke);
+      if (!b) continue;
+      if (b.minX < minX) minX = b.minX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.maxY > maxY) maxY = b.maxY;
+    }
+    
+    if (minX === Infinity) return null;
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+  }
+
   function translateShape(shape, dx, dy) {
     if (!shape) return shape;
     const next = { ...shape };
@@ -3301,12 +3334,15 @@ export default function LavagnaCanvas({
           console.warn('[lavagna] selection: invalid point');
           return;
         }
-        // If there is no current selection but the user clicked on a shape,
-        // select that shape and begin dragging immediately. We search from
-        // the topmost shape backwards so visual stacking is respected.
+        // If there is no current selection but the user clicked on a shape or stroke,
+        // select that item and begin dragging immediately. We search from
+        // the topmost shape/stroke backwards so visual stacking is respected.
         try {
           const tolForHit = Math.max(8, 12 / (zoom || 1));
           let hitShape = null;
+          let hitStrokeIdx = -1;
+          
+          // Check shapes first (they are typically drawn on top)
           for (let i = (forme || []).length - 1; i >= 0; i--) {
             const candidate = forme[i];
             if (!candidate) continue;
@@ -3315,6 +3351,19 @@ export default function LavagnaCanvas({
               break;
             }
           }
+          
+          // If no shape hit, check strokes
+          if (!hitShape) {
+            for (let i = tratti.length - 1; i >= 0; i--) {
+              const stroke = tratti[i];
+              if (!stroke) continue;
+              if (hitTestStroke(p.x, p.y, stroke)) {
+                hitStrokeIdx = i;
+                break;
+              }
+            }
+          }
+          
           if (hitShape && !(selectedItems && selectedItems.forme && selectedItems.forme.includes(hitShape.id))) {
             // select the hit shape
             setSelectedItems({ forme: [hitShape.id], tratti: [] });
@@ -3329,18 +3378,32 @@ export default function LavagnaCanvas({
             try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
             try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select)', hitShape.id); } catch(_){}
             return;
+          } else if (hitStrokeIdx >= 0 && !(selectedItems && selectedItems.tratti && selectedItems.tratti.includes(hitStrokeIdx))) {
+            // select the hit stroke
+            setSelectedItems({ forme: [], tratti: [hitStrokeIdx] });
+            // start dragging the newly selected stroke
+            draggingSelectionRef.current.active = true;
+            draggingSelectionRef.current.lastWorld = p;
+            draggingSelectionRef.current.pointerId = pointerId;
+            draggingSelectionRef.current.pointerTool = 'selezione';
+            draggingSelectionRef.current.moved = false;
+            draggingSelectionRef.current.primaryShapeId = null;
+            draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify({ forme: [], tratti: [hitStrokeIdx] }));
+            try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
+            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select stroke)', hitStrokeIdx); } catch(_){}
+            return;
           }
         } catch (_) {}
         // If the user clicks inside the current selection (or on any selected
-        // shape), start a drag of the selection instead of starting a new
+        // shape/stroke), start a drag of the selection instead of starting a new
         // rectangular selection box. This enables move-by-drag for selected
-        // items.
+        // items (both shapes and strokes).
         try {
           // Begin dragging when the user clicks anywhere inside the
           // current selection bounding box — this keeps dragging
           // independent from shape rotation and from per-shape hit tests.
-          if (selectedItems && selectedItems.forme && selectedItems.forme.length) {
-            const selBoundsLocal = getSelectionBoundsForIds(selectedItems.forme || []);
+          if (selectedItems && ((selectedItems.forme && selectedItems.forme.length) || (selectedItems.tratti && selectedItems.tratti.length))) {
+            const selBoundsLocal = getSelectionBoundsWithStrokes(selectedItems);
             if (selBoundsLocal) {
               const pad = Math.max(6 / (zoom || 1), 0);
               const inside = p.x >= selBoundsLocal.minX - pad && p.x <= selBoundsLocal.maxX + pad && p.y >= selBoundsLocal.minY - pad && p.y <= selBoundsLocal.maxY + pad;
@@ -3350,10 +3413,10 @@ export default function LavagnaCanvas({
                 draggingSelectionRef.current.pointerId = pointerId;
                 draggingSelectionRef.current.pointerTool = 'selezione';
                 draggingSelectionRef.current.moved = false;
-                draggingSelectionRef.current.primaryShapeId = selectedItems.forme[0];
+                draggingSelectionRef.current.primaryShapeId = selectedItems.forme?.[0] || null;
                 draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
                 try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems.forme[0]); } catch(_){}
+                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems); } catch(_){}
                 selectionClickRef.current = {
                   pointerId,
                   pointerTool: 'selezione',
@@ -3361,7 +3424,7 @@ export default function LavagnaCanvas({
                   metaClick: !!(native?.ctrlKey || native?.metaKey),
                   doubleTap: false,
                   aborted: false,
-                  shapeId: selectedItems.forme[0]
+                  shapeId: selectedItems.forme?.[0] || null
                 };
                 return;
               }
@@ -3370,8 +3433,8 @@ export default function LavagnaCanvas({
         } catch (_) {}
         
         // Check if user clicked on the proportional resize lock icon
-        const selBounds = getSelectionBoundsForIds(selectedItems.forme || []);
-        if (selBounds && selectedItems.forme && selectedItems.forme.length > 0) {
+        const selBounds = getSelectionBoundsWithStrokes(selectedItems);
+        if (selBounds && ((selectedItems.forme && selectedItems.forme.length > 0) || (selectedItems.tratti && selectedItems.tratti.length > 0))) {
           const padding = 6 / (zoom || 1);
           const lockSize = 24 / (zoom || 1);
           const width = selBounds.maxX - selBounds.minX;
@@ -3570,6 +3633,11 @@ export default function LavagnaCanvas({
       panningRef.current.viaContext = false;
       setContextPanning(false);
       setIsPanning(true);
+      return;
+    }
+
+    // Don't start drawing if we're in pinch-zoom gesture mode
+    if (gestureRef.current.mode === 'panzoom') {
       return;
     }
 
@@ -3992,10 +4060,10 @@ export default function LavagnaCanvas({
     }
 
     // Update cursor when hovering over resize handles
-    if (strumento === 'selezione' && selectedItems.forme && selectedItems.forme.length > 0) {
+    if (strumento === 'selezione' && ((selectedItems.forme && selectedItems.forme.length > 0) || (selectedItems.tratti && selectedItems.tratti.length > 0))) {
       try {
         const p = getPoint(e);
-        const selBounds = getSelectionBoundsForIds(selectedItems.forme);
+        const selBounds = getSelectionBoundsWithStrokes(selectedItems);
         if (selBounds) {
           const handleSize = 10 / (zoom || 1);
           const handleTol = Math.max(handleSize, 12 / (zoom || 1));
@@ -5604,21 +5672,35 @@ export default function LavagnaCanvas({
       )}
       <div style={st.canvasBox}>
         {toolbar}
-  {!isMobile && (
-    <div ref={zoomControlsRef} style={st.zoomControls}>
+        <div ref={zoomControlsRef} style={{
+          ...st.zoomControls,
+          ...(isMobile && {
+            right: 8,
+            bottom: 80,
+            padding: '6px 6px 6px 8px',
+            gap: 4,
+            borderRadius: 12
+          })
+        }}>
           <button
             type="button"
-            style={zoomButtonStyle(zoomDisabled || !canZoomOut)}
+            style={{
+              ...zoomButtonStyle(zoomDisabled || !canZoomOut),
+              ...(isMobile && { width: 44, height: 44, fontSize: 24, touchAction: 'manipulation' })
+            }}
             onClick={handleZoomOut}
             disabled={zoomDisabled || !canZoomOut}
             title="Riduci zoom"
           >
             -
           </button>
-          <span style={st.zoomValue}>{zoomLabel}</span>
+          <span style={{...st.zoomValue, ...(isMobile && { minWidth: 40, fontSize: 12 })}}>{zoomLabel}</span>
           <button
             type="button"
-            style={zoomButtonStyle(zoomDisabled || !canZoomIn)}
+            style={{
+              ...zoomButtonStyle(zoomDisabled || !canZoomIn),
+              ...(isMobile && { width: 44, height: 44, fontSize: 24, touchAction: 'manipulation' })
+            }}
             onClick={handleZoomIn}
             disabled={zoomDisabled || !canZoomIn}
             title="Aumenta zoom"
@@ -5627,18 +5709,20 @@ export default function LavagnaCanvas({
           </button>
           <button
             type="button"
-            style={zoomResetStyle(zoomDisabled || !canResetView)}
+            style={{
+              ...zoomResetStyle(zoomDisabled || !canResetView),
+              ...(isMobile && { width: 44, height: 44, touchAction: 'manipulation' })
+            }}
             onClick={handleResetZoom}
             disabled={zoomDisabled || !canResetView}
             title="Reimposta vista"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <svg width={isMobile ? "20" : "16"} height={isMobile ? "20" : "16"} viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M12 5V3l-4 4 4 4V9c2.76 0 5 2.24 5 5a5 5 0 0 1-2.53 4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M12 19v2l4-4-4-4v2a5 5 0 0 0-5 5 5 5 0 0 0 2.37 4.23" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
-  )}
         <div
           ref={overlayRef}
           style={{
