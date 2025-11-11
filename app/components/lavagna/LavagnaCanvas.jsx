@@ -128,15 +128,6 @@ export default function LavagnaCanvas({
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
   
-  // Long-press ref: if user holds for 1 sec, activate temporary pan (no drawing)
-  const longPressRef = useRef({
-    active: false,
-    timerId: null,
-    pointerId: null,
-    startPoint: null,
-    originalTool: null
-  });
-  
   // Refs for callback access to latest values (avoid re-creating subscriptions)
   const utenteIdRef = useRef(utenteId);
   const ruoloRef = useRef(ruolo);
@@ -2378,7 +2369,8 @@ export default function LavagnaCanvas({
           id: stroke.id,
           streamId: stroke.id,
           punti: stroke.punti,
-          lavagnaId
+          lavagnaId,
+          senderId: utenteId  // Echo prevention
         });
         
         // Save to database (async, don't block)
@@ -3344,29 +3336,6 @@ export default function LavagnaCanvas({
         pointerWorldRef.current = cachedPoint;
         return cachedPoint;
       };
-      
-      // Long-press for pan on mobile: if user holds touch for 1 sec, activate temporary pan
-      // This prevents accidental drawing on mobile - user can long-press to pan without drawing
-      if (native?.pointerType === 'touch' && btn === 0 && strumento === 'penna') {
-        const p = getPointerWorld();
-        if (p) {
-          longPressRef.current.pointerId = pointerId;
-          longPressRef.current.startPoint = { x: p.x, y: p.y };
-          longPressRef.current.originalTool = strumento;
-          longPressRef.current.timerId = setTimeout(() => {
-            // After 1 second, activate pan mode temporarily
-            longPressRef.current.active = true;
-            panningRef.current.active = true;
-            panningRef.current.viaContext = false;
-            panningRef.current.lastX = native.clientX;
-            panningRef.current.lastY = native.clientY;
-            setIsPanning(true);
-            try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-            // Vibrate feedback if available
-            try { if (navigator.vibrate) navigator.vibrate(50); } catch(_) {}
-          }, 1000); // 1 second
-        }
-      }
 
     if (btn === 2) {
       // Right-click: start context panning. If the current tool is not 'mano',
@@ -3399,6 +3368,10 @@ export default function LavagnaCanvas({
 
     if (native?.pointerType === 'touch') {
       touchesRef.current.set(pointerId, { x: native.clientX, y: native.clientY });
+      // If 2+ touches active, block drawing/selection - only allow pan/zoom gesture
+      if (touchesRef.current.size >= 2) {
+        return; // Multitouch gesture in progress, handled in pointerMove
+      }
     }
 
     // Single-click on link shapes when using the hand tool: open URL and consume event
@@ -3749,16 +3722,6 @@ export default function LavagnaCanvas({
     if (gestureRef.current.mode === 'panzoom') {
       return;
     }
-    
-    // Don't start drawing if long-press timer is active (waiting for pan mode)
-    if (longPressRef.current.timerId) {
-      return;
-    }
-    
-    // Don't start drawing if long-press pan is active
-    if (longPressRef.current.active) {
-      return;
-    }
 
     setDisegnando(true);
     const punto = getPointerWorld();
@@ -3844,21 +3807,6 @@ export default function LavagnaCanvas({
 
   function pointerMove(e) {
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
-    
-    // Cancel long-press timer if finger moves (user is drawing, not pan-holding)
-    if (longPressRef.current.timerId && e.nativeEvent?.pointerId === longPressRef.current.pointerId) {
-      // Check if moved more than a small threshold (avoid canceling on tiny jitter)
-      const p = getPoint(e);
-      if (p && longPressRef.current.startPoint) {
-        const dist = Math.hypot(p.x - longPressRef.current.startPoint.x, p.y - longPressRef.current.startPoint.y);
-        if (dist > 3) { // 3 world units threshold
-          clearTimeout(longPressRef.current.timerId);
-          longPressRef.current.timerId = null;
-          longPressRef.current.pointerId = null;
-          longPressRef.current.startPoint = null;
-        }
-      }
-    }
     
     // If panning active (hand) update pan
     if (panningRef.current.active) {
@@ -4303,6 +4251,21 @@ export default function LavagnaCanvas({
     } catch (_) {}
 
     if (!disegnando) return;
+    
+    // Stop drawing if multitouch gesture started (2+ fingers)
+    if (e.nativeEvent.pointerType === 'touch' && touchesRef.current.size >= 2) {
+      setDisegnando(false);
+      puntiCorrentiRef.current = [];
+      if (outgoingRAFRef.current) {
+        cancelAnimationFrame(outgoingRAFRef.current);
+        outgoingRAFRef.current = null;
+      }
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+      }
+      return;
+    }
 
     const punto = ensurePoint();
     if (strumento === 'gomma' && !gommaPuntuale) {
@@ -4326,26 +4289,6 @@ export default function LavagnaCanvas({
     const pointerId = e?.nativeEvent?.pointerId;
     const pendingClick = selectionClickRef.current;
     const dragInfo = draggingSelectionRef.current;
-    
-    // Handle long-press cleanup
-    if (longPressRef.current.timerId && pointerId === longPressRef.current.pointerId) {
-      // User lifted finger before 1 sec - cancel the timer, allow normal drawing
-      clearTimeout(longPressRef.current.timerId);
-      longPressRef.current.timerId = null;
-      longPressRef.current.pointerId = null;
-      longPressRef.current.startPoint = null;
-    }
-    
-    // If long-press pan was active, deactivate it
-    if (longPressRef.current.active && pointerId === longPressRef.current.pointerId) {
-      panningRef.current.active = false;
-      setIsPanning(false);
-      longPressRef.current.active = false;
-      longPressRef.current.pointerId = null;
-      longPressRef.current.startPoint = null;
-      try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
-      return; // Don't process as a drawing action
-    }
     
     // (no-op) -- overlay visibility will be reconciled below depending on
     // whether the pointer remains over the canvas and current tool.
@@ -4394,7 +4337,8 @@ export default function LavagnaCanvas({
                   id: stroke.id,
                   streamId: stroke.id,
                   punti: stroke.punti,
-                  lavagnaId
+                  lavagnaId,
+                  senderId: utenteId  // Echo prevention
                 });
                 // Persist to DB
                 fetch(`/api/lavagna/tratto/${stroke.dbId}`, {
@@ -4692,19 +4636,7 @@ export default function LavagnaCanvas({
   }
 
   function pointerCancel(e) {
-    // Clean up long-press timer if active
     const pointerId = e?.nativeEvent?.pointerId;
-    if (longPressRef.current.timerId && pointerId === longPressRef.current.pointerId) {
-      clearTimeout(longPressRef.current.timerId);
-      longPressRef.current.timerId = null;
-      longPressRef.current.pointerId = null;
-      longPressRef.current.startPoint = null;
-    }
-    if (longPressRef.current.active && pointerId === longPressRef.current.pointerId) {
-      longPressRef.current.active = false;
-      longPressRef.current.pointerId = null;
-      longPressRef.current.startPoint = null;
-    }
     
     if (panningRef.current.active) {
       panningRef.current.active = false;
