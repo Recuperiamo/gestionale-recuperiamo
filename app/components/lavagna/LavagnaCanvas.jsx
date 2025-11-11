@@ -1528,12 +1528,14 @@ export default function LavagnaCanvas({
 
   // Setup Ably helpers and subscriptions
   const applyViewport = useCallback((view) => {
+    console.log('[SPECTATOR] applyViewport called with:', view);
     if (!view) return;
     const { pan: remotePan, zoom: remoteZoom, visibleRect } = view;
     
     // If the admin sent a visibleRect, compute a fit-to-view for spectators so
     // they scale and center the admin's view into their own canvas (responsive).
     if (visibleRect && visibleRect.width > 0 && visibleRect.height > 0) {
+      console.log('[SPECTATOR] Using visibleRect fit-to-view mode');
       try {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -1591,6 +1593,7 @@ export default function LavagnaCanvas({
     }
     
     // Fallback: if no visibleRect, apply admin pan/zoom directly (old behavior)
+    console.log('[SPECTATOR] Using fallback mode (no visibleRect or invalid)');
     if (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number') {
       setPan((prev) => {
         if (prev.x === remotePan.x && prev.y === remotePan.y) return prev;
@@ -1922,10 +1925,13 @@ export default function LavagnaCanvas({
         
         const onViewportUpdate = (msg) => {
           const { data } = msg || {};
+          console.log('[SPECTATOR] Received viewport:update', data);
           if (!data) return;
           if (data.senderId && data.senderId === utenteIdRef.current) return;
           const remotePan = data.pan;
           const remoteZoom = data.zoom;
+          const visibleRect = data.visibleRect;
+          console.log('[SPECTATOR] visibleRect received:', visibleRect);
           if (!remotePan && typeof remoteZoom !== 'number') return;
           const snapshot = {
             pan: (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number')
@@ -1934,8 +1940,10 @@ export default function LavagnaCanvas({
             zoom: (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom))
               ? remoteZoom
               : (latestAdminViewportRef.current?.zoom ?? zoomRef.current),
+            visibleRect: visibleRect || latestAdminViewportRef.current?.visibleRect,
             ts: data.ts || Date.now()
           };
+          console.log('[SPECTATOR] Snapshot created:', snapshot);
           latestAdminViewportRef.current = snapshot;
           if (!isAdminRef.current && spectatorModeRef.current) {
             // Buffer viewport update and apply once per animation frame to prevent "jittering"
