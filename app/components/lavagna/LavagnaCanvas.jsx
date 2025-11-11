@@ -1540,7 +1540,7 @@ export default function LavagnaCanvas({
           const localW = rect.width;
           const localH = rect.height;
           if (localW > 0 && localH > 0) {
-            // Add padding for mobile: keep 5% margin so content doesn't touch edges
+            // Add padding for mobile: keep margin so content doesn't touch edges
             const isMobileSpectator = localW <= 768;
             const paddingFactor = isMobileSpectator ? 0.9 : 0.95; // 10% padding on mobile, 5% on desktop
             
@@ -1550,12 +1550,16 @@ export default function LavagnaCanvas({
             const targetZoom = Math.min(scaleX, scaleY);
             // Clamp zoom to allowed range
             const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
-            // Center the admin's visible rect in our canvas
-            const centerX = visibleRect.x + visibleRect.width / 2;
-            const centerY = visibleRect.y + visibleRect.height / 2;
+            
+            // Calculate padding in canvas pixels
+            const paddingX = (localW - localW * paddingFactor) / 2;
+            const paddingY = (localH - localH * paddingFactor) / 2;
+            
+            // Position the admin's visible rect with padding offset
+            // pan represents top-left corner of the viewport in world coordinates
             const newPan = {
-              x: centerX - (localW / 2) / clampedZoom,
-              y: centerY - (localH / 2) / clampedZoom
+              x: visibleRect.x - paddingX / clampedZoom,
+              y: visibleRect.y - paddingY / clampedZoom
             };
             // Apply the computed fit
             setPan((prev) => {
@@ -4714,8 +4718,13 @@ export default function LavagnaCanvas({
       const currentStroke = tratti.find(s => s.id === t.id);
       const puntiToSave = currentStroke ? currentStroke.punti : t.punti;
       
-      const res = await fetch("/api/lavagna/tratto", {
-        method: "POST",
+      // If stroke already has dbId, UPDATE it instead of creating a new one
+      const isUpdate = !!t.dbId;
+      const url = isUpdate ? `/api/lavagna/tratto/${t.dbId}` : "/api/lavagna/tratto";
+      const method = isUpdate ? "PUT" : "POST";
+      
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: t.id, // Invia l'ID univoco
@@ -4730,7 +4739,7 @@ export default function LavagnaCanvas({
       if (res.ok) {
         const definitivo = prepareStroke({
           ...js.tratto,
-          dbId: js.tratto.id,
+          dbId: isUpdate ? t.dbId : js.tratto.id, // Keep existing dbId on update
           id: t.id, // mantieni lo streamId come id locale coerente
           punti: puntiToSave  // Ensure we keep the moved coordinates
         });
