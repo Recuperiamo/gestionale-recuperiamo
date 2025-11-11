@@ -1540,9 +1540,13 @@ export default function LavagnaCanvas({
           const localW = rect.width;
           const localH = rect.height;
           if (localW > 0 && localH > 0) {
-            // Compute zoom to fit admin's visible rect into our canvas
-            const scaleX = localW / visibleRect.width;
-            const scaleY = localH / visibleRect.height;
+            // Add padding for mobile: keep 5% margin so content doesn't touch edges
+            const isMobileSpectator = localW <= 768;
+            const paddingFactor = isMobileSpectator ? 0.9 : 0.95; // 10% padding on mobile, 5% on desktop
+            
+            // Compute zoom to fit admin's visible rect into our canvas (with padding)
+            const scaleX = (localW * paddingFactor) / visibleRect.width;
+            const scaleY = (localH * paddingFactor) / visibleRect.height;
             const targetZoom = Math.min(scaleX, scaleY);
             // Clamp zoom to allowed range
             const clampedZoom = Math.max(0.1, Math.min(5, targetZoom));
@@ -4703,6 +4707,13 @@ export default function LavagnaCanvas({
         console.warn("Salvataggio stroke annullato: utenteId assente.");
         return;
       }
+      
+      // CRITICAL: Use current punti from state, not the original ones
+      // This fixes the bug where moving a stroke immediately after drawing
+      // would create a duplicate because the original coordinates were saved
+      const currentStroke = tratti.find(s => s.id === t.id);
+      const puntiToSave = currentStroke ? currentStroke.punti : t.punti;
+      
       const res = await fetch("/api/lavagna/tratto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4712,7 +4723,7 @@ export default function LavagnaCanvas({
           strumento: t.strumento,
           colore: t.colore,
           spessore: t.spessore,
-          punti: t.punti
+          punti: puntiToSave  // Use current coordinates, not original
         })
       });
       const js = await res.json();
@@ -4721,6 +4732,7 @@ export default function LavagnaCanvas({
           ...js.tratto,
           dbId: js.tratto.id,
           id: t.id, // mantieni lo streamId come id locale coerente
+          punti: puntiToSave  // Ensure we keep the moved coordinates
         });
         setTratti((prev) =>
           prev.map((s) => (s.id === t.id ? definitivo : s))
