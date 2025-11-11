@@ -270,6 +270,33 @@ export default function LavagnaCanvas({
   const erasingRef = useRef(false);
   const selectingRef = useRef({ active: false, start: null });
   const rotatingRef = useRef({ active: false, center: null, startAngle: 0, originals: {} });
+  // Snap rotation increments helper (used for 90° rotation commands)
+  const SNAP_ANGLE = Math.PI / 2; // 90°
+  function snapToQuarterTurns(angle) {
+    // Normalize angle to [0, 2π)
+    const TAU = Math.PI * 2;
+    let a = angle % TAU;
+    if (a < 0) a += TAU;
+    // Find nearest multiple of 90°
+    const steps = Math.round(a / SNAP_ANGLE);
+    return (steps * SNAP_ANGLE) % TAU;
+  }
+  function rotateSelectionQuarter(direction = 1) {
+    // direction: +1 = clockwise 90°, -1 = counter-clockwise 90°
+    const sel = selectedItems;
+    if (!sel || (!sel.forme || sel.forme.length === 0)) return;
+    const delta = direction * SNAP_ANGLE;
+    setForme(prev => prev.map(f => {
+      if (!sel.forme.includes(f.id)) return f;
+      const current = Number(f.rotation) || 0;
+      const target = snapToQuarterTurns(current + delta);
+      const updated = { ...f, rotation: target };
+      // Emit realtime update
+      emitOrPublish('shape:update', { ...updated, lavagnaId });
+      return updated;
+    }));
+    drawAll();
+  }
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
   const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
   const draggingSelectionRef = useRef({
@@ -2429,6 +2456,11 @@ export default function LavagnaCanvas({
         }
         // do not prevent default so images/links from system clipboard still arrive in onPaste
       }
+      // Snap rotation shortcuts: R = clockwise 90°, Shift+R = counterclockwise 90°
+      if (e.key.toLowerCase() === 'r' && !mod) {
+        rotateSelectionQuarter(e.shiftKey ? -1 : 1);
+        e.preventDefault();
+      }
       if (e.key === 'Delete') { // delete selection
         console.log('[LAVAGNA-DELETE-KEY] Delete pressed, selectedItems:', selectedItems);
         selectedItems.forme.forEach(id => {
@@ -3565,19 +3597,10 @@ export default function LavagnaCanvas({
           
           if (rotDist <= rotateSize/2) {
             // Clicked on rotation button - start rotating!
-            rotatingRef.current.active = true;
-            const center = { x: (selBounds.minX + selBounds.maxX) / 2, y: (selBounds.minY + selBounds.maxY) / 2 };
-            rotatingRef.current.center = center;
-            rotatingRef.current.startAngle = Math.atan2(p.y - center.y, p.x - center.x);
-            const originals = {};
-            for (const id of (selectedItems.forme || [])) {
-              const f = (forme || []).find(s => s.id === id);
-              originals[id] = (f && typeof f.rotation === 'number') ? f.rotation : 0;
-            }
-            rotatingRef.current.originals = originals;
-            try { canvas?.setPointerCapture?.(pointerId); } catch(_){}
-            try { console.log('[LAVAGNA-DBG] start-rotation via button', center); } catch(_){}
-            return;
+            // Instead of free rotate start, perform a 90° clockwise snap rotate immediately (usable quick action)
+            rotateSelectionQuarter(1);
+            drawAll();
+            return;            
           }
           
           // Check if the user clicked on a resize handle (after rotation button check)
