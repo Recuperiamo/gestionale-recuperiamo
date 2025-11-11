@@ -123,6 +123,15 @@ export async function POST(req) {
   let sezione = (formData.get("sezione") || "MATERIALE").toString().trim().toUpperCase();
   if (!['MATERIALE','COMPITI','VOTI'].includes(sezione)) sezione = 'MATERIALE';
   
+  // Sottocategoria: solo per sezione MATERIALE
+  let sottocategoria = null;
+  if (sezione === "MATERIALE") {
+    const sottocat = formData.get("sottocategoria");
+    if (sottocat && ['TEORIA','SIMULAZIONI','ESERCIZI'].includes(sottocat.toUpperCase())) {
+      sottocategoria = sottocat.toUpperCase();
+    }
+  }
+  
   const uploadBatchId = formData.get("uploadBatchId") || null;
 
   try {
@@ -139,6 +148,7 @@ export async function POST(req) {
         titolo: titolo.trim(),
         materia: materia || null,
         sezione,
+        sottocategoria: sottocategoria || null,
         nomeOriginale: file.name,
         blobUrl: blob.url,
         mimeType: file.type || 'application/octet-stream',

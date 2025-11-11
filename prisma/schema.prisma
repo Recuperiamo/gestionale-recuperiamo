@@ -206,19 +206,20 @@ model RichiestaLavagna {
 /// *
 ///  * ====================== MATERIALE DIDATTICO ======================
 model MaterialeDidattico {
-  id            Int              @id @default(autoincrement())
-  clienteId     Int
-  titolo        String
-  materia       String?
-  nomeOriginale String
-  blobUrl       String
-  mimeType      String?
-  fileSize      Int?
-  uploadedBy    String?
-  uploadBatchId String?          // ID batch per raggruppare file caricati insieme
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  sezione       MaterialeSezione @default(MATERIALE)
+  id             Int                       @id @default(autoincrement())
+  clienteId      Int
+  titolo         String
+  materia        String?
+  nomeOriginale  String
+  blobUrl        String
+  mimeType       String?
+  fileSize       Int?
+  uploadedBy     String?
+  uploadBatchId  String?                   // ID batch per raggruppare file caricati insieme
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  sezione        MaterialeSezione          @default(MATERIALE)
+  sottocategoria MaterialeSottocategoria?  // Solo per sezione MATERIALE
 
   @@index([clienteId])
   @@index([createdAt])
@@ -340,6 +341,12 @@ enum MaterialeSezione {
   MATERIALE
   COMPITI
   VOTI
+}
+
+enum MaterialeSottocategoria {
+  TEORIA
+  SIMULAZIONI
+  ESERCIZI
 }
 
 enum PasswordResetStatus {

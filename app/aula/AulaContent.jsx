@@ -446,6 +446,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
   const [files, setFiles] = useState([]);
   const [materia, setMateria] = useState("");
   const [sezione, setSezione] = useState("MATERIALE");
+  const [sottocategoria, setSottocategoria] = useState("TEORIA"); // Default for MATERIALE
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef();
@@ -460,6 +461,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
     setFiles([]);
     setMateria("");
     setSezione("MATERIALE");
+    setSottocategoria("TEORIA");
     setNome("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -484,6 +486,8 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
         formData.append("titolo", titolo);
   if (materia) formData.append("materia", materia);
   if (sezione) formData.append("sezione", sezione);
+        // Add sottocategoria only for MATERIALE section
+        if (sezione === "MATERIALE" && sottocategoria) formData.append("sottocategoria", sottocategoria);
         formData.append("clienteId", clienteId);
         if (uploadBatchId) formData.append("uploadBatchId", uploadBatchId);
         const res = await fetch("/api/materiale", { method: "POST", body: formData });
@@ -572,6 +576,20 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
             <option value="VOTI">Voti</option>
           </select>
         </div>
+        {sezione === "MATERIALE" && (
+          <div style={{marginBottom:12}}>
+            <label style={{fontWeight:600, fontSize:14, marginBottom:3, display:"block", color: coloreTema}}>Tipo materiale</label>
+            <select
+              value={sottocategoria}
+              onChange={e => setSottocategoria(e.target.value)}
+              style={{...inputStyle, borderColor: coloreTema}}
+            >
+              <option value="TEORIA">Teoria</option>
+              <option value="SIMULAZIONI">Simulazioni di verifica</option>
+              <option value="ESERCIZI">Esercizi</option>
+            </select>
+          </div>
+        )}
         {/* Rimosso: Assegna a studente (assegnato automaticamente) */}
         <div style={{textAlign:"right"}}>
           <button type="button" onClick={onClose} style={btnGhost}>Annulla</button>
@@ -1298,6 +1316,11 @@ export default function AulaContent({ initialClienteId = null }) {
                           
                           <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
                             {firstItem.materia && <span style={{...categoria, background: `${coloreTema}20`, color: coloreTema}}>{firstItem.materia}</span>}
+                            {firstItem.sottocategoria && <span style={{...categoria, background: `${coloreTema}15`, color: coloreTema, fontSize: 11, fontWeight: 500}}>{
+                              firstItem.sottocategoria === 'TEORIA' ? 'Teoria' :
+                              firstItem.sottocategoria === 'SIMULAZIONI' ? 'Simulazioni' :
+                              firstItem.sottocategoria === 'ESERCIZI' ? 'Esercizi' : firstItem.sottocategoria
+                            }</span>}
                             {isAdmin && <span style={clientePill}>{getStudenteLabel(firstItem.clienteId)}</span>}
                           </div>
                           <div style={{fontSize:13,color:"#5a6d90",marginBottom:7}}>
@@ -1354,6 +1377,11 @@ export default function AulaContent({ initialClienteId = null }) {
                       )}
                       <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
                         {m.materia && <span style={{...categoria, background: `${coloreTema}20`, color: coloreTema}}>{m.materia}</span>}
+                        {m.sottocategoria && <span style={{...categoria, background: `${coloreTema}15`, color: coloreTema, fontSize: 11, fontWeight: 500}}>{
+                          m.sottocategoria === 'TEORIA' ? 'Teoria' :
+                          m.sottocategoria === 'SIMULAZIONI' ? 'Simulazioni' :
+                          m.sottocategoria === 'ESERCIZI' ? 'Esercizi' : m.sottocategoria
+                        }</span>}
                         {isAdmin && <span style={clientePill}>{getStudenteLabel(m.clienteId)}</span>}
                         {typeof m.tipo === "string" && m.tipo.trim() && m.tipo !== "undefined" && !["jpg","jpeg","png","gif","bmp","webp"].includes(m.tipo.toLowerCase()) &&
                           <FileIcon tipo={m.tipo} />
