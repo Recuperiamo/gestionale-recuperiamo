@@ -50,6 +50,7 @@ export default function LavagnaCanvas({
   const [disegnando, setDisegnando] = useState(false);
   const puntiCorrentiRef = useRef([]);
   const salvandoRef = useRef(false);
+  const pendingSavesRef = useRef(new Map()); // Track pending saves by stroke id
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
@@ -1559,12 +1560,24 @@ export default function LavagnaCanvas({
             const paddingX = (localW - fittedW) / 2;
             const paddingY = (localH - fittedH) / 2;
             
+            // Debug spectator viewport
+            console.log('[SPECTATOR] Viewport calc:', {
+              localW, localH,
+              visibleRect,
+              paddingFactor,
+              scaleX, scaleY, targetZoom, clampedZoom,
+              fittedW, fittedH,
+              paddingX, paddingY
+            });
+            
             // Position the admin's visible rect with padding offset
             // pan represents top-left corner of the viewport in world coordinates
             const newPan = {
               x: visibleRect.x - paddingX / clampedZoom,
               y: visibleRect.y - paddingY / clampedZoom
             };
+            
+            console.log('[SPECTATOR] New pan:', newPan, 'vs visibleRect:', visibleRect);
             // Apply the computed fit
             setPan((prev) => {
               if (prev.x === newPan.x && prev.y === newPan.y) return prev;
@@ -4727,6 +4740,21 @@ export default function LavagnaCanvas({
         return;
       }
       
+      // Prevent duplicate saves for the same stroke
+      const pendingSave = pendingSavesRef.current.get(t.id);
+      if (pendingSave) {
+        // If there's a pending POST, wait for it to complete before allowing another save
+        if (!t.dbId) {
+          console.log('[LAVAGNA] Waiting for pending POST to complete before saving stroke', t.id);
+          await pendingSave;
+          // After POST completes, get updated stroke with dbId from state
+          const updatedStroke = tratti.find(s => s.id === t.id);
+          if (updatedStroke && updatedStroke.dbId) {
+            t = updatedStroke; // Use updated stroke with dbId
+          }
+        }
+      }
+      
       // CRITICAL: Use current punti from state, not the original ones
       // This fixes the bug where moving a stroke immediately after drawing
       // would create a duplicate because the original coordinates were saved
@@ -4740,44 +4768,56 @@ export default function LavagnaCanvas({
       const url = isUpdate ? `/api/lavagna/tratto/${t.dbId}` : "/api/lavagna/tratto";
       const method = isUpdate ? "PUT" : "POST";
       
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: t.id, // Invia l'ID univoco
-          lavagnaId,
-          strumento: t.strumento,
-          colore: t.colore,
-          spessore: t.spessore,
-          punti: puntiToSave  // Use current coordinates, not original
-        })
-      });
-      const js = await res.json();
-      if (res.ok) {
-        const definitivo = prepareStroke({
-          ...js.tratto,
-          dbId: isUpdate ? t.dbId : js.tratto.id, // Keep existing dbId on update
-          id: t.id, // mantieni lo streamId come id locale coerente
-          punti: puntiToSave  // Ensure we keep the moved coordinates
-        });
-        setTratti((prev) =>
-          prev.map((s) => (s.id === t.id ? definitivo : s))
-        );
-        setUndoStack((prev) =>
-          prev.map((a) =>
-            a.type === "add" && a.stroke.id === t.id
-              ? { ...a, stroke: definitivo }
-              : a
-          )
-        );
-      } else {
-        console.error("Errore creazione tratto API:", js.error);
-      }
+      // Track this save operation to prevent duplicates
+      const savePromise = (async () => {
+        try {
+          const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: t.id, // Invia l'ID univoco
+              lavagnaId,
+              strumento: t.strumento,
+              colore: t.colore,
+              spessore: t.spessore,
+              punti: puntiToSave  // Use current coordinates, not original
+            })
+          });
+          const js = await res.json();
+          if (res.ok) {
+            const definitivo = prepareStroke({
+              ...js.tratto,
+              dbId: isUpdate ? t.dbId : js.tratto.id, // Keep existing dbId on update
+              id: t.id, // mantieni lo streamId come id locale coerente
+              punti: puntiToSave  // Ensure we keep the moved coordinates
+            });
+            setTratti((prev) =>
+              prev.map((s) => (s.id === t.id ? definitivo : s))
+            );
+            setUndoStack((prev) =>
+              prev.map((a) =>
+                a.type === "add" && a.stroke.id === t.id
+                  ? { ...a, stroke: definitivo }
+                  : a
+              )
+            );
+          } else {
+            console.error("Errore creazione tratto API:", js.error);
+          }
+        } finally {
+          pendingSavesRef.current.delete(t.id);
+          salvandoRef.current = false;
+          drawAll();
+        }
+      })();
+      
+      pendingSavesRef.current.set(t.id, savePromise);
+      await savePromise;
+      
     } catch (e) {
       console.error(e);
-    } finally {
+      pendingSavesRef.current.delete(t.id);
       salvandoRef.current = false;
-      drawAll();
     }
   }
 
