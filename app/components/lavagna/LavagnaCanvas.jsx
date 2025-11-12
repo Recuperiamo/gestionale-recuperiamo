@@ -168,7 +168,7 @@ export default function LavagnaCanvas({
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  }, [canvasRotation]);
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
@@ -3220,8 +3220,24 @@ export default function LavagnaCanvas({
       clientX = typeof e?.clientX === 'number' ? e.clientX : 0;
       clientY = typeof e?.clientY === 'number' ? e.clientY : 0;
     }
-    const offX = clientX - rect.left;
-    const offY = clientY - rect.top;
+    let offX = clientX - rect.left;
+    let offY = clientY - rect.top;
+    // If canvas is rotated visually, map the pointer through the inverse rotation
+    try {
+      const rot = (canvasRotation || 0) % 360;
+      if (rot !== 0) {
+        const rad = (rot * Math.PI) / 180;
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const dx = offX - cx;
+        const dy = offY - cy;
+        const inv = -rad;
+        const nx = dx * Math.cos(inv) - dy * Math.sin(inv);
+        const ny = dx * Math.sin(inv) + dy * Math.cos(inv);
+        offX = nx + cx;
+        offY = ny + cy;
+      }
+    } catch (_) {}
     const currentPan = panRef.current || { x: 0, y: 0 };
     const currentZoom = zoomRef.current || 1;
     const x = currentPan.x + offX / currentZoom;
@@ -3241,11 +3257,23 @@ export default function LavagnaCanvas({
       const currentZoom = zoomRef.current || 1;
       const sx = (point.x - currentPan.x) * currentZoom + rect.left;
       const sy = (point.y - currentPan.y) * currentZoom + rect.top;
+      // If canvas is rotated, rotate the screen point around the canvas center
+      const rot = (canvasRotation || 0) % 360;
+      if (rot && rot !== 0) {
+        const rad = (rot * Math.PI) / 180;
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const dx = sx - rect.left - cx;
+        const dy = sy - rect.top - cy;
+        const nx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const ny = dx * Math.sin(rad) + dy * Math.cos(rad);
+        return { clientX: rect.left + nx + cx, clientY: rect.top + ny + cy, rect };
+      }
       return { clientX: sx, clientY: sy, rect };
     } catch (err) {
       return null;
     }
-  }, []);
+  }, [canvasRotation]);
 
   // == RESIZE & REDRAW ==
   useEffect(() => {
@@ -3254,12 +3282,19 @@ export default function LavagnaCanvas({
       if (!canvas) return;
       const parent = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
-      const w = parent.clientWidth;
-      const h = altezza;
+      // If canvasRotation is 90 or 270, swap width/height to emulate screen-rotation
+      const rotated = canvasRotation && (canvasRotation % 180 !== 0);
+      const w = rotated ? altezza : parent.clientWidth;
+      const h = rotated ? parent.clientWidth : altezza;
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
+      // Ensure parent grows to accommodate swapped orientation and avoid clipping
+      try {
+        parent.style.height = canvas.style.height;
+        parent.style.overflow = rotated ? 'visible' : 'hidden';
+      } catch (_) {}
       const ctx = canvas.getContext("2d");
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
@@ -3271,8 +3306,8 @@ export default function LavagnaCanvas({
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tratti, altezza]);
+    // Include canvasRotation so resize reacts to rotation changes
+  }, [tratti, altezza, canvasRotation]);
 
   // Zoom via rotella mouse
   const handleWheel = useCallback((event) => {
@@ -5980,14 +6015,7 @@ export default function LavagnaCanvas({
           )}
         </div>
       )}
-      <div style={{
-        ...st.canvasBox,
-        ...(canvasRotation !== 0 && {
-          transform: `rotate(${canvasRotation}deg)`,
-          transformOrigin: 'center center',
-          transition: 'transform 0.3s ease'
-        })
-      }}>
+      <div style={st.canvasBox}>
         {toolbar}
         <div ref={zoomControlsRef} style={{
           ...st.zoomControls,
@@ -6081,11 +6109,21 @@ export default function LavagnaCanvas({
               }
             } catch (_) {}
           }}
-          style={{
-            ...st.canvas,
-            // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
-            cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'gomma') ? 'none' : canvasCursor))
-          }}
+          style={(() => {
+            const base = {
+              ...st.canvas,
+              // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
+              cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'gomma') ? 'none' : canvasCursor))
+            };
+            if (canvasRotation && canvasRotation % 360 !== 0) {
+              return {
+                ...base,
+                transform: `rotate(${canvasRotation}deg)`,
+                transformOrigin: 'center center'
+              };
+            }
+            return base;
+          })()}
         />
       </div>
     </div>
