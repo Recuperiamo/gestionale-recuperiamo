@@ -1581,8 +1581,14 @@ export default function LavagnaCanvas({
         const canvas = canvasRef.current;
         if (canvas) {
           const rect = canvas.getBoundingClientRect();
-          const localW = rect.width;
-          const localH = rect.height;
+          let localW = rect.width;
+          let localH = rect.height;
+          
+          // Se mobile ruotato 90°, swap dimensions per calcolo fit corretto
+          if (canvasRotation === 90 || canvasRotation === 270) {
+            [localW, localH] = [localH, localW];
+          }
+          
           if (localW > 0 && localH > 0) {
             // Compute zoom to exactly fit admin's visible rect with minimal safety margin
             const fitScaleX = localW / visibleRect.width;
@@ -1867,9 +1873,6 @@ export default function LavagnaCanvas({
         const onShapeCreate = (msg) => {
           const { data } = msg || {};
           if (!data) return;
-          
-          // Con echoMessages attivo, usa senderId per ignorare solo i propri messaggi echo
-          if (data.senderId && data.senderId === utenteIdRef.current) return;
           
           const normalized = normalizeShape(data);
           if (!normalized) return;
@@ -4419,8 +4422,8 @@ export default function LavagnaCanvas({
           for (const idx of selStrokeIndexes) {
             try {
               const stroke = tratti[idx];
-              if (stroke && stroke.dbId) {
-                // Final emit to ensure sync
+              if (stroke) {
+                // Final emit to ensure sync (even if no dbId yet)
                 emitOrPublish('stroke:update', {
                   id: stroke.id,
                   streamId: stroke.id,
@@ -4428,12 +4431,14 @@ export default function LavagnaCanvas({
                   lavagnaId,
                   senderId: utenteId  // Echo prevention
                 });
-                // Persist to DB
-                fetch(`/api/lavagna/tratto/${stroke.dbId}`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ punti: stroke.punti })
-                }).catch(err => console.error('[LAVAGNA] Error persisting stroke position:', err));
+                // Persist to DB only if dbId exists
+                if (stroke.dbId) {
+                  fetch(`/api/lavagna/tratto/${stroke.dbId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ punti: stroke.punti })
+                  }).catch(err => console.error('[LAVAGNA] Error persisting stroke position:', err));
+                }
               }
             } catch(_) {}
           }
@@ -5932,23 +5937,6 @@ export default function LavagnaCanvas({
                   </div>
                 )}
               </div>
-              {openInNewWindow && attivitaId && (
-                <button
-                  type="button"
-                  style={st.secondaryButton}
-                  onClick={() => {
-                    setShowExportMenu(false);
-                    window.open(`/lavagna/full?attivitaId=${attivitaId}`, "_blank");
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M14 3h7v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M10 14l11-11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M21 13v5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span>Nuova finestra</span>
-                </button>
-              )}
             </div>
           )}
           {spectatorIndicatorVisible && (

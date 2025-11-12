@@ -79,8 +79,8 @@ export default function PaginaLavagna() {
   function handleLavagnaSelect(lavagna) {
     console.log('[LAVAGNA] Lavagna selezionata:', lavagna);
     console.log('[LAVAGNA] attivitaId:', lavagna.attivitaId);
-    setAttivitaId(lavagna.attivitaId);
-    carica(lavagna.attivitaId);
+    // Apri in nuova finestra
+    window.open(`/lavagna/full?attivitaId=${lavagna.attivitaId}`, "_blank");
   }
 
   if (status === "loading") {
