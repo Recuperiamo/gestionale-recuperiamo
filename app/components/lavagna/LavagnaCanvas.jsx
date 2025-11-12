@@ -1319,6 +1319,36 @@ export default function LavagnaCanvas({
   ctx.globalCompositeOperation = 'source-over';
   }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
 
+  // Reset forme/tratti quando cambia lavagnaId (fix ghost lavagne vecchie)
+  useEffect(() => {
+    console.log('[LAVAGNA-CHANGE] lavagnaId changed to:', lavagnaId, 'resetting to:', {
+      formeCount: (formeIniziali || []).length,
+      trattiCount: (trattiIniziali || []).length
+    });
+    
+    // Reset forme
+    const nuoveForme = (formeIniziali || []).map((s) => ({
+      ...s,
+      dbId: s.id,
+      id: `shape-${s.id}`
+    }));
+    setForme(nuoveForme);
+    
+    // Reset tratti  
+    const nuoviTratti = (trattiIniziali || []).map((s) =>
+      prepareStroke({
+        ...s,
+        dbId: s.id,
+        id: s.streamId || s.id,
+      })
+    );
+    setTratti(nuoviTratti);
+    
+    // Clear selection
+    setSelectedItems({ tratti: [], forme: [] });
+    
+  }, [lavagnaId, formeIniziali, trattiIniziali]); // Include props per avere valori aggiornati
+
   // Loop di rendering per il disegno locale
   const renderLoop = useCallback(() => {
     drawAll();
