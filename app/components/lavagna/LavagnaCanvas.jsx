@@ -2132,7 +2132,7 @@ export default function LavagnaCanvas({
     } catch (_) {}
     if (emit) {
       // Include srcPreview for realtime sync of pasted images
-      const payload = { ...normalized, lavagnaId, senderId: utenteId };
+      const payload = { ...normalized, lavagnaId };
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
         payload.srcPreview = normalized.src;
       }
@@ -3256,19 +3256,9 @@ export default function LavagnaCanvas({
       const parent = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
       
-      // When rotated 90/270, swap dimensions so canvas area matches visible area
-      const rot = (canvasRotation || 0) % 360;
-      const isRotated90or270 = (rot === 90 || rot === 270);
-      
-      let w, h;
-      if (isRotated90or270) {
-        // Swap: width becomes height-based, height becomes width-based
-        w = altezza;
-        h = parent.clientWidth;
-      } else {
-        w = parent.clientWidth;
-        h = altezza;
-      }
+      // Always use full parent width and fixed height - CSS rotation handles orientation
+      const w = parent.clientWidth;
+      const h = altezza;
       
       canvas.width = w * dpr;
       canvas.height = h * dpr;
