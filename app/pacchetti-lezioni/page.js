@@ -325,6 +325,19 @@ export default function PacchettiLezioniPage() {
     return { prenotate: future, svolte: past, cancellate: canc };
   }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, ordinamento, isAdmin, isCliente]);
 
+  // Helpers per il calcolo ore
+  function oreFromAttivita(a) {
+    const v = a?.oreConsumate ?? a?.durataOre ?? 0;
+    const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  function sommaOre(list) {
+    if (!Array.isArray(list)) return 0;
+    const tot = list.reduce((acc, a) => acc + oreFromAttivita(a), 0);
+    // Evita -0
+    return Math.abs(tot) === 0 ? 0 : tot;
+  }
+
   function exportToPDF(categoria = null) {
     console.log("exportToPDF chiamata, categoria:", categoria);
     console.log("prenotate:", prenotate?.length, "svolte:", svolte?.length, "cancellate:", cancellate?.length);
@@ -490,7 +503,29 @@ export default function PacchettiLezioniPage() {
           margin: { left: 14, right: 14 }
         });
         
-        return doc.lastAutoTable.finalY;
+        // Stampa il totale ore della sezione, allineato a destra
+        let endY = doc.lastAutoTable.finalY;
+        const pageW = doc.internal.pageSize.width || doc.internal.pageSize.getWidth?.() || 210;
+        const pageH = doc.internal.pageSize.height || doc.internal.pageSize.getHeight?.() || 297;
+        const marginX = 14;
+        const nextY = endY + 8;
+        const needsNewPage = nextY > (pageH - 20);
+        if (needsNewPage) {
+          doc.addPage();
+          endY = 20;
+        } else {
+          endY = nextY;
+        }
+        const totOre = sommaOre(attivitaList);
+        const label = `Totale ore sezione: ${totOre}`;
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        const textW = doc.getTextWidth(label);
+        const x = (pageW - marginX) - textW;
+        doc.text(label, x, endY);
+        
+        return endY;
       };
       
       // Se categoria specifica, esporta solo quella
@@ -558,23 +593,8 @@ export default function PacchettiLezioniPage() {
     console.log("exportToTXT chiamata, categoria:", categoria);
     
     try {
-      let dataToExport = [];
-      let title = "Pacchetti e Lezioni";
-      
-      if (categoria === "prenotate") {
-        dataToExport = prenotate;
-        title = "Lezioni Prenotate";
-      } else if (categoria === "svolte") {
-        dataToExport = svolte;
-        title = "Lezioni Svolte";
-      } else if (categoria === "cancellate") {
-        dataToExport = cancellate;
-        title = "Lezioni Cancellate";
-      } else {
-        dataToExport = [...prenotate, ...svolte, ...cancellate];
-      }
-      
-      let text = `${title}\n${'='.repeat(title.length)}\n\n`;
+      const titoloBase = "Pacchetti e Lezioni";
+      let text = `${titoloBase}\n${'='.repeat(titoloBase.length)}\n\n`;
     
     // Aggiungi informazioni filtri
       if (filtroCliente) {
@@ -598,19 +618,37 @@ export default function PacchettiLezioniPage() {
         text += `Periodo: ${filtroDataDa || "inizio"} - ${filtroDataA || "fine"}\n`;
       }
     
-    text += `\nTotale lezioni: ${dataToExport.length}\n\n`;
-    
-    // Aggiungi righe dati
-    dataToExport.forEach((a, idx) => {
-      text += `${idx + 1}. ${formatDate(a)}\n`;
-  text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}`+"\n";
-  text += `   Ore: ${a.oreConsumate ?? a.durataOre ?? "—"}\n`;
-      text += `   Stato: ${displayStato(a)}\n`;
-      if (isModificata(a)) {
-        text += `   Riprogrammata: ${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}\n`;
+    const renderSezioneTxt = (label, lista) => {
+      text += `\n${label}\n${'-'.repeat(label.length)}\n`;
+      if (!lista.length) {
+        text += `(Nessuna voce)\n\n`;
+        return;
       }
-      text += '\n';
-    });
+      lista.forEach((a, idx) => {
+        text += `${idx + 1}. ${formatDate(a)}\n`;
+        text += `   Descrizione: ${a.descrizione || `Lezione #${a.id}`}\n`;
+        text += `   Ore: ${a.oreConsumate ?? a.durataOre ?? "—"}\n`;
+        text += `   Stato: ${displayStato(a)}\n`;
+        if (isModificata(a)) {
+          text += `   Riprogrammata: ${formatDateFromValue(a.orarioOriginale)} → ${formatDateFromValue(a.orario)}\n`;
+        }
+        text += '\n';
+      });
+      const totOre = sommaOre(lista);
+      text += `Totale ore sezione: ${totOre}\n`;
+    };
+
+    if (categoria === 'prenotate') {
+      renderSezioneTxt('LEZIONI PRENOTATE', prenotate);
+    } else if (categoria === 'svolte') {
+      renderSezioneTxt('LEZIONI SVOLTE', svolte);
+    } else if (categoria === 'cancellate') {
+      renderSezioneTxt('LEZIONI CANCELLATE', cancellate);
+    } else {
+      renderSezioneTxt('LEZIONI PRENOTATE', prenotate);
+      renderSezioneTxt('LEZIONI SVOLTE', svolte);
+      renderSezioneTxt('LEZIONI CANCELLATE', cancellate);
+    }
     
     // Download
     const blob = new Blob([text], { type: 'text/plain' });
@@ -641,6 +679,40 @@ export default function PacchettiLezioniPage() {
     }
 
     try {
+      // Inserisci dinamicamente i contatori ore per sezione (solo per l'export)
+      const injected = [];
+      const makeBadge = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        div.style.cssText = [
+          'width:100%',
+          'text-align:right',
+          'margin:8px 0 12px 0',
+          'font-weight:700',
+          'font-size:12px',
+          'color:#0f172a'
+        ].join(';');
+        return div;
+      };
+
+      const injectIf = (ref, list) => {
+        if (ref?.current && Array.isArray(list)) {
+          const tot = sommaOre(list);
+          const el = makeBadge(`Totale ore sezione: ${tot}`);
+          ref.current.appendChild(el);
+          injected.push(el);
+        }
+      };
+
+      if (categoria === 'prenotate') injectIf(contentRefPrenotate, prenotate);
+      else if (categoria === 'svolte') injectIf(contentRefSvolte, svolte);
+      else if (categoria === 'cancellate') injectIf(contentRefCancellate, cancellate);
+      else {
+        injectIf(contentRefPrenotate, prenotate);
+        injectIf(contentRefSvolte, svolte);
+        injectIf(contentRefCancellate, cancellate);
+      }
+
       const canvas = await html2canvas(refToUse.current, {
         backgroundColor: '#ffffff',
         scale: 2,
@@ -654,6 +726,8 @@ export default function PacchettiLezioniPage() {
         a.download = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.png` : `lezioni_${new Date().toISOString().split('T')[0]}.png`;
         a.click();
         URL.revokeObjectURL(url);
+        // Pulisci i nodi iniettati
+        injected.forEach(n => { try { n.remove(); } catch (_) {} });
       });
     } catch (err) {
       console.error('Errore export PNG:', err);
