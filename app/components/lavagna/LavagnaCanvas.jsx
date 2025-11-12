@@ -1639,7 +1639,7 @@ export default function LavagnaCanvas({
     if (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom)) {
       setZoom((prev) => (prev === remoteZoom ? prev : remoteZoom));
     }
-  }, []);  // Empty deps - uses only refs and stable setters
+  }, [canvasRotation]);  // Include canvasRotation for mobile rotation swap
 
   useEffect(() => {
     if (!spectatorMode || isAdmin) return;
@@ -1803,7 +1803,14 @@ export default function LavagnaCanvas({
 
         const onDone = (msg) => {
           const { data } = msg || {};
-          const { streamId } = data || {};
+          const { streamId, senderId } = data || {};
+          
+          // Ignora i propri messaggi echo (admin non deve aggiungere due volte)
+          if (senderId && senderId === utenteIdRef.current) {
+            remoteStreams.current.delete(streamId);
+            return;
+          }
+          
           const st = remoteStreams.current.get(streamId);
           if (st && st.punti.length >= 2) {
             const definitivo = prepareStroke({
@@ -1814,7 +1821,13 @@ export default function LavagnaCanvas({
               punti: st.punti,
               autoreUserId: 'remote'
             });
-            setTratti((prev) => [...prev, definitivo]);
+            setTratti((prev) => {
+              // Check duplicati - non aggiungere se già esiste
+              if (prev.find((t) => String(t.id) === String(streamId))) {
+                return prev;
+              }
+              return [...prev, definitivo];
+            });
           }
           remoteStreams.current.delete(streamId);
         };
@@ -4723,7 +4736,7 @@ export default function LavagnaCanvas({
       }
     }
 
-    emitOrPublish('stroke:done', { streamId: currentStreamId.current });
+    emitOrPublish('stroke:done', { streamId: currentStreamId.current, senderId: utenteId });
 
     try {
       canvasRef.current?.releasePointerCapture?.(pointerId);
