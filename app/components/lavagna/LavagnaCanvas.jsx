@@ -1584,9 +1584,12 @@ export default function LavagnaCanvas({
           let localW = rect.width;
           let localH = rect.height;
           
+          console.log('[SPECTATOR-MOBILE] Original dimensions:', { localW, localH, canvasRotation });
+          
           // Se mobile ruotato 90°, swap dimensions per calcolo fit corretto
           if (canvasRotation === 90 || canvasRotation === 270) {
             [localW, localH] = [localH, localW];
+            console.log('[SPECTATOR-MOBILE] Swapped dimensions:', { localW, localH });
           }
           
           if (localW > 0 && localH > 0) {
@@ -1887,6 +1890,8 @@ export default function LavagnaCanvas({
           const { data } = msg || {};
           if (!data) return;
           
+          console.log('[PASTE-DEBUG] Received shape:create', { id: data.id, kind: data.kind, hasData: !!data });
+          
           const normalized = normalizeShape(data);
           if (!normalized) return;
           
@@ -2153,6 +2158,7 @@ export default function LavagnaCanvas({
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
         payload.srcPreview = normalized.src;
       }
+      console.log('[PASTE-DEBUG] Emitting shape:create', { id: normalized.id, kind: normalized.kind, lavagnaId });
       emitOrPublish('shape:create', payload);
     }
     // try persist async (best-effort)
@@ -3358,8 +3364,15 @@ export default function LavagnaCanvas({
     setTimeout(drawAll, 0);
   }, [drawAll, isAdmin]);
 
-  const handleZoomIn = useCallback(() => applyZoomAt(1.1), [applyZoomAt]);
-  const handleZoomOut = useCallback(() => applyZoomAt(0.9), [applyZoomAt]);
+  const handleZoomIn = useCallback(() => {
+    if (spectatorModeRef.current && !isAdmin) return;
+    applyZoomAt(1.1);
+  }, [applyZoomAt, isAdmin]);
+  
+  const handleZoomOut = useCallback(() => {
+    if (spectatorModeRef.current && !isAdmin) return;
+    applyZoomAt(0.9);
+  }, [applyZoomAt, isAdmin]);
 
   const handleResetZoom = useCallback(() => {
     if (spectatorModeRef.current && !isAdmin) return;
