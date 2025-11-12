@@ -1620,12 +1620,19 @@ export default function LavagnaCanvas({
             // Center alignment ensures content is fully visible and symmetric
             const centerX = visibleRect.x + visibleRect.width / 2;
             const centerY = visibleRect.y + visibleRect.height / 2;
+            
+            // CRITICAL: localW/localH sono già swappati se rotazione 90/270
+            // Ma il pan è in coordinate MONDO, non canvas - usa dimensioni originali canvas
+            const canvas = canvasRef.current;
+            const canvasW = canvas.width;
+            const canvasH = canvas.height;
+            
             const newPan = {
-              x: centerX - (localW / 2) / clampedZoom,
-              y: centerY - (localH / 2) / clampedZoom
+              x: centerX - (canvasW / 2) / clampedZoom,
+              y: centerY - (canvasH / 2) / clampedZoom
             };
             
-            console.log('[SPECTATOR] New pan:', newPan, 'vs visibleRect:', visibleRect);
+            console.log('[SPECTATOR] New pan:', newPan, 'canvas dims:', { canvasW, canvasH }, 'vs visibleRect:', visibleRect);
             // Apply the computed fit
             setPan((prev) => {
               if (prev.x === newPan.x && prev.y === newPan.y) return prev;
