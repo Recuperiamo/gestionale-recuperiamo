@@ -89,7 +89,9 @@ export async function POST(req) {
     });
 
     // Return DB shape and echo client id if provided
-    return NextResponse.json({ shape: { ...created, clientId: clientShapeId || null } }, { status: 201 });
+    const response = NextResponse.json({ shape: { ...created, clientId: clientShapeId || null } }, { status: 201 });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return response;
   } catch (e) {
     console.error("POST /api/lavagna/shape error", e);
     return NextResponse.json({ error: e.message }, { status: 500 });

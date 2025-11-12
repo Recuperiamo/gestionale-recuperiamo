@@ -45,7 +45,9 @@ export async function PUT(req, { params }) {
         createdAt: true
       }
     });
-    return NextResponse.json({ shape: updated });
+    const response = NextResponse.json({ shape: updated });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return response;
   } catch (e) {
     console.error("PUT /api/lavagna/shape/:id error", e);
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -75,7 +77,9 @@ export async function DELETE(_req, { params }) {
     }
 
     await prisma.lavagnaShape.update({ where: { id: numericId }, data: { deletedAt: new Date() } });
-    return NextResponse.json({ ok: true, id: numericId });
+    const response = NextResponse.json({ ok: true, id: numericId });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return response;
   } catch (e) {
     console.error("DELETE /api/lavagna/shape/:id error", e);
     return NextResponse.json({ error: e.message }, { status: 500 });

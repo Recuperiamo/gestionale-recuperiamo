@@ -108,6 +108,7 @@ export default function LavagnaCanvas({
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
+  const [canvasRotation, setCanvasRotation] = useState(0); // 0, 90, 180, 270 degrees
   const latestAdminViewportRef = useRef(null);
   const pendingViewportRef = useRef(null);
   const viewportApplyRAFRef = useRef(null);
@@ -1816,7 +1817,8 @@ export default function LavagnaCanvas({
           const { strokeId } = data || {};
           if (!strokeId) return;
           setTratti((prev) => prev.filter((t) => String(t.id) !== String(strokeId)));
-          drawAll();
+          // Force redraw on next animation frame to ensure React state has updated
+          requestAnimationFrame(() => drawAll());
         };
 
         const onStrokeUpdate = (msg) => {
@@ -1844,7 +1846,8 @@ export default function LavagnaCanvas({
             if (data.spessore) updated.spessore = data.spessore;
             return updated;
           }));
-          drawAll();
+          // Force redraw on next animation frame to ensure React state has updated
+          requestAnimationFrame(() => drawAll());
         };
 
         const onClear = () => {
@@ -1888,11 +1891,12 @@ export default function LavagnaCanvas({
           // Per le immagini, precarica e ridisegna quando pronta
           if (normalized.kind === 'immagine' && normalized.src) {
             const img = new Image();
-            img.onload = () => drawAll();
-            img.onerror = () => drawAll();
+            img.onload = () => requestAnimationFrame(() => drawAll());
+            img.onerror = () => requestAnimationFrame(() => drawAll());
             img.src = normalized.src;
           } else {
-            drawAll();
+            // Force redraw on next animation frame to ensure React state has updated
+            requestAnimationFrame(() => drawAll());
           }
         };
         
@@ -1912,14 +1916,15 @@ export default function LavagnaCanvas({
           if (normalized.kind === 'immagine' && normalized.src) {
             const img = new Image();
             img.onload = () => {
-              drawAll();
+              requestAnimationFrame(() => drawAll());
             };
             img.onerror = () => {
-              drawAll();
+              requestAnimationFrame(() => drawAll());
             };
             img.src = normalized.src;
           } else {
-            drawAll();
+            // Force redraw on next animation frame to ensure React state has updated
+            requestAnimationFrame(() => drawAll());
           }
         };
         
@@ -1929,7 +1934,8 @@ export default function LavagnaCanvas({
           console.log('[LAVAGNA-REMOTE-DELETE] Received shape:delete event:', data);
           // Only remove from local state; persistence is handled by the originating client
           setForme((prev) => prev.filter((f) => f.id !== data.id));
-          drawAll();
+          // Force redraw on next animation frame to ensure React state has updated
+          requestAnimationFrame(() => drawAll());
         };
         
         const onBackgroundChange = (msg) => {
@@ -5939,23 +5945,49 @@ export default function LavagnaCanvas({
             </div>
           )}
           {spectatorIndicatorVisible && (
-            <div
-              style={{
-                ...st.eyeBadge,
-                cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
-              }}
-              onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
-              title={spectatorIndicatorTitle}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
-              </svg>
-              {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div
+                style={{
+                  ...st.eyeBadge,
+                  cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
+                }}
+                onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
+                title={spectatorIndicatorTitle}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
+                </svg>
+                {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
+              </div>
+              {(!isAdmin && spectatorMode && isMobile) && (
+                <div
+                  style={{
+                    ...st.eyeBadge,
+                    cursor: 'pointer',
+                    padding: '8px'
+                  }}
+                  onClick={() => {
+                    setCanvasRotation((prev) => (prev + 90) % 360);
+                  }}
+                  title="Ruota lavagna (90°)"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="#20489a"/>
+                  </svg>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
-      <div style={st.canvasBox}>
+      <div style={{
+        ...st.canvasBox,
+        ...(canvasRotation !== 0 && {
+          transform: `rotate(${canvasRotation}deg)`,
+          transformOrigin: 'center center',
+          transition: 'transform 0.3s ease'
+        })
+      }}>
         {toolbar}
         <div ref={zoomControlsRef} style={{
           ...st.zoomControls,
