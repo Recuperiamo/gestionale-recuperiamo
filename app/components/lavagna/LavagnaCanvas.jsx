@@ -1817,8 +1817,7 @@ export default function LavagnaCanvas({
           const { strokeId } = data || {};
           if (!strokeId) return;
           setTratti((prev) => prev.filter((t) => String(t.id) !== String(strokeId)));
-          // Force redraw on next animation frame to ensure React state has updated
-          requestAnimationFrame(() => drawAll());
+          drawAll();
         };
 
         const onStrokeUpdate = (msg) => {
@@ -1846,8 +1845,7 @@ export default function LavagnaCanvas({
             if (data.spessore) updated.spessore = data.spessore;
             return updated;
           }));
-          // Force redraw on next animation frame to ensure React state has updated
-          requestAnimationFrame(() => drawAll());
+          drawAll();
         };
 
         const onClear = () => {
@@ -1891,14 +1889,11 @@ export default function LavagnaCanvas({
           // Per le immagini, precarica e ridisegna quando pronta
           if (normalized.kind === 'immagine' && normalized.src) {
             const img = new Image();
-            img.onload = () => requestAnimationFrame(() => drawAll());
-            img.onerror = () => requestAnimationFrame(() => drawAll());
+            img.onload = () => drawAll();
+            img.onerror = () => drawAll();
             img.src = normalized.src;
           } else {
-            // Force redraw on next animation frame to ensure React state has updated
-            // Use double approach for mobile: RAF + setTimeout fallback
-            requestAnimationFrame(() => drawAll());
-            setTimeout(() => drawAll(), 50);
+            drawAll();
           }
         };
         
@@ -1922,19 +1917,14 @@ export default function LavagnaCanvas({
           if (normalized.kind === 'immagine' && normalized.src) {
             const img = new Image();
             img.onload = () => {
-              requestAnimationFrame(() => drawAll());
-              setTimeout(() => drawAll(), 50);
+              drawAll();
             };
             img.onerror = () => {
-              requestAnimationFrame(() => drawAll());
-              setTimeout(() => drawAll(), 50);
+              drawAll();
             };
             img.src = normalized.src;
           } else {
-            // Force redraw on next animation frame to ensure React state has updated
-            // Use double approach for mobile: RAF + setTimeout fallback
-            requestAnimationFrame(() => drawAll());
-            setTimeout(() => drawAll(), 50);
+            drawAll();
           }
         };
         
@@ -1944,8 +1934,7 @@ export default function LavagnaCanvas({
           console.log('[LAVAGNA-REMOTE-DELETE] Received shape:delete event:', data);
           // Only remove from local state; persistence is handled by the originating client
           setForme((prev) => prev.filter((f) => f.id !== data.id));
-          // Force redraw on next animation frame to ensure React state has updated
-          requestAnimationFrame(() => drawAll());
+          drawAll();
         };
         
         const onBackgroundChange = (msg) => {
