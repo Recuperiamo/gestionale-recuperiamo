@@ -1610,13 +1610,49 @@ export default function LavagnaCanvas({
     if (!view) return;
     const { pan: remotePan, zoom: remoteZoom, visibleRect } = view;
     
-    // If the admin sent a visibleRect, compute a fit-to-view for spectators so
-    // they scale and center the admin's view into their own canvas (responsive).
-    if (visibleRect && visibleRect.width > 0 && visibleRect.height > 0) {
-      console.log('[SPECTATOR] Using visibleRect fit-to-view mode');
-      try {
-        const canvas = canvasRef.current;
-        if (canvas) {
+    // MOBILE SPECTATOR FIX: Invece di usare visibleRect admin (troppo grande),
+    // calcola bbox del contenuto REALE (forme + tratti)
+    try {
+      const canvas = canvasRef.current;
+      if (canvas && (forme.length > 0 || tratti.length > 0)) {
+        // Calcola bounding box del contenuto reale
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        
+        // Include forme
+        forme.forEach(f => {
+          const bounds = f._bb ?? getShapeBounds(f);
+          if (bounds) {
+            minX = Math.min(minX, bounds.minX);
+            minY = Math.min(minY, bounds.minY);
+            maxX = Math.max(maxX, bounds.maxX);
+            maxY = Math.max(maxY, bounds.maxY);
+          }
+        });
+        
+        // Include tratti
+        tratti.forEach(t => {
+          if (t._bb) {
+            minX = Math.min(minX, t._bb.minX);
+            minY = Math.min(minY, t._bb.minY);
+            maxX = Math.max(maxX, t._bb.maxX);
+            maxY = Math.max(maxY, t._bb.maxY);
+          }
+        });
+        
+        if (Number.isFinite(minX) && Number.isFinite(maxX)) {
+          // Aggiungi margine 10% attorno al contenuto
+          const contentW = maxX - minX;
+          const contentH = maxY - minY;
+          const margin = 0.1;
+          const contentRect = {
+            x: minX - contentW * margin,
+            y: minY - contentH * margin,
+            width: contentW * (1 + 2 * margin),
+            height: contentH * (1 + 2 * margin)
+          };
+          
+          console.log('[SPECTATOR] Using CONTENT bbox instead of visibleRect:', contentRect);
+          
           const rect = canvas.getBoundingClientRect();
           let localW = rect.width;
           let localH = rect.height;
@@ -1629,31 +1665,24 @@ export default function LavagnaCanvas({
             console.log('[SPECTATOR-MOBILE] Swapped dimensions:', { localW, localH });
           }
           
-          if (localW > 0 && localH > 0) {
-            // Compute zoom to exactly fit admin's visible rect with minimal safety margin
-            const fitScaleX = localW / visibleRect.width;
-            const fitScaleY = localH / visibleRect.height;
+          if (localW > 0 && localH > 0 && contentRect.width > 0 && contentRect.height > 0) {
+            // Fit-to-view del contenuto reale
+            const fitScaleX = localW / contentRect.width;
+            const fitScaleY = localH / contentRect.height;
             const targetZoom = Math.min(fitScaleX, fitScaleY);
             
-            // Add tiny margin (0.1%) to prevent edge cropping due to rounding
-            const safetyFactor = 0.999;
+            const safetyFactor = 0.95; // margine 5% per evitare clipping
             const clampedZoom = Math.max(0.1, Math.min(5, targetZoom * safetyFactor));
 
-            // Debug spectator viewport
-            console.log('[SPECTATOR] Viewport calc:', {
-              localW, localH,
-              visibleRect,
-              fitScaleX, fitScaleY, targetZoom, safetyFactor, clampedZoom
+            console.log('[SPECTATOR] Content fit calc:', {
+              localW, localH, contentRect,
+              fitScaleX, fitScaleY, targetZoom, clampedZoom
             });
             
-            // Position the admin's visible rect centered
-            // Center alignment ensures content is fully visible and symmetric
-            const centerX = visibleRect.x + visibleRect.width / 2;
-            const centerY = visibleRect.y + visibleRect.height / 2;
+            // Centra il contenuto
+            const centerX = contentRect.x + contentRect.width / 2;
+            const centerY = contentRect.y + contentRect.height / 2;
             
-            // CRITICAL: localW/localH sono già swappati se rotazione 90/270
-            // Ma il pan è in coordinate MONDO, non canvas - usa dimensioni originali canvas
-            const canvas = canvasRef.current;
             const canvasW = canvas.width;
             const canvasH = canvas.height;
             
@@ -1662,8 +1691,8 @@ export default function LavagnaCanvas({
               y: centerY - (canvasH / 2) / clampedZoom
             };
             
-            console.log('[SPECTATOR] New pan:', newPan, 'canvas dims:', { canvasW, canvasH }, 'vs visibleRect:', visibleRect);
-            // Apply the computed fit
+            console.log('[SPECTATOR] New pan (content-based):', newPan, 'canvas dims:', { canvasW, canvasH });
+            
             setPan((prev) => {
               if (prev.x === newPan.x && prev.y === newPan.y) return prev;
               return newPan;
@@ -1672,7 +1701,9 @@ export default function LavagnaCanvas({
             return;
           }
         }
-      } catch (_) {}
+      }
+    } catch (err) {
+      console.error('[SPECTATOR] Error calculating content bbox:', err);
     }
     
     // Fallback: if no visibleRect, apply admin pan/zoom directly (old behavior)
@@ -1686,7 +1717,7 @@ export default function LavagnaCanvas({
     if (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom)) {
       setZoom((prev) => (prev === remoteZoom ? prev : remoteZoom));
     }
-  }, [canvasRotation]);  // Include canvasRotation for mobile rotation swap
+  }, [canvasRotation, forme, tratti]);  // Include forme/tratti per ricalcolare bbox quando contenuto cambia
 
   useEffect(() => {
     if (!spectatorMode || isAdmin) return;
