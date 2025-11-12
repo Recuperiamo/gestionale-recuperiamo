@@ -286,16 +286,31 @@ export default function LavagnaCanvas({
     const sel = selectedItems;
     if (!sel || (!sel.forme || sel.forme.length === 0)) return;
     const delta = direction * SNAP_ANGLE;
-    setForme(prev => prev.map(f => {
-      if (!sel.forme.includes(f.id)) return f;
-      const current = Number(f.rotation) || 0;
-      const target = snapToQuarterTurns(current + delta);
-      const updated = { ...f, rotation: target };
-      // Emit realtime update
-      emitOrPublish('shape:update', { ...updated, lavagnaId });
+    
+    const updatedShapes = [];
+    setForme(prev => {
+      const updated = prev.map(f => {
+        if (!sel.forme.includes(f.id)) return f;
+        const current = Number(f.rotation) || 0;
+        const target = snapToQuarterTurns(current + delta);
+        const rotated = { ...f, rotation: target };
+        // Invalidate cached bbox to force recalc on next draw
+        delete rotated._bb;
+        updatedShapes.push(rotated);
+        return rotated;
+      });
       return updated;
-    }));
-    drawAll();
+    });
+    
+    // Persist and emit updates for each rotated shape (after state update completes)
+    setTimeout(() => {
+      updatedShapes.forEach(shape => {
+        updateShapeLocal(shape, true);
+      });
+    }, 0);
+    
+    // Force redraw to update selection box with new rotated bounds
+    requestAnimationFrame(() => drawAll());
   }
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
   const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
@@ -5061,6 +5076,17 @@ export default function LavagnaCanvas({
         ctx.strokeStyle = f.colore || '#20489a';
         ctx.lineWidth = f.spessore || 3;
         
+        // Apply rotation transform if shape has rotation
+        try {
+          const rot = Number(f.rotation) || 0;
+          if (rot && isFinite(rot)) {
+            const c = getShapeCenter(f);
+            ctx.translate(c.x, c.y);
+            ctx.rotate(rot);
+            ctx.translate(-c.x, -c.y);
+          }
+        } catch(_) {}
+        
         if (f.kind === 'rettangolo' || f.kind === 'quadrato') {
           ctx.strokeRect(f.x, f.y, f.w, f.h);
         } else if (f.kind === 'cerchio' || f.kind === 'ellisse') {
@@ -5168,6 +5194,17 @@ export default function LavagnaCanvas({
       ctx.save();
       ctx.strokeStyle = f.colore || '#20489a';
       ctx.lineWidth = f.spessore || 3;
+      
+      // Apply rotation transform
+      try {
+        const rot = Number(f.rotation) || 0;
+        if (rot && isFinite(rot)) {
+          const c = getShapeCenter(f);
+          ctx.translate(c.x, c.y);
+          ctx.rotate(rot);
+          ctx.translate(-c.x, -c.y);
+        }
+      } catch(_) {}
       
       if (f.kind === 'rettangolo' || f.kind === 'quadrato') {
         ctx.strokeRect(f.x, f.y, f.w, f.h);
