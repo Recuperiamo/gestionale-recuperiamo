@@ -108,8 +108,6 @@ export default function LavagnaCanvas({
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
-  // Mobile sempre 90° ruotato, desktop 0°
-  const canvasRotation = isMobile ? 90 : 0;
   const latestAdminViewportRef = useRef(null);
   const pendingViewportRef = useRef(null);
   const viewportApplyRAFRef = useRef(null);
@@ -164,12 +162,14 @@ export default function LavagnaCanvas({
 
   // Mobile responsive hook
   const [isMobile, setIsMobile] = useState(false);
+  // Mobile sempre 90° ruotato, desktop 0°
+  const canvasRotation = isMobile ? 90 : 0;
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, [canvasRotation]);
+  }, []);
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
