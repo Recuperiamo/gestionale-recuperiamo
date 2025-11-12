@@ -403,6 +403,12 @@ export default function LavagnaCanvas({
   const drawAll = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
+    
+    // Debug flash: log numero forme/tratti
+    if (forme.length > 0 || tratti.length > 0) {
+      console.log('[DRAW-DEBUG] Drawing:', { formeCount: forme.length, trattiCount: tratti.length, firstFormeId: forme[0]?.id });
+    }
+    
     const canvas = ctx.canvas;
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.width / dpr;
@@ -1894,7 +1900,10 @@ export default function LavagnaCanvas({
           console.log('[PASTE-DEBUG] Received shape:create', { id: data.id, kind: data.kind, hasData: !!data });
           
           const normalized = normalizeShape(data);
-          if (!normalized) return;
+          if (!normalized) {
+            console.log('[PASTE-DEBUG] normalizeShape returned null/undefined');
+            return;
+          }
           
           // If the creator included an inline data URL fallback (srcData), prefer it
           try {
@@ -1905,7 +1914,11 @@ export default function LavagnaCanvas({
           } catch (_) {}
           
           setForme((prev) => {
-            if (prev.find((f) => f.id === normalized.id)) return prev;
+            if (prev.find((f) => f.id === normalized.id)) {
+              console.log('[PASTE-DEBUG] Duplicate shape detected, ignoring:', normalized.id);
+              return prev;
+            }
+            console.log('[PASTE-DEBUG] Adding shape to forme array:', normalized.id);
             return [...prev, normalized];
           });
           
@@ -3935,8 +3948,16 @@ export default function LavagnaCanvas({
       }
       // ensure overlay hidden while panning
       try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
-      const dx = e.nativeEvent.clientX - panningRef.current.lastX;
-      const dy = e.nativeEvent.clientY - panningRef.current.lastY;
+      let dx = e.nativeEvent.clientX - panningRef.current.lastX;
+      let dy = e.nativeEvent.clientY - panningRef.current.lastY;
+      
+      // Su mobile ruotato 90°, inverti gli assi del pan
+      if (canvasRotation === 90) {
+        [dx, dy] = [dy, -dx]; // su/giù diventa destra/sinistra, sinistra/destra diventa giù/su
+      } else if (canvasRotation === 270) {
+        [dx, dy] = [-dy, dx];
+      }
+      
       panningRef.current.lastX = e.nativeEvent.clientX;
       panningRef.current.lastY = e.nativeEvent.clientY;
       setPan((p) => {
@@ -5989,17 +6010,19 @@ export default function LavagnaCanvas({
       )}
       <div style={st.canvasBox}>
         {toolbar}
-        <div ref={zoomControlsRef} style={{
-          ...st.zoomControls,
-          ...(isMobile && {
-            right: 8,
-            top: 8,
-            bottom: 'auto',
-            padding: '6px 6px 6px 8px',
-            gap: 4,
-            borderRadius: 12
-          })
-        }}>
+        {/* Nascondi zoom controls se mobile spectator */}
+        {!(isMobile && spectatorMode && !isAdmin) && (
+          <div ref={zoomControlsRef} style={{
+            ...st.zoomControls,
+            ...(isMobile && {
+              right: 8,
+              top: 8,
+              bottom: 'auto',
+              padding: '6px 6px 6px 8px',
+              gap: 4,
+              borderRadius: 12
+            })
+          }}>
           <button
             type="button"
             style={{
@@ -6041,6 +6064,7 @@ export default function LavagnaCanvas({
             </svg>
           </button>
         </div>
+        )}
         <div
           ref={overlayRef}
           style={{
