@@ -170,7 +170,7 @@ export default function LavagnaCanvas({
   }, []);
   
   // Mobile sempre 90° ruotato, desktop 0° - calcolato dopo isMobile
-  const canvasRotation = useMemo(() => isMobile ? 90 : 0, [isMobile]);
+  const canvasRotation = useMemo(() => 0, [isMobile]); // DISABILITATO: isMobile ? 90 : 0
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
