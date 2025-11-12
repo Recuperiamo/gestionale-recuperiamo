@@ -3228,24 +3228,9 @@ export default function LavagnaCanvas({
       clientX = typeof e?.clientX === 'number' ? e.clientX : 0;
       clientY = typeof e?.clientY === 'number' ? e.clientY : 0;
     }
-    let offX = clientX - rect.left;
-    let offY = clientY - rect.top;
-    // If canvas is rotated visually, map the pointer through the inverse rotation
-    try {
-      const rot = (canvasRotation || 0) % 360;
-      if (rot !== 0) {
-        const rad = (rot * Math.PI) / 180;
-        const cx = rect.width / 2;
-        const cy = rect.height / 2;
-        const dx = offX - cx;
-        const dy = offY - cy;
-        const inv = -rad;
-        const nx = dx * Math.cos(inv) - dy * Math.sin(inv);
-        const ny = dx * Math.sin(inv) + dy * Math.cos(inv);
-        offX = nx + cx;
-        offY = ny + cy;
-      }
-    } catch (_) {}
+    const offX = clientX - rect.left;
+    const offY = clientY - rect.top;
+    // Canvas dimensions are already swapped when rotated, so no coordinate transformation needed
     const currentPan = panRef.current || { x: 0, y: 0 };
     const currentZoom = zoomRef.current || 1;
     const x = currentPan.x + offX / currentZoom;
@@ -3265,23 +3250,12 @@ export default function LavagnaCanvas({
       const currentZoom = zoomRef.current || 1;
       const sx = (point.x - currentPan.x) * currentZoom + rect.left;
       const sy = (point.y - currentPan.y) * currentZoom + rect.top;
-      // If canvas is rotated, rotate the screen point around the canvas center
-      const rot = (canvasRotation || 0) % 360;
-      if (rot && rot !== 0) {
-        const rad = (rot * Math.PI) / 180;
-        const cx = rect.width / 2;
-        const cy = rect.height / 2;
-        const dx = sx - rect.left - cx;
-        const dy = sy - rect.top - cy;
-        const nx = dx * Math.cos(rad) - dy * Math.sin(rad);
-        const ny = dx * Math.sin(rad) + dy * Math.cos(rad);
-        return { clientX: rect.left + nx + cx, clientY: rect.top + ny + cy, rect };
-      }
+      // Canvas dimensions are already swapped when rotated, no transform needed
       return { clientX: sx, clientY: sy, rect };
     } catch (err) {
       return null;
     }
-  }, [canvasRotation]);
+  }, []);
 
   // == RESIZE & REDRAW ==
   useEffect(() => {
@@ -3290,13 +3264,26 @@ export default function LavagnaCanvas({
       if (!canvas) return;
       const parent = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
-      // Always use full parent width and fixed height (no swap here - rotation is visual only)
-      const w = parent.clientWidth;
-      const h = altezza;
+      
+      // When rotated 90/270, swap dimensions so canvas area matches visible area
+      const rot = (canvasRotation || 0) % 360;
+      const isRotated90or270 = (rot === 90 || rot === 270);
+      
+      let w, h;
+      if (isRotated90or270) {
+        // Swap: width becomes height-based, height becomes width-based
+        w = altezza;
+        h = parent.clientWidth;
+      } else {
+        w = parent.clientWidth;
+        h = altezza;
+      }
+      
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
+      
       const ctx = canvas.getContext("2d");
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
@@ -5996,7 +5983,7 @@ export default function LavagnaCanvas({
                 </svg>
                 {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
               </div>
-              {(!isAdmin && spectatorMode) && (
+              {(!isAdmin && spectatorMode && isMobile) && (
                 <div
                   style={{
                     ...st.eyeBadge,
@@ -6128,16 +6115,12 @@ export default function LavagnaCanvas({
               };
               const rot = canvasRotation % 360;
               if (rot !== 0) {
-                // When rotated 90 or 270, scale down to fit within container
-                const isPortraitRotation = (rot === 90 || rot === 270);
-                const scaleFactor = isPortraitRotation ? 0.6 : 1; // Scale down to fit
+                // Pure rotation without scale - dimensions already swapped in resize()
                 return {
                   ...base,
-                  transform: `rotate(${rot}deg) scale(${scaleFactor})`,
+                  transform: `rotate(${rot}deg)`,
                   transformOrigin: 'center center',
-                  transition: 'transform 0.3s ease',
-                  maxWidth: '100%',
-                  maxHeight: '100%'
+                  transition: 'transform 0.3s ease'
                 };
               }
               return base;
