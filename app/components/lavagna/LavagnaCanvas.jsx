@@ -1915,6 +1915,8 @@ export default function LavagnaCanvas({
               normalized.src = preview;
             }
           } catch (_) {}
+          // Invalidate cached bounding box when shape is updated (especially for rotation)
+          delete normalized._bb;
           setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
           // Per le immagini, precarica e ridisegna quando pronta
           if (normalized.kind === 'immagine' && normalized.src) {
