@@ -162,14 +162,15 @@ export default function LavagnaCanvas({
 
   // Mobile responsive hook
   const [isMobile, setIsMobile] = useState(false);
-  // Mobile sempre 90° ruotato, desktop 0°
-  const canvasRotation = isMobile ? 90 : 0;
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+  
+  // Mobile sempre 90° ruotato, desktop 0° - calcolato dopo isMobile
+  const canvasRotation = useMemo(() => isMobile ? 90 : 0, [isMobile]);
 
   const penCursor = useMemo(() => {
     if (strumento !== "penna") return null;
@@ -4596,11 +4597,13 @@ export default function LavagnaCanvas({
       if (shapeObj) {
         createShapeLocal(shapeObj, true);
       }
-      previewShapeRef.current = null; drawingShapeRef.current = false; rightClickLineRef.current = { active: false, start: null };
+      previewShapeRef.current = null; 
+      drawingShapeRef.current = false; 
+      rightClickLineRef.current = { active: false, start: null };
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}
-      drawAll();
+      // Don't call drawAll here - let React do it when forme updates
       return;
     }
 
