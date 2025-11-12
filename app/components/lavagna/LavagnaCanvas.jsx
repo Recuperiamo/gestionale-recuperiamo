@@ -108,7 +108,8 @@ export default function LavagnaCanvas({
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
-  const [canvasRotation, setCanvasRotation] = useState(0); // 0, 90, 180, 270 degrees
+  // Mobile sempre 90° ruotato, desktop 0°
+  const canvasRotation = isMobile ? 90 : 0;
   const latestAdminViewportRef = useRef(null);
   const pendingViewportRef = useRef(null);
   const viewportApplyRAFRef = useRef(null);
@@ -5964,23 +5965,6 @@ export default function LavagnaCanvas({
                 </svg>
                 {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
               </div>
-              {(!isAdmin && spectatorMode && isMobile) && (
-                <div
-                  style={{
-                    ...st.eyeBadge,
-                    cursor: 'pointer',
-                    padding: '8px'
-                  }}
-                  onClick={() => {
-                    setCanvasRotation((prev) => (prev + 90) % 360);
-                  }}
-                  title="Ruota lavagna (90°)"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="#20489a"/>
-                  </svg>
-                </div>
-              )}
             </div>
           )}
         </div>
