@@ -6092,8 +6092,8 @@ export default function LavagnaCanvas({
       )}
       <div style={st.canvasBox}>
         {toolbar}
-        {/* Nascondi zoom controls se mobile spectator */}
-        {!(isMobile && spectatorMode && !isAdmin) && (
+        {/* Nascondi zoom controls se mobile E non admin (spectator o studente) */}
+        {!(isMobile && !isAdmin) && (
           <div ref={zoomControlsRef} style={{
             ...st.zoomControls,
             ...(isMobile && {
