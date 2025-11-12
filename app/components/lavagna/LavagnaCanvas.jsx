@@ -3930,7 +3930,8 @@ export default function LavagnaCanvas({
           const dy = p.y - last.y;
           if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
             const selectionSnapshot = dragInfo.selectionSnapshot || selectedItems;
-            moveSelectionBy(dx, dy, true, selectionSnapshot);
+            // Don't emit during drag - only at pointerUp
+            moveSelectionBy(dx, dy, false, selectionSnapshot);
             dragInfo.lastWorld = p;
             if (!dragInfo.moved) {
               const delta = Math.max(Math.abs(dx), Math.abs(dy));
