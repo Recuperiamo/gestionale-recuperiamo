@@ -1896,13 +1896,17 @@ export default function LavagnaCanvas({
             img.src = normalized.src;
           } else {
             // Force redraw on next animation frame to ensure React state has updated
+            // Use double approach for mobile: RAF + setTimeout fallback
             requestAnimationFrame(() => drawAll());
+            setTimeout(() => drawAll(), 50);
           }
         };
         
         const onShapeUpdate = (msg) => {
           const { data } = msg || {};
           if (!data || !data.id) return;
+          // Ignore own updates (echo prevention)
+          if (data.senderId && data.senderId === utenteIdRef.current) return;
           const normalized = normalizeShape(data);
           if (!normalized) return;
           try {
@@ -1917,14 +1921,18 @@ export default function LavagnaCanvas({
             const img = new Image();
             img.onload = () => {
               requestAnimationFrame(() => drawAll());
+              setTimeout(() => drawAll(), 50);
             };
             img.onerror = () => {
               requestAnimationFrame(() => drawAll());
+              setTimeout(() => drawAll(), 50);
             };
             img.src = normalized.src;
           } else {
             // Force redraw on next animation frame to ensure React state has updated
+            // Use double approach for mobile: RAF + setTimeout fallback
             requestAnimationFrame(() => drawAll());
+            setTimeout(() => drawAll(), 50);
           }
         };
         
@@ -2158,8 +2166,8 @@ export default function LavagnaCanvas({
     if (!normalized) return;
     setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, ...normalized } : f)));
     if (emit) {
-      // Include srcPreview for realtime sync of updated images
-      const payload = { ...normalized, lavagnaId };
+      // Include srcPreview for realtime sync of updated images and senderId to prevent echo
+      const payload = { ...normalized, lavagnaId, senderId: utenteId };
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
         payload.srcPreview = normalized.src;
       }
@@ -2427,7 +2435,7 @@ export default function LavagnaCanvas({
     if (emit) {
       // Emit shape updates
       updatedShapes.forEach((shape) => {
-        emitOrPublish('shape:update', { ...shape, lavagnaId });
+        emitOrPublish('shape:update', { ...shape, lavagnaId, senderId: utenteId });
       });
       
       // Emit stroke updates (realtime sync)
@@ -3282,19 +3290,13 @@ export default function LavagnaCanvas({
       if (!canvas) return;
       const parent = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
-      // If canvasRotation is 90 or 270, swap width/height to emulate screen-rotation
-      const rotated = canvasRotation && (canvasRotation % 180 !== 0);
-      const w = rotated ? altezza : parent.clientWidth;
-      const h = rotated ? parent.clientWidth : altezza;
+      // Always use full parent width and fixed height (no swap here - rotation is visual only)
+      const w = parent.clientWidth;
+      const h = altezza;
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
-      // Ensure parent grows to accommodate swapped orientation and avoid clipping
-      try {
-        parent.style.height = canvas.style.height;
-        parent.style.overflow = rotated ? 'visible' : 'hidden';
-      } catch (_) {}
       const ctx = canvas.getContext("2d");
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
@@ -5994,7 +5996,7 @@ export default function LavagnaCanvas({
                 </svg>
                 {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
               </div>
-              {(!isAdmin && spectatorMode && isMobile) && (
+              {(!isAdmin && spectatorMode) && (
                 <div
                   style={{
                     ...st.eyeBadge,
@@ -6084,47 +6086,64 @@ export default function LavagnaCanvas({
           }}
         />
 
-        <canvas
-          ref={canvasRef}
-          onPointerDown={pointerDown}
-          onPointerMove={pointerMove}
-          onPointerUp={pointerUp}
-          onPointerLeave={pointerUp}
-          onPointerCancel={pointerCancel}
-          // block native context menu so right-click is reserved for grab/pan
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onDoubleClick={(e) => {
-            try {
-              const p = getPoint(e);
-              if (!p) return;
-              for (const f of (forme || [])) {
-                if (f.kind !== 'link') continue;
-                if (hitTestShape(f, p.x, p.y, 12)) {
-                  openLinkShape(f);
-                  return;
+        <div style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <canvas
+            ref={canvasRef}
+            onPointerDown={pointerDown}
+            onPointerMove={pointerMove}
+            onPointerUp={pointerUp}
+            onPointerLeave={pointerUp}
+            onPointerCancel={pointerCancel}
+            // block native context menu so right-click is reserved for grab/pan
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDoubleClick={(e) => {
+              try {
+                const p = getPoint(e);
+                if (!p) return;
+                for (const f of (forme || [])) {
+                  if (f.kind !== 'link') continue;
+                  if (hitTestShape(f, p.x, p.y, 12)) {
+                    openLinkShape(f);
+                    return;
+                  }
                 }
-              }
-            } catch (_) {}
-          }}
-          style={(() => {
-            const base = {
-              ...st.canvas,
-              // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
-              cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'gomma') ? 'none' : canvasCursor))
-            };
-            if (canvasRotation && canvasRotation % 360 !== 0) {
-              return {
-                ...base,
-                transform: `rotate(${canvasRotation}deg)`,
-                transformOrigin: 'center center'
+              } catch (_) {}
+            }}
+            style={(() => {
+              const base = {
+                ...st.canvas,
+                // When hovering toolbar, force default cursor and hide overlay via toolbar handlers
+                cursor: inToolbar ? 'default' : (contextPanning ? canvasCursor : ((strumento === 'gomma') ? 'none' : canvasCursor))
               };
-            }
-            return base;
-          })()}
-        />
+              const rot = canvasRotation % 360;
+              if (rot !== 0) {
+                // When rotated 90 or 270, scale down to fit within container
+                const isPortraitRotation = (rot === 90 || rot === 270);
+                const scaleFactor = isPortraitRotation ? 0.6 : 1; // Scale down to fit
+                return {
+                  ...base,
+                  transform: `rotate(${rot}deg) scale(${scaleFactor})`,
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.3s ease',
+                  maxWidth: '100%',
+                  maxHeight: '100%'
+                };
+              }
+              return base;
+            })()}
+          />
+        </div>
       </div>
     </div>
   );
