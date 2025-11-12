@@ -2065,6 +2065,20 @@ export default function LavagnaCanvas({
           console.log('[SPECTATOR] Received viewport:update', data);
           if (!data) return;
           if (data.senderId && data.senderId === utenteIdRef.current) return;
+          
+          // CRITICAL FIX: Se lavagnaId cambia, significa che admin ha aperto ALTRA lavagna
+          // Spectator deve fare page reload per caricare la nuova lavagna
+          if (data.lavagnaId && data.lavagnaId !== lavagnaIdRef.current) {
+            console.log('[SPECTATOR] Admin switched to different lavagna!', {
+              current: lavagnaIdRef.current,
+              new: data.lavagnaId,
+              attivitaId: data.attivitaId
+            });
+            console.log('[SPECTATOR] Reloading page to load new lavagna...');
+            window.location.href = `/lavagna/full?attivitaId=${data.attivitaId}`;
+            return;
+          }
+          
           const remotePan = data.pan;
           const remoteZoom = data.zoom;
           const visibleRect = data.visibleRect;
