@@ -710,7 +710,7 @@ function groupByDay(list) {
 }
 
 // --- MAIN PAGE ---
-export default function AulaContent({ initialClienteId = null }) {
+export default function AulaContent({ initialClienteId = null, hideSidebar = false }) {
   const { data: session, status } = useSession();
   const [items, setItems] = useState([]);
   const [filtroTipo, setFiltroTipo] = useState("");
@@ -726,6 +726,8 @@ export default function AulaContent({ initialClienteId = null }) {
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
+  const [previewBatch, setPreviewBatch] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("materiale"); // imposta default obbligatorio (materiale o compiti)
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
@@ -818,6 +820,22 @@ export default function AulaContent({ initialClienteId = null }) {
 
     return () => cleanupAbly();
   }, [targetClienteId, status]);
+
+  // Keyboard handlers for batch preview navigation (attach only when previewBatch is open)
+  useEffect(() => {
+    if (!previewBatch) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setPreviewBatch(null);
+      } else if (e.key === 'ArrowLeft') {
+        setPreviewIndex(i => Math.max(0, i - 1));
+      } else if (e.key === 'ArrowRight') {
+        setPreviewIndex(i => Math.min(previewBatch.length - 1, i + 1));
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [previewBatch]);
 
   // Materie effettive nei materiali filtrati
   const materieEffettive = useMemo(
@@ -1183,7 +1201,7 @@ export default function AulaContent({ initialClienteId = null }) {
       </header>
 
       <div style={pageGrid}>
-        {hasTarget && <div style={sidebarWrap}>{sidebar}</div>}
+        {hasTarget && !hideSidebar && <div style={sidebarWrap}>{sidebar}</div>}
         <main style={mainStyle}>
           {(!hasTarget && isAdmin) ? (
             <div style={{ ...emptyBox, marginTop: 0 }}>
@@ -1298,15 +1316,15 @@ export default function AulaContent({ initialClienteId = null }) {
                             gap: 10,
                             marginBottom: 12
                           }}>
-                            {batchItems.slice(0, 4).map((m) => {
+                            {batchItems.slice(0, 4).map((m, idx) => {
                               const isImage = ["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase());
                               return (
                                 <div 
                                   key={m.id}
                                   role="button"
                                   tabIndex={0}
-                                  onClick={() => setPreviewItem(m)}
-                                  onKeyDown={(e)=>{ if(e.key==='Enter') setPreviewItem(m); }}
+                                  onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(idx); }}
+                                  onKeyDown={(e)=>{ if(e.key==='Enter') { setPreviewBatch(batchItems); setPreviewIndex(idx); } }}
                                   style={{
                                     cursor: 'pointer',
                                     position: 'relative',
@@ -1338,7 +1356,12 @@ export default function AulaContent({ initialClienteId = null }) {
                               );
                             })}
                             {batchItems.length > 4 && (
-                              <div style={{
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(4); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { setPreviewBatch(batchItems); setPreviewIndex(4); } }}
+                                style={{
                                 cursor: 'pointer',
                                 position: 'relative',
                                 aspectRatio: '1',
@@ -1370,7 +1393,7 @@ export default function AulaContent({ initialClienteId = null }) {
                             Caricato il {formatAggDate(firstItem.updatedAt)}
                           </div>
                           <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                            <button type="button" style={btnGhost} onClick={() => setPreviewItem(batchItems[0])}>
+                            <button type="button" style={btnGhost} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
                               Vedi file
                             </button>
                           </div>
@@ -1498,6 +1521,67 @@ export default function AulaContent({ initialClienteId = null }) {
           </div>
         </div>
       )}
+      {/* Modale preview batch (carousel) */}
+      {previewBatch && (
+        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1110,padding:20}} onClick={() => setPreviewBatch(null)}>
+          <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1100,height:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.45)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div style={{fontWeight:700,color: coloreTema}}>{(previewBatch[previewIndex] && (previewBatch[previewIndex].titolo || previewBatch[previewIndex].nomeOriginale)) || 'Anteprima'}</div>
+                <div style={{fontSize:13,color:'#5a6d90'}}>{previewIndex + 1} / {previewBatch.length}</div>
+              </div>
+              <div>
+                {previewBatch[previewIndex] && (
+                  <a href={`/api/materiale?fileId=${previewBatch[previewIndex].id}`} style={{...btnGhost, marginRight:8}} download={previewBatch[previewIndex].nomeOriginale}>Scarica</a>
+                )}
+                <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewBatch(null)}>Chiudi</button>
+              </div>
+            </div>
+
+            <div style={{position:'relative',padding:16,display:'flex',alignItems:'center',justifyContent:'center',flex:1,overflow:'hidden',minHeight:0}}>
+              {/* Prev / Next side buttons */}
+              <button
+                type="button"
+                onClick={(e)=>{ e.stopPropagation(); setPreviewIndex(i => Math.max(0, i-1)); }}
+                disabled={previewIndex <= 0}
+                style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',zIndex:20,background:'transparent',border:'none',fontSize:40,color: previewIndex <= 0 ? '#ccc' : coloreTema, cursor: previewIndex <= 0 ? 'not-allowed' : 'pointer'}}
+                aria-label="Prev"
+              >◀</button>
+              <button
+                type="button"
+                onClick={(e)=>{ e.stopPropagation(); setPreviewIndex(i => Math.min(previewBatch.length - 1, i + 1)); }}
+                disabled={previewIndex >= previewBatch.length - 1}
+                style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',zIndex:20,background:'transparent',border:'none',fontSize:40,color: previewIndex >= previewBatch.length - 1 ? '#ccc' : coloreTema, cursor: previewIndex >= previewBatch.length - 1 ? 'not-allowed' : 'pointer'}}
+                aria-label="Next"
+              >▶</button>
+
+              <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                {(() => {
+                  const cur = previewBatch[previewIndex];
+                  if (!cur) return null;
+                  const tipo = (cur.tipo || '').toLowerCase();
+                  if (['jpg','jpeg','png','gif','bmp','webp'].includes(tipo)) {
+                    return <ImagePreviewWithZoom src={`/api/materiale?fileId=${cur.id}`} alt={cur.titolo} coloreTema={coloreTema} />;
+                  }
+                  if (tipo === 'pdf') {
+                    return <PDFPreviewWithControls src={`/api/materiale?fileId=${cur.id}`} title={cur.titolo} coloreTema={coloreTema} />;
+                  }
+                  return (
+                    <div style={{textAlign:'center'}}>
+                      <div style={{fontSize:64,fontWeight:700,color: coloreTema,marginBottom:12}}>{cur.tipo ? cur.tipo.toUpperCase() : 'FILE'}</div>
+                      <div style={{marginBottom:8,fontWeight:700}}>{cur.nomeOriginale || cur.titolo}</div>
+                      <div style={{color:'#6b7b9a',marginBottom:12}}>{cur.materia}</div>
+                      <a href={`/api/materiale?fileId=${cur.id}`} download={cur.nomeOriginale} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>Scarica file</a>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
       <UploadMaterialeModal
         open={showUpload}
         onClose={() => setShowUpload(false)}

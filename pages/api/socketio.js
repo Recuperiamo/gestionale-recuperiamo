@@ -34,6 +34,23 @@ export default function handler(req, res) {
         if (clienteId) ioServer.to(`lavagne:${clienteId}`).emit("delete-all-lavagne");
       });
 
+      // Programma realtime: stanza per lista programma per cliente
+      socket.on("join:programma", ({ clienteId }) => {
+        if (clienteId) socket.join(`programma:${clienteId}`);
+      });
+
+      socket.on("new-programma", ({ programma, clienteId }) => {
+        if (programma && clienteId) ioServer.to(`programma:${clienteId}`).emit("new-programma", { programma });
+      });
+
+      socket.on("delete-programma", ({ programmaId, clienteId }) => {
+        if (clienteId && programmaId) ioServer.to(`programma:${clienteId}`).emit("delete-programma", { programmaId });
+      });
+
+      socket.on("delete-all-programma", ({ clienteId }) => {
+        if (clienteId) ioServer.to(`programma:${clienteId}`).emit("delete-all-programma");
+      });
+
       // Stanza della singola lavagna (sincronizzazione disegno live)
       socket.on("join:lavagna", ({ attivitaId }) => {
         if (attivitaId) socket.join(`lavagna:${attivitaId}`);

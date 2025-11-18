@@ -23,6 +23,7 @@ model User {
   role                   Role                     @relation(fields: [roleId], references: [id])
   passwordResetRequests  PasswordResetRequest[]   @relation("UserPasswordResetRequests")
   passwordResetReviews   PasswordResetRequest[]   @relation("UserPasswordResetReviews")
+  programmiCreati        Programma[]
 }
 
 model Role {
@@ -85,6 +86,7 @@ model Client {
   OreExtra          OreExtra[]
   pacchetti         PacchettoOre[]
   richiesteModifica RichiestaModifica[]
+  programmi          Programma[]
 
   @@index([email])
   @@index([referenteId])
@@ -370,4 +372,24 @@ model PasswordResetRequest {
   @@index([userId])
   @@index([status])
   @@map("password_reset_requests")
+}
+
+/// *
+///  * ====================== PROGRAMMA (per-aula per materia) ======================
+model Programma {
+  id           Int      @id @default(autoincrement())
+  clienteId    Int
+  materia      String?
+  titolo       String
+  descrizione  String?
+  data         DateTime?
+  autoreUserId Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cliente      Client   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  autoreUser   User?    @relation(fields: [autoreUserId], references: [id])
+
+  @@index([clienteId])
+  @@index([materia])
 }
