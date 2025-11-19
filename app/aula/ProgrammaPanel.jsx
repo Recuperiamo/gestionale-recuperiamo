@@ -82,10 +82,14 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
       const payload = { clienteId, titolo: verificaForm.titolo, materia: verificaForm.materia, descrizione: verificaForm.descrizione, data: verificaForm.data };
       const res = await fetch('/api/programma', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const js = await res.json();
-      if (!res.ok) throw new Error(js?.error || 'Errore');
+      if (!res.ok) {
+        console.error('[ProgrammaPanel] create verifica error', js);
+        throw new Error(js?.error || 'Errore');
+      }
       // Try to create a calendar event for the verifica. If it fails we still created programma.
       try {
-        await fetch('/api/attivita/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, descrizione: `Verifica: ${verificaForm.titolo}`, orario: verificaForm.data, durataOre: 1 }) });
+        const orarioIso = verificaForm.data ? new Date(verificaForm.data).toISOString() : undefined;
+        await fetch('/api/attivita/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, descrizione: `Verifica: ${verificaForm.titolo}`, orario: orarioIso, durataOre: 1 }) });
       } catch (e) { /* ignore calendar sync error */ }
       setVerificaForm({ titolo: '', materia: '', data: '', descrizione: '' });
       await load();

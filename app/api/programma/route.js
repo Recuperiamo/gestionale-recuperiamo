@@ -35,6 +35,7 @@ export async function POST(req) {
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
     const body = await req.json();
+    console.log('[programma] POST body', JSON.stringify(body));
     const { clienteId, materia, titolo, descrizione, data } = body;
     if (!clienteId || !titolo) return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 });
 
