@@ -36,7 +36,7 @@ export async function POST(req) {
 
     const body = await req.json();
     console.log('[programma] POST body', JSON.stringify(body));
-    const { clienteId, materia, titolo, descrizione, data } = body;
+    const { clienteId, materia, titolo, descrizione, data, isVerifica } = body;
     if (!clienteId || !titolo) return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 });
 
     // Permission: admin/operator can create for any cliente, cliente can create only for their own clienteId
@@ -52,14 +52,15 @@ export async function POST(req) {
         titolo: String(titolo).trim(),
         descrizione: descrizione || null,
         data: data ? new Date(data) : null,
-        autoreUserId: session.user?.id ?? null
+        autoreUserId: session.user?.id ?? null,
+        isVerifica: isVerifica || false
       }
     });
 
     return NextResponse.json({ ok: true, programma: created }, { status: 201 });
   } catch (err) {
     console.error('[programma] POST error', err);
-    return NextResponse.json({ error: 'Errore interno' }, { status: 500 });
+    return NextResponse.json({ error: 'Errore interno', details: err.message }, { status: 500 });
   }
 }
 

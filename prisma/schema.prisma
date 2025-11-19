@@ -383,6 +383,7 @@ model Programma {
   titolo       String
   descrizione  String?
   data         DateTime?
+  isVerifica   Boolean? @default(false)
   autoreUserId Int?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

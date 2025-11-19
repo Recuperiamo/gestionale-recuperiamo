@@ -5,7 +5,7 @@ import { MATERIE_AULA as MATERIE_AULA_DEFAULT } from '../../lib/materie';
 import dynamic from 'next/dynamic';
 const CalendarioAttivita = dynamic(() => import('../components/calendario/CalendarioAttivita'), { ssr: false });
 import { useSession } from 'next-auth/react';
-import { io } from 'socket.io-client';
+import { getAblyChannelAsync } from '../lib/realtime/ablyClient';
 
 export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAdmin = false, hideAside = false, materie = [], asideTop = 96 }) {
   const { data: session } = useSession();
@@ -16,7 +16,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ titolo: '', materia: '', descrizione: '', data: '' });
   const [verificaForm, setVerificaForm] = useState({ titolo: '', materia: '', data: '', descrizione: '' });
-  const socketRef = useRef(null);
 
   async function load() {
     if (!clienteId) return;
@@ -36,27 +35,58 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
 
   useEffect(() => {
     if (!clienteId) return;
-    const socket = io(undefined, { path: '/api/socketio' });
-    socketRef.current = socket;
-    socket.emit('join:programma', { clienteId });
 
-    const onNew = ({ programma }) => {
-      if (!programma) return;
-      setProgrammi(prev => [programma, ...prev.filter(p => p.id !== programma.id)]);
-    };
-    const onDelete = ({ programmaId }) => setProgrammi(prev => prev.filter(p => p.id !== Number(programmaId)));
+    let cleanupAbly = () => {};
 
-    socket.on('new-programma', onNew);
-    socket.on('delete-programma', onDelete);
+    (async () => {
+      try {
+        const channel = await getAblyChannelAsync(`programma:${clienteId}`);
+        
+        const onNew = ({ data }) => {
+          const programma = data.programma;
+          if (!programma) return;
+          setProgrammi(prev => [programma, ...prev.filter(p => p.id !== programma.id)]);
+        };
+        const onDelete = ({ data }) => {
+          const programmaId = data.programmaId;
+          setProgrammi(prev => prev.filter(p => p.id !== Number(programmaId)));
+        };
+
+        channel.subscribe('new-programma', onNew);
+        channel.subscribe('delete-programma', onDelete);
+
+        cleanupAbly = () => {
+          channel.unsubscribe('new-programma', onNew);
+          channel.unsubscribe('delete-programma', onDelete);
+          channel.detach();
+        };
+      } catch (error) {
+        console.error("Failed to subscribe to Ably channel:", error);
+      }
+    })();
 
     return () => {
-      try {
-        socket.off('new-programma', onNew);
-        socket.off('delete-programma', onDelete);
-        socket.disconnect();
-      } catch (e) {}
+      cleanupAbly();
     };
   }, [clienteId]);
+
+  async function publishProgrammaUpdate(programma) {
+    try {
+      const channel = await getAblyChannelAsync(`programma:${clienteId}`);
+      channel.publish('new-programma', { programma });
+    } catch (error) {
+      console.error("Failed to publish Ably message:", error);
+    }
+  }
+
+  async function publishProgrammaDelete(programmaId) {
+    try {
+      const channel = await getAblyChannelAsync(`programma:${clienteId}`);
+      channel.publish('delete-programma', { programmaId });
+    } catch (error) {
+      console.error("Failed to publish Ably message:", error);
+    }
+  }
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -69,7 +99,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
       setOpenNew(false);
       setForm({ titolo: '', materia: '', descrizione: '', data: '' });
       await load();
-      try { socketRef.current && socketRef.current.emit('new-programma', { programma: js.programma, clienteId }); } catch (e) {}
+      publishProgrammaUpdate(js.programma);
     } catch (err) {
       alert('Errore salvataggio: ' + err.message);
     }
@@ -79,20 +109,30 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
     e.preventDefault();
     if (!verificaForm.titolo.trim()) return alert('Titolo obbligatorio');
     try {
-      const payload = { clienteId, titolo: verificaForm.titolo, materia: verificaForm.materia, descrizione: verificaForm.descrizione, data: verificaForm.data ? new Date(verificaForm.data).toISOString() : null };
+      const payload = { 
+        clienteId, 
+        titolo: `Verifica: ${verificaForm.titolo}`, 
+        materia: verificaForm.materia, 
+        descrizione: verificaForm.descrizione, 
+        data: verificaForm.data ? new Date(verificaForm.data).toISOString() : null,
+        isVerifica: true
+      };
       const res = await fetch('/api/programma', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const js = await res.json();
       if (!res.ok) {
         console.error('[ProgrammaPanel] create verifica error', js);
         throw new Error(js?.error || 'Errore');
       }
-      // Try to create a calendar event for the verifica. If it fails we still created programma.
+      
       try {
         const orarioIso = verificaForm.data ? new Date(verificaForm.data).toISOString() : undefined;
         await fetch('/api/attivita/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, descrizione: `Verifica: ${verificaForm.titolo}`, orario: orarioIso, durataOre: 1 }) });
       } catch (e) { /* ignore calendar sync error */ }
+
       setVerificaForm({ titolo: '', materia: '', data: '', descrizione: '' });
       await load();
+      publishProgrammaUpdate(js.programma);
+
     } catch (err) {
       alert('Errore salvataggio verifica: ' + err.message);
     }
@@ -105,7 +145,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
       const js = await res.json();
       if (!res.ok) throw new Error(js?.error || 'Errore');
       await load();
-      try { socketRef.current && socketRef.current.emit('delete-programma', { programmaId: id, clienteId }); } catch (e) {}
+      publishProgrammaDelete(id);
     } catch (err) {
       alert('Errore eliminazione: ' + err.message);
     }
@@ -128,7 +168,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
       setEditingItem(null);
       setEditForm({ titolo: '', materia: '', descrizione: '', data: '' });
       await load();
-      try { socketRef.current && socketRef.current.emit('new-programma', { programma: js.programma, clienteId }); } catch (e) {}
+      publishProgrammaUpdate(js.programma);
     } catch (err) {
       alert('Errore aggiornamento: ' + err.message);
     }
@@ -136,7 +176,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
 
   const recenti = () => (programmi || []).slice(0,5);
 
-  // derive the list of subjects to show: prefer provided materie, otherwise derive from DB, otherwise default list
   const materieList = (() => {
     if (Array.isArray(materie) && materie.length > 0) return materie;
     const fromDb = Array.from(new Set((programmi || []).map(p => p.materia).filter(Boolean)));
@@ -147,16 +186,13 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       <div style={{ flex: 1 }}>
-        {/* Removed global Programma title for a cleaner view per user request */}
         {loading && <div>Caricamento…</div>}
           {!loading && (
             <div>
-            {/* Registro Verifiche */}
             <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff', marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ fontWeight: 800, color: coloreTema }}>Registro verifiche</div>
                 <div>
-                  {/* nothing for now */}
                 </div>
               </div>
               <form onSubmit={handleCreateVerifica} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 140px', gap: 10, alignItems: 'center' }}>
@@ -171,7 +207,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                 </div>
               </form>
             </div>
-            {/* Render per materia as 'agenda' sessions: even if empty, show placeholder */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {materieList.map((m) => {
                 const listForMateria = (programmi || []).filter(p => (p.materia || '').toLowerCase() === (m || '').toLowerCase()).sort((a,b) => new Date(a.data || a.createdAt) - new Date(b.data || b.createdAt));
@@ -187,7 +222,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                     </div>
                     {listForMateria.length === 0 ? (
                       <div style={{ color: '#64748b', fontSize: 13, minHeight: 60, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {/* Empty table-like rows (3 placeholders to show the layout) */}
                         {[1, 2, 3].map((_,r) => (
                           <div key={r} style={{ display:'grid', gridTemplateColumns: '76px 1fr', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
                             <div style={{ textAlign: 'left', fontSize: 12, color: '#6b7b9a' }}>—</div>
@@ -225,7 +259,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
           <div style={{ position: 'sticky', top: asideTop }}>
             <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff' }}>
               <h4 style={{ marginTop: 0 }}>Argomenti recenti</h4>
-              {/* Global message removed - placeholders are shown per-materia in the agenda tiles */}
               <ul style={{ padding: 0, listStyle: 'none' }}>
                 {recenti().map(p => (
                   <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
@@ -234,7 +267,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                   </li>
                 ))}
               </ul>
-              {/* Admin-only mini calendar under Programma preview */}
               {isAdmin && (
                 <div style={{ marginTop: 12 }}>
                   <CalendarioAttivita forceClienteId={clienteId} initialMode="week" allowModeSwitch={false} enableAdminRequests={false} />
@@ -282,3 +314,4 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
     </div>
   );
 }
+
