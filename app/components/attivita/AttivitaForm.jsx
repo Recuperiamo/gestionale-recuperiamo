@@ -202,7 +202,11 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         });
         const result = await res.json();
         if (!res.ok) {
-          setErrorForm(result?.error || "Errore salvataggio");
+          let msg = result?.error || "Errore salvataggio";
+          if (result?.stack) {
+            msg += "\n" + result.stack;
+          }
+          setErrorForm(msg);
           setLoadingSubmit(false);
           return;
         }
@@ -229,7 +233,11 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         });
         const result = await res.json();
         if (!res.ok) {
-          setErrorForm(result?.error || "Errore modifica ricorrenza");
+          let msg = result?.error || "Errore modifica ricorrenza";
+          if (result?.stack) {
+            msg += "\n" + result.stack;
+          }
+          setErrorForm(msg);
           setLoadingSubmit(false);
           return;
         }
@@ -256,7 +264,11 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         });
         const result = await res.json();
         if (!res.ok) {
-          setErrorForm(result?.error || "Errore creazione ricorrenza");
+          let msg = result?.error || "Errore creazione ricorrenza";
+          if (result?.stack) {
+            msg += "\n" + result.stack;
+          }
+          setErrorForm(msg);
           setLoadingSubmit(false);
           return;
         }
