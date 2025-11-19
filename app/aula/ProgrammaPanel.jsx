@@ -154,9 +154,11 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                     ) : (
                       <div style={{ display: 'grid', gap: 8 }}>
                         {listForMateria.map(p => (
-                          <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff', display:'grid', gridTemplateColumns: '72px 1fr', gap: 12, alignItems:'start' }}>
-                            <div style={{ fontSize:12, color:'#6b7b9a', fontWeight:700 }}>
-                              {(p.data && new Date(p.data).toLocaleDateString('it-IT')) || (p.createdAt && new Date(p.createdAt).toLocaleDateString('it-IT')) || ''}
+                          <div key={p.id} style={{ padding: '10px 8px', borderBottom: '1px dashed #f0f4ff', display:'grid', gridTemplateColumns: '76px 1fr', gap: 12, alignItems:'center' }}>
+                            <div style={{ fontSize:12, color:'#6b7b9a', fontWeight:700, minWidth: 76, textAlign: 'left' }}>
+                              <div style={{ background: `${coloreTema}10`, padding:'8px', borderRadius:6, display:'inline-block', minWidth:56, textAlign:'center' }}>
+                                {(p.data && new Date(p.data).toLocaleDateString('it-IT')) || (p.createdAt && new Date(p.createdAt).toLocaleDateString('it-IT')) || ''}
+                              </div>
                             </div>
                             <div>
                               <div style={{ fontWeight:700 }}>{p.titolo}</div>
