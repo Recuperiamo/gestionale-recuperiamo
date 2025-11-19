@@ -21,6 +21,7 @@ export async function POST(req) {
 
     const attivita = await prisma.attivita.create({
       data: {
+        oreConsumate: 0,
         pacchettoId: null,
         clienteId: Number(clienteId),
         descrizione: String(descrizione).slice(0, 200),

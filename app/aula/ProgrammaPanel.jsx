@@ -239,7 +239,12 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontWeight:700 }}>{p.titolo}</div>
+                              <div style={{ fontWeight:700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                {p.titolo}
+                                {isAdmin && (
+                                  <button onClick={() => editInit(p)} style={{ marginLeft: 8, padding: '4px 8px', fontSize: 12, background: '#eef2ff', border: '1px solid #e6eefc', borderRadius: 6, cursor: 'pointer' }}>Modifica</button>
+                                )}
+                              </div>
                               <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.descrizione}</div>
                             </div>
                           </div>
