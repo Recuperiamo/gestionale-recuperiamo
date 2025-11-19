@@ -122,7 +122,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Programma</h3>
-          {isAdmin && <button onClick={() => setOpenNew(true)} style={{ padding: '8px 12px', borderRadius: 8 }}>+ Nuovo</button>}
         </div>
         {loading && <div>Caricamento…</div>}
         {!loading && (
