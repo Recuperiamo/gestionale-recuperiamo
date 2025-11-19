@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
 import ProgrammaPreview from './ProgrammaPreview';
+import ProgrammaPanel from './ProgrammaPanel';
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
 import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 
@@ -1202,7 +1203,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
       </header>
 
       <div style={pageGrid}>
-        {hasTarget && !hideSidebar && <div style={sidebarWrap}>{sidebar}</div>}
+        {hasTarget && !hideSidebar && activeTab !== 'programma' && <div style={sidebarWrap}>{sidebar}</div>}
         <main style={mainStyle}>
           {(!hasTarget && isAdmin) ? (
             <div style={{ ...emptyBox, marginTop: 0 }}>
@@ -1257,7 +1258,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                   <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
                     Carica materiale
                   </button>
-                  <a href={`/aula/${targetClienteId}/programma`} style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700, marginLeft:8, padding:'8px 12px', borderRadius:8}}>Programma</a>
+                  <button type="button" onClick={() => setActiveTab('programma')} style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700, marginLeft:8, padding:'8px 12px', borderRadius:8}}>Programma</button>
                 </>
               )}
               {activeTab === 'voti' && targetClienteId && (
@@ -1277,6 +1278,12 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {activeTab === 'bacheca' && targetClienteId && (
             <div style={{ marginBottom: 18 }}>
               <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} />
+            </div>
+          )}
+
+          {activeTab === 'programma' && targetClienteId && (
+            <div style={{ marginTop: 14 }}>
+              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} />
             </div>
           )}
           {visible.length === 0 && !loading && (
