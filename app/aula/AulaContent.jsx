@@ -1260,7 +1260,6 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                   <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
                     Carica materiale
                   </button>
-                  <button type="button" onClick={() => setActiveTab('programma')} style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700, marginLeft:8, padding:'8px 12px', borderRadius:8}}>Programma</button>
                 </>
               )}
               {activeTab === 'voti' && targetClienteId && (
@@ -1505,7 +1504,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             <div style={{ position: 'sticky', top: 96 }}>
               <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
                 <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
-                <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} />
+                <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} />
               </div>
             </div>
           </div>
