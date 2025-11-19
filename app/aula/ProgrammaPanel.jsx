@@ -142,16 +142,29 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                       </div>
                     </div>
                     {listForMateria.length === 0 ? (
-                      <div style={{ color: '#64748b', fontSize: 13, minHeight: 60, display: 'flex', alignItems: 'center' }}>Nessun argomento in programma per questa materia.</div>
+                      <div style={{ color: '#64748b', fontSize: 13, minHeight: 60, display: 'flex', alignItems: 'center' }}>
+                        {/* show empty agenda-like rows */}
+                        <div style={{width:'100%'}}>
+                          <div style={{display:'grid', gridTemplateColumns: '72px 1fr', gap: 8, alignItems:'center'}}>
+                            <div style={{ color:'#6b7b9a', fontSize:12 }}>—</div>
+                            <div style={{ color:'#64748b', fontSize:13 }}>Nessun argomento in programma per questa materia.</div>
+                          </div>
+                        </div>
+                      </div>
                     ) : (
-                      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                      <div style={{ display: 'grid', gap: 8 }}>
                         {listForMateria.map(p => (
-                          <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
-                            <div style={{ fontWeight: 700 }}>{p.titolo}</div>
-                            <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.descrizione}</div>
-                          </li>
+                          <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff', display:'grid', gridTemplateColumns: '72px 1fr', gap: 12, alignItems:'start' }}>
+                            <div style={{ fontSize:12, color:'#6b7b9a', fontWeight:700 }}>
+                              {(p.data && new Date(p.data).toLocaleDateString('it-IT')) || (p.createdAt && new Date(p.createdAt).toLocaleDateString('it-IT')) || ''}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight:700 }}>{p.titolo}</div>
+                              <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.descrizione}</div>
+                            </div>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     )}
                   </div>
                 );

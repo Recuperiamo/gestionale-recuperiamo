@@ -56,29 +56,34 @@ export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', ma
         <div style={{ color: '#6b7b9a' }}>Nessun argomento ancora.</div>
       )}
 
-      {!loading && items.length > 0 && (
+      {!loading && (
         <div style={{ display: 'grid', gap: 10 }}>
           {materieToShow.map((mat) => {
-            const list = (byMateria[mat] || []).slice(0, 5);
+            const list = (byMateria[mat] || []);
+            // pick latest item for preview
+            const latest = list.slice().sort((a, b) => new Date(b.data || b.createdAt) - new Date(a.data || a.createdAt))[0];
             return (
               <div key={mat} style={{ borderRadius: 8, padding: 8, background: '#fbfdff', border: '1px solid #eef6ff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div style={{ fontWeight: 800, color: coloreTema }}>{mat}</div>
                   <div style={{ fontSize: 12, color: '#6b7b9a' }}>{list.length} recenti</div>
                 </div>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {list.map(i => (
-                    <li key={i.id} style={{ display: 'flex', gap: 8, padding: '6px 0', borderTop: '1px solid #f2f8ff' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 6, background: `${coloreTema}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: coloreTema, fontWeight: 700 }}>
-                        {i.data ? new Date(i.data).getDate() : '•'}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>{i.titolo}</div>
-                        {i.descrizione && <div style={{ fontSize: 12, color: '#6b7b9a' }}>{i.descrizione.slice(0, 80)}{i.descrizione.length > 80 ? '…' : ''}</div>}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                {/* single preview row with date + description (or placeholder if none) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr', gap: 8, alignItems: 'center' }}>
+                  <div style={{ width: 52, height: 34, borderRadius: 6, background: `${coloreTema}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: coloreTema, fontWeight: 700 }}>
+                    {latest && (latest.data ? new Date(latest.data).getDate() : new Date(latest.createdAt).getDate())}
+                  </div>
+                  <div>
+                    {latest ? (
+                      <>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{latest.titolo}</div>
+                        {latest.descrizione && <div style={{ fontSize: 12, color: '#6b7b9a' }}>{latest.descrizione.slice(0, 120)}{latest.descrizione.length > 120 ? '…' : ''}</div>}
+                      </>
+                    ) : (
+                      <div style={{ color: '#64748b', fontSize: 13 }}>Nessun argomento registrato per questa materia.</div>
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })}

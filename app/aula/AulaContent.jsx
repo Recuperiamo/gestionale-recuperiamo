@@ -1406,11 +1406,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                             Caricato il {formatAggDate(firstItem.updatedAt)}
                           </div>
                           <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                            {((firstItem.sezione || '').toUpperCase() !== 'PROGRAMMA') && (
-                              <button type="button" style={btnGhost} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
+                                  {((firstItem.sezione || '').toUpperCase() !== 'PROGRAMMA' && activeTab !== 'programma') && (
+                                    <button type="button" style={btnGhost} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
                                 Vedi file
                               </button>
-                            )}
+                                  )}
                           </div>
                           
                           {/* Commenti batch */}
@@ -1447,7 +1447,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                     </div>
                     <div style={streamCardBody}>
                       {/* Preview immagini */}
-                      {(["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase()) && ((m.sezione || '').toUpperCase() !== 'PROGRAMMA')) && (
+                      {(["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase()) && ((m.sezione || '').toUpperCase() !== 'PROGRAMMA') && activeTab !== 'programma') && (
                         <div role="button" tabIndex={0} onClick={() => setPreviewItem(m)} onKeyDown={(e)=>{ if(e.key==='Enter') setPreviewItem(m); }} style={{cursor:'pointer'}}>
                           <img
                             src={`/api/materiale?fileId=${m.id}`}
@@ -1472,7 +1472,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                         Caricato il {formatAggDate(m.updatedAt)}
                       </div>
                       <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                        {((m.sezione || '').toUpperCase() !== 'PROGRAMMA') && (
+                        {((m.sezione || '').toUpperCase() !== 'PROGRAMMA' && activeTab !== 'programma') && (
                           <button type="button" style={btnGhost} onClick={() => setPreviewItem(m)}>Anteprima</button>
                         )}
                         {isAdmin && (
@@ -1759,7 +1759,7 @@ const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
 const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
 const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block"};
-const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block"};
+const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};
 const sidebarBox = {
   background:"#fff",borderRadius:18,padding:"22px 18px",marginBottom:0,
