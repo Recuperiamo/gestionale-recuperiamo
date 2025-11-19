@@ -79,7 +79,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
     e.preventDefault();
     if (!verificaForm.titolo.trim()) return alert('Titolo obbligatorio');
     try {
-      const payload = { clienteId, titolo: verificaForm.titolo, materia: verificaForm.materia, descrizione: verificaForm.descrizione, data: verificaForm.data };
+      const payload = { clienteId, titolo: verificaForm.titolo, materia: verificaForm.materia, descrizione: verificaForm.descrizione, data: verificaForm.data ? new Date(verificaForm.data).toISOString() : null };
       const res = await fetch('/api/programma', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const js = await res.json();
       if (!res.ok) {

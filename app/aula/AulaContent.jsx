@@ -1584,7 +1584,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               <div style={{ position: 'relative' }}>
           {/* Lower the ProgrammaPreview sticky position under the green Tag heading */}
             {/* Small extra offset to ensure the ProgrammaPreview sits under the green Tag */}
-                <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+                <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop + 24), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
                 {/* ProgrammaPreview contains its own heading; remove extra top heading and align it with Tag */}
                 <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
               </div>
