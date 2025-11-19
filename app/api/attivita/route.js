@@ -348,7 +348,8 @@ export async function POST(request) {
     return NextResponse.json({ attivita: attivitaCreata, pacchetto: pacchettoAggiornato }, { status: 201 })
   } catch (err) {
     console.error('Errore POST /api/attivita (singola):', err)
-    return NextResponse.json({ error: 'Errore interno' }, { status: 500 })
+    // DEBUG: mostra errore dettagliato in risposta (solo per sviluppo)
+    return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 })
   }
 }
 
