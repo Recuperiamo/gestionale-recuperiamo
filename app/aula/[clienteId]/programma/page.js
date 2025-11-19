@@ -11,4 +11,6 @@ export default function ProgrammaPage({ params }) {
     else router.replace('/aule');
   }, [params, router]);
   return null;
+}
+
 
