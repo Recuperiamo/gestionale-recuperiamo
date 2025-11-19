@@ -32,10 +32,10 @@ export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', ma
     byMateria[m].push(it);
   }
 
-  // Decide which materie to show: if parent passed materie array use up to first 2, otherwise take keys
+  // Decide which materie to show: if parent passed materie array use them all, otherwise take all keys
   const materieToShow = (Array.isArray(materie) && materie.length > 0)
-    ? materie.slice(0, 2)
-    : Object.keys(byMateria).slice(0, 2);
+    ? materie
+    : Object.keys(byMateria);
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 12, border: '1px solid #eef6ff' }}>
