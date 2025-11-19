@@ -308,9 +308,14 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
               <input placeholder="Titolo" value={editForm.titolo} onChange={e => setEditForm({ ...editForm, titolo: e.target.value })} required style={{ padding: 8 }} />
               <input placeholder="Materia" value={editForm.materia} onChange={e => setEditForm({ ...editForm, materia: e.target.value })} style={{ padding: 8 }} />
               <textarea placeholder="Descrizione" value={editForm.descrizione} onChange={e => setEditForm({ ...editForm, descrizione: e.target.value })} style={{ padding: 8, minHeight: 120 }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" onClick={() => setEditingItem(null)} style={{ padding: '8px 12px' }}>Annulla</button>
-                <button type="submit" style={{ padding: '8px 12px', background: coloreTema, color: '#fff', borderRadius: 8 }}>Aggiorna</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                {isAdmin && (
+                  <button type="button" onClick={() => { handleDelete(editingItem.id); setEditingItem(null); }} style={{ padding: '8px 12px', background: '#ef4444', color: '#fff', borderRadius: 8 }}>Elimina</button>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => setEditingItem(null)} style={{ padding: '8px 12px' }}>Annulla</button>
+                  <button type="submit" style={{ padding: '8px 12px', background: coloreTema, color: '#fff', borderRadius: 8 }}>Aggiorna</button>
+                </div>
               </div>
             </div>
           </form>
