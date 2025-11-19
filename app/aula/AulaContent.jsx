@@ -743,6 +743,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
   const sidebarTagRef = useRef(null);
   const [rightAsideMarginTop, setRightAsideMarginTop] = useState(36);
 
+  // Debug: print the computed sticky offsets on each render (only in dev)
+  if (process.env.NODE_ENV !== 'production') {
+    try { console.log('[AulaContent] render asideTop', asideTop, 'rightAsideMarginTop', rightAsideMarginTop); } catch (e) { }
+  }
+
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
   const myClienteId = session?.user?.clienteId ? String(session.user.clienteId) : "";
   const initialClienteIdStr = initialClienteId ? String(initialClienteId) : "";
@@ -966,14 +971,20 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         const h = headerRef?.current ? headerRef.current.getBoundingClientRect().height : 96;
         // add a small gap to place the sticky aside below the header (pixel tweak)
         const offset = Math.round(h + 10);
+        console.log('[AulaContent] updateTop headerHeight', h, 'asideTop', offset);
         setAsideTop(offset);
       } catch (e) {
         setAsideTop(96);
       }
     }
     updateTop();
+    // Also re-measure after a frame and a short delay to catch layout changes
+    const raf = requestAnimationFrame(() => updateTop());
+    const t1 = setTimeout(() => updateTop(), 150);
+    const t2 = setTimeout(() => updateTop(), 500);
     window.addEventListener('resize', updateTop);
-    return () => window.removeEventListener('resize', updateTop);
+    // Combined cleanup: remove listener and cancel timers/RAF
+    return () => { window.removeEventListener('resize', updateTop); cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
   }, [headerRef, coloreTema]);
 
   // Measure position of 'Tag' heading and set rightAside marginTop to match it
@@ -984,13 +995,18 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         const headerRect = headerRef.current.getBoundingClientRect();
         const tagRect = sidebarTagRef.current.getBoundingClientRect();
         const delta = Math.max(0, Math.round(tagRect.top - headerRect.bottom));
+        console.log('[AulaContent] alignRightAside headerRect.bottom', headerRect.bottom, 'tagRect.top', tagRect.top, 'delta', delta);
         // add a small fallback if delta is too small
         setRightAsideMarginTop(delta || 36);
       } catch (_) { setRightAsideMarginTop(36); }
     }
     alignRightAside();
+    // Reevaluate after paint & short delays to ensure Tag/ header positions are stable
+    requestAnimationFrame(() => alignRightAside());
+    const tA = setTimeout(() => alignRightAside(), 80);
+    const tB = setTimeout(() => alignRightAside(), 250);
     window.addEventListener('resize', alignRightAside);
-    return () => window.removeEventListener('resize', alignRightAside);
+    return () => { window.removeEventListener('resize', alignRightAside); clearTimeout(tA); clearTimeout(tB); };
   }, [sidebarTagRef, headerRef]);
 
   async function handleDeleteMateriale(fileId) {
@@ -1564,10 +1580,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop}px 24px 0 0` }}>
+          <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop + 24}px 24px 0 0` }}>
               <div style={{ position: 'relative' }}>
           {/* Lower the ProgrammaPreview sticky position under the green Tag heading */}
-          <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+            {/* Small extra offset to ensure the ProgrammaPreview sits under the green Tag */}
+            <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop + 24), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
                 <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
                 <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} />
               </div>
