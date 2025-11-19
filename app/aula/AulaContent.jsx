@@ -859,6 +859,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
       list = list.filter(it => (it.sezione || '').toUpperCase() === "COMPITI");
     } else if (activeTab === "materiale") {
       list = list.filter(it => (it.sezione || '').toUpperCase() === "MATERIALE");
+    } else if (activeTab === "programma") {
+      list = list.filter(it => (it.sezione || '').toUpperCase() === "PROGRAMMA");
     } else if (activeTab === "voti") {
       list = list.filter(it => (it.sezione || '').toUpperCase() === "VOTI");
     }
@@ -1222,7 +1224,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               borderBottom: "2px solid #e0e4f0",
               paddingBottom: "0"
             }}>
-                {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
+                {["bacheca", "compiti", "materiale", "programma", "voti"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
                     <button
@@ -1275,11 +1277,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             </div>
           </div>
           {loading && <div style={{margin:30}}>Caricamento…</div>}
-          {activeTab === 'bacheca' && targetClienteId && (
-            <div style={{ marginBottom: 18 }}>
-              <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} />
-            </div>
-          )}
+          {/* ProgrammaPreview will be rendered as a right-side aside in Bacheca */}
 
           {activeTab === 'programma' && targetClienteId && (
             <div style={{ marginTop: 14 }}>
@@ -1501,6 +1499,18 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             </>
           )}
         </main>
+
+        {activeTab === 'bacheca' && targetClienteId && (
+          <div style={rightAsideWrap}>
+            <div style={{ position: 'sticky', top: 96 }}>
+              <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+                <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
+                <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} />
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
       {/* Modale upload */}
       {/* Modale preview materiale */}
@@ -1746,6 +1756,7 @@ const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
 const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
 const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw"};
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block"};
+const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block"};
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};
 const sidebarBox = {
   background:"#fff",borderRadius:18,padding:"22px 18px",marginBottom:0,

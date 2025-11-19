@@ -166,15 +166,16 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
 
       {openNew && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,64,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
-          <form onSubmit={handleCreate} style={{ background: '#fff', padding: 18, borderRadius: 10, width: 640 }}>
-            <h3 style={{ marginTop: 0 }}>Nuovo elemento Programma</h3>
-            <div style={{ display: 'grid', gap: 8 }}>
-              <input placeholder="Titolo" value={form.titolo} onChange={e => setForm({ ...form, titolo: e.target.value })} required style={{ padding: 8 }} />
-              <input placeholder="Materia" value={form.materia} onChange={e => setForm({ ...form, materia: e.target.value })} style={{ padding: 8 }} />
-              <textarea placeholder="Descrizione" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} style={{ padding: 8, minHeight: 120 }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" onClick={() => setOpenNew(false)} style={{ padding: '8px 12px' }}>Annulla</button>
-                <button type="submit" style={{ padding: '8px 12px', background: coloreTema, color: '#fff', borderRadius: 8 }}>Salva</button>
+          <form onSubmit={handleCreate} style={{ background: '#fff', padding: 20, borderRadius: 12, width: 'min(92%,720px)', boxShadow: '0 18px 40px rgba(16,24,64,0.35)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: 6, color: coloreTema, fontSize: 20 }}>Aggiungi un nuovo argomento svolto</h3>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Inserisci titolo, materia e una breve descrizione (opzionale).</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <input placeholder="Titolo" value={form.titolo} onChange={e => setForm({ ...form, titolo: e.target.value })} required style={{ padding: 10, borderRadius: 8, border: '1px solid #eef2ff' }} />
+              <input placeholder="Materia" value={form.materia} onChange={e => setForm({ ...form, materia: e.target.value })} style={{ padding: 10, borderRadius: 8, border: '1px solid #eef2ff' }} />
+              <textarea placeholder="Descrizione" value={form.descrizione} onChange={e => setForm({ ...form, descrizione: e.target.value })} style={{ padding: 10, borderRadius: 8, border: '1px solid #eef2ff', minHeight: 120 }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button type="button" onClick={() => setOpenNew(false)} style={{ padding: '9px 14px', borderRadius: 8, background: '#f1f5f9', border: '1px solid #e6eefc' }}>Annulla</button>
+                <button type="submit" style={{ padding: '9px 14px', background: coloreTema, color: '#fff', borderRadius: 8, boxShadow: `0 6px 18px ${coloreTema}33` }}>Salva</button>
               </div>
             </div>
           </form>
