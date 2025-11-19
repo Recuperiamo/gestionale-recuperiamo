@@ -12,6 +12,8 @@ export default function ProgrammaPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({ titolo: '', materia: '', descrizione: '', data: '' });
+  const [editingItem, setEditingItem] = useState(null);
+  const [editForm, setEditForm] = useState({ titolo: '', materia: '', descrizione: '', data: '' });
 
   async function load() {
     if (!clienteId) return;
@@ -93,6 +95,36 @@ export default function ProgrammaPage({ params }) {
     }
   }
 
+  async function handleEditInit(item) {
+    setEditingItem(item);
+    setEditForm({
+      titolo: item.titolo || '',
+      materia: item.materia || '',
+      descrizione: item.descrizione || '',
+      data: item.data ? (new Date(item.data)).toISOString().slice(0,10) : ''
+    });
+  }
+
+  async function handleUpdate(e) {
+    e.preventDefault();
+    if (!editingItem) return;
+    if (!editForm.titolo.trim()) return alert('Titolo obbligatorio');
+    try {
+      const payload = { id: editingItem.id, ...editForm };
+      const res = await fetch('/api/programma', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const js = await res.json();
+      if (!res.ok) throw new Error(js?.error || 'Errore');
+      setEditingItem(null);
+      setEditForm({ titolo: '', materia: '', descrizione: '', data: '' });
+      await load();
+      try {
+        socketRef.current && socketRef.current.emit('new-programma', { programma: js.programma, clienteId });
+      } catch (e) {}
+    } catch (err) {
+      alert('Errore aggiornamento: ' + err.message);
+    }
+  }
+
   // Recent topics (most recent 5)
   const recenti = programma => (programmi || []).slice(0,5);
 
@@ -130,7 +162,10 @@ export default function ProgrammaPage({ params }) {
                           <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => navigator.clipboard?.writeText(p.titolo)} style={{ padding: '6px 8px' }}>Copia</button>
                           {isAdmin && (
-                            <button onClick={() => handleDelete(p.id)} style={{ padding: '6px 8px', color: '#c33' }}>Elimina</button>
+                            <>
+                              <button onClick={() => handleEditInit(p)} style={{ padding: '6px 8px' }}>Modifica</button>
+                              <button onClick={() => handleDelete(p.id)} style={{ padding: '6px 8px', color: '#c33' }}>Elimina</button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -171,6 +206,23 @@ export default function ProgrammaPage({ params }) {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button type="button" onClick={() => setOpenNew(false)} style={{ padding: '8px 12px' }}>Annulla</button>
                 <button type="submit" style={{ padding: '8px 12px', background: '#1cb0f6', color: '#fff', borderRadius: 8 }}>Salva</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingItem && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,64,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1210 }}>
+          <form onSubmit={handleUpdate} style={{ background: '#fff', padding: 18, borderRadius: 10, width: 640 }}>
+            <h3 style={{ marginTop: 0 }}>Modifica elemento Programma</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <input placeholder="Titolo" value={editForm.titolo} onChange={e => setEditForm({ ...editForm, titolo: e.target.value })} required style={{ padding: 8 }} />
+              <input placeholder="Materia" value={editForm.materia} onChange={e => setEditForm({ ...editForm, materia: e.target.value })} style={{ padding: 8 }} />
+              <textarea placeholder="Descrizione" value={editForm.descrizione} onChange={e => setEditForm({ ...editForm, descrizione: e.target.value })} style={{ padding: 8, minHeight: 120 }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" onClick={() => setEditingItem(null)} style={{ padding: '8px 12px' }}>Annulla</button>
+                <button type="submit" style={{ padding: '8px 12px', background: '#1cb0f6', color: '#fff', borderRadius: 8 }}>Aggiorna</button>
               </div>
             </div>
           </form>
