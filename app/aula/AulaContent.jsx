@@ -1566,7 +1566,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         {activeTab === 'bacheca' && targetClienteId && (
           <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop}px 24px 0 0` }}>
               <div style={{ position: 'relative' }}>
-                <div style={{ position: 'sticky', top: asideTop, background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+          {/* Lower the ProgrammaPreview sticky position under the green Tag heading */}
+          <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
                 <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
                 <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} />
               </div>
