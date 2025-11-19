@@ -1,4 +1,5 @@
 "use client";
+console.log('[INIT] CalendarioAttivita');
 
 import React, {
   useCallback,
@@ -14,8 +15,9 @@ import interactionPlugin from "@fullcalendar/interaction"; // IMPORTANTE!
 import { useSession } from "next-auth/react";
 import { mapAttivita, colorsForStato } from "../../utils/calendario/mapping";
 import { useRichiesteModifica } from "../modifiche/useRichiesteModifica";
+import dynamic from 'next/dynamic';
 import RichiestaModificaModal from "../modifiche/RichiestaModificaModal";
-import AttivitaForm from "../attivita/AttivitaForm";
+const AttivitaForm = dynamic(() => import('../attivita/AttivitaForm'), { ssr: false });
 
 export default function CalendarioAttivita({
   initialMode = "week",

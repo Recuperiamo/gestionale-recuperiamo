@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+console.log('[INIT] AttivitaForm');
 
 const giorniSettimana = [
   { value: "Mon", label: "Lunedì" },

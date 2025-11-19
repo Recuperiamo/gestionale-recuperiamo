@@ -1,4 +1,5 @@
 "use client";
+console.log('[INIT] AulaContent');
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
@@ -738,6 +739,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
   const [activeTab, setActiveTab] = useState("materiale"); // imposta default obbligatorio (materiale o compiti)
   const headerRef = useRef(null);
   const [asideTop, setAsideTop] = useState(96);
+  // Move sidebar refs near header ref to avoid referential TDZ issues in useEffect
+  const sidebarTagRef = useRef(null);
+  const [rightAsideMarginTop, setRightAsideMarginTop] = useState(36);
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
   const myClienteId = session?.user?.clienteId ? String(session.user.clienteId) : "";
@@ -1041,8 +1045,6 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     return `#${rr}${gg}${bb}`;
   }
 
-  const sidebarTagRef = useRef(null);
-  const [rightAsideMarginTop, setRightAsideMarginTop] = useState(36);
 
   // ---- SIDEBAR (desktop) con ricerca e filtri spostati a sinistra ----
   const sidebar = (

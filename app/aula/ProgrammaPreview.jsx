@@ -1,4 +1,5 @@
 "use client";
+console.log('[INIT] ProgrammaPreview');
 import React, { useEffect, useState } from 'react';
 
 export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', materie = [], onOpenProgramma = () => {} }) {

@@ -1,7 +1,9 @@
 "use client";
+console.log('[INIT] ProgrammaPanel');
 import React, { useEffect, useState, useRef } from 'react';
 import { MATERIE_AULA as MATERIE_AULA_DEFAULT } from '../../lib/materie';
-import CalendarioAttivita from '../components/calendario/CalendarioAttivita';
+import dynamic from 'next/dynamic';
+const CalendarioAttivita = dynamic(() => import('../components/calendario/CalendarioAttivita'), { ssr: false });
 import { useSession } from 'next-auth/react';
 import { io } from 'socket.io-client';
 
