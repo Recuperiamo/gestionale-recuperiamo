@@ -444,7 +444,14 @@ export default function CalendarioAttivita({
             }
           }
 
-          // Cliente → modale richiesta
+          // Se nessun handler speciale è presente, apri la lavagna full
+          // Priorità: onEventClick, admin editing, admin requests handled above.
+          if (!onEventClick && !(enableAdminRequests && isAdmin) && !(isAdmin)) {
+            // Client or basic user: open lavagna full view for this activity
+            window.location.href = `/lavagna/full?attivitaId=${attIdNum}`;
+            return;
+          }
+          // Cliente → modale richiesta (legacy behavior)
           if (enableStudentRequests && isCliente) {
             setSelectedEvent({
               id: attIdNum,

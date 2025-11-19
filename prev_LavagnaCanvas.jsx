@@ -2188,47 +2188,8 @@ export default function LavagnaCanvas({
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
-
-        // Connection state listener to auto resubscribe after reconnect
-        let ablyConnListener = null;
-        try {
-          if (ch && ch.connection && ch.connection.on) {
-            ablyConnListener = (stateChange) => {
-              try { console.log('[ABLY-CONNECTION-STATE]', stateChange.current); } catch(_) {}
-              if (stateChange.current === 'connected') {
-                // When reconnected, re-subscribe to events
-                try { cleanup(); } catch (_) {}
-                try {
-                  ch.subscribe('stroke:start', onStart);
-                  ch.subscribe('stroke:points', onPoints);
-                  ch.subscribe('stroke:done', onDone);
-                  ch.subscribe('stroke:delete', onDelete);
-                  ch.subscribe('stroke:update', onStrokeUpdate);
-                  ch.subscribe('clear-lavagna', onClear);
-                  ch.subscribe('shape:create', onShapeCreate);
-                  ch.subscribe('shape:update', onShapeUpdate);
-                  ch.subscribe('shape:delete', onShapeDelete);
-                  ch.subscribe('background:change', onBackgroundChange);
-                  ch.subscribe('background:request', onBackgroundRequest);
-                  ch.subscribe('viewport:update', onViewportUpdate);
-                  ch.subscribe('viewport:request', onViewportRequest);
-                  ch.subscribe('spectator:toggle', onSpectatorToggle);
-                  ch.subscribe('spectator:request', onSpectatorRequest);
-                } catch (err) {
-                  console.error('[LAVAGNA-SUB-ERROR] Re-subscribe failed after reconnect:', err?.message || err);
-                }
-              }
-            };
-            ch.connection.on('connectionStateChange', ablyConnListener);
-          }
-        } catch (_) {}
         
         cleanup = () => {
-          try {
-            if (ablyConnListener && ch && ch.connection && ch.connection.off) {
-              ch.connection.off('connectionStateChange', ablyConnListener);
-            }
-          } catch (_) {}
           try {
             ch.unsubscribe('stroke:start', onStart);
             ch.unsubscribe('stroke:points', onPoints);
