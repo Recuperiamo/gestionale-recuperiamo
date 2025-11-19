@@ -1,10 +1,13 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import AulaContent from '../../AulaContent';
 import { io } from 'socket.io-client';
 
 export default function ProgrammaPage({ params }) {
   const clienteId = Array.isArray(params?.clienteId) ? params.clienteId[0] : params?.clienteId;
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'operatore';
   const [programmi, setProgrammi] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openNew, setOpenNew] = useState(false);
@@ -103,7 +106,9 @@ export default function ProgrammaPage({ params }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h2 style={{ margin: 0 }}>Programma</h2>
             <div>
-              <button onClick={() => setOpenNew(true)} style={{ padding: '8px 12px', borderRadius: 8 }}>+ Nuovo</button>
+              {isAdmin && (
+                <button onClick={() => setOpenNew(true)} style={{ padding: '8px 12px', borderRadius: 8 }}>+ Nuovo</button>
+              )}
             </div>
           </div>
 
@@ -122,9 +127,11 @@ export default function ProgrammaPage({ params }) {
                           <strong>{p.titolo}</strong> {p.materia ? `— ${p.materia}` : ''}
                           <div style={{ fontSize: 13, color: '#556' }}>{p.descrizione}</div>
                         </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => navigator.clipboard?.writeText(p.titolo)} style={{ padding: '6px 8px' }}>Copia</button>
-                          <button onClick={() => handleDelete(p.id)} style={{ padding: '6px 8px', color: '#c33' }}>Elimina</button>
+                          {isAdmin && (
+                            <button onClick={() => handleDelete(p.id)} style={{ padding: '6px 8px', color: '#c33' }}>Elimina</button>
+                          )}
                         </div>
                       </div>
                     </li>
