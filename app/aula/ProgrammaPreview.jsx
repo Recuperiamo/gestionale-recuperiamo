@@ -2,7 +2,7 @@
 console.log('[INIT] ProgrammaPreview');
 import React, { useEffect, useState } from 'react';
 
-export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', materie = [], onOpenProgramma = () => {} }) {
+export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', materie = [], onOpenProgramma = () => {}, noTopPadding = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +39,7 @@ export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', ma
     : Object.keys(byMateria);
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: 12, border: '1px solid #eef6ff' }}>
+    <div style={{ background: '#fff', borderRadius: 12, padding: noTopPadding ? '0 12px 12px 12px' : 12, border: '1px solid #eef6ff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

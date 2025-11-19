@@ -736,7 +736,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
   const [previewItem, setPreviewItem] = useState(null);
   const [previewBatch, setPreviewBatch] = useState(null);
   const [previewIndex, setPreviewIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState("materiale"); // imposta default obbligatorio (materiale o compiti)
+  const [activeTab, setActiveTab] = useState("bacheca"); // imposta default a "bacheca"
   const headerRef = useRef(null);
   const [asideTop, setAsideTop] = useState(96);
   // Move sidebar refs near header ref to avoid referential TDZ issues in useEffect
@@ -1580,13 +1580,13 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop + 24}px 24px 0 0` }}>
+          <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop}px 24px 0 0` }}>
               <div style={{ position: 'relative' }}>
           {/* Lower the ProgrammaPreview sticky position under the green Tag heading */}
             {/* Small extra offset to ensure the ProgrammaPreview sits under the green Tag */}
-            <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop + 24), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
-                <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
-                <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} />
+                <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+                {/* ProgrammaPreview contains its own heading; remove extra top heading and align it with Tag */}
+                <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
               </div>
             </div>
           </div>

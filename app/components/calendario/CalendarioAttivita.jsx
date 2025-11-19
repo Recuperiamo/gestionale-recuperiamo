@@ -411,7 +411,8 @@ export default function CalendarioAttivita({
 
           // Scorciatoia ALT+click => apri lavagna
           if (info.jsEvent && info.jsEvent.altKey) {
-            window.open(`/lavagna?attivitaId=${attIdNum}`, "_blank");
+            // Open the full lavagna page directly in full view
+            window.open(`https://recuperiamo.vercel.app/lavagna/full?attivitaId=${attIdNum}` , "_blank");
             return;
           }
 

@@ -578,9 +578,9 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
                   <span>Videolezione</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => window.open(`/lavagna?attivitaId=${initialData.id}`, '_blank')}
+                <button
+                  type="button"
+                  onClick={() => window.open(`https://recuperiamo.vercel.app/lavagna/full?attivitaId=${initialData.id}`, '_blank')}
                 style={{
                   flex: "1 1 calc(33.333% - 7px)",
                   minWidth: 100,
