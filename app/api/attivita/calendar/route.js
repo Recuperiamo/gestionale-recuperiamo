@@ -12,6 +12,12 @@ export async function POST(req) {
     const { clienteId, descrizione, orario, durataOre } = body;
     if (!clienteId || !descrizione || !orario) return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 });
 
+    // Permission: cliente can create only for their own clienteId
+    const isCliente = session.user?.role === 'cliente';
+    if (isCliente && Number(session.user?.clienteId) !== Number(clienteId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const attivita = await prisma.attivita.create({
       data: {
         pacchettoId: null,
