@@ -128,7 +128,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
         {!loading && (
           <div>
             {/* Render per materia as 'agenda' sessions: even if empty, show placeholder */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {materieList.map((m) => {
                 const listForMateria = (programmi || []).filter(p => (p.materia || '').toLowerCase() === (m || '').toLowerCase()).sort((a,b) => new Date(a.data || a.createdAt) - new Date(b.data || b.createdAt));
                 return (
@@ -142,14 +142,14 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                       </div>
                     </div>
                     {listForMateria.length === 0 ? (
-                      <div style={{ color: '#64748b', fontSize: 13, minHeight: 60, display: 'flex', alignItems: 'center' }}>
-                        {/* show empty agenda-like rows */}
-                        <div style={{width:'100%'}}>
-                          <div style={{display:'grid', gridTemplateColumns: '72px 1fr', gap: 8, alignItems:'center'}}>
-                            <div style={{ color:'#6b7b9a', fontSize:12 }}>—</div>
-                            <div style={{ color:'#64748b', fontSize:13 }}>Nessun argomento in programma per questa materia.</div>
+                      <div style={{ color: '#64748b', fontSize: 13, minHeight: 60, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {/* Empty table-like rows (3 placeholders to show the layout) */}
+                        {[1, 2, 3].map((_,r) => (
+                          <div key={r} style={{ display:'grid', gridTemplateColumns: '76px 1fr', gap: 12, alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
+                            <div style={{ textAlign: 'left', fontSize: 12, color: '#6b7b9a' }}>—</div>
+                            <div style={{ color:'#64748b', fontSize:13 }}>—</div>
                           </div>
-                        </div>
+                        ))}
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gap: 8 }}>

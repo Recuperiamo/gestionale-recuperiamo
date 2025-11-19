@@ -1280,7 +1280,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
           {activeTab === 'programma' && targetClienteId && (
             <div style={{ marginTop: 14 }}>
-              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} />
+              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} />
             </div>
           )}
           {visible.length === 0 && !loading && (
@@ -1759,7 +1759,7 @@ const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
 const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
 const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
-const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
+const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"56px 24px 0 0",display:"block", alignSelf: 'flex-start'};
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};
 const sidebarBox = {
   background:"#fff",borderRadius:18,padding:"22px 18px",marginBottom:0,

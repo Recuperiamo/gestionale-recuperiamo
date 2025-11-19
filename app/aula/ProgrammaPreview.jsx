@@ -52,9 +52,7 @@ export default function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', ma
       </div>
 
       {loading && <div style={{ color: '#6b7b9a' }}>Caricamento…</div>}
-      {!loading && items.length === 0 && (
-        <div style={{ color: '#6b7b9a' }}>Nessun argomento ancora.</div>
-      )}
+      {/* Do not show a global 'Nessun argomento ancora.' message; we show per-materia placeholders instead */}
 
       {!loading && (
         <div style={{ display: 'grid', gap: 10 }}>
