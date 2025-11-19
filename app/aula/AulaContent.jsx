@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
+import ProgrammaPanel from './ProgrammaPanel';
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
 import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 
@@ -1220,7 +1221,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               borderBottom: "2px solid #e0e4f0",
               paddingBottom: "0"
             }}>
-                {["bacheca", "compiti", "materiale", "voti"].map((tab) => {
+                  {["bacheca", "compiti", "materiale", "programma", "voti"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
                     <button
@@ -1252,12 +1253,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             <div />
             <div style={filtersBarRight}>
               {targetClienteId && (
-                <>
-                  <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
-                    Carica materiale
-                  </button>
-                  <a href={`/aula/${targetClienteId}/programma`} style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700, marginLeft:8, padding:'8px 12px', borderRadius:8}}>Programma</a>
-                </>
+                <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
+                  Carica materiale
+                </button>
               )}
               {activeTab === 'voti' && targetClienteId && (
                 <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
@@ -1272,17 +1270,27 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               )}
             </div>
           </div>
-          {loading && <div style={{margin:30}}>Caricamento…</div>}
-          {visible.length === 0 && !loading && (
-            <div style={emptyBox}>Nessun materiale trovato.</div>
+          {/* Programma integrato: se selezionato mostra il pannello, altrimenti la vista materiali */}
+          {activeTab === 'programma' && targetClienteId && (
+            <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} />
           )}
 
+          {activeTab !== 'programma' && (
+            <>
+              {loading && <div style={{margin:30}}>Caricamento…</div>}
+              {visible.length === 0 && !loading && (
+                <div style={emptyBox}>Nessun materiale trovato.</div>
+              )}
+
           {/* STREAM stile classroom con giorni e batch */}
-          <div style={streamWrap}>
-            {grouped.map(([giorno, items]) => (
-              <React.Fragment key={giorno}>
-                <div style={{...dayHeaderStyle, color: coloreTema}}>{formatDayHeader(giorno)}</div>
-                {items.map((item, idx) => {
+          {activeTab === 'bacheca' ? (
+            <div style={{display:'flex',gap:20,alignItems:'flex-start'}}>
+              <div style={{flex:1}}>
+                <div style={streamWrap}>
+                  {grouped.map(([giorno, items]) => (
+                    <React.Fragment key={giorno}>
+                      <div style={{...dayHeaderStyle, color: coloreTema}}>{formatDayHeader(giorno)}</div>
+                      {items.map((item, idx) => {
                   // Batch di file multipli
                   if (item.isBatch) {
                     const batchItems = item.items;
@@ -1483,8 +1491,24 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                   );
                 })}
               </React.Fragment>
-            ))}
-          </div>
+                      })}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+              <aside style={{width:320}}>
+                <div style={{position:'sticky',top:96}}>
+                  <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} onOpen={() => setActiveTab('programma')} />
+                </div>
+              </aside>
+            </div>
+          ) : (
+            <div style={streamWrap}>
+              {grouped.map(([giorno, items]) => (
+                <React.Fragment key={giorno}>
+                  <div style={{...dayHeaderStyle, color: coloreTema}}>{formatDayHeader(giorno)}</div>
+                  {items.map((item, idx) => {
+                    
             </>
           )}
         </main>
@@ -1679,6 +1703,47 @@ function formatAggDate(dateStr) {
 function formatDayHeader(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleString("it-IT", {weekday:"long",year:"numeric",month:"long",day:"numeric"});
+}
+
+// Programma preview component used in Bacheca (shows last 5 topics)
+function ProgrammaPreview({ clienteId, coloreTema = '#1cb0f6', onOpen = () => {} }) {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!clienteId) { setList([]); return; }
+    setLoading(true);
+    fetch(`/api/programma?clienteId=${clienteId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (!mounted) return; setList(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!mounted) return; setList([]); })
+      .finally(() => { if (!mounted) return; setLoading(false); });
+    return () => { mounted = false; };
+  }, [clienteId]);
+
+  const recent = (list || []).slice(0, 5);
+
+  return (
+    <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff' }}>
+      <h4 style={{ marginTop: 0 }}>Argomenti recenti</h4>
+      {loading && <div style={{ color: '#6b7b9a' }}>Caricamento…</div>}
+      {!loading && recent.length === 0 && <div style={{ color: '#6b7b9a' }}>Nessun argomento</div>}
+      {!loading && recent.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {recent.map(p => (
+            <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{p.titolo}</div>
+              <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.materia || '—'}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+        <button type="button" onClick={onOpen} style={{ ...btnGhost, padding: '6px 10px' }}>Apri Programma</button>
+      </div>
+    </div>
+  );
 }
 
 // COMMENTI COMPONENT
