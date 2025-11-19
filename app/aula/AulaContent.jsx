@@ -1252,9 +1252,12 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             <div />
             <div style={filtersBarRight}>
               {targetClienteId && (
-                <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
-                  Carica materiale
-                </button>
+                <>
+                  <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
+                    Carica materiale
+                  </button>
+                  <a href={`/aula/${targetClienteId}/programma`} style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700, marginLeft:8, padding:'8px 12px', borderRadius:8}}>Programma</a>
+                </>
               )}
               {activeTab === 'voti' && targetClienteId && (
                 <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
