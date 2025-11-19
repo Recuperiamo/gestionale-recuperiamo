@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
 import { MATERIE_AULA as MATERIE_AULA_DEFAULT } from '../../lib/materie';
+import CalendarioAttivita from '../components/calendario/CalendarioAttivita';
 import { useSession } from 'next-auth/react';
 import { io } from 'socket.io-client';
 
-export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAdmin = false, hideAside = false, materie = [] }) {
+export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAdmin = false, hideAside = false, materie = [], asideTop = 96 }) {
   const { data: session } = useSession();
   const [programmi, setProgrammi] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -12,6 +13,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
   const [form, setForm] = useState({ titolo: '', materia: '', descrizione: '', data: '' });
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ titolo: '', materia: '', descrizione: '', data: '' });
+  const [verificaForm, setVerificaForm] = useState({ titolo: '', materia: '', data: '', descrizione: '' });
   const socketRef = useRef(null);
 
   async function load() {
@@ -71,6 +73,25 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
     }
   }
 
+  async function handleCreateVerifica(e) {
+    e.preventDefault();
+    if (!verificaForm.titolo.trim()) return alert('Titolo obbligatorio');
+    try {
+      const payload = { clienteId, titolo: verificaForm.titolo, materia: verificaForm.materia, descrizione: verificaForm.descrizione, data: verificaForm.data };
+      const res = await fetch('/api/programma', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const js = await res.json();
+      if (!res.ok) throw new Error(js?.error || 'Errore');
+      // Try to create a calendar event for the verifica. If it fails we still created programma.
+      try {
+        await fetch('/api/attivita/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, descrizione: `Verifica: ${verificaForm.titolo}`, orario: verificaForm.data, durataOre: 1 }) });
+      } catch (e) { /* ignore calendar sync error */ }
+      setVerificaForm({ titolo: '', materia: '', data: '', descrizione: '' });
+      await load();
+    } catch (err) {
+      alert('Errore salvataggio verifica: ' + err.message);
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm('Eliminare questo elemento?')) return;
     try {
@@ -120,12 +141,30 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>Programma</h3>
-        </div>
+        {/* Removed global Programma title for a cleaner view per user request */}
         {loading && <div>Caricamento…</div>}
-        {!loading && (
-          <div>
+          {!loading && (
+            <div>
+            {/* Registro Verifiche */}
+            <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontWeight: 800, color: coloreTema }}>Registro verifiche</div>
+                <div>
+                  {/* nothing for now */}
+                </div>
+              </div>
+              <form onSubmit={handleCreateVerifica} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 140px', gap: 10, alignItems: 'center' }}>
+                <input placeholder="Titolo verifica" value={verificaForm.titolo} onChange={e => setVerificaForm(prev => ({ ...prev, titolo: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff' }} />
+                <select value={verificaForm.materia} onChange={e => setVerificaForm(prev => ({ ...prev, materia: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff' }}>
+                  <option value="">Materia (opzionale)</option>
+                  {materieList.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+                <input type="date" value={verificaForm.data} onChange={e => setVerificaForm(prev => ({ ...prev, data: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff' }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="submit" style={{ padding: '8px 12px', background: coloreTema, color: '#fff', borderRadius: 8 }}>{isAdmin ? 'Aggiungi verifica' : 'Segnala'}</button>
+                </div>
+              </form>
+            </div>
             {/* Render per materia as 'agenda' sessions: even if empty, show placeholder */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {materieList.map((m) => {
@@ -177,10 +216,10 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
 
       {!hideAside && (
         <aside style={{ width: 320 }}>
-          <div style={{ position: 'sticky', top: 96 }}>
+          <div style={{ position: 'sticky', top: asideTop }}>
             <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff' }}>
               <h4 style={{ marginTop: 0 }}>Argomenti recenti</h4>
-              {programmi.length === 0 && <div style={{ color: '#6b7b9a' }}>Nessun argomento</div>}
+              {/* Global message removed - placeholders are shown per-materia in the agenda tiles */}
               <ul style={{ padding: 0, listStyle: 'none' }}>
                 {recenti().map(p => (
                   <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
@@ -189,6 +228,12 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                   </li>
                 ))}
               </ul>
+              {/* Admin-only mini calendar under Programma preview */}
+              {isAdmin && (
+                <div style={{ marginTop: 12 }}>
+                  <CalendarioAttivita forceClienteId={clienteId} initialMode="week" allowModeSwitch={false} enableAdminRequests={false} />
+                </div>
+              )}
             </div>
           </div>
         </aside>

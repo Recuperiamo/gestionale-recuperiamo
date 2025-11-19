@@ -605,7 +605,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
 }
 
 // --- COMPONENTE ELIMINA TUTTI (solo admin/operator) ---
-function EliminaTuttiMateriali({ clienteId, onDeleted }) {
+function EliminaTuttiMateriali({ clienteId, onDeleted, sezione }) {
   const [show, setShow] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -618,6 +618,7 @@ function EliminaTuttiMateriali({ clienteId, onDeleted }) {
     let url = `/api/materiale?clienteId=${clienteId}&all=true`;
     if (from) url += `&from=${encodeURIComponent(from)}`;
     if (to) url += `&to=${encodeURIComponent(to)}`;
+    if (sezione) url += `&sezione=${encodeURIComponent(sezione)}`;
     const res = await fetch(url, { method: "DELETE" });
     setLoading(false);
     if (res.ok) {
@@ -634,7 +635,7 @@ function EliminaTuttiMateriali({ clienteId, onDeleted }) {
         onClick={() => setShow(!show)}
         disabled={!clienteId}
       >
-        Elimina tutti
+        {sezione === 'VOTI' ? 'Elimina voti' : 'Elimina tutti'}
       </button>
       {show && (
         <div style={{
@@ -735,6 +736,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
   const [previewBatch, setPreviewBatch] = useState(null);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("materiale"); // imposta default obbligatorio (materiale o compiti)
+  const headerRef = useRef(null);
+  const [asideTop, setAsideTop] = useState(96);
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
   const myClienteId = session?.user?.clienteId ? String(session.user.clienteId) : "";
@@ -952,6 +955,40 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     }
   }, [items, activeTab]);
 
+  // Measure header height to apply as sticky offset for right aside and other sticky elements
+  useEffect(() => {
+    function updateTop() {
+      try {
+        const h = headerRef?.current ? headerRef.current.getBoundingClientRect().height : 96;
+        // add a small gap to place the sticky aside below the header (pixel tweak)
+        const offset = Math.round(h + 10);
+        setAsideTop(offset);
+      } catch (e) {
+        setAsideTop(96);
+      }
+    }
+    updateTop();
+    window.addEventListener('resize', updateTop);
+    return () => window.removeEventListener('resize', updateTop);
+  }, [headerRef, coloreTema]);
+
+  // Measure position of 'Tag' heading and set rightAside marginTop to match it
+  useEffect(() => {
+    function alignRightAside() {
+      try {
+        if (!sidebarTagRef?.current || !headerRef?.current) return setRightAsideMarginTop(36);
+        const headerRect = headerRef.current.getBoundingClientRect();
+        const tagRect = sidebarTagRef.current.getBoundingClientRect();
+        const delta = Math.max(0, Math.round(tagRect.top - headerRect.bottom));
+        // add a small fallback if delta is too small
+        setRightAsideMarginTop(delta || 36);
+      } catch (_) { setRightAsideMarginTop(36); }
+    }
+    alignRightAside();
+    window.addEventListener('resize', alignRightAside);
+    return () => window.removeEventListener('resize', alignRightAside);
+  }, [sidebarTagRef, headerRef]);
+
   async function handleDeleteMateriale(fileId) {
     if (!window.confirm("Sei sicuro di voler eliminare questo materiale?")) return;
     const res = await fetch(`/api/materiale?fileId=${fileId}`, { method: "DELETE" });
@@ -1004,6 +1041,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     return `#${rr}${gg}${bb}`;
   }
 
+  const sidebarTagRef = useRef(null);
+  const [rightAsideMarginTop, setRightAsideMarginTop] = useState(36);
+
   // ---- SIDEBAR (desktop) con ricerca e filtri spostati a sinistra ----
   const sidebar = (
     <aside style={sidebarStyle}>
@@ -1038,7 +1078,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
       )}
       {/* TAG UNIFICATI */}
       <div style={sidebarBox}>
-        <div style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Tag</div>
+        <div ref={sidebarTagRef} style={{fontWeight:700, color: coloreTema, marginBottom:10}}>Tag</div>
         
         {/* Sezioni */}
         <div style={{marginBottom:14}}>
@@ -1194,7 +1234,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
       <Navbar />
       {/* HEADER stile classroom con gradiente coloreTema */}
-      <header style={{
+      <header ref={headerRef} style={{
         ...headerStyle, 
         background: `linear-gradient(135deg, ${coloreTema} 0%, ${adjustColorBrightness(coloreTema, -30)} 100%)`
       }}>
@@ -1259,19 +1299,33 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           <div style={barFlex}>
             <div />
             <div style={filtersBarRight}>
-              {targetClienteId && (
+              {/* Show action buttons based on activeTab: material/compiti -> Carica Materiale, admin Elimina tutti
+                  bacheca -> no buttons
+                  programma -> no buttons
+                  voti -> show registra voto + delete votes (admin) */}
+              {targetClienteId && (activeTab === 'materiale' || activeTab === 'compiti') && (
                 <>
                   <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
                     Carica materiale
                   </button>
                 </>
               )}
+
               {activeTab === 'voti' && targetClienteId && (
-                <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
-                  Registra voto
-                </button>
+                <>
+                  <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
+                    Registra voto
+                  </button>
+                  {isAdmin && targetClienteId && (
+                    <EliminaTuttiMateriali
+                      clienteId={targetClienteId}
+                      sezione={'VOTI'}
+                      onDeleted={() => fetchMateriali(targetClienteId)}
+                    />
+                  )}
+                </>
               )}
-              {isAdmin && targetClienteId && (
+              {isAdmin && targetClienteId && (activeTab === 'materiale' || activeTab === 'compiti') && (
                 <EliminaTuttiMateriali
                   clienteId={targetClienteId}
                   onDeleted={() => fetchMateriali(targetClienteId)}
@@ -1284,10 +1338,10 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
           {activeTab === 'programma' && targetClienteId && (
             <div style={{ marginTop: 14 }}>
-              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} />
+                <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} asideTop={asideTop} />
             </div>
           )}
-          {visible.length === 0 && !loading && (
+          {visible.length === 0 && !loading && activeTab !== 'programma' && (
             <div style={emptyBox}>Nessun materiale trovato.</div>
           )}
 
@@ -1508,9 +1562,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={rightAsideWrap}>
-            <div style={{ position: 'relative' }}>
-              <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+          <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop}px 24px 0 0` }}>
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'sticky', top: asideTop, background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
                 <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
                 <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} />
               </div>
@@ -1763,7 +1817,7 @@ const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
 const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
 const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
-const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
+  const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};
 const sidebarBox = {
   background:"#fff",borderRadius:18,padding:"22px 18px",marginBottom:0,
