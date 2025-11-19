@@ -111,17 +111,24 @@ export async function GET(request) {
 
 // ------------------ POST (singola + ricorrente/nidificata) ------------------
 export async function POST(request) {
-  let body;
   try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Body JSON non valido' }, { status: 400 })
-  }
+    console.log('[API][POST /api/attivita] Ricevuta richiesta');
+    const bodyText = await request.text();
+    console.log('[API][POST /api/attivita] Body raw:', bodyText);
+      let body;
+      try {
+        body = JSON.parse(bodyText);
+      } catch (e) {
+        console.error('[API][POST /api/attivita] Errore parsing JSON:', e);
+        return NextResponse.json({ error: 'Body JSON non valido', stack: e.stack }, { status: 400 });
+      }
+      console.log('[API][POST /api/attivita] Body parsed:', body);
 
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   console.log('[ATTIVITA][POST][RAW BODY]', body)
+  console.log('[API][POST /api/attivita] Session:', session?.user?.email, session?.user?.role);
 
   // Estrazione top-level
   let {
@@ -347,10 +354,13 @@ export async function POST(request) {
 
     return NextResponse.json({ attivita: attivitaCreata, pacchetto: pacchettoAggiornato }, { status: 201 })
   } catch (err) {
-    console.error('Errore POST /api/attivita (singola):', err)
-    // DEBUG: mostra errore dettagliato in risposta (solo per sviluppo)
+    console.error('[API][POST /api/attivita] Errore:', err);
     return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 })
   }
+    } catch (err) {
+      console.error('[API][POST /api/attivita] Errore:', err);
+      return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 });
+    }
 }
 
 // ------------------ PATCH ------------------

@@ -200,12 +200,23 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           headers: { "Content-Type":"application/json" },
           body: JSON.stringify(payload)
         });
-        const result = await res.json();
+        console.log('[AttivitaForm] Invio richiesta', { method, payload });
+        let result;
+        try {
+          result = await res.json();
+        } catch (e) {
+          console.error('[AttivitaForm] Errore parsing JSON risposta:', e);
+          setErrorForm('Errore parsing risposta: ' + e.message);
+          setLoadingSubmit(false);
+          return;
+        }
+        console.log('[AttivitaForm] Risposta API:', result);
         if (!res.ok) {
           let msg = result?.error || "Errore salvataggio";
           if (result?.stack) {
             msg += "\n" + result.stack;
           }
+          console.error('[AttivitaForm] Errore API:', msg);
           setErrorForm(msg);
           setLoadingSubmit(false);
           return;
@@ -232,16 +243,28 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           body: JSON.stringify(payload)
         });
         const result = await res.json();
+        console.log('[AttivitaForm] PATCH batch invio:', payload);
+        let resultPatch;
+        try {
+          resultPatch = await res.json();
+        } catch (e) {
+          console.error('[AttivitaForm] Errore parsing JSON risposta PATCH:', e);
+          setErrorForm('Errore parsing risposta PATCH: ' + e.message);
+          setLoadingSubmit(false);
+          return;
+        }
+        console.log('[AttivitaForm] PATCH batch risposta:', resultPatch);
         if (!res.ok) {
-          let msg = result?.error || "Errore modifica ricorrenza";
-          if (result?.stack) {
-            msg += "\n" + result.stack;
+          let msg = resultPatch?.error || "Errore modifica ricorrenza";
+          if (resultPatch?.stack) {
+            msg += "\n" + resultPatch.stack;
           }
+          console.error('[AttivitaForm] PATCH batch errore:', msg);
           setErrorForm(msg);
           setLoadingSubmit(false);
           return;
         }
-        onSuccess && onSuccess(result);
+        onSuccess && onSuccess(resultPatch);
       } else if (!isEdit && tipoLezione === "ricorrente") {
         const res = await fetch("/api/attivita", {
           method:"POST",
@@ -263,16 +286,41 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           })
         });
         const result = await res.json();
-        if (!res.ok) {
-          let msg = result?.error || "Errore creazione ricorrenza";
-          if (result?.stack) {
-            msg += "\n" + result.stack;
+        console.log('[AttivitaForm] POST ricorrenza invio:', {
+          descrizione,
+          clienteId: Number(clienteId),
+          pacchettoId: Number(pacchettoId),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ricorrenza: {
+            giorni: selectedDays,
+            orarioInizio,
+            durata: Number(durata),
+            dataInizio: dataInizioRic,
+            dataFine: dataFineRic,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
           }
+        });
+        let resultRic;
+        try {
+          resultRic = await res.json();
+        } catch (e) {
+          console.error('[AttivitaForm] Errore parsing JSON risposta ricorrenza:', e);
+          setErrorForm('Errore parsing risposta ricorrenza: ' + e.message);
+          setLoadingSubmit(false);
+          return;
+        }
+        console.log('[AttivitaForm] POST ricorrenza risposta:', resultRic);
+        if (!res.ok) {
+          let msg = resultRic?.error || "Errore creazione ricorrenza";
+          if (resultRic?.stack) {
+            msg += "\n" + resultRic.stack;
+          }
+          console.error('[AttivitaForm] POST ricorrenza errore:', msg);
           setErrorForm(msg);
           setLoadingSubmit(false);
           return;
         }
-        onSuccess && onSuccess(result);
+        onSuccess && onSuccess(resultRic);
       }
     } catch (err) {
       setErrorForm("Errore di rete.");
