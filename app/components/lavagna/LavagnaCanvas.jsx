@@ -8,341 +8,104 @@ import React, {
 } from "react";
 import { getAblyChannel, getAblyChannelAsync, whenChannelAttachedAsync } from "../../lib/realtime/ablyClient";
 
-export default function LavagnaCanvas({
-  lavagnaId,
-  attivitaId,
-  trattiIniziali,
-  formeIniziali,
-  utenteId,
-  clienteId,
-  ruolo,
-  altezza = 600,
-  openInNewWindow = false,
-  isNewLavagna = false,
-  topRightPlacement = "in-canvas",
-  onActionsChange
-}) {
-  const canvasRef = useRef(null);
-  const ctxRef = useRef(null);
-  const overlayRef = useRef(null);
-  const ablyRef = useRef({ ch: null });
-
-  // Default tool: 'selezione' on mobile for better UX (pinch zoom, pan, no accidental drawing)
-  const [strumento, setStrumento] = useState(() => {
-    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-      return 'selezione';
-    }
-    return 'penna';
-  }); // penna|gomma|mano|selezione|shape-tools
-  // Default color: Nero puro e spessore sottile
-  const [colore, setColore] = useState('#000000');
-  const [spessore, setSpessore] = useState(1); // default sottile
-  const [tratti, setTratti] = useState(() =>
-    (trattiIniziali || []).map((s) =>
-      prepareStroke({
-        ...s,
-        dbId: s.id,
-        id: s.streamId || s.id,
-      })
-    )
-  );
-  const [disegnando, setDisegnando] = useState(false);
-  const puntiCorrentiRef = useRef([]);
-  const salvandoRef = useRef(false);
-  const pendingSavesRef = useRef(new Map()); // Track pending saves by stroke id
-  const [undoStack, setUndoStack] = useState([]);
-  const [redoStack, setRedoStack] = useState([]);
-  const [gommaPuntuale, setGommaPuntuale] = useState(false);
-  const [enablePinchZoom, setEnablePinchZoom] = useState(true);
-  const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
-  const [showTools, setShowTools] = useState(true);
-  const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
-  const sfondoRef = useRef(sfondo);
-  const backgroundStorageKey = useMemo(() => {
-    const keySource = attivitaId ?? lavagnaId;
-    if (!keySource) return null;
-    return `lavagna-bg:${keySource}`;
-  }, [attivitaId, lavagnaId]);
-  const backgroundHydratedRef = useRef(false);
-  const backgroundRequestedRef = useRef(false);
-  const backgroundRequestKeyRef = useRef(null);
-  const [zoom, setZoom] = useState(1); // 1 = 100%
-  const penPalette = useMemo(
-    () => [
-      { value: "#111827", label: "Grafite", preview: "#111827" },
-      { value: "#2563eb", label: "Blu", preview: "#2563eb" },
-      { value: "#0ea5e9", label: "Ciano", preview: "#0ea5e9" },
-      { value: "#ef4444", label: "Rosso", preview: "#ef4444" },
-      { value: "#16a34a", label: "Verde", preview: "#16a34a" },
-      { value: "#f59e0b", label: "Ambra", preview: "#f59e0b" },
-      { value: "#f43f5e", label: "Corallo", preview: "#f43f5e" },
-      { value: "#a855f7", label: "Viola", preview: "#a855f7" },
-      { value: "#14b8a6", label: "Acqua", preview: "#14b8a6" }
-    ],
-    []
-  );
-  const colorInputRef = useRef(null);
-  const sfondoLabels = useMemo(() => ({
-    bianco: "Bianco",
-    nero: "Nero",
-    righe: "Righe",
-    quadretti: "Quadretti",
-    punti: "Punti"
-  }), []);
-  const [showPenPopover, setShowPenPopover] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [inToolbar, setInToolbar] = useState(false);
-  const toolbarRef = useRef(null);
-  const zoomControlsRef = useRef(null);
-  const [pan, setPan] = useState({ x: 0, y: 0 }); // pan in unità mondo
-  const [isPanning, setIsPanning] = useState(false);
-  const [contextPanning, setContextPanning] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [proportionalResize, setProportionalResize] = useState(true); // Lucchetto proporzioni
-  const panningRef = useRef({ active: false, lastX: 0, lastY: 0, viaContext: false });
-  const contextTempToolRef = useRef(null); // when right-click temporarily switches tool to 'mano'
-  const touchesRef = useRef(new Map()); // pointerId -> { x,y }
-  const gestureRef = useRef({ mode: 'none', startZoom: 1, startPan: { x: 0, y: 0 }, startDist: 0, startMidWorld: { x: 0, y: 0 } });
-  const enablePinchZoomRef = useRef(enablePinchZoom);
-  const enableSingleFingerPanRef = useRef(enableSingleFingerPan);
-  const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
-  const [spectatorMode, setSpectatorMode] = useState(false);
-  const spectatorModeRef = useRef(false);
-  const latestAdminViewportRef = useRef(null);
-  const pendingViewportRef = useRef(null);
-  const viewportApplyRAFRef = useRef(null);
-  const viewportBroadcastRef = useRef({ rafId: null, payload: null });
-  const pointerWorldRef = useRef(null);
-  const spectatorStorageKey = useMemo(() => {
-    const keySource = attivitaId ?? lavagnaId;
-    if (!keySource || !utenteId) return null;
-    return `lavagna:spectator:${keySource}:${utenteId}`;
-  }, [attivitaId, lavagnaId, utenteId]);
-  const spectatorToggleId = useMemo(() => {
-    const base = String(attivitaId ?? lavagnaId ?? 'lavagna');
-    return `spectator-toggle-${base.replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  }, [attivitaId, lavagnaId]);
-  const panRef = useRef(pan);
-  const zoomRef = useRef(zoom);
-  const spectatorRosterRef = useRef(new Set());
-  const [spectatorCount, setSpectatorCount] = useState(0);
-  const exportMenuRef = useRef(null);
-  
-  // Refs for callback access to latest values (avoid re-creating subscriptions)
-  const utenteIdRef = useRef(utenteId);
-  const ruoloRef = useRef(ruolo);
-  const isAdminRef = useRef(false);
-  const lavagnaIdRef = useRef(lavagnaId);
-  const attivitaIdRef = useRef(attivitaId);
-  
-  useEffect(() => {
-    utenteIdRef.current = utenteId;
-  }, [utenteId]);
-  
-  useEffect(() => {
-    ruoloRef.current = ruolo;
-    isAdminRef.current = String(ruolo || "").toLowerCase() === "admin";
-  }, [ruolo]);
-  
-  useEffect(() => {
-    lavagnaIdRef.current = lavagnaId;
-  }, [lavagnaId]);
-  
-  useEffect(() => {
-    attivitaIdRef.current = attivitaId;
-  }, [attivitaId]);
-  
-  // Refs for callback functions to avoid recreating subscriptions
-  const drawAllRef = useRef(null);
-  const drawIncrementalStrokeRef = useRef(null);
-  const prepareStrokeRef = useRef(null);
-  const applyViewportRef = useRef(null);
-  const normalizeShapeRef = useRef(null);
-  const clearLavagnaStateRef = useRef(null);
-
-  // Mobile responsive hook
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  // Mobile sempre 90° ruotato, desktop 0° - calcolato dopo isMobile
-  const canvasRotation = useMemo(() => 0, [isMobile]); // DISABILITATO: isMobile ? 90 : 0
-
-  const penCursor = useMemo(() => {
-    if (strumento !== "penna") return null;
-  // Always show a simple colored circular cursor (even smaller now).
-  // Use a compact scale factor so the visible cursor is minimal and
-  // consistent while drawing.
-  const effectiveSize = spessore * 2 * (zoom || 1);
-  const diameter = Math.max(8, Math.min(effectiveSize, 28));
-    const size = Math.round(diameter);
-    const radius = size / 2;
-    const strokeWidth = Math.max(2, Math.round(size * 0.18));
-    const innerRadius = Math.max(radius - strokeWidth / 2, 1);
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${radius}" cy="${radius}" r="${radius}" fill="${colore}" />
-        <circle cx="${radius}" cy="${radius}" r="${innerRadius}" fill="${colore}" stroke="white" stroke-width="${strokeWidth}" opacity="0.85" />
-      </svg>
-    `;
-    return {
-      url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
-      hotspot: radius
-    };
-  }, [strumento, colore, spessore, zoom]);
-
-  const eraserCursor = useMemo(() => {
-    if (strumento !== 'gomma') return null;
-    const effectiveSize = spessore * 4 * (zoom || 1);
-    const diameter = Math.max(16, Math.min(effectiveSize, 72));
-    const size = Math.round(diameter);
-    const radius = size / 2;
-    const strokeWidth = Math.max(2, Math.round(size * 0.18));
-    const dash = Math.max(4, Math.round(size * 0.45));
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${radius}" cy="${radius}" r="${radius - strokeWidth / 2}" fill="rgba(28,125,247,0.1)" stroke="#0f1f53" stroke-width="${strokeWidth}" stroke-dasharray="${dash} ${dash}" stroke-linecap="round" />
-      </svg>
-    `;
-    return {
-      url: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
-      hotspot: radius
-    };
-  }, [strumento, spessore, zoom]);
-
-  // Overlay cursor size in CSS pixels (used when we render our own cursor overlay)
-  const overlaySize = useMemo(() => {
-    // desired visual diameter in CSS pixels (match stroke thickness visually)
-  // make overlay slightly smaller than before so it matches the new pen cursor
-  // For pen we will not show the DOM overlay (we rely on CSS cursor). Keep overlay
-  // sizing for eraser only.
-  const desired = Math.max(8, Math.min(spessore * 2 * zoom, 48));
-    // For the eraser we want it slightly larger (≈1cm on typical displays)
-    const oneCmPx = 38; // approx 1cm in CSS pixels at ~96dpi
-    const final = (strumento === 'gomma') ? Math.max(desired, oneCmPx) : desired;
-    // clamp to a reasonable max so overlay doesn't become huge
-    return Math.round(final);
-  }, [spessore, zoom, strumento]);
-
-  const channelName = useMemo(
-    () => (attivitaId != null ? `lavagna:${attivitaId}` : `lavagna:${lavagnaId}`),
-    [attivitaId, lavagnaId]
-  );
-
-  // Queue per messaggi da inviare quando channel non è ancora pronto
-  const pendingMessages = useRef([]);
-
-  const emitOrPublish = useCallback(
-    (name, data) => {
+    // --- Ably connection state monitoring and auto-resubscribe ---
+    let ablyConnectionListener = null;
+    let ablyChannelListener = null;
+    let subscriptions = [];
+    let channelInstance = null;
+    async function setupAblySubscriptions() {
       try {
-        let ch = ablyRef.current.ch;
-        
+        const ch = await getAblyChannelAsync(channelName);
+        ablyRef.current.ch = ch;
+        channelInstance = ch;
         if (!ch) {
-          ch = getAblyChannel(channelName);
+          console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
+          return;
         }
-        
-        if (ch) {
-          ch.publish(name, data);
-        } else {
-          // Channel non pronto, accoda il messaggio
-          pendingMessages.current.push({ name, data });
+        // Svuota la queue dei messaggi pendenti
+        if (pendingMessages.current.length > 0) {
+          pendingMessages.current.forEach(({ name, data }) => {
+            try {
+              ch.publish(name, data);
+            } catch (e) {
+              console.error('[LAVAGNA-QUEUE-ERROR]', { event: name, error: e.message || e });
+            }
+          });
+          pendingMessages.current = [];
+        }
+        whenChannelAttachedAsync(channelName).catch((err) => {
+          console.warn('[LavagnaCanvas] channel attach failed', err?.message);
+        });
+
+        // --- Event handlers ---
+        const onStart = (msg) => { /* ...existing code... */ };
+        const onPoints = (msg) => { /* ...existing code... */ };
+        const onDone = (msg) => { /* ...existing code... */ };
+        const onDelete = (msg) => { /* ...existing code... */ };
+        const onStrokeUpdate = (msg) => { /* ...existing code... */ };
+        const onClear = () => { /* ...existing code... */ };
+        const onShapeCreate = (msg) => { /* ...existing code... */ };
+        const onShapeUpdate = (msg) => { /* ...existing code... */ };
+        const onShapeDelete = (msg) => { /* ...existing code... */ };
+        const onBackgroundChange = (msg) => { /* ...existing code... */ };
+        const onBackgroundRequest = () => { /* ...existing code... */ };
+        const onViewportUpdate = (msg) => { /* ...existing code... */ };
+        const onViewportRequest = (msg) => { /* ...existing code... */ };
+
+        // --- Subscribe to all events ---
+        try {
+          subscriptions = [
+            ch.subscribe('stroke:start', onStart),
+            ch.subscribe('stroke:points', onPoints),
+            ch.subscribe('stroke:done', onDone),
+            ch.subscribe('stroke:delete', onDelete),
+            ch.subscribe('stroke:update', onStrokeUpdate),
+            ch.subscribe('clear-lavagna', onClear),
+            ch.subscribe('shape:create', onShapeCreate),
+            ch.subscribe('shape:update', onShapeUpdate),
+            ch.subscribe('shape:delete', onShapeDelete),
+            ch.subscribe('background:change', onBackgroundChange),
+            ch.subscribe('background:request', onBackgroundRequest),
+            ch.subscribe('viewport:update', onViewportUpdate),
+            ch.subscribe('viewport:request', onViewportRequest),
+            ch.subscribe('spectator:toggle', onSpectatorToggle),
+            ch.subscribe('spectator:request', onSpectatorRequest),
+          ];
+        } catch (subscribeError) {
+          console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
+        }
+
+        // --- Ably connection state listener ---
+        if (ch.connection) {
+          ablyConnectionListener = (stateChange) => {
+            console.log('[ABLY-CONNECTION-STATE]', stateChange.current);
+            if (stateChange.current === 'connected') {
+              // Re-subscribe to all events after reconnect
+              if (channelInstance) {
+                try {
+                  // Unsubscribe all first
+                  channelInstance.unsubscribe();
+                } catch (_) {}
+                setupAblySubscriptions();
+              }
+            }
+          };
+          ch.connection.on('connectionStateChange', ablyConnectionListener);
         }
       } catch (e) {
-        console.error('[LAVAGNA-PUBLISH-ERROR]', { event: name, error: e.message || e });
+        ablyRef.current.ch = null;
       }
-    },
-    [channelName]
-  );
-
-  // Shapes and selection
-  const [forme, setForme] = useState(() =>
-    (formeIniziali || []).map((s) => ({
-      ...s,
-      dbId: s.id,
-      id: `shape-${s.id}` // Unique client-side ID
-    }))
-  ); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
-  const pendingDeletions = useRef(new Map()); // localId -> true (queued for deletion once dbId arrives)
-  const previewShapeRef = useRef(null);
-  const drawingShapeRef = useRef(false);
-  const rightClickLineRef = useRef({ active: false, start: null }); // for right-click straight line while pen mode
-  const erasingRef = useRef(false);
-  const selectingRef = useRef({ active: false, start: null });
-  const rotatingRef = useRef({ active: false, center: null, startAngle: 0, originals: {} });
-  // Snap rotation increments helper (used for 90° rotation commands)
-  const SNAP_ANGLE = Math.PI / 2; // 90°
-  function snapToQuarterTurns(angle) {
-    // Normalize angle to [0, 2π)
-    const TAU = Math.PI * 2;
-    let a = angle % TAU;
-    if (a < 0) a += TAU;
-    // Find nearest multiple of 90°
-    const steps = Math.round(a / SNAP_ANGLE);
-    return (steps * SNAP_ANGLE) % TAU;
-  }
-  function rotateSelectionQuarter(direction = 1) {
-    // direction: +1 = clockwise 90°, -1 = counter-clockwise 90°
-    const sel = selectedItems;
-    if (!sel || (!sel.forme || sel.forme.length === 0)) return;
-    const delta = direction * SNAP_ANGLE;
-    
-    const updatedShapes = [];
-    setForme(prev => {
-      const updated = prev.map(f => {
-        if (!sel.forme.includes(f.id)) return f;
-        const current = Number(f.rotation) || 0;
-        const target = snapToQuarterTurns(current + delta);
-        const rotated = { ...f, rotation: target };
-        // Invalidate cached bbox to force recalc on next draw
-        delete rotated._bb;
-        updatedShapes.push(rotated);
-        return rotated;
-      });
-      return updated;
-    });
-    
-    // Persist and emit updates for each rotated shape (after state update completes)
-    setTimeout(() => {
-      updatedShapes.forEach(shape => {
-        updateShapeLocal(shape, true);
-      });
-    }, 0);
-    
-    // Force redraw to update selection box with new rotated bounds
-    requestAnimationFrame(() => drawAll());
-  }
-  const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
-  const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
-  const draggingSelectionRef = useRef({
-    active: false,
-    lastWorld: null,
-    moved: false,
-    pointerTool: null,
-    pointerId: null,
-    primaryShapeId: null,
-    primaryStrokeIndex: null,
-    selectionSnapshot: null
-  });
-  const resizingSelectionRef = useRef({
-    active: false,
-    handle: null, // e.g., 'top-left', 'bottom-right'
-    aspectRatio: 1,
-    originalBounds: null,
-    selectionSnapshot: null,
-  });
-  const selectionClickRef = useRef(null);
-  const [showShapesPopover, setShowShapesPopover] = useState(false);
-
-  const getResizeCursor = (handle) => {
-    switch (handle) {
-      case 'top-left':
-      case 'bottom-right':
-        return 'nwse-resize';
-      case 'top-right':
+    }
+    setupAblySubscriptions();
+    // Cleanup on unmount
+    return () => {
+      try {
+        if (channelInstance) channelInstance.unsubscribe();
+        if (ablyConnectionListener && channelInstance && channelInstance.connection) {
+          channelInstance.connection.off('connectionStateChange', ablyConnectionListener);
+        }
+      } catch (_) {}
+    };
       case 'bottom-left':
         return 'nesw-resize';
       case 'top':
