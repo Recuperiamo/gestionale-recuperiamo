@@ -52,7 +52,7 @@ export async function POST(req) {
         titolo: String(titolo).trim(),
         descrizione: descrizione || null,
         data: data ? new Date(data) : null,
-        autoreUserId: session.user?.id ?? null,
+        autoreUserId: session.user?.id ? Number(session.user.id) : null,
         isVerifica: isVerifica || false
       }
     });
