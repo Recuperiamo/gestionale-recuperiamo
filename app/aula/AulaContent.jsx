@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
+import ProgrammaPreview from './ProgrammaPreview';
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
 import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 
@@ -1273,6 +1274,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             </div>
           </div>
           {loading && <div style={{margin:30}}>Caricamento…</div>}
+          {activeTab === 'bacheca' && targetClienteId && (
+            <div style={{ marginBottom: 18 }}>
+              <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} />
+            </div>
+          )}
           {visible.length === 0 && !loading && (
             <div style={emptyBox}>Nessun materiale trovato.</div>
           )}
