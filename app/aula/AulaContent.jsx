@@ -1280,7 +1280,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
           {activeTab === 'programma' && targetClienteId && (
             <div style={{ marginTop: 14 }}>
-              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} />
+              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} />
             </div>
           )}
           {visible.length === 0 && !loading && (
@@ -1406,9 +1406,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                             Caricato il {formatAggDate(firstItem.updatedAt)}
                           </div>
                           <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                            <button type="button" style={btnGhost} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
-                              Vedi file
-                            </button>
+                            {((firstItem.sezione || '').toUpperCase() !== 'PROGRAMMA') && (
+                              <button type="button" style={btnGhost} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
+                                Vedi file
+                              </button>
+                            )}
                           </div>
                           
                           {/* Commenti batch */}
@@ -1445,7 +1447,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                     </div>
                     <div style={streamCardBody}>
                       {/* Preview immagini */}
-                      {["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase()) && (
+                      {(["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase()) && ((m.sezione || '').toUpperCase() !== 'PROGRAMMA')) && (
                         <div role="button" tabIndex={0} onClick={() => setPreviewItem(m)} onKeyDown={(e)=>{ if(e.key==='Enter') setPreviewItem(m); }} style={{cursor:'pointer'}}>
                           <img
                             src={`/api/materiale?fileId=${m.id}`}
@@ -1470,7 +1472,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                         Caricato il {formatAggDate(m.updatedAt)}
                       </div>
                       <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                        <button type="button" style={btnGhost} onClick={() => setPreviewItem(m)}>Anteprima</button>
+                        {((m.sezione || '').toUpperCase() !== 'PROGRAMMA') && (
+                          <button type="button" style={btnGhost} onClick={() => setPreviewItem(m)}>Anteprima</button>
+                        )}
                         {isAdmin && (
                           <button
                             style={{...btnOutline, color:"#c33", borderColor:"#ea8484", fontWeight:700}}
@@ -1501,7 +1505,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
         {activeTab === 'bacheca' && targetClienteId && (
           <div style={rightAsideWrap}>
-            <div style={{ position: 'relative', marginTop: 36 }}>
+            <div style={{ position: 'relative' }}>
               <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
                 <h4 style={{ marginTop: 0, marginBottom: 8, color: coloreTema }}>Argomenti recenti</h4>
                 <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} />
@@ -1753,7 +1757,7 @@ function CommentiBox({ materialeId, lista, addCommento, user, coloreTema = "#1cb
 /* --- STILI OTTIMIZZATI STREAM CLASSROOM + SIDEBAR --- */
 const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
 const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
-const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw"};
+const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block"};
 const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block"};
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};

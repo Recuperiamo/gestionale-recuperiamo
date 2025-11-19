@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
+import { MATERIE_AULA as MATERIE_AULA_DEFAULT } from '../../lib/materie';
 import { useSession } from 'next-auth/react';
 import { io } from 'socket.io-client';
 
-export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAdmin = false }) {
+export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAdmin = false, hideAside = false, materie = [] }) {
   const { data: session } = useSession();
   const [programmi, setProgrammi] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -108,6 +109,14 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
 
   const recenti = () => (programmi || []).slice(0,5);
 
+  // derive the list of subjects to show: prefer provided materie, otherwise derive from DB, otherwise default list
+  const materieList = (() => {
+    if (Array.isArray(materie) && materie.length > 0) return materie;
+    const fromDb = Array.from(new Set((programmi || []).map(p => p.materia).filter(Boolean)));
+    if (fromDb.length > 0) return fromDb;
+    return MATERIE_AULA_DEFAULT || [];
+  })();
+
   return (
     <div style={{ display: 'flex', gap: 20 }}>
       <div style={{ flex: 1 }}>
@@ -118,51 +127,58 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
         {loading && <div>Caricamento…</div>}
         {!loading && (
           <div>
-            {programmi.length === 0 ? (
-              <div style={{ padding: 18, borderRadius: 8, background: '#fff' }}>Nessun elemento nel programma.</div>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {programmi.map(p => (
-                  <li key={p.id} style={{ marginBottom: 14, background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #e6eefc' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Render per materia as 'agenda' sessions: even if empty, show placeholder */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              {materieList.map((m) => {
+                const listForMateria = (programmi || []).filter(p => (p.materia || '').toLowerCase() === (m || '').toLowerCase()).sort((a,b) => new Date(a.data || a.createdAt) - new Date(b.data || b.createdAt));
+                return (
+                  <div key={m} style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontWeight: 800, color: coloreTema }}>{m || '—'}</div>
                       <div>
-                        <strong>{p.titolo}</strong> {p.materia ? `— ${p.materia}` : ''}
-                        <div style={{ fontSize: 13, color: '#556' }}>{p.descrizione}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => navigator.clipboard?.writeText(p.titolo)} style={{ padding: '6px 8px' }}>Copia</button>
                         {isAdmin && (
-                          <>
-                            <button onClick={() => editInit(p)} style={{ padding: '6px 8px' }}>Modifica</button>
-                            <button onClick={() => handleDelete(p.id)} style={{ padding: '6px 8px', color: '#c33' }}>Elimina</button>
-                          </>
+                          <button onClick={() => { setOpenNew(true); setForm(prev => ({ ...prev, materia: m })); }} style={{ padding: '6px 10px', borderRadius: 6 }}>+ Nuovo</button>
                         )}
                       </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    {listForMateria.length === 0 ? (
+                      <div style={{ color: '#64748b', fontSize: 13, minHeight: 60, display: 'flex', alignItems: 'center' }}>Nessun argomento in programma per questa materia.</div>
+                    ) : (
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                        {listForMateria.map(p => (
+                          <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
+                            <div style={{ fontWeight: 700 }}>{p.titolo}</div>
+                            <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.descrizione}</div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
-      <aside style={{ width: 320 }}>
-        <div style={{ position: 'sticky', top: 96 }}>
-          <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff' }}>
-            <h4 style={{ marginTop: 0 }}>Argomenti recenti</h4>
-            {programmi.length === 0 && <div style={{ color: '#6b7b9a' }}>Nessun argomento</div>}
-            <ul style={{ padding: 0, listStyle: 'none' }}>
-              {recenti().map(p => (
-                <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
-                  <div style={{ fontWeight: 700 }}>{p.titolo}</div>
-                  <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.materia || '—'}</div>
-                </li>
-              ))}
-            </ul>
+      {!hideAside && (
+        <aside style={{ width: 320 }}>
+          <div style={{ position: 'sticky', top: 96 }}>
+            <div style={{ background: '#fff', padding: 12, borderRadius: 10, border: '1px solid #eef2ff' }}>
+              <h4 style={{ marginTop: 0 }}>Argomenti recenti</h4>
+              {programmi.length === 0 && <div style={{ color: '#6b7b9a' }}>Nessun argomento</div>}
+              <ul style={{ padding: 0, listStyle: 'none' }}>
+                {recenti().map(p => (
+                  <li key={p.id} style={{ padding: '8px 0', borderBottom: '1px dashed #f0f4ff' }}>
+                    <div style={{ fontWeight: 700 }}>{p.titolo}</div>
+                    <div style={{ fontSize: 12, color: '#6b7b9a' }}>{p.materia || '—'}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       {openNew && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,64,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
