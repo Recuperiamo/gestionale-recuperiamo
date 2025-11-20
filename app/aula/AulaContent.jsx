@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
 import ProgrammaPreview from './ProgrammaPreview';
+import CalendarioAttivita from '../components/calendario/CalendarioAttivita';
 import ProgrammaPanel from './ProgrammaPanel';
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
 import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
@@ -1580,14 +1581,21 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `${rightAsideMarginTop}px 24px 0 0` }}>
-              <div style={{ position: 'relative' }}>
-          {/* Lower the ProgrammaPreview sticky position under the green Tag heading */}
-            {/* Small extra offset to ensure the ProgrammaPreview sits under the green Tag */}
-                <div style={{ position: 'sticky', top: (asideTop + rightAsideMarginTop), background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
-                {/* ProgrammaPreview contains its own heading; remove extra top heading and align it with Tag */}
-                <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
-              </div>
+          <div style={{ ...rightAsideWrap, margin: `0 24px 0 0`, position: 'sticky', top: asideTop + rightAsideMarginTop }}>
+            <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}> {/* Added marginBottom */}
+              <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
+            </div>
+            {/* Mini-calendar */}
+            <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
+              <CalendarioAttivita
+                clienteId={targetClienteId}
+                initialMode="month"
+                allowModeSwitch={false}
+                allowNavigation={false}
+                showLegend={false}
+                enableStudentRequests={false}
+                enableAdminRequests={false}
+              />
             </div>
           </div>
         )}
