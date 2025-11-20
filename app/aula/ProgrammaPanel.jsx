@@ -324,4 +324,3 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
     </div>
   );
 }
-

@@ -1260,7 +1260,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {/* TABS CLASSROOM */}
           {targetClienteId && (
             <div style={{
-              display: "flex",
+              display: "inline-flex", /* Modifica: inline-flex per centrare */
               gap: "8px",
               marginTop: "24px",
               marginBottom: "8px",
@@ -1297,40 +1297,25 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {/* BAR: azioni principali a destra */}
           <div style={barFlex}>
             <div />
-            <div style={filtersBarRight}>
-              {/* Show action buttons based on activeTab: material/compiti -> Carica Materiale, admin Elimina tutti
-                  bacheca -> no buttons
-                  programma -> no buttons
-                  voti -> show registra voto + delete votes (admin) */}
-              {targetClienteId && (activeTab === 'materiale' || activeTab === 'compiti') && (
-                <>
-                  <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
-                    Carica materiale
-                  </button>
-                </>
-              )}
-
-              {activeTab === 'voti' && targetClienteId && (
-                <>
-                  <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
-                    Registra voto
-                  </button>
-                  {isAdmin && targetClienteId && (
-                    <EliminaTuttiMateriali
-                      clienteId={targetClienteId}
-                      sezione={'VOTI'}
-                      onDeleted={() => fetchMateriali(targetClienteId)}
-                    />
-                  )}
-                </>
-              )}
-              {isAdmin && targetClienteId && (activeTab === 'materiale' || activeTab === 'compiti') && (
-                <EliminaTuttiMateriali
-                  clienteId={targetClienteId}
-                  onDeleted={() => fetchMateriali(targetClienteId)}
-                />
-              )}
-            </div>
+            {activeTab === 'materiale' && (
+              <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
+                Carica materiale
+              </button>
+            )}
+            <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
+              Registra voto
+            </button>
+            {isAdmin && targetClienteId && (
+              <EliminaTuttiMateriali
+                clienteId={targetClienteId}
+                sezione={'VOTI'}
+                onDeleted={() => fetchMateriali(targetClienteId)}
+              />
+            )}
+            <EliminaTuttiMateriali
+              clienteId={targetClienteId}
+              onDeleted={() => fetchMateriali(targetClienteId)}
+            />
           </div>
           {loading && <div style={{margin:30}}>Caricamento…</div>}
           {/* ProgrammaPreview will be rendered as a right-side aside in Bacheca */}
@@ -1338,11 +1323,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {activeTab === 'programma' && targetClienteId && (
             <div style={{ 
               marginTop: 14,
-              display: 'flex',
+              display: 'inline-flex', /* Modifica: inline-flex per centrare */
               justifyContent: 'center',
               width: '100%'
             }}>
-              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} asideTop={asideTop} />
+              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={false} asideTop={asideTop} />
             </div>
           )}
           {visible.length === 0 && !loading && activeTab !== 'programma' && (
@@ -1928,6 +1913,7 @@ const videoLinkButton = {
   gap:12,
   transition:"all 0.2s ease"
 };
+
 const emptyBox = {
   border:"1px dashed #b9c9e3",
   background:"#f1f6fc",
