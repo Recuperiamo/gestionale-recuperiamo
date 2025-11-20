@@ -988,26 +988,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     return () => { window.removeEventListener('resize', updateTop); cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
   }, [headerRef, coloreTema]);
 
-  // Measure position of 'Tag' heading and set rightAside marginTop to match it
-  useEffect(() => {
-    function alignRightAside() {
-      try {
-        if (!sidebarTagRef?.current || !headerRef?.current) return setRightAsideMarginTop(36);
-        const headerRect = headerRef.current.getBoundingClientRect();
-        const tagRect = sidebarTagRef.current.getBoundingClientRect();
-        const calculatedRightAsideMarginTop = tagRect.top - asideTop;
-        console.log('[AulaContent] alignRightAside headerRect.bottom', headerRect.bottom, 'tagRect.top', tagRect.top, 'calculatedRightAsideMarginTop', calculatedRightAsideMarginTop);
-        setRightAsideMarginTop(calculatedRightAsideMarginTop);
-      } catch (_) { setRightAsideMarginTop(36); }
-    }
-    alignRightAside();
-    // Reevaluate after paint & short delays to ensure Tag/ header positions are stable
-    requestAnimationFrame(() => alignRightAside());
-    const tA = setTimeout(() => alignRightAside(), 80);
-    const tB = setTimeout(() => alignRightAside(), 250);
-    window.addEventListener('resize', alignRightAside);
-    return () => { window.removeEventListener('resize', alignRightAside); clearTimeout(tA); clearTimeout(tB); };
-  }, [sidebarTagRef, headerRef, asideTop]);
+
 
   async function handleDeleteMateriale(fileId) {
     if (!window.confirm("Sei sicuro di voler eliminare questo materiale?")) return;
@@ -1580,7 +1561,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `36px 24px 0 0` }}> {/* Reverted margin, removed sticky */}
+          <div style={{ ...rightAsideWrap, margin: `46px 24px 0 0` }}> {/* Reverted margin, removed sticky */}
             <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}>
               <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
             </div>
@@ -1845,7 +1826,10 @@ const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"colu
 const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1920,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
 // ...
 const mainStyle = {
-  flex:1,maxWidth:1400,minWidth:0,margin:"36px 0 0 0",background:"none",padding:0
+  flex:1,maxWidth:1400,minWidth:0,margin:"36px 0 0 0",background:"none",padding:0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center"
 };
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
   const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
@@ -1954,7 +1938,8 @@ const streamWrap = {
   display:"flex",
   flexDirection:"column",
   gap:34,
-  marginTop:10
+  marginTop:10,
+  margin: "0 auto" // Add this to center streamWrap
 };
 const dayHeaderStyle = {
   fontWeight:800,
