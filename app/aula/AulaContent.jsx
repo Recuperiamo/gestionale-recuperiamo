@@ -1297,25 +1297,37 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {/* BAR: azioni principali a destra */}
           <div style={barFlex}>
             <div />
-            {activeTab === 'materiale' && (
-              <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
-                Carica materiale
-              </button>
-            )}
-            <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
-              Registra voto
-            </button>
-            {isAdmin && targetClienteId && (
-              <EliminaTuttiMateriali
-                clienteId={targetClienteId}
-                sezione={'VOTI'}
-                onDeleted={() => fetchMateriali(targetClienteId)}
-              />
-            )}
-            <EliminaTuttiMateriali
-              clienteId={targetClienteId}
-              onDeleted={() => fetchMateriali(targetClienteId)}
-            />
+            <div style={filtersBarRight}>
+              {/* Logica pulsanti corretta per tab */}
+              {targetClienteId && (activeTab === 'materiale' || activeTab === 'compiti') && (
+                <>
+                  <button style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}} onClick={() => setShowUpload(true)}>
+                    Carica materiale
+                  </button>
+                  {isAdmin && (
+                    <EliminaTuttiMateriali
+                      clienteId={targetClienteId}
+                      onDeleted={() => fetchMateriali(targetClienteId)}
+                    />
+                  )}
+                </>
+              )}
+
+              {targetClienteId && activeTab === 'voti' && (
+                <>
+                  <button style={{...btnOutline, borderColor: coloreTema, color: coloreTema, fontWeight:700}} onClick={()=>setShowVoto(true)}>
+                     Registra voto
+                  </button>
+                  {isAdmin && (
+                    <EliminaTuttiMateriali
+                      clienteId={targetClienteId} 
+                      sezione={'VOTI'} 
+                      onDeleted={() => fetchMateriali(targetClienteId)} 
+                    />
+                  )}
+                </>
+              )}
+            </div>
           </div>
           {loading && <div style={{margin:30}}>Caricamento…</div>}
           {/* ProgrammaPreview will be rendered as a right-side aside in Bacheca */}
@@ -1323,11 +1335,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {activeTab === 'programma' && targetClienteId && (
             <div style={{ 
               marginTop: 14,
-              display: 'inline-flex', /* Modifica: inline-flex per centrare */
+              display: 'flex',
               justifyContent: 'center',
               width: '100%'
             }}>
-              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={false} asideTop={asideTop} />
+              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} asideTop={asideTop} />
             </div>
           )}
           {visible.length === 0 && !loading && activeTab !== 'programma' && (
