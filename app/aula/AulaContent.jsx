@@ -1828,8 +1828,7 @@ const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1920,margin:"0 aut
 const mainStyle = {
   flex:1,maxWidth:1400,minWidth:0,margin:"36px 0 0 0",background:"none",padding:0,
   display: "flex",
-  flexDirection: "column",
-  alignItems: "center"
+  flexDirection: "column"
 };
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
   const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
@@ -1938,24 +1937,23 @@ const streamWrap = {
   display:"flex",
   flexDirection:"column",
   gap:34,
-  marginTop:10,
-  margin: "0 auto" // Add this to center streamWrap
+  marginTop: 10,
+  margin: "0 auto", // Centra il contenitore
+  maxWidth: 600, // Definisce la larghezza massima della colonna centrale
+  width: '100%' // Assicura che sia responsivo
 };
 const dayHeaderStyle = {
   fontWeight:800,
   fontSize:18,
   color:"#20489a",
-  margin:"34px 0 10px 0",
-  paddingLeft:10,
+  margin:"34px 0 10px 0", // Rimosso paddingLeft per allineare con le card
   letterSpacing:".5px"
 };
 const streamCard = {
   background:"#fff",
   borderRadius:22,
   boxShadow:"0 3px 22px #20489a22",
-  padding:"0 0 0",
-  maxWidth:600,
-  margin:"0 auto",
+  width: '100%', // Ogni card occupa il 100% del contenitore streamWrap
   border:"1.4px solid #eaeaf0"
 };
 const streamCardHead = {
