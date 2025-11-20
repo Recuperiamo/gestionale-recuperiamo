@@ -101,22 +101,6 @@ export default function AulePage() {
         <Navbar />
         <main style={mainStyle}>
           {/* Minicalendario per studente selezionato */}
-          {selectedStudente && (
-            <section style={{ margin: "32px 0 24px", background: "#fff", borderRadius: "18px", boxShadow: "0 4px 18px rgba(32,72,154,0.10)", padding: "18px 18px 8px 18px", maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: 10, color: "#20489a" }}>
-                Calendario studente: {selectedStudente.nomeReferente || selectedStudente.email || `Studente #${selectedStudente.id}`}
-              </h2>
-              <CalendarioAttivita
-                externalMode="month"
-                allowModeSwitch={false}
-                allowNavigation={true}
-                showLegend={true}
-                enableStudentRequests={false}
-                forceClienteId={selectedStudente.id}
-                // Mostra solo le attività di questo studente
-              />
-            </section>
-          )}
           <header style={headerBox}>
             <div>
               <h1 style={title}>Aule studenti</h1>
@@ -129,17 +113,6 @@ export default function AulePage() {
           </header>
 
           {/* Calendario delle attività */}
-          <section style={{ margin: "40px 0 32px", background: "#fff", borderRadius: "18px", boxShadow: "0 4px 18px rgba(32,72,154,0.10)", padding: "24px" }}>
-            <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: 18, color: "#20489a" }}>Calendario attività</h2>
-            <CalendarioAttivita
-              externalMode="month"
-              allowModeSwitch={false}
-              allowNavigation={true}
-              showLegend={true}
-              enableStudentRequests={false}
-              // forceClienteId non passato: mostra tutte le attività
-            />
-          </section>
 
           <section style={filtersRow}>
             <input

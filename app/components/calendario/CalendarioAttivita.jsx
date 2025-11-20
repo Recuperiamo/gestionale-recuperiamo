@@ -200,7 +200,27 @@ export default function CalendarioAttivita({
   );
 
   useEffect(() => {
-    recomputeWeekLayout(currentDate);
+    if (mode === "week") {
+      recomputeWeekLayout(currentDate);
+    } else if (mode === "month") {
+      const currentMonthEvents = events.filter(event => {
+        const eventDate = event.start;
+        // Check if the event falls within the current month and year
+        return eventDate.getMonth() === currentDate.getMonth() &&
+               eventDate.getFullYear() === currentDate.getFullYear();
+      });
+
+      const hasSatEvents = currentMonthEvents.some(event => event.start.getDay() === 6);
+      const hasSunEvents = currentMonthEvents.some(event => event.start.getDay() === 0);
+
+      const newHiddenDays = [];
+      if (!hasSunEvents) newHiddenDays.push(0); // Sunday
+      if (!hasSatEvents) newHiddenDays.push(6); // Saturday
+
+      setHiddenDays(newHiddenDays);
+    } else {
+      setHiddenDays([]); // Clear hidden days for other modes
+    }
   }, [events, mode, currentDate, recomputeWeekLayout]);
 
   /* Navigazione */

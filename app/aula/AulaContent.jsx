@@ -995,10 +995,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         if (!sidebarTagRef?.current || !headerRef?.current) return setRightAsideMarginTop(36);
         const headerRect = headerRef.current.getBoundingClientRect();
         const tagRect = sidebarTagRef.current.getBoundingClientRect();
-        const delta = Math.max(0, Math.round(tagRect.top - headerRect.bottom));
-        console.log('[AulaContent] alignRightAside headerRect.bottom', headerRect.bottom, 'tagRect.top', tagRect.top, 'delta', delta);
-        // add a small fallback if delta is too small
-        setRightAsideMarginTop(delta || 36);
+        const calculatedRightAsideMarginTop = tagRect.top - asideTop;
+        console.log('[AulaContent] alignRightAside headerRect.bottom', headerRect.bottom, 'tagRect.top', tagRect.top, 'calculatedRightAsideMarginTop', calculatedRightAsideMarginTop);
+        setRightAsideMarginTop(calculatedRightAsideMarginTop);
       } catch (_) { setRightAsideMarginTop(36); }
     }
     alignRightAside();
@@ -1008,7 +1007,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     const tB = setTimeout(() => alignRightAside(), 250);
     window.addEventListener('resize', alignRightAside);
     return () => { window.removeEventListener('resize', alignRightAside); clearTimeout(tA); clearTimeout(tB); };
-  }, [sidebarTagRef, headerRef]);
+  }, [sidebarTagRef, headerRef, asideTop]);
 
   async function handleDeleteMateriale(fileId) {
     if (!window.confirm("Sei sicuro di voler eliminare questo materiale?")) return;
