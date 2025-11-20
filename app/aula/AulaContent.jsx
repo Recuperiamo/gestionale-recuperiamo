@@ -1336,8 +1336,13 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {/* ProgrammaPreview will be rendered as a right-side aside in Bacheca */}
 
           {activeTab === 'programma' && targetClienteId && (
-            <div style={{ marginTop: 14 }}>
-                <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} asideTop={asideTop} />
+            <div style={{ 
+              marginTop: 14,
+              display: 'flex',
+              justifyContent: 'center',
+              width: '100%'
+            }}>
+              <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} asideTop={asideTop} />
             </div>
           )}
           {visible.length === 0 && !loading && activeTab !== 'programma' && (
@@ -1561,7 +1566,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `46px 24px 0 0` }}> {/* Reverted margin, removed sticky */}
+          <div style={{ ...rightAsideWrap, margin: `60px 24px 0 0` }}> {/* Adjusted margin for alignment */}
             <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}>
               <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
             </div>
