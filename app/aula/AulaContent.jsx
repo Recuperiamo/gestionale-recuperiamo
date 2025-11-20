@@ -1858,9 +1858,7 @@ const sidebarBtn = {
   display:"block",margin:"7px 0",padding:"8px 14px",border:"none",borderRadius:8,
   background:"#e3eefe",color:"#20489a",fontWeight:600,fontSize:13,cursor:"pointer"
 };
-const mainStyle = {
-  flex:1,maxWidth:1100,minWidth:0,margin:"36px 0 0 36px",background:"none",padding:0
-};
+
 const barFlex = {display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,marginBottom:26};
 const filtersBarRight = {display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"};
 const filtersBar = { display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:20, marginBottom:28 };
