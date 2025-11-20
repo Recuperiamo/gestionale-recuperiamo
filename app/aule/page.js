@@ -145,19 +145,20 @@ export default function AulePage() {
                   {Array.isArray(ref.studenti) && ref.studenti.length > 0 ? (
                     ref.studenti.map(stud => (
                       <div key={stud.id} style={studentCardWrapper}>
-                        <div
-                          style={{ ...studentCard, cursor: "pointer", border: selectedStudente && selectedStudente.id === stud.id ? "2.5px solid #1cb0f6" : studentCard.border }}
-                          onClick={() => setSelectedStudente(stud)}
-                          title="Seleziona per vedere il calendario"
-                        >
-                          <div style={studentCardInfo}>
-                            <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
-                            {Array.isArray(stud.materie) && stud.materie.length > 0 && (
-                              <div style={studentSubjects}>{stud.materie.slice(0, 2).join(", ")}{stud.materie.length > 2 ? '...' : ''}</div>
-                            )}
+                        <Link href={`/aula/${stud.id}`} passHref>
+                          <div
+                            style={{ ...studentCard, cursor: "pointer", border: selectedStudente && selectedStudente.id === stud.id ? "2.5px solid #1cb0f6" : studentCard.border }}
+                            title="Apri l'aula dello studente"
+                          >
+                            <div style={studentCardInfo}>
+                              <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
+                              {Array.isArray(stud.materie) && stud.materie.length > 0 && (
+                                <div style={studentSubjects}>{stud.materie.slice(0, 2).join(", ")}{stud.materie.length > 2 ? '...' : ''}</div>
+                              )}
+                            </div>
+                            <div style={enterButtonCompact}>→</div>
                           </div>
-                          <div style={enterButtonCompact}>→</div>
-                        </div>
+                        </Link>
                         {/* Videolezione link - placeholder (sarà attivato quando aggiungi linkVideolezione al DB) */}
                         <button
                           onClick={() => {

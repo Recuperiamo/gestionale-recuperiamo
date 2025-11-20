@@ -1580,8 +1580,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `0 24px 0 0`, position: 'sticky', top: asideTop + rightAsideMarginTop }}>
-            <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}> {/* Added marginBottom */}
+          <div style={{ ...rightAsideWrap, margin: `36px 24px 0 0` }}> {/* Reverted margin, removed sticky */}
+            <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}>
               <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
             </div>
             {/* Mini-calendar */}
@@ -1590,7 +1590,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                 clienteId={targetClienteId}
                 initialMode="month"
                 allowModeSwitch={false}
-                allowNavigation={false}
+                allowNavigation={true}
                 showLegend={false}
                 enableStudentRequests={false}
                 enableAdminRequests={false}
@@ -1842,7 +1842,11 @@ function CommentiBox({ materialeId, lista, addCommento, user, coloreTema = "#1cb
 /* --- STILI OTTIMIZZATI STREAM CLASSROOM + SIDEBAR --- */
 const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
 const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
-const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1600,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
+const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1920,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
+// ...
+const mainStyle = {
+  flex:1,maxWidth:1400,minWidth:0,margin:"36px 0 0 0",background:"none",padding:0
+};
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
   const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};

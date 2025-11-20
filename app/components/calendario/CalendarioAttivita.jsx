@@ -393,7 +393,7 @@ export default function CalendarioAttivita({
         slotMinTime={weekView ? slotMinTime : undefined}
         slotMaxTime={weekView ? slotMaxTime : undefined}
         slotDuration={weekView ? "01:00:00" : undefined}
-        hiddenDays={weekView ? hiddenDays : []}
+        hiddenDays={hiddenDays}
         nowIndicator={weekView}
         events={events}
         locale="it"
