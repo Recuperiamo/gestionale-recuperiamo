@@ -1828,7 +1828,7 @@ const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1920,margin:"0 aut
 const mainStyle = {
   flex:1,maxWidth:1400,minWidth:0,margin:"36px 0 0 0",background:"none",padding:0,
   display: "flex",
-  flexDirection: "column"
+  flexDirection: "column",
 };
 const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
   const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
