@@ -5,8 +5,12 @@ import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
 import AdminOnly from "../components/auth/AdminOnly";
 import Navbar from "../components/Navbar";
+import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
+
 
 export default function AulePage() {
+    // Stato per studente selezionato
+    const [selectedStudente, setSelectedStudente] = useState(null);
   const [referenti, setReferenti] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -96,6 +100,23 @@ export default function AulePage() {
       <AdminOnly redirectTo="/profilo">
         <Navbar />
         <main style={mainStyle}>
+          {/* Minicalendario per studente selezionato */}
+          {selectedStudente && (
+            <section style={{ margin: "32px 0 24px", background: "#fff", borderRadius: "18px", boxShadow: "0 4px 18px rgba(32,72,154,0.10)", padding: "18px 18px 8px 18px", maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: 10, color: "#20489a" }}>
+                Calendario studente: {selectedStudente.nomeReferente || selectedStudente.email || `Studente #${selectedStudente.id}`}
+              </h2>
+              <CalendarioAttivita
+                externalMode="month"
+                allowModeSwitch={false}
+                allowNavigation={true}
+                showLegend={true}
+                enableStudentRequests={false}
+                forceClienteId={selectedStudente.id}
+                // Mostra solo le attività di questo studente
+              />
+            </section>
+          )}
           <header style={headerBox}>
             <div>
               <h1 style={title}>Aule studenti</h1>
@@ -106,6 +127,19 @@ export default function AulePage() {
               <span style={statsLabel}>Studenti attivi</span>
             </div>
           </header>
+
+          {/* Calendario delle attività */}
+          <section style={{ margin: "40px 0 32px", background: "#fff", borderRadius: "18px", boxShadow: "0 4px 18px rgba(32,72,154,0.10)", padding: "24px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: 18, color: "#20489a" }}>Calendario attività</h2>
+            <CalendarioAttivita
+              externalMode="month"
+              allowModeSwitch={false}
+              allowNavigation={true}
+              showLegend={true}
+              enableStudentRequests={false}
+              // forceClienteId non passato: mostra tutte le attività
+            />
+          </section>
 
           <section style={filtersRow}>
             <input
@@ -138,7 +172,11 @@ export default function AulePage() {
                   {Array.isArray(ref.studenti) && ref.studenti.length > 0 ? (
                     ref.studenti.map(stud => (
                       <div key={stud.id} style={studentCardWrapper}>
-                        <Link href={`/aula/${stud.id}`} style={studentCard}>
+                        <div
+                          style={{ ...studentCard, cursor: "pointer", border: selectedStudente && selectedStudente.id === stud.id ? "2.5px solid #1cb0f6" : studentCard.border }}
+                          onClick={() => setSelectedStudente(stud)}
+                          title="Seleziona per vedere il calendario"
+                        >
                           <div style={studentCardInfo}>
                             <div style={studentName}>{stud.nomeReferente || stud.email || `Studente #${stud.id}`}</div>
                             {Array.isArray(stud.materie) && stud.materie.length > 0 && (
@@ -146,7 +184,7 @@ export default function AulePage() {
                             )}
                           </div>
                           <div style={enterButtonCompact}>→</div>
-                        </Link>
+                        </div>
                         {/* Videolezione link - placeholder (sarà attivato quando aggiungi linkVideolezione al DB) */}
                         <button
                           onClick={() => {
