@@ -12,8 +12,15 @@ export default function DashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState('');
 
   const isAdmin = ['admin', 'operatore'].includes(session?.user?.role);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('dashboard-notes');
+    if (stored) setNotes(stored);
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -129,7 +136,9 @@ export default function DashboardPage() {
   }
 
   if (!isAdmin) {
-    router.replace('/profilo');
+    if (typeof window !== 'undefined') {
+      router.replace('/profilo');
+    }
     return null;
   }
 
@@ -327,8 +336,14 @@ export default function DashboardPage() {
                     resize: 'vertical',
                     background: '#f8fafc'
                   }}
-                  defaultValue={localStorage?.getItem('dashboard-notes') || ''}
-                  onChange={(e) => localStorage?.setItem('dashboard-notes', e.target.value)}
+                  value={notes}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNotes(val);
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('dashboard-notes', val);
+                    }
+                  }}
                 />
                 <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>
                   Le note vengono salvate automaticamente nel browser

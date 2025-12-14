@@ -42,6 +42,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
   const [pacchettoId, setPacchettoId] = useState(initialData?.pacchettoId || "");
   const [clienteId, setClienteId] = useState(initialData?.clienteId || "");
+  const [extraPacchetto, setExtraPacchetto] = useState(initialData?.extraPacchetto || false);
 
   // Ricorrenza
   const [tipoLezione, setTipoLezione] = useState(isEdit && isRicorrente ? "singola" : "singola");
@@ -190,6 +191,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         if (!isEdit) {
           payload.pacchettoId = Number(pacchettoId);
           payload.clienteId = Number(clienteId);
+          payload.extraPacchetto = extraPacchetto;
         } else {
           payload.id = initialData.id;
         }
@@ -553,6 +555,28 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
                 </select>
               )}
             </div>
+            {tipoLezione === "singola" && (
+              <div style={{
+                marginBottom: 16,
+                padding: "12px 14px",
+                borderRadius: 8,
+                background: extraPacchetto ? "#e3fff3" : "#f8fafd",
+                border: "1px solid #cbe5fc"
+              }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={extraPacchetto}
+                    onChange={(e) => setExtraPacchetto(e.target.checked)}
+                  />
+                  Segna come EXTRA pacchetto
+                </label>
+                <p style={{ margin: "8px 0 0 26px", color: "#4b5563", fontSize: 13, lineHeight: 1.5 }}>
+                  Non scala le ore residue del pacchetto selezionato ma mantiene il collegamento per lo storico.
+                  Utile per lezioni extra o fuori pacchetto.
+                </p>
+              </div>
+            )}
           </>
         )}
 

@@ -146,6 +146,7 @@ model Attivita {
   createdAt         DateTime              @default(now())
   descrizione       String?
   oreConsumate      Int
+  extraPacchetto    Boolean               @default(false)
   pacchettoId       Int?
   clienteId         Int
   durataOre         Float?

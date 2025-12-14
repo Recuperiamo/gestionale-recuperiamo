@@ -145,8 +145,11 @@ export async function POST(request) {
     dataInizio,
     dataFine,
     oraInizio,
+    extraPacchetto,
     utente = session.user?.email || 'admin'
   } = body
+
+  const isExtraPacchetto = extraPacchetto === true || extraPacchetto === 'true'
 
   // Caso: payload annidato in body.ricorrenza (il tuo caso attuale)
   if (!tipo && body.ricorrenza) {
@@ -244,7 +247,7 @@ export async function POST(request) {
     if (occorrenze.length === 0) {
       return NextResponse.json({ error: 'Nessuna occorrenza generata', giorniNorm }, { status: 400 })
     }
-    if (requiredHours > pacchetto.oreResidue) {
+    if (!isExtraPacchetto && requiredHours > pacchetto.oreResidue) {
       return NextResponse.json({
         error: 'Ore insufficienti',
         requiredHours,
@@ -272,31 +275,37 @@ export async function POST(request) {
               oreConsumate: durataNormalizzata,
               durataOre: durataNormalizzata,
               orario: dt,
-              stato: 'Prenotata',
+              stato: isExtraPacchetto ? 'EXTRA' : 'Prenotata',
+              extraPacchetto: isExtraPacchetto,
               ricorrenzaId: ricorrenzaId
             }
           })
           rows.push(att)
         }
-        await tx.pacchettoOre.update({
-          where: { id: Number(pacchettoId) },
-          data: {
-            oreResidue: { decrement: requiredHours }
-          }
-        })
+
+        if (!isExtraPacchetto) {
+          await tx.pacchettoOre.update({
+            where: { id: Number(pacchettoId) },
+            data: {
+              oreResidue: { decrement: requiredHours }
+            }
+          })
+        }
         return rows
       })
 
-      await logPacchettoChange({
-        pacchettoId: Number(pacchettoId),
-        tipoOperazione: 'creazione-ricorrenza',
-        orePrima: pacchetto.oreResidue,
-        oreDopo: pacchetto.oreResidue - requiredHours,
-        attivitaId: null,
-        utente,
-        motivazione: `Ricorrenza: ${descrizione}`,
-        pacchettoDescrizione: pacchetto.descrizione
-      })
+      if (!isExtraPacchetto) {
+        await logPacchettoChange({
+          pacchettoId: Number(pacchettoId),
+          tipoOperazione: 'creazione-ricorrenza',
+          orePrima: pacchetto.oreResidue,
+          oreDopo: pacchetto.oreResidue - requiredHours,
+          attivitaId: null,
+          utente,
+          motivazione: `Ricorrenza: ${descrizione}`,
+          pacchettoDescrizione: pacchetto.descrizione
+        })
+      }
 
       return NextResponse.json({
         ok: true,
@@ -314,7 +323,7 @@ export async function POST(request) {
   if (!durataNormalizzata) {
     return NextResponse.json({ error: 'Durata/ore mancanti o non valide (singola)' }, { status: 400 })
   }
-  if (pacchetto.oreResidue < durataNormalizzata) {
+  if (!isExtraPacchetto && pacchetto.oreResidue < durataNormalizzata) {
     return NextResponse.json({ error: 'Ore residue insufficienti' }, { status: 400 })
   }
 
@@ -323,7 +332,9 @@ export async function POST(request) {
     clienteId: Number(clienteId),
     oreConsumate: durataNormalizzata,
     descrizione,
-    durataOre: durataNormalizzata
+    durataOre: durataNormalizzata,
+    extraPacchetto: isExtraPacchetto,
+    stato: isExtraPacchetto ? 'EXTRA' : undefined
   }
   if (orario) {
     const d = new Date(orario)
@@ -331,6 +342,11 @@ export async function POST(request) {
   }
 
   try {
+    if (isExtraPacchetto) {
+      const attivitaCreata = await prisma.attivita.create({ data: dataCreate })
+      return NextResponse.json({ attivita: attivitaCreata, pacchetto }, { status: 201 })
+    }
+
     const [attivitaCreata, pacchettoAggiornato] = await prisma.$transaction([
       prisma.attivita.create({ data: dataCreate }),
       prisma.pacchettoOre.update({
@@ -720,6 +736,24 @@ export async function DELETE(request) {
       select: { id: true }
     })
     console.log('[DELETE /api/attivita] Lavagna trovata:', lavagna?.id || 'nessuna')
+
+    // Se l'attività è segnata come extra, non reintegriamo le ore del pacchetto
+    if (att.extraPacchetto) {
+      const result = await prisma.$transaction(async tx => {
+        await tx.richiestaModifica.deleteMany({ where: { attivitaId: att.id } })
+
+        if (lavagna) {
+          await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: lavagna.id } })
+          await tx.lavagna.delete({ where: { id: lavagna.id } })
+        }
+
+        const deleted = await tx.attivita.delete({ where: { id: att.id } })
+        return { deleted }
+      })
+
+      console.log('[DELETE /api/attivita] Eliminazione completata (extraPacchetto=true)')
+      return NextResponse.json({ deleted: result.deleted, pacchetto })
+    }
 
     console.log('[DELETE /api/attivita] Inizio transazione')
     const result = await prisma.$transaction(async tx => {
