@@ -555,7 +555,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
                 </select>
               )}
             </div>
-            {tipoLezione === "singola" && (
+            {tipoLezione === "singola" && pacchettoId && (
               <div style={{
                 marginBottom: 16,
                 padding: "12px 14px",
