@@ -478,6 +478,15 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
     }
     setLoading(true);
     const errors = [];
+
+    // Prevent sending oversized files to Vercel serverless functions
+    const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 MB
+    const oversized = files.filter(f => (f && f.size) ? f.size > MAX_UPLOAD_SIZE : false);
+    if (oversized.length) {
+      alert("I seguenti file sono troppo grandi (>5 MB):\n" + oversized.map(f => f.name).join('\n') + "\n\nCarica file più piccoli oppure contatta l'amministratore per soluzioni alternative (upload diretto a storage).");
+      setLoading(false);
+      return;
+    }
     
     // Genera uploadBatchId solo se ci sono più file
     const uploadBatchId = files.length > 1 ? `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : null;
