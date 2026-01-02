@@ -1910,6 +1910,16 @@ export default function LavagnaCanvas({
           remoteStreams.current.delete(streamId);
         };
 
+        // Remote stroke canceled mid-drawing: drop any temp stream and clear partials
+        const onCancelStroke = (msg) => {
+          const { data } = msg || {};
+          const { streamId } = data || {};
+          if (!streamId) return;
+          remoteStreams.current.delete(streamId);
+          setTratti((prev) => prev.filter((t) => String(t.id) !== String(streamId)));
+          drawAll();
+        };
+
         const onDelete = (msg) => {
           const { data } = msg || {};
           const { strokeId } = data || {};
@@ -1954,6 +1964,7 @@ export default function LavagnaCanvas({
           ch.subscribe('stroke:start', onStart);
           ch.subscribe('stroke:points', onPoints);
           ch.subscribe('stroke:done', onDone);
+          ch.subscribe('stroke:cancel', onCancelStroke);
           ch.subscribe('stroke:delete', onDelete);
           ch.subscribe('stroke:update', onStrokeUpdate);
           ch.subscribe('clear-lavagna', onClear);
@@ -2202,6 +2213,7 @@ export default function LavagnaCanvas({
                   ch.subscribe('stroke:start', onStart);
                   ch.subscribe('stroke:points', onPoints);
                   ch.subscribe('stroke:done', onDone);
+                  ch.subscribe('stroke:cancel', onCancelStroke);
                   ch.subscribe('stroke:delete', onDelete);
                   ch.subscribe('stroke:update', onStrokeUpdate);
                   ch.subscribe('clear-lavagna', onClear);
@@ -2233,6 +2245,7 @@ export default function LavagnaCanvas({
             ch.unsubscribe('stroke:start', onStart);
             ch.unsubscribe('stroke:points', onPoints);
             ch.unsubscribe('stroke:done', onDone);
+            ch.unsubscribe('stroke:cancel', onCancelStroke);
             ch.unsubscribe('stroke:delete', onDelete);
             ch.unsubscribe('stroke:update', onStrokeUpdate);
             ch.unsubscribe('clear-lavagna', onClear);
@@ -4909,6 +4922,24 @@ export default function LavagnaCanvas({
 
   function pointerCancel(e) {
     const pointerId = e?.nativeEvent?.pointerId;
+
+    // Hard abort of any in-progress local stroke to avoid ghost lines
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
+    if (outgoingRAFRef.current) {
+      cancelAnimationFrame(outgoingRAFRef.current);
+      outgoingRAFRef.current = null;
+    }
+    outgoingBufferRef.current = [];
+    puntiCorrentiRef.current = [];
+    if (disegnando) setDisegnando(false);
+    if (currentStreamId.current) {
+      emitOrPublish('stroke:cancel', { streamId: currentStreamId.current, senderId: utenteId });
+      currentStreamId.current = null;
+    }
+    try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch (_) {}
     
     if (panningRef.current.active) {
       panningRef.current.active = false;
