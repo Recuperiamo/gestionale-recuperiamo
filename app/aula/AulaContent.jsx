@@ -480,10 +480,10 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
     const errors = [];
 
     // Prevent sending oversized files to Vercel serverless functions
-    const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 MB
+    const MAX_UPLOAD_SIZE = 100 * 1024 * 1024; // 100 MB
     const oversized = files.filter(f => (f && f.size) ? f.size > MAX_UPLOAD_SIZE : false);
     if (oversized.length) {
-      alert("I seguenti file sono troppo grandi (>5 MB):\n" + oversized.map(f => f.name).join('\n') + "\n\nCarica file più piccoli oppure contatta l'amministratore per soluzioni alternative (upload diretto a storage).");
+      alert("I seguenti file sono troppo grandi (>100 MB):\n" + oversized.map(f => f.name).join('\n') + "\n\nCarica file più piccoli oppure contatta l'amministratore per soluzioni alternative (upload diretto a storage).");
       setLoading(false);
       return;
     }

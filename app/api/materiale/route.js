@@ -5,6 +5,8 @@ import { authOptions } from '../auth/[...nextauth]/authOptions';
 import { prisma } from '../../../lib/prisma';
 // Ably removed: realtime notifications are now handled client-side via Socket.IO
 
+const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB safeguard for uploads
+
 // Recupera la sessione NextAuth dal server e normalizza le informazioni utente
 async function getUserFromRequest(req) {
   try {
@@ -102,6 +104,10 @@ export async function POST(req) {
   
   const file = formData.get("file");
   if (!file) return NextResponse.json({ error: "File mancante" }, { status: 400 });
+
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+    return NextResponse.json({ error: "File troppo grande (limite 100 MB)" }, { status: 413 });
+  }
 
   // clienteId obbligatorio!
   let clienteId = formData.get("clienteId");
