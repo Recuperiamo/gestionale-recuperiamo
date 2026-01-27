@@ -1,20 +1,4 @@
 "use client";
-// Supporto pointerrawupdate per input ultra-fluido
-useEffect(() => {
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-  // Handler condiviso
-  const handlePointerRawUpdate = (e) => {
-    // Solo se stiamo disegnando e non stiamo facendo pan/zoom
-    if (disegnando && !panningRef.current.active) {
-      pointerMove(e);
-    }
-  };
-  canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate);
-  return () => {
-    canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
-  };
-}, [disegnando]);
 import React, {
   useEffect,
   useRef,
@@ -65,7 +49,6 @@ export default function LavagnaCanvas({
   );
   const [disegnando, setDisegnando] = useState(false);
   const puntiCorrentiRef = useRef([]);
-  const salvandoRef = useRef(false);
   const pendingSavesRef = useRef(new Map()); // Track pending saves by stroke id
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -152,6 +135,19 @@ export default function LavagnaCanvas({
   const lavagnaIdRef = useRef(lavagnaId);
   const attivitaIdRef = useRef(attivitaId);
   
+  // Supporto pointerrawupdate per input ultra-fluido
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handlePointerRawUpdate = (e) => {
+      if (!disegnando) return;
+      if (panningRef.current && panningRef.current.active) return;
+      try { pointerMove(e); } catch (_) {}
+    };
+    canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate);
+    return () => canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
+  }, [disegnando]);
+
   useEffect(() => {
     utenteIdRef.current = utenteId;
   }, [utenteId]);
