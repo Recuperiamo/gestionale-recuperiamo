@@ -49,6 +49,11 @@ export default function LavagnaCanvas({
   );
   const [disegnando, setDisegnando] = useState(false);
   const puntiCorrentiRef = useRef([]);
+  // Buffer per punti in uscita: aggrega punti e li invia a intervalli
+  const outgoingBufferRef = useRef([]);
+  const outgoingIntervalRef = useRef(null);
+  const outgoingLastFlushRef = useRef(0);
+  const outgoingRAFRef = useRef(null);
   const pendingSavesRef = useRef(new Map()); // Track pending saves by stroke id
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -270,6 +275,45 @@ export default function LavagnaCanvas({
     },
     [channelName]
   );
+
+  // Raggruppa i punti in buffer e li invia in batch per ridurre i publish verso Ably
+  const flushOutgoing = useCallback(() => {
+    try {
+      const buf = outgoingBufferRef.current;
+      if (!buf || buf.length === 0) return;
+      // Group by streamId to send arrays of points per stream
+      const grouped = Object.create(null);
+      for (let i = 0; i < buf.length; i++) {
+        const it = buf[i];
+        const sid = it.streamId || '__default';
+        if (!grouped[sid]) grouped[sid] = [];
+        grouped[sid].push(it.point);
+      }
+      // Emit grouped messages
+      Object.keys(grouped).forEach((sid) => {
+        try {
+          emitOrPublish('stroke:points', { streamId: sid, points: grouped[sid] });
+        } catch (err) {
+          console.error('[LAVAGNA-FLUSH-ERROR]', err && err.message ? err.message : err);
+        }
+      });
+      outgoingBufferRef.current = [];
+      outgoingLastFlushRef.current = Date.now();
+    } catch (e) {
+      console.error('[LAVAGNA-FLUSH-ERROR]', e && e.message ? e.message : e);
+    }
+  }, [emitOrPublish]);
+
+  useEffect(() => {
+    // Start periodic flusher (30ms default -> max ~33 flushes/sec). This batches
+    // multiple high-frequency pointer events into fewer publishes, avoiding Ably
+    // rate-limit errors while preserving responsiveness.
+    outgoingIntervalRef.current = setInterval(flushOutgoing, 30);
+    return () => {
+      if (outgoingIntervalRef.current) clearInterval(outgoingIntervalRef.current);
+      outgoingIntervalRef.current = null;
+    };
+  }, [flushOutgoing]);
 
   // Shapes and selection
   const [forme, setForme] = useState(() =>
@@ -4013,11 +4057,8 @@ export default function LavagnaCanvas({
       spessore,
       start: punto,
     });
-    // Invio immediato del primo punto
-    emitOrPublish('stroke:points', {
-      streamId,
-      points: [punto]
-    });
+    // Bufferizza il primo punto per invio batch
+    outgoingBufferRef.current.push({ streamId, point: punto });
     // ensure overlay visible and positioned on pointer down (support eraser only)
     try {
       const ov = overlayRef.current;
@@ -4550,11 +4591,8 @@ export default function LavagnaCanvas({
     }
 
     puntiCorrentiRef.current.push(punto);
-    // Invio immediato del punto
-    emitOrPublish('stroke:points', {
-      streamId: currentStreamId.current,
-      points: [punto]
-    });
+    // Bufferizza il punto corrente per invio batch
+    outgoingBufferRef.current.push({ streamId: currentStreamId.current, point: punto });
   }
 
   function pointerUp(e) {
@@ -4902,6 +4940,8 @@ export default function LavagnaCanvas({
       }
     }
 
+    // Assicura l'invio degli eventuali punti rimanenti nel buffer
+    try { flushOutgoing(); } catch (_) {}
     emitOrPublish('stroke:done', { streamId: currentStreamId.current, senderId: utenteId });
 
     try {
