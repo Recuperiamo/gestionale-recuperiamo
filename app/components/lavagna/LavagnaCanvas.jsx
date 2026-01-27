@@ -35,7 +35,11 @@ export default function LavagnaCanvas({
   altezza = 600,
   openInNewWindow = false,
   isNewLavagna = false,
+  topRightPlacement = "in-canvas",
+  onActionsChange
+}) {
   const salvandoRef = useRef(false);
+  const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
