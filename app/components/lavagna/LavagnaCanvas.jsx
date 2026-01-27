@@ -1,20 +1,20 @@
-  // Supporto pointerrawupdate per input ultra-fluido
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Handler condiviso
-    const handlePointerRawUpdate = (e) => {
-      // Solo se stiamo disegnando e non stiamo facendo pan/zoom
-      if (disegnando && !panningRef.current.active) {
-        pointerMove(e);
-      }
-    };
-    canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate);
-    return () => {
-      canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
-    };
-  }, [disegnando]);
 "use client";
+// Supporto pointerrawupdate per input ultra-fluido
+useEffect(() => {
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  // Handler condiviso
+  const handlePointerRawUpdate = (e) => {
+    // Solo se stiamo disegnando e non stiamo facendo pan/zoom
+    if (disegnando && !panningRef.current.active) {
+      pointerMove(e);
+    }
+  };
+  canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate);
+  return () => {
+    canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
+  };
+}, [disegnando]);
 import React, {
   useEffect,
   useRef,
