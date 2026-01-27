@@ -1,5 +1,42 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 # LOG OPERATIVO
+## [2026-01-27 18:14] - Correzione LavagnaCanvas input
+
+**Autore**: Copilot/Recuperiamo
+**Operazione**: Rimozione buffering/throttling dei punti di disegno, invio immediato dei punti, aggiunta supporto `pointerrawupdate`; fix vari di sintassi e rimozione dichiarazione duplicata.
+
+**Motivo/contesto**:
+- L'input da tavoletta grafica risultava non fluido e generava linee rette casuali a causa di buffering e throttling. Era richiesto invio immediato dei punti e supporto per `pointerrawupdate`.
+
+**File coinvolti**:
+- app/components/lavagna/LavagnaCanvas.jsx (modificato)
+
+**Scenario Test**:
+1. Eseguire `npm run build` nella root del progetto (cartella `gestionale-recuperiamo`) e verificare che la build completi senza errori.
+2. Avviare l'app in ambiente di sviluppo (`npm run dev`) e aprire la pagina della lavagna (`/lavagna-sandbox` o la lavagna reale).
+3. Disegnare usando mouse e tavoletta grafica: il tratto deve essere fluido, senza ritardi evidenti; eventuali punti devono comparire immediatamente.
+4. Verificare anche l'uso della gomma e la gestione delle gesture (pan/pinch) per regressioni.
+
+**Problemi riscontrati**:
+- Inserimento iniziale del `useEffect` per `pointerrawupdate` in cima al file (prima degli import), che causava errore Next.js sulla direttiva `"use client"`.
+- Dichiarazione duplicata di `salvandoRef` che causava errore di dichiarazione multipla durante la build.
+
+**Azioni effettuate**:
+- Rimosso buffering (`outgoingBufferRef`) e throttling (`outgoingRAFRef` / `flushOutgoing`), inviando punti immediatamente con `emitOrPublish('stroke:points', { points: [...] })`.
+- Aggiunto `useEffect` per registrare `pointerrawupdate` sull'elemento canvas, collocato all'interno del componente dopo le `refs` in modo che i riferimenti siano disponibili.
+- Corretto posizionamento della direttiva `"use client"` e rimosso codice collocato erroneamente prima degli import.
+- Rimosso dichiarazione duplicata di `salvandoRef`.
+- Eseguito `npm run build` localmente per verificare la compilazione.
+- Committed e pushato le modifiche su `main`.
+
+**Note**:
+- La build locale ora passa; suggerito riprovare il deploy su Vercel e controllare i log.
+- Alcuni warning riguardano possibili marker React 19 canary nelle dipendenze (`react19` guard) — warning non bloccante.
+
+**TODO**:
+- Verificare deploy Vercel e segnalare eventuali regressioni in produzione.
+- Testare in ambiente reale con tavoletta grafica e utenti finali.
+
 
 # LOG OPERATIVO (reverse order)
 # Timestamp file (presentazione log): 2025-09-29 03:50 UTC+2
