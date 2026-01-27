@@ -3976,6 +3976,16 @@ export default function LavagnaCanvas({
       return;
     }
 
+    // Only start drawing if the pointer is actually pressing (mouse button, pen pressure, or touch).
+    const nativeEvt = e?.nativeEvent || {};
+    const isTouchPress = nativeEvt.pointerType === 'touch';
+    const isPenPress = nativeEvt.pointerType === 'pen' && (nativeEvt.pressure > 0 || (nativeEvt.buttons && nativeEvt.buttons !== 0));
+    const isMousePress = nativeEvt.pointerType === 'mouse' && (nativeEvt.buttons && nativeEvt.buttons !== 0);
+    if (!(isTouchPress || isPenPress || isMousePress)) {
+      // Ignore hover/idle pointerdown events that don't represent a real press.
+      return;
+    }
+
     setDisegnando(true);
     const punto = getPointerWorld();
     if (!punto) {
