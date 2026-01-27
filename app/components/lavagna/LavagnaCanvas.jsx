@@ -1,3 +1,19 @@
+  // Supporto pointerrawupdate per input ultra-fluido
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Handler condiviso
+    const handlePointerRawUpdate = (e) => {
+      // Solo se stiamo disegnando e non stiamo facendo pan/zoom
+      if (disegnando && !panningRef.current.active) {
+        pointerMove(e);
+      }
+    };
+    canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate);
+    return () => {
+      canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
+    };
+  }, [disegnando]);
 "use client";
 import React, {
   useEffect,
@@ -19,10 +35,7 @@ export default function LavagnaCanvas({
   altezza = 600,
   openInNewWindow = false,
   isNewLavagna = false,
-  topRightPlacement = "in-canvas",
-  onActionsChange
-}) {
-  const canvasRef = useRef(null);
+  const salvandoRef = useRef(false);
   const ctxRef = useRef(null);
   const overlayRef = useRef(null);
   const ablyRef = useRef({ ch: null });
@@ -1560,9 +1573,6 @@ export default function LavagnaCanvas({
   const remoteStreams = useRef(new Map()); // streamId -> { strumento, colore, spessore, punti: [] }
   const currentStreamId = useRef(null);
   const throttler = useRef({ last: 0 });
-  // buffer per pubblicare punti in batch (meno segmentazione remota)
-  const outgoingBufferRef = useRef([]);
-  const outgoingRAFRef = useRef(null);
 
   const clearLavagnaState = useCallback(() => {
     try {
@@ -1756,27 +1766,6 @@ export default function LavagnaCanvas({
     emitOrPublish('spectator:request', { lavagnaId, attivitaId, requesterId: utenteId, ts: Date.now() });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId, utenteId]);
 
-  const flushOutgoing = useCallback(() => {
-    if (!currentStreamId.current) {
-      outgoingRAFRef.current = null;
-      outgoingBufferRef.current = [];
-      return;
-    }
-    const batch = outgoingBufferRef.current;
-    if (batch.length) {
-      emitOrPublish('stroke:points', {
-        streamId: currentStreamId.current,
-        points: batch.slice()
-      });
-      outgoingBufferRef.current = [];
-    }
-    // Continua finché si disegna - throttle a 60fps (16ms) per cattura più reattiva
-    if (disegnando) {
-      outgoingRAFRef.current = setTimeout(flushOutgoing, 16);
-    } else {
-      outgoingRAFRef.current = null;
-    }
-  }, [emitOrPublish, disegnando]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -3996,13 +3985,11 @@ export default function LavagnaCanvas({
     if (strumento === 'gomma' && gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
     }
-    // For non-puntuale eraser (intero-tratto) mark erasing active so the
-    // dedicated erasing branch runs and pointer-up will properly release state.
     if (strumento === 'gomma' && !gommaPuntuale) {
       erasingRef.current = true;
     }
     puntiCorrentiRef.current = [punto];
-       animationFrameId.current = requestAnimationFrame(renderLoop);
+    animationFrameId.current = requestAnimationFrame(renderLoop);
     const streamId = `${utenteId}-${Date.now()}`;
     currentStreamId.current = streamId;
     const strokeColor = strumento === 'gomma' ? '#ffffff' : colore;
@@ -4015,6 +4002,11 @@ export default function LavagnaCanvas({
       colore: strokeColor,
       spessore,
       start: punto,
+    });
+    // Invio immediato del primo punto
+    emitOrPublish('stroke:points', {
+      streamId,
+      points: [punto]
     });
     // ensure overlay visible and positioned on pointer down (support eraser only)
     try {
@@ -4529,10 +4521,6 @@ export default function LavagnaCanvas({
     if (e.nativeEvent.pointerType === 'touch' && touchesRef.current.size >= 2) {
       setDisegnando(false);
       puntiCorrentiRef.current = [];
-      if (outgoingRAFRef.current) {
-        cancelAnimationFrame(outgoingRAFRef.current);
-        outgoingRAFRef.current = null;
-      }
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = null;
@@ -4552,10 +4540,11 @@ export default function LavagnaCanvas({
     }
 
     puntiCorrentiRef.current.push(punto);
-    outgoingBufferRef.current.push(punto);
-    if (!outgoingRAFRef.current) {
-      outgoingRAFRef.current = requestAnimationFrame(flushOutgoing);
-    }
+    // Invio immediato del punto
+    emitOrPublish('stroke:points', {
+      streamId: currentStreamId.current,
+      points: [punto]
+    });
   }
 
   function pointerUp(e) {
@@ -4843,11 +4832,7 @@ export default function LavagnaCanvas({
     setDisegnando(false);
     // Flush finale di eventuali punti in buffer
     if (outgoingBufferRef.current.length) {
-      emitOrPublish('stroke:points', {
-        streamId: currentStreamId.current,
-        points: outgoingBufferRef.current,
-      });
-      outgoingBufferRef.current = [];
+      // (buffer non più usato, invio già immediato)
     }
 
   // Apply lightweight smoothing to the collected points so handwriting
@@ -4929,8 +4914,7 @@ export default function LavagnaCanvas({
       animationFrameId.current = null;
     }
     if (outgoingRAFRef.current) {
-      cancelAnimationFrame(outgoingRAFRef.current);
-      outgoingRAFRef.current = null;
+      // outgoingRAFRef non più usato
     }
     outgoingBufferRef.current = [];
     puntiCorrentiRef.current = [];
