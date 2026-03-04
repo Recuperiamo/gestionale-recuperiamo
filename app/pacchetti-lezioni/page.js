@@ -339,9 +339,6 @@ export default function PacchettiLezioniPage() {
   }
 
   function exportToPDF(categoria = null) {
-    console.log("exportToPDF chiamata, categoria:", categoria);
-    console.log("prenotate:", prenotate?.length, "svolte:", svolte?.length, "cancellate:", cancellate?.length);
-    
     try {
       const doc = new jsPDF();
       let y = 20;
@@ -590,8 +587,7 @@ export default function PacchettiLezioniPage() {
   }
 
   function exportToTXT(categoria = null) {
-    console.log("exportToTXT chiamata, categoria:", categoria);
-    
+
     try {
       const titoloBase = "Pacchetti e Lezioni";
       let text = `${titoloBase}\n${'='.repeat(titoloBase.length)}\n\n`;
@@ -667,7 +663,6 @@ export default function PacchettiLezioniPage() {
   async function exportToPNG(categoria = null) {
     // Decide quale ref usare (se è stata passata una categoria usa il ref dedicato,
     // altrimenti usa il ref principale che avvolge l'intero main)
-    console.log("exportToPNG chiamata, categoria:", categoria);
     const refToUse = categoria === "prenotate" ? contentRefPrenotate
       : categoria === "svolte" ? contentRefSvolte
       : categoria === "cancellate" ? contentRefCancellate

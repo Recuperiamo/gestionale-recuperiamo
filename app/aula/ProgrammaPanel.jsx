@@ -1,5 +1,5 @@
 "use client";
-console.log('[INIT] ProgrammaPanel');
+
 import React, { useEffect, useState, useRef } from 'react';
 import { MATERIE_AULA as MATERIE_AULA_DEFAULT } from '../../lib/materie';
 import dynamic from 'next/dynamic';

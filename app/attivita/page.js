@@ -10,7 +10,7 @@ export default function AttivitaPage() {
   const [attivitaList, setAttivitaList] = useState([]);
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  console.log("Attività passate ad AttivitaList:", attivitaList);
+
 
   const [clienti, setClienti] = useState([]);
   const [pacchetti, setPacchetti] = useState([]);

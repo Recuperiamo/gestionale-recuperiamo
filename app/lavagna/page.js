@@ -22,7 +22,7 @@ export default function PaginaLavagna() {
         .then(r => r.json())
         .then(data => {
           // DEBUG: logga la risposta dei clienti per capire cosa arriva
-          console.log("DEBUG clienti:", data);
+
           if (Array.isArray(data.clienti)) {
             setClienti(data.clienti);
           } else if (Array.isArray(data)) {
@@ -47,14 +47,14 @@ export default function PaginaLavagna() {
 
   async function carica(id) {
     if (!id) return;
-    console.log('[LAVAGNA] Caricamento lavagna con attivitaId:', id);
+
     setLoading(true);
     try {
       const r = await fetch(`/api/lavagna?attivitaId=${id}`, { cache: "no-store" });
       const js = await r.json();
-      console.log('[LAVAGNA] Risposta API:', { ok: r.ok, status: r.status, data: js });
+
       if (r.ok) {
-        console.log('[LAVAGNA] Lavagna caricata con successo:', js.lavagna);
+
         setLavagna(js.lavagna);
       } else {
         console.error('[LAVAGNA] Errore API:', js.error);
@@ -77,8 +77,8 @@ export default function PaginaLavagna() {
   }, [status]);
 
   function handleLavagnaSelect(lavagna) {
-    console.log('[LAVAGNA] Lavagna selezionata:', lavagna);
-    console.log('[LAVAGNA] attivitaId:', lavagna.attivitaId);
+
+
     // Apri in nuova finestra
     window.open(`/lavagna/full?attivitaId=${lavagna.attivitaId}`, "_blank");
   }
@@ -94,8 +94,8 @@ export default function PaginaLavagna() {
   if (!session) return null;
 
   // DEBUG: Mostra tutto l'oggetto session.user per capire dove trovare il clienteId corretto
-  console.log("DEBUG session.user:", session.user);
-  console.log("DEBUG clienteId passato a LavagneList:", clienteId);
+
+
 
   const titoloBase = lavagna?.titolo || "";
   let titoloAdmin = lavagna?.titoloVisuale || titoloBase;

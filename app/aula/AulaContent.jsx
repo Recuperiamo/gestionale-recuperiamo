@@ -1,5 +1,5 @@
 "use client";
-console.log('[INIT] AulaContent');
+
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
@@ -755,7 +755,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
   // Debug: print the computed sticky offsets on each render (only in dev)
   if (process.env.NODE_ENV !== 'production') {
-    try { console.log('[AulaContent] render asideTop', asideTop, 'rightAsideMarginTop', rightAsideMarginTop); } catch (e) { }
+
   }
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
@@ -813,12 +813,12 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         const ch = await getAblyChannelAsync(`materiale:${targetClienteId}`);
         if (ch) {
           if (process.env.NODE_ENV !== 'production') {
-            console.log('[AulaContent] Ably channel attached materiale:' + targetClienteId);
+
           }
           
           const onNewMaterial = ({ data }) => {
             if (process.env.NODE_ENV !== 'production') {
-              console.log('[AulaContent] received new-material', data);
+
             }
             // Ricarica automaticamente la lista
             fetchMateriali(targetClienteId);
@@ -826,7 +826,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
           const onDeleteMaterial = ({ data }) => {
             if (process.env.NODE_ENV !== 'production') {
-              console.log('[AulaContent] received delete-material', data);
+
             }
             // Ricarica automaticamente la lista
             fetchMateriali(targetClienteId);
@@ -981,7 +981,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         const h = headerRef?.current ? headerRef.current.getBoundingClientRect().height : 96;
         // add a small gap to place the sticky aside below the header (pixel tweak)
         const offset = Math.round(h + 10);
-        console.log('[AulaContent] updateTop headerHeight', h, 'asideTop', offset);
+
         setAsideTop(offset);
       } catch (e) {
         setAsideTop(96);

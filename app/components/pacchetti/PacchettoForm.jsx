@@ -70,7 +70,7 @@ export default function PacchettoForm({ onClose, onSuccess, clienteId: propClien
       sogliaOreResidue: sogliaOreResidue === "" ? null : Number(sogliaOreResidue),
     };
 
-    console.log("PACCHETTO PAYLOAD:", payload);
+
 
     try {
       const res = await fetch("/api/pacchetti", {

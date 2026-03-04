@@ -117,10 +117,7 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
   }
 
   function handleSelect(lavagna) {
-    console.log('[LavagneList] handleSelect chiamato con:', lavagna);
-    console.log('[LavagneList] onSelect è una funzione?', typeof onSelect === "function");
     if (typeof onSelect === "function") {
-      console.log('[LavagneList] Chiamando onSelect...');
       onSelect(lavagna);
     } else {
       console.error('[LavagneList] onSelect non è una funzione!', onSelect);
