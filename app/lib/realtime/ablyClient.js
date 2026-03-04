@@ -4,8 +4,6 @@ let _connectPromise = null;
 const _channelCache = new Map(); // Cache for channel wrappers
 
 async function getAblyApiKey() {
-
-  
   // Try localStorage first (for admin/testing)
   if (typeof window !== 'undefined') {
     try {
@@ -19,18 +17,16 @@ async function getAblyApiKey() {
           // It's already a string, use it
         }
         if (typeof key === 'string' && key.trim()) {
-
           return key.trim();
         }
       }
     } catch (e) {
-      console.error('[Ably Debug] Error reading localStorage:', e);
+      console.error('[Ably] Error reading localStorage:', e);
     }
   }
-  
+
   // Fetch from server-side endpoint
   try {
-
     const response = await fetch('/api/ably-auth');
     if (!response.ok) {
       const errorText = await response.text();
@@ -38,64 +34,45 @@ async function getAblyApiKey() {
     }
     const data = await response.json();
     if (data.apiKey && typeof data.apiKey === 'string') {
-
       return data.apiKey.trim();
     }
   } catch (error) {
-    console.error('[Ably Debug] Error fetching API key:', error);
+    console.error('[Ably] Error fetching API key:', error);
   }
-  
-  console.error('[Ably Debug] API key not found in any location!');
+
+  console.error('[Ably] API key not found!');
   return null;
 }
 
 async function ensureAbly() {
-
-  if (typeof window === 'undefined') {
-
-    return null;
-  }
-  if (_ably) {
-
-    return _ably;
-  }
-  if (_connectPromise) {
-
-    return _connectPromise;
-  }
-
+  if (typeof window === 'undefined') return null;
+  if (_ably) return _ably;
+  if (_connectPromise) return _connectPromise;
 
   _connectPromise = (async () => {
     try {
-
       const Ably = await import('ably');
-
-      
       const apiKey = await getAblyApiKey();
       if (!apiKey) {
         console.error('[Ably] API key not found!');
         throw new Error('Ably API key not found');
       }
 
-      
       // Try different import patterns
       const RealtimeClient = Ably.Realtime || Ably.default?.Realtime || Ably.default;
 
-      
-      const ably = new RealtimeClient({ 
+      const ably = new RealtimeClient({
         key: apiKey,
         echoMessages: true // Enable receiving own published messages (important for local state sync)
       });
       _ably = ably;
-      
-      ably.connection.on('connected', () => {
 
-      });
-      
+      ably.connection.on('connected', () => {});
+
       ably.connection.on('failed', (stateChange) => {
         console.error('[Ably] Connection failed:', stateChange);
       });
-      
+
       return _ably;
     } catch (error) {
       console.error('[Ably] Error in ensureAbly promise:', error);
@@ -113,7 +90,7 @@ export function getAblyClient() {
 
 function createChannelWrapper(channel) {
   const listeners = new Map();
-  
+
   return {
     state: channel.state,
     subscribe: (event, handler) => {
@@ -130,9 +107,9 @@ function createChannelWrapper(channel) {
     publish: (event, data, cb) => {
       channel.publish(event, data).then(() => {
         cb && cb();
-      }).catch((e) => { 
-        if (process.env.NODE_ENV !== 'production') console.error('[Ably publish error]', event, e); 
-        cb && cb(e); 
+      }).catch((e) => {
+        if (process.env.NODE_ENV !== 'production') console.error('[Ably publish error]', event, e);
+        cb && cb(e);
       });
     },
     detach: () => {
@@ -144,11 +121,7 @@ function createChannelWrapper(channel) {
 }
 
 export async function getAblyChannelAsync(name) {
-  // Check cache first
-  if (_channelCache.has(name)) {
-    return _channelCache.get(name);
-  }
-  
+  if (_channelCache.has(name)) return _channelCache.get(name);
   const ably = await ensureAbly();
   if (!ably) return null;
   const channel = ably.channels.get(name);
@@ -158,11 +131,7 @@ export async function getAblyChannelAsync(name) {
 }
 
 export function getAblyChannel(name) {
-  // Check cache first
-  if (_channelCache.has(name)) {
-    return _channelCache.get(name);
-  }
-  
+  if (_channelCache.has(name)) return _channelCache.get(name);
   if (!_ably) return null;
   const channel = _ably.channels.get(name);
   const wrapper = createChannelWrapper(channel);
