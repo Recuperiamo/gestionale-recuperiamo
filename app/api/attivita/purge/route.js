@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth/[...nextauth]/authOptions";
 import { prisma } from "../../../lib/prisma"; // percorso: app/api/attivita/purge/route.js -> su a api -> su a app -> lib/prisma
 
 /**
@@ -8,9 +10,13 @@ import { prisma } from "../../../lib/prisma"; // percorso: app/api/attivita/purg
  * Di default esegue il reset dei pacchetti (oreResidue = oreAcquistate).
  * Se passi ?noReset=1 NON modifica i pacchetti.
  *
- * TODO: proteggere con check ruolo (admin).
+ * Richiede ruolo admin.
  */
 export async function DELETE(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user?.role !== "admin") {
+    return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  }
   try {
     // 0. Verifica che il client prisma funzioni (rigenera se necessario)
     if (!prisma) {

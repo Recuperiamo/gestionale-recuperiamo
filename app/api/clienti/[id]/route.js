@@ -1,9 +1,15 @@
 import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/authOptions';
 
 const prisma = new PrismaClient();
 
 // GET /api/clienti/[id] - dettaglio cliente
 export async function GET(req, ctx) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 401 });
+  }
   try {
     const idStr = ctx?.params?.id || req.url.split('/').pop();
     const id = Number(idStr);

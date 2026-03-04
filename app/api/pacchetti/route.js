@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/authOptions";
 
 const prisma = new PrismaClient();
 
@@ -16,6 +18,10 @@ async function getNextProgressivo(clienteId, dataAttivazione) {
 }
 
 export async function GET(request) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   const { searchParams } = new URL(request.url);
 
   if (request.nextUrl.pathname.endsWith("/progressivo")) {
@@ -41,7 +47,6 @@ export async function GET(request) {
         attivita: true,
       },
     });
-    console.log("GET /api/pacchetti, pacchetti:", pacchetti); // DEBUG
     return Response.json(pacchetti);
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400 });
@@ -49,9 +54,12 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   try {
     const body = await request.json();
-    console.log("BACKEND RICEVE BODY:", body); // DEBUG
 
     // Normalizza clienteId (accetta anche stringa numerica)
     let clienteId = body.clienteId;
@@ -102,7 +110,6 @@ export async function POST(request) {
         sogliaOreResidue: body.sogliaOreResidue !== undefined ? body.sogliaOreResidue : null,
       },
     });
-    console.log("PACCHETTO CREATO:", pacchetto); // DEBUG
     return Response.json(pacchetto, { status: 201 });
   } catch (error) {
     console.error("ERRORE POST /api/pacchetti:", error);
@@ -111,6 +118,10 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { id, ...updateData } = body;
@@ -128,6 +139,10 @@ export async function PUT(request) {
 }
 
 export async function DELETE(request) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   try {
     const { id } = await request.json();
     if (!id) {

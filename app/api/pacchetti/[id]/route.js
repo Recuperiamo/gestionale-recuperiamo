@@ -1,8 +1,14 @@
 // @ts-nocheck
 import { prisma } from "../../../../lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth/[...nextauth]/authOptions";
 
 // PATCH pacchetto
 export async function PATCH(request, context) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   const { id } = await context.params;
   let data;
   try {
@@ -26,25 +32,25 @@ export async function PATCH(request, context) {
 
 // DELETE pacchetto + dipendenze
 export async function DELETE(request, context) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   const { id } = await context.params;
-  console.log("[PACCHETTI][DELETE] Inizio cancellazione pacchetto id:", id);
   if (!id) return Response.json({ error: "Parametro id mancante" }, { status: 400 });
 
   try {
     const resAlertLetto = await prisma.pacchettoAlertLetto.deleteMany({
       where: { pacchettoId: Number(id) }
     });
-    console.log(`[PACCHETTI][DELETE] AlertLetto eliminati: ${resAlertLetto.count}`);
 
     const resChangeLog = await prisma.pacchetto_ChangeLog.deleteMany({
       where: { pacchettoId: Number(id) }
     });
-    console.log(`[PACCHETTI][DELETE] ChangeLog eliminati: ${resChangeLog.count}`);
 
     const resPacchetto = await prisma.pacchettoOre.delete({
       where: { id: Number(id) }
     });
-    console.log(`[PACCHETTI][DELETE] PacchettoOre eliminato id: ${resPacchetto.id}`);
 
     return Response.json({ result: "Pacchetto eliminato", id });
   } catch (error) {

@@ -1,30 +1,25 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/authOptions';
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
+
   // Vercel: usa ABLY_API_KEY server-side (senza NEXT_PUBLIC_)
   // Fallback a NEXT_PUBLIC_ per compatibilità locale
   const apiKey = process.env.ABLY_API_KEY || process.env.NEXT_PUBLIC_ABLY_API_KEY;
-  
-  console.log('[Ably Auth API] Environment check:', {
-    hasKey: !!apiKey,
-    keyPreview: apiKey ? `${apiKey.slice(0, 10)}...` : 'none',
-    allEnvKeys: Object.keys(process.env).filter(k => k.includes('ABLY'))
-  });
-  
+
   if (!apiKey) {
-    console.error('[Ably Auth API] API key not found in environment');
     return NextResponse.json(
-      { 
-        error: 'Ably API key not configured',
-        hint: 'Set ABLY_API_KEY in Vercel environment variables'
-      },
+      { error: 'Ably API key not configured' },
       { status: 500 }
     );
   }
-  
-  // Return the key to authenticated users
-  // TODO: Add session check here for security
-  return NextResponse.json({ 
+
+  return NextResponse.json({
     apiKey,
     timestamp: Date.now()
   });

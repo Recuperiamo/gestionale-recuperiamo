@@ -172,6 +172,10 @@ export async function GET(req) {
 
 // PATCH: CREA LAVAGNA (POST)
 export async function POST(req) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({ error: "Non autorizzato" }, { status: 401 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     let { attivitaId, clienteId, titolo } = body;
@@ -237,6 +241,10 @@ export async function POST(req) {
 
 // PATCH: DELETE SINGOLA LAVAGNA
 export async function DELETE(req) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({ error: "Non autorizzato" }, { status: 401 });
+  }
   const url = new URL(req.url, "http://localhost");
   const id = Number(url.searchParams.get("id"));
   if (!id) return new Response("ID mancante", { status: 400 });

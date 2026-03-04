@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/authOptions';
 import { MATERIE_AULA } from '../../../lib/materie';
 
 const prisma = new PrismaClient();
@@ -43,13 +45,12 @@ function isValidPIVA(piva) {
 }
 
 export async function POST(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 401 });
+  }
   try {
     const body = await req.json();
-    // PATCH: log diagnostico avanzato
-    console.log('BODY RICEVUTO', body);
-    console.log('EMAIL RICEVUTA DAL CLIENT:', JSON.stringify(body.email));
-    console.log('EMAIL DOPO TRIM:', JSON.stringify(body.email?.trim()));
-    console.log('EMAIL DOPO TRIM/LOWER:', JSON.stringify(body.email?.trim().toLowerCase()));
 
     const tipo = normalizeClientType(body.tipo);
     let referenteId = body.referenteId ? Number(body.referenteId) : null;
@@ -171,6 +172,10 @@ export async function POST(req) {
 // --- CRUD AGGIUNTIVO ---
 
 export async function GET(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 401 });
+  }
   try {
     const url = new URL(req.url);
     const tipoParam = url.searchParams.get('tipo');
@@ -218,6 +223,10 @@ export async function GET(req) {
 }
 
 export async function DELETE(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 401 });
+  }
   try {
     const { id } = await req.json();
     if (!id) {
@@ -234,6 +243,10 @@ export async function DELETE(req) {
 }
 
 export async function PUT(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 401 });
+  }
   try {
     const body = await req.json();
     const id = body.id;

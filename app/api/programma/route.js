@@ -5,6 +5,10 @@ import { prisma } from '../../../lib/prisma';
 
 // Basic CRUD for Programma
 export async function GET(req) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -35,7 +39,6 @@ export async function POST(req) {
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
     const body = await req.json();
-    console.log('[programma] POST body', JSON.stringify(body));
     const { clienteId, materia, titolo, descrizione, data, isVerifica } = body;
     if (!clienteId || !titolo) return NextResponse.json({ error: 'Parametri mancanti' }, { status: 400 });
 

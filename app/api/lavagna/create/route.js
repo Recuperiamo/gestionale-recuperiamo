@@ -1,6 +1,12 @@
 import { prisma } from "../../../lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth/[...nextauth]/authOptions";
 
 export async function POST(req) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({ error: "Non autorizzato" }, { status: 401 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     let { attivitaId, titolo, clienteId } = body;
