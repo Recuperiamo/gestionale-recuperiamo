@@ -1,10 +1,11 @@
 // @ts-nocheck
+import type { AuthOptions } from 'next-auth';
 import { prisma } from '../../../lib/prisma';
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { checkRateLimit, resetRateLimit } from '../../../lib/loginRateLimiter';
 
-export const authOptions = {
+export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credenziali",
