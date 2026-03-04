@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../../../auth/[...nextauth]/authOptions";
+import { authOptions } from "../../../auth/[...nextauth]/authOptions";
 import { prisma } from "../../../../../lib/prisma"; // 5 livelli su fino alla root
 
 // GET /api/clienti/[id]/attivita
