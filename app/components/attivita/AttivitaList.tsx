@@ -1,0 +1,100 @@
+// @ts-nocheck
+import React from 'react';
+
+function formatDateTime(dateString) {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+export default function AttivitaList({
+  attivita,
+  onDettaglio,
+  multiSelect = false,
+  selectedIds = new Set(),
+  onToggleRow = () => {},
+  onToggleAll = () => {}
+}) {
+  const allSelected = multiSelect && attivita.length > 0 && attivita.every(a => selectedIds.has(a.id));
+  return (
+    <section>
+      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, background: "#f8fafd", borderRadius: 8, boxShadow: "0 1px 4px #1976d220", fontSize: "1rem", marginTop: 8 }}>
+        <thead>
+          <tr>
+            {multiSelect && (
+              <th style={{ width: 36, textAlign: 'center', padding: '12px 10px' }}>
+                <input type="checkbox" checked={allSelected} onChange={(e) => onToggleAll(e.target.checked)} />
+              </th>
+            )}
+            <th style={{ textAlign: "left", padding: "12px 14px", fontWeight: 700, fontSize: "1.08rem", color: "#252525" }}>Descrizione</th>
+            <th style={{ textAlign: "right", padding: "12px 10px", fontWeight: 700 }}>Ore</th>
+            <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Pacchetto</th>
+            <th style={{ textAlign: "left", padding: "12px 10px", fontWeight: 700 }}>Cliente</th>
+            <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Orario</th>
+            <th style={{ textAlign: "center", padding: "12px 10px", fontWeight: 700 }}>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {attivita.length === 0 ? (
+            <tr>
+              <td colSpan={multiSelect ? 7 : 6} style={{ textAlign: "center", color: "#888", padding: 24 }}>
+                Nessuna attività trovata
+              </td>
+            </tr>
+          ) : attivita.map(a => (
+            <tr key={a.id}
+              style={{
+                background: "#fff",
+                borderTop: "1px solid #e3eafc",
+                transition: "background 0.2s"
+              }}
+              onMouseOver={e => e.currentTarget.style.background = "#f2faff"}
+              onMouseOut={e => e.currentTarget.style.background = "#fff"}
+            >
+              {multiSelect && (
+                <td style={{ padding: '10px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(a.id)}
+                    onChange={(e) => onToggleRow(a.id, e.target.checked)}
+                  />
+                </td>
+              )}
+              <td style={{ padding: "10px 14px" }}>{a.descrizione}</td>
+              <td style={{ padding: "10px", textAlign: "right" }}>{a.oreConsumate}</td>
+              <td style={{ padding: "10px" }}>{a.pacchetto?.descrizione || ""}</td>
+              <td style={{ padding: "10px" }}>{a.pacchetto?.cliente?.nomeReferente || a.pacchetto?.cliente?.ragione_sociale || a.pacchetto?.cliente?.nome || a.pacchetto?.cliente?.email || ""}</td>
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {formatDateTime(a.orario || a.createdAt)}
+              </td>
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                <button
+                  style={{
+                    fontSize: "0.98rem",
+                    padding: "4px 10px",
+                    border: "none",
+                    borderRadius: 3,
+                    marginRight: 5,
+                    background: "#e3eafc",
+                    color: "#1976d2",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "background 0.2s"
+                  }}
+                  onClick={() => onDettaglio(a)}
+                >Dettaglio</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
