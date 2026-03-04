@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import Navbar from "../components/Navbar";
 import StoricoAttivitaTable from "../components/attivita/StoricoAttivitaTable";
 import ChangelogTable from "../components/ChangelogTable";
-import StoricoRichiesteModificaTable from "../components/modifiche/StoricoRichiesteModificaTable.jsx";
+import StoricoRichiesteModificaTable from "../components/modifiche/StoricoRichiesteModificaTable";
 import { useSession } from "next-auth/react";
 
 const TABS = [
