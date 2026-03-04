@@ -2426,7 +2426,8 @@ export default function LavagnaCanvas({
 
         return res.json();
       })
-      .then(data =>
+      .catch(err => console.error('[LAVAGNA-DELETE] Error:', err));
+  }, [emitOrPublish, lavagnaId, forme, utenteId, isAdmin]);
 
   const computeClipboardBounds = useCallback((cb) => {
     if (!cb) return null;
