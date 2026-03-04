@@ -4,7 +4,7 @@ let _connectPromise = null;
 const _channelCache = new Map(); // Cache for channel wrappers
 
 async function getAblyApiKey() {
-  console.log('[Ably Debug] Checking for API key...');
+
   
   // Try localStorage first (for admin/testing)
   if (typeof window !== 'undefined') {
@@ -19,7 +19,7 @@ async function getAblyApiKey() {
           // It's already a string, use it
         }
         if (typeof key === 'string' && key.trim()) {
-          console.log('[Ably Debug] Found in localStorage');
+
           return key.trim();
         }
       }
@@ -30,7 +30,7 @@ async function getAblyApiKey() {
   
   // Fetch from server-side endpoint
   try {
-    console.log('[Ably Debug] Fetching API key from /api/ably-auth...');
+
     const response = await fetch('/api/ably-auth');
     if (!response.ok) {
       const errorText = await response.text();
@@ -38,7 +38,7 @@ async function getAblyApiKey() {
     }
     const data = await response.json();
     if (data.apiKey && typeof data.apiKey === 'string') {
-      console.log('[Ably Debug] API key received from server');
+
       return data.apiKey.trim();
     }
   } catch (error) {
@@ -50,37 +50,37 @@ async function getAblyApiKey() {
 }
 
 async function ensureAbly() {
-  console.log('[Ably] ensureAbly called');
+
   if (typeof window === 'undefined') {
-    console.log('[Ably] Not in browser, returning null');
+
     return null;
   }
   if (_ably) {
-    console.log('[Ably] Returning existing instance');
+
     return _ably;
   }
   if (_connectPromise) {
-    console.log('[Ably] Returning existing promise');
+
     return _connectPromise;
   }
 
-  console.log('[Ably] Creating new connection promise');
+
   _connectPromise = (async () => {
     try {
-      console.log('[Ably] Importing Ably SDK...');
+
       const Ably = await import('ably');
-      console.log('[Ably] SDK imported successfully, keys:', Object.keys(Ably));
+
       
       const apiKey = await getAblyApiKey();
       if (!apiKey) {
         console.error('[Ably] API key not found!');
         throw new Error('Ably API key not found');
       }
-      console.log(`[Ably] API Key found, connecting... (key starts with: ${apiKey.slice(0, 5)})`);
+
       
       // Try different import patterns
       const RealtimeClient = Ably.Realtime || Ably.default?.Realtime || Ably.default;
-      console.log('[Ably] Using Realtime constructor:', typeof RealtimeClient);
+
       
       const ably = new RealtimeClient({ 
         key: apiKey,
@@ -89,7 +89,7 @@ async function ensureAbly() {
       _ably = ably;
       
       ably.connection.on('connected', () => {
-        console.log('[Ably] Connected');
+
       });
       
       ably.connection.on('failed', (stateChange) => {

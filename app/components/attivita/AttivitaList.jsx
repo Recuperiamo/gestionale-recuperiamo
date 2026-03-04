@@ -21,7 +21,6 @@ export default function AttivitaList({
   onToggleRow = () => {},
   onToggleAll = () => {}
 }) {
-  console.log("AttivitaList riceve:", attivita);
   const allSelected = multiSelect && attivita.length > 0 && attivita.every(a => selectedIds.has(a.id));
   return (
     <section>

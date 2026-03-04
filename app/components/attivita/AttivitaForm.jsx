@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-console.log('[INIT] AttivitaForm');
 
 const giorniSettimana = [
   { value: "Mon", label: "Lunedì" },
@@ -202,7 +201,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           headers: { "Content-Type":"application/json" },
           body: JSON.stringify(payload)
         });
-        console.log('[AttivitaForm] Invio richiesta', { method, payload });
         let result;
         try {
           result = await res.json();
@@ -212,7 +210,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           setLoadingSubmit(false);
           return;
         }
-        console.log('[AttivitaForm] Risposta API:', result);
         if (!res.ok) {
           let msg = result?.error || "Errore salvataggio";
           if (result?.stack) {
@@ -245,7 +242,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           body: JSON.stringify(payload)
         });
         const result = await res.json();
-        console.log('[AttivitaForm] PATCH batch invio:', payload);
         let resultPatch;
         try {
           resultPatch = await res.json();
@@ -255,7 +251,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           setLoadingSubmit(false);
           return;
         }
-        console.log('[AttivitaForm] PATCH batch risposta:', resultPatch);
         if (!res.ok) {
           let msg = resultPatch?.error || "Errore modifica ricorrenza";
           if (resultPatch?.stack) {
@@ -288,20 +283,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           })
         });
         const result = await res.json();
-        console.log('[AttivitaForm] POST ricorrenza invio:', {
-          descrizione,
-          clienteId: Number(clienteId),
-          pacchettoId: Number(pacchettoId),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ricorrenza: {
-            giorni: selectedDays,
-            orarioInizio,
-            durata: Number(durata),
-            dataInizio: dataInizioRic,
-            dataFine: dataFineRic,
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-          }
-        });
         let resultRic;
         try {
           resultRic = await res.json();
@@ -311,7 +292,6 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           setLoadingSubmit(false);
           return;
         }
-        console.log('[AttivitaForm] POST ricorrenza risposta:', resultRic);
         if (!res.ok) {
           let msg = resultRic?.error || "Errore creazione ricorrenza";
           if (resultRic?.stack) {

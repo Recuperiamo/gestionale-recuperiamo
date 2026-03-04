@@ -9,9 +9,6 @@ export function useSession(options) {
 
   useEffect(() => {
     if (status !== lastStatus.current) {
-      console.log(`[useSession] status changed from ${lastStatus.current} to ${status}`, {
-        data: session.data,
-      });
       lastStatus.current = status;
     }
   }, [status, session.data]);

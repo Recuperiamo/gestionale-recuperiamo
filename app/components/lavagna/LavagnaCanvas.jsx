@@ -463,7 +463,7 @@ export default function LavagnaCanvas({
     
     // Debug flash: log numero forme/tratti
     if (forme.length > 0 || tratti.length > 0) {
-      console.log('[DRAW-DEBUG] Drawing:', { formeCount: forme.length, trattiCount: tratti.length, firstFormeId: forme[0]?.id });
+
     }
     
     const canvas = ctx.canvas;
@@ -1378,10 +1378,7 @@ export default function LavagnaCanvas({
 
   // Reset forme/tratti quando cambia lavagnaId (fix ghost lavagne vecchie)
   useEffect(() => {
-    console.log('[LAVAGNA-CHANGE] lavagnaId changed to:', lavagnaId, 'resetting to:', {
-      formeCount: (formeIniziali || []).length,
-      trattiCount: (trattiIniziali || []).length
-    });
+
     
     // Reset forme
     const nuoveForme = (formeIniziali || []).map((s) => ({
@@ -1588,7 +1585,7 @@ export default function LavagnaCanvas({
     });
     // Quando si attiva spectatorMode, richiedi viewport corrente dall'admin
     if (spectatorMode && !isAdmin) {
-      console.log('[LAVAGNA-SPECTATOR] Requesting viewport from admin');
+
       emitOrPublish('viewport:request', {
         lavagnaId,
         attivitaId,
@@ -1660,7 +1657,7 @@ export default function LavagnaCanvas({
 
   // Setup Ably helpers and subscriptions
   const applyViewport = useCallback((view) => {
-    console.log('[SPECTATOR] applyViewport called with:', view);
+
     if (!view) return;
     const { pan: remotePan, zoom: remoteZoom, visibleRect } = view;
     
@@ -1705,18 +1702,18 @@ export default function LavagnaCanvas({
             height: contentH * (1 + 2 * margin)
           };
           
-          console.log('[SPECTATOR] Using CONTENT bbox instead of visibleRect:', contentRect);
+
           
           const rect = canvas.getBoundingClientRect();
           let localW = rect.width;
           let localH = rect.height;
           
-          console.log('[SPECTATOR-MOBILE] Original dimensions:', { localW, localH, canvasRotation });
+
           
           // Se mobile ruotato 90°, swap dimensions per calcolo fit corretto
           if (canvasRotation === 90 || canvasRotation === 270) {
             [localW, localH] = [localH, localW];
-            console.log('[SPECTATOR-MOBILE] Swapped dimensions:', { localW, localH });
+
           }
           
           if (localW > 0 && localH > 0 && contentRect.width > 0 && contentRect.height > 0) {
@@ -1728,10 +1725,7 @@ export default function LavagnaCanvas({
             const safetyFactor = 0.95; // margine 5% per evitare clipping
             const clampedZoom = Math.max(0.1, Math.min(5, targetZoom * safetyFactor));
 
-            console.log('[SPECTATOR] Content fit calc:', {
-              localW, localH, contentRect,
-              fitScaleX, fitScaleY, targetZoom, clampedZoom
-            });
+
             
             // Centra il contenuto
             const centerX = contentRect.x + contentRect.width / 2;
@@ -1745,7 +1739,7 @@ export default function LavagnaCanvas({
               y: centerY - (canvasH / 2) / clampedZoom
             };
             
-            console.log('[SPECTATOR] New pan (content-based):', newPan, 'canvas dims:', { canvasW, canvasH });
+
             
             setPan((prev) => {
               if (prev.x === newPan.x && prev.y === newPan.y) return prev;
@@ -1761,7 +1755,7 @@ export default function LavagnaCanvas({
     }
     
     // Fallback: if no visibleRect, apply admin pan/zoom directly (old behavior)
-    console.log('[SPECTATOR] Using fallback mode (no visibleRect or invalid)');
+
     if (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number') {
       setPan((prev) => {
         if (prev.x === remotePan.x && prev.y === remotePan.y) return prev;
@@ -2009,11 +2003,11 @@ export default function LavagnaCanvas({
           const { data } = msg || {};
           if (!data) return;
           
-          console.log('[PASTE-DEBUG] Received shape:create', { id: data.id, kind: data.kind, hasData: !!data });
+
           
           const normalized = normalizeShape(data);
           if (!normalized) {
-            console.log('[PASTE-DEBUG] normalizeShape returned null/undefined');
+
             return;
           }
           
@@ -2027,10 +2021,10 @@ export default function LavagnaCanvas({
           
           setForme((prev) => {
             if (prev.find((f) => f.id === normalized.id)) {
-              console.log('[PASTE-DEBUG] Duplicate shape detected, ignoring:', normalized.id);
+
               return prev;
             }
-            console.log('[PASTE-DEBUG] Adding shape to forme array:', normalized.id);
+
             return [...prev, normalized];
           });
           
@@ -2079,7 +2073,7 @@ export default function LavagnaCanvas({
         const onShapeDelete = (msg) => {
           const { data } = msg || {};
           if (!data || !data.id) return;
-          console.log('[LAVAGNA-REMOTE-DELETE] Received shape:delete event:', data);
+
           // Only remove from local state; persistence is handled by the originating client
           setForme((prev) => prev.filter((f) => f.id !== data.id));
           drawAll();
@@ -2106,19 +2100,15 @@ export default function LavagnaCanvas({
         
         const onViewportUpdate = (msg) => {
           const { data } = msg || {};
-          console.log('[SPECTATOR] Received viewport:update', data);
+
           if (!data) return;
           if (data.senderId && data.senderId === utenteIdRef.current) return;
           
           // CRITICAL FIX: Se lavagnaId cambia, significa che admin ha aperto ALTRA lavagna
           // Spectator deve fare page reload per caricare la nuova lavagna
           if (data.lavagnaId && data.lavagnaId !== lavagnaIdRef.current) {
-            console.log('[SPECTATOR] Admin switched to different lavagna!', {
-              current: lavagnaIdRef.current,
-              new: data.lavagnaId,
-              attivitaId: data.attivitaId
-            });
-            console.log('[SPECTATOR] Reloading page to load new lavagna...');
+
+
             window.location.href = `/lavagna/full?attivitaId=${data.attivitaId}`;
             return;
           }
@@ -2126,7 +2116,7 @@ export default function LavagnaCanvas({
           const remotePan = data.pan;
           const remoteZoom = data.zoom;
           const visibleRect = data.visibleRect;
-          console.log('[SPECTATOR] visibleRect received:', visibleRect);
+
           if (!remotePan && typeof remoteZoom !== 'number') return;
           const snapshot = {
             pan: (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number')
@@ -2138,7 +2128,7 @@ export default function LavagnaCanvas({
             visibleRect: visibleRect || latestAdminViewportRef.current?.visibleRect,
             ts: data.ts || Date.now()
           };
-          console.log('[SPECTATOR] Snapshot created:', snapshot);
+
           latestAdminViewportRef.current = snapshot;
           if (!isAdminRef.current && spectatorModeRef.current) {
             // Buffer viewport update and apply once per animation frame to prevent "jittering"
@@ -2238,7 +2228,7 @@ export default function LavagnaCanvas({
         try {
           if (ch && ch.connection && ch.connection.on) {
             ablyConnListener = (stateChange) => {
-              try { console.log('[ABLY-CONNECTION-STATE]', stateChange.current); } catch(_) {}
+
               if (stateChange.current === 'connected') {
                 // When reconnected, re-subscribe to events
                 try { cleanup(); } catch (_) {}
@@ -2325,7 +2315,7 @@ export default function LavagnaCanvas({
     const normalized = normalizeShape(shape);
     if (!normalized) return;
     setForme((prev) => [...prev, normalized]);
-    try { console.log('[LAVAGNA-DBG-SHAPE] created', JSON.stringify(normalized)); } catch(_){}
+    try { } catch(_){}
     // register undo entry for local user-created shapes
     try {
       if (normalized.autoreUserId && normalized.autoreUserId === utenteId) {
@@ -2339,7 +2329,7 @@ export default function LavagnaCanvas({
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
         payload.srcPreview = normalized.src;
       }
-      console.log('[PASTE-DEBUG] Emitting shape:create', { id: normalized.id, kind: normalized.kind, lavagnaId });
+
       emitOrPublish('shape:create', payload);
     }
     // try persist async (best-effort)
@@ -2369,26 +2359,25 @@ export default function LavagnaCanvas({
       emitOrPublish('shape:update', payload);
     }
     const dbId = shape.dbId || shape.id;
-    console.log('[LAVAGNA-UPDATE] Updating shape:', { localId: shape.id, dbId, normalized });
+
     fetch(`/api/lavagna/shape/${dbId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...normalized, dbId })
     })
       .then(res => {
-        console.log('[LAVAGNA-UPDATE] Response status:', res.status);
+
         return res.json();
       })
-      .then(data => console.log('[LAVAGNA-UPDATE] Response data:', data))
       .catch(err => console.error('[LAVAGNA-UPDATE] Error:', err));
   }, [emitOrPublish, lavagnaId]);
 
   const deleteShapeLocal = useCallback((id, emit = true, force = false) => {
-    console.log('[LAVAGNA-DELETE] deleteShapeLocal called:', { id, emit, force, formeLengthBefore: forme.length });
+
     
     // Find the shape BEFORE removing it from state
     const target = forme.find((f) => f.id === id);
-    console.log('[LAVAGNA-DELETE] Found target shape:', { id, found: !!target, kind: target?.kind });
+
     
     if (!target) {
       console.warn('[LAVAGNA-DELETE] Shape not found:', { id });
@@ -2396,7 +2385,7 @@ export default function LavagnaCanvas({
     }
     
     if (!force && !isAdmin && target.autoreUserId && target.autoreUserId !== utenteId) {
-      console.log('[LAVAGNA-DELETE] Permission denied:', { isAdmin, targetAuthor: target.autoreUserId, utenteId });
+
       return;
     }
     
@@ -2421,28 +2410,23 @@ export default function LavagnaCanvas({
     } catch (_) {}
     
     const dbId = target.dbId || id;
-    console.log('[LAVAGNA-DELETE] Removing shape:', { localId: id, dbId, kind: target.kind, dbIdType: typeof dbId });
+
     
     // If dbId is not numeric, queue for deletion when persist completes
     if (typeof dbId !== 'number' && isNaN(Number(dbId))) {
-      console.log('[LAVAGNA-DELETE] dbId not yet assigned, queuing deletion:', { localId: id, kind: target.kind });
+
       pendingDeletions.current.set(id, true);
       return;
     }
     
     // Send DELETE to server
-    console.log('[LAVAGNA-DELETE] Sending DELETE to server:', { localId: id, dbId, kind: target.kind });
+
     fetch(`/api/lavagna/shape/${dbId}`, { method: 'DELETE' })
       .then(res => {
-        console.log('[LAVAGNA-DELETE] DELETE response:', { status: res.status, dbId, kind: target.kind });
+
         return res.json();
       })
-      .then(data => console.log('[LAVAGNA-DELETE] DELETE success:', { data, dbId, kind: target.kind }))
-      .catch(err => console.error('[LAVAGNA-DELETE] DELETE error:', { err, dbId, kind: target.kind }));
-  }, [emitOrPublish, lavagnaId, isAdmin, utenteId, forme]);
-
-  // Clipboard for cut/copy/paste
-  const clipboardRef = useRef({ tratti: [], forme: [] });
+      .then(data =>
 
   const computeClipboardBounds = useCallback((cb) => {
     if (!cb) return null;
@@ -2684,9 +2668,9 @@ export default function LavagnaCanvas({
         e.preventDefault();
       }
       if (e.key === 'Delete') { // delete selection
-        console.log('[LAVAGNA-DELETE-KEY] Delete pressed, selectedItems:', selectedItems);
+
         selectedItems.forme.forEach(id => {
-          console.log('[LAVAGNA-DELETE-KEY] Calling deleteShapeLocal for id:', id);
+
           deleteShapeLocal(id, true);
         });
         setTratti(prev => prev.filter((_, idx) => !selectedItems.tratti.includes(idx)));
@@ -2713,7 +2697,7 @@ export default function LavagnaCanvas({
                 try {
                   // Create a compressed data URL for storage and realtime sync
                   const srcData = await createPreviewDataURL(file, { maxDim: 1200, quality: 0.8 });
-                  console.log('[LAVAGNA-PASTE] Image pasted, data URL length:', srcData?.length);
+
                   
                   const id = `img-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
                   const baseWidth = 400 / (zoom || 1);
@@ -3607,10 +3591,10 @@ export default function LavagnaCanvas({
         }
       }
       if (!toDelete.length) return false;
-      console.log('[LAVAGNA-ERASE] Erasing shapes:', toDelete);
+
       toDelete.forEach((id) => {
         eraseSessionRef.current.shapeIds.add(id);
-        console.log('[LAVAGNA-ERASE] Calling deleteShapeLocal for id:', id);
+
         deleteShapeLocal(id, true);
       });
       drawAll();
@@ -3764,7 +3748,7 @@ export default function LavagnaCanvas({
             draggingSelectionRef.current.primaryShapeId = hitShape.id;
             draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify({ forme: [hitShape.id], tratti: [] }));
             try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select)', hitShape.id); } catch(_){}
+            try { } catch(_){}
             return;
           } else if (hitStrokeIdx >= 0 && !(selectedItems && selectedItems.tratti && selectedItems.tratti.includes(hitStrokeIdx))) {
             // select the hit stroke
@@ -3778,7 +3762,7 @@ export default function LavagnaCanvas({
             draggingSelectionRef.current.primaryShapeId = null;
             draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify({ forme: [], tratti: [hitStrokeIdx] }));
             try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-            try { console.log('[LAVAGNA-DBG-DRAG] start (auto-select stroke)', hitStrokeIdx); } catch(_){}
+            try { } catch(_){}
             return;
           }
         } catch (_) {}
@@ -3804,7 +3788,7 @@ export default function LavagnaCanvas({
                 draggingSelectionRef.current.primaryShapeId = selectedItems.forme?.[0] || null;
                 draggingSelectionRef.current.selectionSnapshot = JSON.parse(JSON.stringify(selectedItems));
                 try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-                try { console.log('[LAVAGNA-DBG-DRAG] start (bbox)', selectedItems); } catch(_){}
+                try { } catch(_){}
                 selectionClickRef.current = {
                   pointerId,
                   pointerTool: 'selezione',
@@ -3898,7 +3882,7 @@ export default function LavagnaCanvas({
             resizingSelectionRef.current.originalShapes = originalShapes;
             resizingSelectionRef.current.startPoint = { x: p.x, y: p.y };
             try { canvas?.setPointerCapture?.(pointerId); } catch(_) {}
-            try { console.log('[LAVAGNA-DBG-RESIZE] start', hitHandle); } catch(_) {}
+
             return;
           }
         }
@@ -4006,7 +3990,7 @@ export default function LavagnaCanvas({
         canvas?.setPointerCapture?.(pointerId);
       } catch (_) {}
       panningRef.current.active = true;
-  try { console.log('[LAVAGNA-STATE] panningRef.active = true (mano)'); } catch(_){}
+  try { } catch(_){}
       panningRef.current.lastX = native.clientX;
       panningRef.current.lastY = native.clientY;
       panningRef.current.viaContext = false;
@@ -4076,7 +4060,7 @@ export default function LavagnaCanvas({
         ov.style.borderRadius = '50%';
         // Eraser visual: translucent fill with dashed border
         ov.style.background = 'rgba(255,255,255,0.06)';
-        try { console.log('[LAVAGNA-STATE] erasingRef = true (gomma intero-tratto)'); } catch(_){ }
+        try { } catch(_){ }
         ov.style.opacity = '1';
         ov.style.boxShadow = 'none';
         const borderPx = Math.max(2, Math.round(overlaySize * 0.08));
@@ -4738,7 +4722,7 @@ export default function LavagnaCanvas({
       resizingSelectionRef.current.originalShapes = null;
       resizingSelectionRef.current.startPoint = null;
       try { canvasRef.current?.releasePointerCapture?.(pointerId); } catch(_) {}
-      try { console.log('[LAVAGNA-DBG-RESIZE] finished'); } catch(_) {}
+
       drawAll();
       return;
     }
@@ -4748,7 +4732,7 @@ export default function LavagnaCanvas({
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}
       panningRef.current.active = false;
-      try { console.log('[LAVAGNA-STATE] panningRef.active = false'); } catch(_){}
+
       panningRef.current.viaContext = false;
       setIsPanning(false);
       setContextPanning(false);
@@ -4779,7 +4763,7 @@ export default function LavagnaCanvas({
       try {
         canvasRef.current?.releasePointerCapture?.(pointerId);
       } catch (_) {}
-      try { console.log('[LAVAGNA-STATE] erasing finished -> released capture'); } catch(_){}
+
     }
 
     // If currently drawing a shape, finalize it
@@ -4987,7 +4971,7 @@ export default function LavagnaCanvas({
           contextTempToolRef.current = null;
         }
       } catch (_) {}
-      try { console.log('[LAVAGNA-STATE] pointerCancel: panningRef reset'); } catch(_){}
+
     }
     if (e?.nativeEvent?.pointerType === 'touch') {
       touchesRef.current.delete(e.nativeEvent.pointerId);
@@ -5046,7 +5030,7 @@ export default function LavagnaCanvas({
       if (pendingSave) {
         // If there's a pending POST, wait for it to complete before allowing another save
         if (!t.dbId) {
-          console.log('[LAVAGNA] Waiting for pending POST to complete before saving stroke', t.id);
+
           await pendingSave;
           // After POST completes, get updated stroke with dbId from state
           const updatedStroke = tratti.find(s => s.id === t.id);

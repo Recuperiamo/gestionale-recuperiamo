@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '../[...nextauth]/authOptions';
 import { prisma } from '../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
@@ -17,8 +18,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password richieste' }, { status: 400 });
     }
 
-    if (newPassword.length < 8) {
-      return NextResponse.json({ error: 'La nuova password deve essere di almeno 8 caratteri' }, { status: 400 });
+    if (newPassword.length < 10) {
+      return NextResponse.json({ error: 'La nuova password deve essere di almeno 10 caratteri' }, { status: 400 });
     }
 
     // Trova l'utente

@@ -1,5 +1,4 @@
 "use client";
-console.log('[INIT] CalendarioAttivita');
 
 import React, {
   useCallback,
@@ -332,8 +331,6 @@ export default function CalendarioAttivita({
   // handle slot click solo per admin/operator
   const handleDateClick = info => {
     if (!isAdmin) return;
-    // DEBUG: verifica che la funzione venga chiamata
-    console.log("DEBUG handleDateClick:", info);
     setCreateInitialData({
       orario: info.date.toISOString(),
       descrizione: "",

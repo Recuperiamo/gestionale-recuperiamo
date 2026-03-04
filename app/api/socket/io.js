@@ -43,7 +43,7 @@ export default function handler(req, res) {
 
       // (Facoltativo) altri eventi: update-lavagna, update-tratto, ecc.
     });
-    console.log("Socket.IO server started!");
+
   }
   res.end();
 }
