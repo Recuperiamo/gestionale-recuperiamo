@@ -88,6 +88,7 @@ export default function LavagnaCanvas({
     []
   );
   const colorInputRef = useRef(null);
+  const selectionColorInputRef = useRef(null);
   const sfondoLabels = useMemo(() => ({
     bianco: "Bianco",
     nero: "Nero",
@@ -2653,6 +2654,96 @@ export default function LavagnaCanvas({
     } catch (_) {}
   }, []);
 
+  // Applica colore a tutti gli elementi selezionati
+  const applyColorToSelection = useCallback((newColor) => {
+    if (!selectedItems) return;
+    const shapeIds = new Set(selectedItems.forme);
+    const selIdxs = new Set(selectedItems.tratti);
+    setForme(prev => prev.map(f => shapeIds.has(f.id) ? { ...f, colore: newColor } : f));
+    setTratti(prev => prev.map((t, idx) => selIdxs.has(idx) ? { ...t, colore: newColor } : t));
+    for (const id of selectedItems.forme) {
+      const f = forme.find(x => x.id === id);
+      if (!f) continue;
+      const dbId = f.dbId || f.id;
+      emitOrPublish('shape:update', { ...f, colore: newColor, lavagnaId, senderId: utenteId });
+      fetch(`/api/lavagna/shape/${dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colore: newColor, dbId }) }).catch(() => {});
+    }
+    for (const idx of selectedItems.tratti) {
+      const t = tratti[idx];
+      if (!t) continue;
+      emitOrPublish('stroke:update', { id: t.id, streamId: t.id, colore: newColor, lavagnaId, senderId: utenteId });
+      if (t.dbId) fetch(`/api/lavagna/tratto/${t.dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colore: newColor }) }).catch(() => {});
+    }
+    setTimeout(drawAll, 0);
+  }, [selectedItems, forme, tratti, emitOrPublish, lavagnaId, utenteId, drawAll]);
+
+  // Applica spessore a tutti gli elementi selezionati
+  const applySpessoreToSelection = useCallback((newSpessore) => {
+    if (!selectedItems) return;
+    const shapeIds = new Set(selectedItems.forme);
+    const selIdxs = new Set(selectedItems.tratti);
+    setForme(prev => prev.map(f => shapeIds.has(f.id) ? { ...f, spessore: newSpessore } : f));
+    setTratti(prev => prev.map((t, idx) => selIdxs.has(idx) ? { ...t, spessore: newSpessore } : t));
+    for (const id of selectedItems.forme) {
+      const f = forme.find(x => x.id === id);
+      if (!f) continue;
+      const dbId = f.dbId || f.id;
+      emitOrPublish('shape:update', { ...f, spessore: newSpessore, lavagnaId, senderId: utenteId });
+      fetch(`/api/lavagna/shape/${dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spessore: newSpessore, dbId }) }).catch(() => {});
+    }
+    for (const idx of selectedItems.tratti) {
+      const t = tratti[idx];
+      if (!t) continue;
+      emitOrPublish('stroke:update', { id: t.id, streamId: t.id, spessore: newSpessore, lavagnaId, senderId: utenteId });
+      if (t.dbId) fetch(`/api/lavagna/tratto/${t.dbId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spessore: newSpessore }) }).catch(() => {});
+    }
+    setTimeout(drawAll, 0);
+  }, [selectedItems, forme, tratti, emitOrPublish, lavagnaId, utenteId, drawAll]);
+
+  // Porta gli elementi selezionati in primo piano (fine array = disegnati per ultimi)
+  const bringSelectionToFront = useCallback(() => {
+    if (!selectedItems) return;
+    if (selectedItems.forme.length > 0) {
+      setForme(prev => {
+        const sel = prev.filter(f => selectedItems.forme.includes(f.id));
+        const rest = prev.filter(f => !selectedItems.forme.includes(f.id));
+        return [...rest, ...sel];
+      });
+    }
+    if (selectedItems.tratti.length > 0) {
+      setTratti(prev => {
+        const selIdxs = new Set(selectedItems.tratti);
+        const sel = prev.filter((_, i) => selIdxs.has(i));
+        const rest = prev.filter((_, i) => !selIdxs.has(i));
+        setSelectedItems(si => ({ ...si, tratti: sel.map((_, i) => rest.length + i) }));
+        return [...rest, ...sel];
+      });
+    }
+    setTimeout(drawAll, 0);
+  }, [selectedItems, drawAll]);
+
+  // Manda gli elementi selezionati in fondo (inizio array = disegnati per primi)
+  const sendSelectionToBack = useCallback(() => {
+    if (!selectedItems) return;
+    if (selectedItems.forme.length > 0) {
+      setForme(prev => {
+        const sel = prev.filter(f => selectedItems.forme.includes(f.id));
+        const rest = prev.filter(f => !selectedItems.forme.includes(f.id));
+        return [...sel, ...rest];
+      });
+    }
+    if (selectedItems.tratti.length > 0) {
+      setTratti(prev => {
+        const selIdxs = new Set(selectedItems.tratti);
+        const sel = prev.filter((_, i) => selIdxs.has(i));
+        const rest = prev.filter((_, i) => !selIdxs.has(i));
+        setSelectedItems(si => ({ ...si, tratti: sel.map((_, i) => i) }));
+        return [...sel, ...rest];
+      });
+    }
+    setTimeout(drawAll, 0);
+  }, [selectedItems, drawAll]);
+
   // Keyboard shortcuts for copy/cut/paste/delete/duplicate
   useEffect(() => {
     function onKey(e) {
@@ -2787,6 +2878,26 @@ export default function LavagnaCanvas({
       window.removeEventListener('paste', onPaste);
     };
   }, [selectedItems, tratti, forme, deleteShapeLocal, pasteClipboard, copySelection, cutSelection]);
+
+  // Keyboard shortcuts per cambio strumento (P, G, S, M, F)
+  useEffect(() => {
+    function onToolShortcut(e) {
+      const tag = document.activeElement?.tagName?.toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (spectatorModeRef.current && !isAdmin) return;
+      switch (e.key.toLowerCase()) {
+        case 's': setStrumento('selezione'); setShowPenPopover(false); setShowShapesPopover(false); e.preventDefault(); break;
+        case 'm': setStrumento('mano'); setShowPenPopover(false); setShowShapesPopover(false); e.preventDefault(); break;
+        case 'p': setStrumento('penna'); setShowShapesPopover(false); e.preventDefault(); break;
+        case 'g': setStrumento('gomma'); setShowPenPopover(false); setShowShapesPopover(false); e.preventDefault(); break;
+        case 'f': setShowShapesPopover(v => !v); setShowPenPopover(false); e.preventDefault(); break;
+        case 'escape': setShowPenPopover(false); setShowShapesPopover(false); setShowMoreMenu(false); setShowExportMenu(false); break;
+      }
+    }
+    window.addEventListener('keydown', onToolShortcut);
+    return () => window.removeEventListener('keydown', onToolShortcut);
+  }, [isAdmin, setStrumento, setShowPenPopover, setShowShapesPopover, setShowMoreMenu, setShowExportMenu]);
 
   // helper: rounded rect
   function roundRect(ctx, x, y, w, h, r, fill, stroke) {
@@ -5655,7 +5766,7 @@ export default function LavagnaCanvas({
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
               }}
-              title="Selezione / Lazo"
+              title="Selezione (S)"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M5 3l6.8 6.4 3-3.4 3.7 11.8-11.8-3.7 3.4-3-6.4-6.8z" stroke={strumento==='selezione' ? '#fff' : '#20489a'} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" fill={strumento==='selezione' ? '#fff' : 'none'} />
@@ -5672,7 +5783,7 @@ export default function LavagnaCanvas({
                   setShowShapesPopover(false);
                   setShowExportMenu(false);
                 }}
-                title="Sposta"
+                title="Sposta (M)"
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                   <path d="M7.5 11V5.75a1.25 1.25 0 1 1 2.5 0V11m0-3.25V4.75a1.25 1.25 0 1 1 2.5 0V11m0-1.25V6.75a1.25 1.25 0 1 1 2.5 0V13m0-2.25V8.75a1.25 1.25 0 1 1 2.5 0V15.5c0 2.485-2.015 4.5-4.5 4.5s-4.5-2.015-4.5-4.5V13" stroke={strumento==='mano'? '#fff':'#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
@@ -5701,7 +5812,7 @@ export default function LavagnaCanvas({
                     setShowExportMenu(false);
                   }
                 }}
-                title="Penna"
+                title="Penna (P)"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -5809,7 +5920,7 @@ export default function LavagnaCanvas({
                   setShowMoreMenu(false);
                   setShowExportMenu(false);
                 }}
-                title="Forme"
+                title="Forme (F)"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <rect x="3" y="3" width="8" height="8" rx="1" stroke={shapeButtonActive ? '#fff' : '#20489a'} strokeWidth="1.6" fill="none"/>
@@ -5940,7 +6051,7 @@ export default function LavagnaCanvas({
                 setShowShapesPopover(false);
                 setShowExportMenu(false);
               }}
-              title="Gomma"
+              title="Gomma (G)"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                 <path
@@ -6079,6 +6190,25 @@ export default function LavagnaCanvas({
     return `url(${penCursor.url}) ${hotspot} ${hotspot}, auto`;
   }, [contextPanning, strumento, isPanning, penCursor, eraserCursor]);
 
+  // Dati pannello modifica selezione
+  const hasSelection = selectedItems && (selectedItems.forme.length + selectedItems.tratti.length) > 0;
+  const totalSelected = selectedItems ? selectedItems.forme.length + selectedItems.tratti.length : 0;
+  const selectionSpessore = (() => {
+    if (!hasSelection) return 2;
+    let val = null;
+    for (const id of (selectedItems.forme || [])) {
+      const f = forme.find(x => x.id === id);
+      const v = f ? (f.spessore || 1) : 1;
+      if (val === null) val = v; else if (val !== v) return null;
+    }
+    for (const idx of (selectedItems.tratti || [])) {
+      const t = tratti[idx];
+      const v = t ? (t.spessore || 1) : 1;
+      if (val === null) val = v; else if (val !== v) return null;
+    }
+    return val ?? 2;
+  })();
+
   const spectatorIndicatorVisible = (!isAdmin && spectatorMode) || (isAdmin && spectatorCount > 0);
   const spectatorIndicatorTitle = isAdmin
     ? (spectatorCount > 0 ? `Modalità spettatore attiva (${spectatorCount})` : '')
@@ -6191,6 +6321,99 @@ export default function LavagnaCanvas({
         </div>
       )}
       <div style={st.canvasBox}>
+        {/* Pannello modifica selezione: colore, spessore, z-order */}
+        {!isMobile && strumento === 'selezione' && hasSelection && (
+          <div style={{
+            position: 'absolute',
+            bottom: 90,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 4,
+            background: 'rgba(255,255,255,0.96)',
+            border: '1px solid #dbe6f5',
+            borderRadius: 14,
+            padding: '7px 12px',
+            boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            userSelect: 'none',
+            pointerEvents: 'auto',
+          }}>
+            {/* Contatore selezione */}
+            <span style={{ fontSize: 11, color: '#20489a', fontWeight: 700, marginRight: 2, minWidth: 30 }}>
+              {totalSelected} sel.
+            </span>
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(212,223,246,0.9)', margin: '0 4px' }} />
+            {/* Palette colori */}
+            {penPalette.map(entry => (
+              <button
+                key={entry.value}
+                type="button"
+                title={entry.label}
+                onClick={() => applyColorToSelection(entry.value)}
+                style={{
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: entry.value,
+                  border: '1.5px solid rgba(0,0,0,0.18)',
+                  cursor: 'pointer', flexShrink: 0, padding: 0,
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              title="Colore personalizzato"
+              onClick={() => selectionColorInputRef.current?.click()}
+              style={{
+                width: 18, height: 18, borderRadius: '50%',
+                background: 'conic-gradient(red,orange,yellow,green,cyan,blue,violet,red)',
+                border: '1.5px solid rgba(0,0,0,0.18)',
+                cursor: 'pointer', flexShrink: 0, padding: 0,
+              }}
+            />
+            <input
+              ref={selectionColorInputRef}
+              type="color"
+              onChange={e => applyColorToSelection(e.target.value)}
+              style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+            />
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(212,223,246,0.9)', margin: '0 4px' }} />
+            {/* Spessore */}
+            <span style={{ fontSize: 11, color: '#20489a', fontWeight: 600 }}>Spess.</span>
+            <input
+              type="range" min={1} max={25}
+              value={selectionSpessore ?? 2}
+              onChange={e => applySpessoreToSelection(Number(e.target.value))}
+              style={{ width: 72, accentColor: '#1c7df7' }}
+            />
+            <span style={{ fontSize: 11, color: '#20489a', minWidth: 26 }}>
+              {selectionSpessore !== null ? `${selectionSpessore}px` : '—'}
+            </span>
+            <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(212,223,246,0.9)', margin: '0 4px' }} />
+            {/* Z-order */}
+            <button
+              type="button"
+              title="Porta in primo piano"
+              onClick={bringSelectionToFront}
+              style={{
+                background: 'rgba(248,251,255,0.96)', border: '1px solid #d4dff6',
+                borderRadius: 8, padding: '3px 8px', cursor: 'pointer',
+                fontSize: 13, color: '#20489a', fontWeight: 700, lineHeight: 1,
+              }}
+            >↑</button>
+            <button
+              type="button"
+              title="Manda in fondo"
+              onClick={sendSelectionToBack}
+              style={{
+                background: 'rgba(248,251,255,0.96)', border: '1px solid #d4dff6',
+                borderRadius: 8, padding: '3px 8px', cursor: 'pointer',
+                fontSize: 13, color: '#20489a', fontWeight: 700, lineHeight: 1,
+              }}
+            >↓</button>
+          </div>
+        )}
         {toolbar}
         {/* Nascondi zoom controls se mobile E non admin (spectator o studente) */}
         {!(isMobile && !isAdmin) && (

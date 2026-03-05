@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { getAblyChannel, getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
 export default function LavagneList({ clienteId, onSelect, sessionUser }) {
@@ -11,8 +11,18 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
   const [selectedAttivita, setSelectedAttivita] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [hoveredId, setHoveredId] = useState(null);
 
   const isAdmin = sessionUser && /^(admin|operatore)$/i.test(sessionUser.role || "");
+
+  // Ordina per data discendente e filtra per ricerca
+  const filteredLavagne = useMemo(() => {
+    const sorted = [...lavagne].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    if (!searchQuery.trim()) return sorted;
+    const q = searchQuery.trim().toLowerCase();
+    return sorted.filter(l => (l.titolo || "Lavagna").toLowerCase().includes(q));
+  }, [lavagne, searchQuery]);
 
   useEffect(() => {
     if (!clienteId) return;
@@ -225,39 +235,60 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
 
   return (
     <div>
-      <h3 style={{ marginBottom: 12, display: "flex", alignItems: "center" }}>
-      
-        {isAdmin && lavagne.length > 0 && (
-          <button
-            onClick={handleDeleteAll}
-            style={{
-              marginLeft: 8, background: "#ff6464", color: "#fff", padding: "6px 14px",
-              borderRadius: 8, border: 0, fontWeight: 700, cursor: "pointer"
-            }}>
-            Elimina tutte
-          </button>
-        )}
+      {/* Header con azioni */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#20489a" }}>
+          Lavagne
+          {lavagne.length > 0 && (
+            <span style={{
+              marginLeft: 6, background: "#e3eefe", color: "#20489a",
+              borderRadius: 20, padding: "1px 8px", fontSize: 12, fontWeight: 600
+            }}>{lavagne.length}</span>
+          )}
+        </span>
         {isAdmin && (
-          <button
-            onClick={openCreateLavagna}
-            style={{
-              marginLeft: 8, background: "#1cb0f6", color: "#fff", padding: "6px 14px",
-              borderRadius: 8, border: 0, fontWeight: 700, cursor: "pointer"
-            }}>
-            Crea nuova lavagna
-          </button>
+          <button onClick={openCreateLavagna} style={{
+            background: "#1cb0f6", color: "#fff", padding: "5px 12px",
+            borderRadius: 8, border: 0, fontWeight: 700, cursor: "pointer", fontSize: 13
+          }}>+ Nuova lavagna</button>
         )}
         {!isAdmin && (
-          <button
-            onClick={openCreateLavagna}
-            style={{
-              marginLeft: 8, background: "#10B981", color: "#fff", padding: "6px 14px",
-              borderRadius: 8, border: 0, fontWeight: 700, cursor: "pointer"
-            }}>
-            Richiedi lavagna
-          </button>
+          <button onClick={openCreateLavagna} style={{
+            background: "#10B981", color: "#fff", padding: "5px 12px",
+            borderRadius: 8, border: 0, fontWeight: 700, cursor: "pointer", fontSize: 13
+          }}>Richiedi lavagna</button>
         )}
-      </h3>
+        {isAdmin && lavagne.length > 0 && (
+          <button onClick={handleDeleteAll} style={{
+            background: "#ffecec", color: "#c00", padding: "5px 12px",
+            borderRadius: 8, border: "1px solid #ffbdbd", fontWeight: 600, cursor: "pointer", fontSize: 13
+          }}>Elimina tutte</button>
+        )}
+      </div>
+
+      {/* Barra di ricerca */}
+      {lavagne.length > 3 && (
+        <div style={{ marginBottom: 10, position: "relative" }}>
+          <input
+            type="text"
+            placeholder="Cerca lavagna…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              padding: "7px 12px 7px 32px",
+              borderRadius: 8, border: "1px solid #dbe6f5",
+              fontSize: 13, color: "#20489a", outline: "none",
+              background: "#f8fbff"
+            }}
+          />
+          <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+            width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
+            <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </div>
+      )}
 
       {showCreate && (
         <form onSubmit={handleCreateLavagna} style={{
@@ -337,49 +368,61 @@ export default function LavagneList({ clienteId, onSelect, sessionUser }) {
         </form>
       )}
 
-      {loading && <div style={{ fontSize: 14, marginBottom: 8 }}>Caricamento lavagne…</div>}
+      {loading && <div style={{ fontSize: 14, marginBottom: 8, color: "#9ab0d4" }}>Caricamento lavagne…</div>}
+
       <ul style={{ padding: 0, margin: 0, listStyle: "none" }}>
-        {lavagne.length === 0 && !loading && !isAdmin && (
+        {lavagne.length === 0 && !loading && (
           <li style={{
-            background: "#e3eefe",
-            border: "1px solid #4268b3",
-            color: "#20489a",
-            padding: "12px 16px",
-            borderRadius: 12,
-            fontSize: 13,
-            fontWeight: 600,
-            marginBottom: 8
+            background: "#f0f5ff", border: "1px solid #d4dff6",
+            color: "#20489a", padding: "12px 16px", borderRadius: 10,
+            fontSize: 13, fontWeight: 500, marginBottom: 8
           }}>
-            Nessuna lavagna disponibile.
+            {isAdmin ? "Nessuna lavagna. Creane una nuova." : "Nessuna lavagna disponibile."}
           </li>
         )}
-        {lavagne.map((l) => (
-          <li key={l.id} style={{
-            marginBottom: 8,
-            background: "#f8fbff",
-            borderRadius: 8,
-            border: "1px solid #dbe6f5",
-            padding: "8px 14px",
-            cursor: "pointer",
-            fontWeight: 600,
-            color: "#20489a",
-            display: "flex", alignItems: "center",
-            transition: "background 0.2s"
+        {filteredLavagne.length === 0 && lavagne.length > 0 && (
+          <li style={{
+            background: "#f0f5ff", border: "1px solid #d4dff6",
+            color: "#20489a", padding: "10px 14px", borderRadius: 10,
+            fontSize: 13, fontWeight: 500
           }}>
-            <span onClick={() => handleSelect(l)} tabIndex={0} style={{ flex: 1 }}>
-              <span style={{ fontWeight: 700 }}>{l.titolo || "Lavagna"}</span>
+            Nessun risultato per "<strong>{searchQuery}</strong>".
+          </li>
+        )}
+        {filteredLavagne.map((l) => (
+          <li
+            key={l.id}
+            style={{
+              marginBottom: 6,
+              background: hoveredId === l.id ? "#eef4ff" : "#f8fbff",
+              borderRadius: 10,
+              border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5",
+              padding: "9px 14px",
+              cursor: "pointer",
+              display: "flex", alignItems: "center",
+              transition: "background 0.15s, border-color 0.15s",
+              boxShadow: hoveredId === l.id ? "0 2px 8px rgba(20,53,120,0.09)" : "none",
+            }}
+            onMouseEnter={() => setHoveredId(l.id)}
+            onMouseLeave={() => setHoveredId(null)}
+          >
+            <span onClick={() => handleSelect(l)} tabIndex={0} style={{ flex: 1, outline: "none" }}>
+              <span style={{ fontWeight: 700, color: "#20489a", fontSize: 14 }}>{l.titolo || "Lavagna"}</span>
               {l.createdAt && (
-                <span style={{ fontWeight: 400, fontSize: 12, marginLeft: 8 }}>
-                  ({new Date(l.createdAt).toLocaleString("it-IT")})
+                <span style={{ fontWeight: 400, fontSize: 11, color: "#7a99c8", marginLeft: 8 }}>
+                  {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
               )}
             </span>
             {isAdmin && (
               <button
-                onClick={() => handleDeleteLavagna(l.id)}
+                onClick={e => { e.stopPropagation(); handleDeleteLavagna(l.id); }}
                 style={{
-                  marginLeft: 8, background: "#ffbdbd", color: "#c00", border: 0,
-                  borderRadius: 6, fontWeight: 700, cursor: "pointer", padding: "4px 10px"
+                  marginLeft: 8, background: "transparent", color: "#c00",
+                  border: "1px solid transparent", borderRadius: 6,
+                  fontWeight: 600, cursor: "pointer", padding: "3px 8px", fontSize: 12,
+                  opacity: hoveredId === l.id ? 1 : 0,
+                  transition: "opacity 0.15s",
                 }}>
                 Elimina
               </button>
