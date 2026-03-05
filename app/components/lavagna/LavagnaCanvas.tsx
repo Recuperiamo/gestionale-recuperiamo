@@ -293,7 +293,7 @@ export default function LavagnaCanvas({
       // Emit grouped messages
       Object.keys(grouped).forEach((sid) => {
         try {
-          emitOrPublish('stroke:points', { streamId: sid, points: grouped[sid] });
+          emitOrPublish('stroke:points', { streamId: sid, points: grouped[sid], senderId: utenteIdRef.current });
         } catch (err) {
           console.error('[LAVAGNA-FLUSH-ERROR]', err && err.message ? err.message : err);
         }
@@ -1887,8 +1887,10 @@ export default function LavagnaCanvas({
 
         const onStart = (msg) => {
           const { data } = msg || {};
-          const { streamId, strumento, colore, spessore, start } = data || {};
+          const { streamId, strumento, colore, spessore, start, senderId } = data || {};
           if (!streamId || !start) return;
+          // Ignora echo dei propri messaggi
+          if (senderId && senderId === utenteIdRef.current) return;
           remoteStreams.current.set(streamId, {
             strumento,
             colore,
@@ -1899,8 +1901,10 @@ export default function LavagnaCanvas({
 
         const onPoints = (msg) => {
           const { data } = msg || {};
-          const { streamId, points } = data || {};
+          const { streamId, points, senderId } = data || {};
           if (!streamId || !Array.isArray(points) || points.length === 0) return;
+          // Ignora echo dei propri messaggi
+          if (senderId && senderId === utenteIdRef.current) return;
           const st = remoteStreams.current.get(streamId);
           if (!st) return;
           st.punti.push(...points);
@@ -4042,6 +4046,7 @@ export default function LavagnaCanvas({
       colore: strokeColor,
       spessore,
       start: punto,
+      senderId: utenteId,
     });
     // Bufferizza il primo punto per invio batch
     outgoingBufferRef.current.push({ streamId, point: punto });
@@ -4561,6 +4566,11 @@ export default function LavagnaCanvas({
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = null;
+      }
+      // Notifica gli altri client che il tratto è stato annullato
+      if (currentStreamId.current) {
+        emitOrPublish('stroke:cancel', { streamId: currentStreamId.current, senderId: utenteId });
+        currentStreamId.current = null;
       }
       return;
     }
