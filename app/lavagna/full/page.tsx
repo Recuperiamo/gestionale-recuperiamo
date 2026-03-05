@@ -1,25 +1,97 @@
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import LavagnaCanvas from "../../components/lavagna/LavagnaCanvas";
+
+// Rileva iOS Safari (requestFullscreen non supportato)
+function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  return /iP(ad|hone|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+const TOP_BAR_H_DESKTOP = 54;
+const TOP_BAR_H_MOBILE = 44;
 
 export default function LavagnaFullScreenPage() {
   const { data: session, status } = useSession();
   const [lavagna, setLavagna] = useState(null);
   const [loading, setLoading] = useState(false);
   const [canvasH, setCanvasH] = useState(
-    typeof window !== "undefined" ? window.innerHeight - 90 : 700
+    typeof window !== "undefined"
+      ? (window.visualViewport?.height ?? window.innerHeight) - TOP_BAR_H_DESKTOP
+      : 700
   );
   const [attivitaId, setAttivitaId] = useState("");
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // iOS: pseudo-fullscreen (nascondi topbar)
+  const [iosFull, setIosFull] = useState(false);
+  const topBarH = isMobile ? TOP_BAR_H_MOBILE : TOP_BAR_H_DESKTOP;
+
+  const updateSize = useCallback(() => {
+    const mobile = window.innerWidth <= 768;
+    setIsMobile(mobile);
+    const barH = mobile ? TOP_BAR_H_MOBILE : TOP_BAR_H_DESKTOP;
+    const vvh = window.visualViewport?.height ?? window.innerHeight;
+    setCanvasH(vvh - barH);
+  }, []);
 
   useEffect(() => {
-    function onResize() {
-      setCanvasH(window.innerHeight - 90);
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    window.visualViewport?.addEventListener("resize", updateSize);
+    return () => {
+      window.removeEventListener("resize", updateSize);
+      window.visualViewport?.removeEventListener("resize", updateSize);
+    };
+  }, [updateSize]);
+
+  // Traccia stato fullscreen nativo
+  useEffect(() => {
+    function onFsChange() {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFullscreen(isFs);
+      // Quando si entra in fullscreen, ricalcola altezza
+      setTimeout(updateSize, 100);
     }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, [updateSize]);
+
+  // Previeni bfcache: se la pagina viene ripristinata dalla cache del browser (tasto Indietro/Avanti),
+  // ricarica completamente per evitare flash di vecchi contenuti lavagna
+  useEffect(() => {
+    function onPageShow(e) {
+      if (e.persisted) window.location.reload();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
+
+  function toggleFullscreen() {
+    if (isIOS()) {
+      // iOS Safari: nessuna API fullscreen — usa pseudo-fullscreen (nascondi topbar)
+      setIosFull(v => !v);
+      setTimeout(updateSize, 50);
+      return;
+    }
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document).catch(() => {});
+    } else {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      req?.call(el).catch(() => {});
+    }
+  }
 
   async function load(id) {
     if (!id) return;
@@ -62,34 +134,72 @@ export default function LavagnaFullScreenPage() {
   }
   const displayTitle = isAdmin ? titoloAdmin : titoloBase;
 
+  const pseudoFull = iosFull; // iOS pseudo-fullscreen attivo
+  const canvasHFinal = pseudoFull
+    ? (typeof window !== "undefined" ? (window.visualViewport?.height ?? window.innerHeight) : 700)
+    : canvasH;
+
   return (
-    <div style={root}>
-      <div style={topBar}>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>
-          {lavagna
-            ? `Lavagna lezione ${displayTitle}`
-            : attivitaId
-              ? "Lavagna lezione"
-              : "Lavagna"}
+    <div style={{
+      ...root,
+      ...(pseudoFull && {
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        zIndex: 9999,
+        background: "#fff"
+      })
+    }}>
+      {/* Topbar: nascosta in pseudo-fullscreen iOS */}
+      {!pseudoFull && (
+        <div style={{
+          ...topBar,
+          height: topBarH,
+          padding: isMobile ? "0 10px" : "0 22px",
+          minHeight: topBarH,
+          flexShrink: 0,
+        }}>
+          <div style={{ fontWeight: 800, fontSize: isMobile ? 13 : 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60vw" }}>
+            {lavagna
+              ? `Lavagna ${displayTitle}`
+              : attivitaId
+                ? "Lavagna lezione"
+                : "Lavagna"}
+          </div>
+          <div style={{ display: "flex", gap: isMobile ? 6 : 10, flexShrink: 0 }}>
+            <button
+              style={{ ...btn, padding: isMobile ? "5px 10px" : "8px 16px", fontSize: isMobile ? 12 : 13 }}
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
+            >
+              {isFullscreen ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/><polyline points="15 9 21 3"/><polyline points="9 15 3 21"/></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              )}
+              {!isMobile && <span style={{ marginLeft: 6 }}>{isFullscreen ? "Esci" : "Fullscreen"}</span>}
+            </button>
+            {!isMobile && (
+              <button style={btn} onClick={() => window.close()}>Chiudi</button>
+            )}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            style={btn}
-            onClick={() => {
-              if (document.fullscreenElement) {
-                document.exitFullscreen().catch(() => {});
-              } else {
-                document.documentElement.requestFullscreen().catch(() => {});
-              }
-            }}
-          >
-            Fullscreen
-          </button>
-          <button style={btn} onClick={() => window.close()}>
-            Chiudi
-          </button>
-        </div>
-      </div>
+      )}
+
+      {/* Pulsante uscita iOS pseudo-fullscreen */}
+      {pseudoFull && (
+        <button
+          onClick={() => { setIosFull(false); setTimeout(updateSize, 50); }}
+          style={{
+            position: "fixed", top: 8, right: 8, zIndex: 10001,
+            background: "rgba(20,53,120,0.75)", color: "#fff",
+            border: "none", borderRadius: 8, padding: "6px 10px",
+            fontSize: 12, fontWeight: 700, cursor: "pointer",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          ✕ Esci
+        </button>
+      )}
 
       {loading && (
         <div style={{ padding: "12px 22px", fontSize: 14 }}>
@@ -98,7 +208,7 @@ export default function LavagnaFullScreenPage() {
       )}
 
       {!loading && lavagna && (
-        <div style={{ flex: 1, padding: "0 22px 22px" }}>
+        <div style={{ flex: 1, padding: isMobile || pseudoFull ? 0 : "0 22px 22px", overflow: "hidden" }}>
           <LavagnaCanvas
             lavagnaId={lavagna.id}
             attivitaId={lavagna.attivitaId}
@@ -107,7 +217,7 @@ export default function LavagnaFullScreenPage() {
             formeIniziali={lavagna.forme}
             utenteId={session.user.id}
             ruolo={session.user.role}
-            altezza={canvasH}
+            altezza={canvasHFinal}
             openInNewWindow={false}
           />
         </div>
@@ -128,18 +238,19 @@ const root = {
   flexDirection: "column",
   background: "#f5f8ff",
   fontFamily: "'Inter','Segoe UI',Arial,sans-serif",
-  color: "#20489a"
+  color: "#20489a",
+  overflow: "hidden",
 };
 const topBar = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 20,
-  padding: "16px 22px 14px",
+  gap: 10,
   background: "#ffffff",
   borderBottom: "1px solid #dbe6f5",
   boxShadow: "0 2px 8px rgba(32,72,154,0.10)",
-  fontSize: 14
+  fontSize: 14,
+  boxSizing: "border-box",
 };
 const btn = {
   background: "#e3eefe",
@@ -149,7 +260,11 @@ const btn = {
   fontWeight: 600,
   fontSize: 13,
   borderRadius: 10,
-  cursor: "pointer"
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  flexShrink: 0,
 };
 const fsWrap = {
   minHeight: "100vh",

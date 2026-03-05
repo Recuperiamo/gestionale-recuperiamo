@@ -134,6 +134,14 @@ export default function LavagnaCanvas({
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
+  // Laser pointer
+  const [remoteLasers, setRemoteLasers] = useState(new Map()); // userId -> {x, y, color, ts}
+  const remoteLaserTimersRef = useRef(new Map()); // userId -> timeoutId
+  const laserThrottleRef = useRef(0);
+  const localLaserDomRef = useRef(null); // DOM div for local laser dot
+  // Text tool
+  const [textInput, setTextInput] = useState(null); // {worldX, worldY, screenX, screenY}
+  const textInputRef = useRef(null);
   
   // Refs for callback access to latest values (avoid re-creating subscriptions)
   const utenteIdRef = useRef(utenteId);
@@ -586,6 +594,20 @@ export default function LavagnaCanvas({
             ctx.fillStyle = '#0f4aa3';
             ctx.textBaseline = 'middle';
             ctx.fillText(txt || f.url || 'link', rx + padding, ry + bh / 2);
+          } catch (_) {}
+          ctx.restore();
+          continue;
+        }
+        if (f.kind === 'testo') {
+          try {
+            const txt = String(f.titolo || '');
+            if (txt) {
+              const fontSize = Math.max(10, f.spessore || 24);
+              ctx.font = `${fontSize}px Inter, Arial, sans-serif`;
+              ctx.fillStyle = f.colore || '#111827';
+              ctx.textBaseline = 'top';
+              ctx.fillText(txt, f.x, f.y);
+            }
           } catch (_) {}
           ctx.restore();
           continue;
@@ -1374,9 +1396,32 @@ export default function LavagnaCanvas({
           }
       } catch (_) {}
 
+      // Remote laser pointers (world space)
+      try {
+        if (remoteLasers && remoteLasers.size > 0) {
+          remoteLasers.forEach((laser) => {
+            const { x, y, color } = laser;
+            const r = 7 / safeZoom;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = color || '#ef4444';
+            ctx.globalAlpha = 0.9;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x, y, r * 2.2, 0, Math.PI * 2);
+            ctx.strokeStyle = color || '#ef4444';
+            ctx.lineWidth = 1.5 / safeZoom;
+            ctx.globalAlpha = 0.4;
+            ctx.stroke();
+            ctx.restore();
+          });
+        }
+      } catch (_) {}
+
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
+  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y, remoteLasers]);
 
   // Reset forme/tratti quando cambia lavagnaId (fix ghost lavagne vecchie)
   useEffect(() => {
@@ -1575,8 +1620,7 @@ export default function LavagnaCanvas({
 
   useEffect(() => {
     if (!utenteId) return;
-    // Aspetta che il channel Ably sia pronto prima di pubblicare
-    if (!ablyRef.current.ch) return;
+    // emitOrPublish gestisce la coda se il channel non è ancora pronto
     emitOrPublish('spectator:toggle', {
       lavagnaId,
       attivitaId,
@@ -1587,7 +1631,6 @@ export default function LavagnaCanvas({
     });
     // Quando si attiva spectatorMode, richiedi viewport corrente dall'admin
     if (spectatorMode && !isAdmin) {
-
       emitOrPublish('viewport:request', {
         lavagnaId,
         attivitaId,
@@ -1792,8 +1835,6 @@ export default function LavagnaCanvas({
       backgroundRequestKeyRef.current = key;
     }
     if (backgroundRequestedRef.current) return;
-    // Aspetta che il channel sia pronto
-    if (!ablyRef.current.ch) return;
     backgroundRequestedRef.current = true;
     emitOrPublish('background:request', { lavagnaId, attivitaId });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId]);
@@ -1801,8 +1842,6 @@ export default function LavagnaCanvas({
   useEffect(() => {
     if (!isAdmin) return;
     if (!utenteId) return;
-    // Aspetta che il channel sia pronto
-    if (!ablyRef.current.ch) return;
     emitOrPublish('spectator:request', { lavagnaId, attivitaId, requesterId: utenteId, ts: Date.now() });
   }, [isAdmin, emitOrPublish, lavagnaId, attivitaId, utenteId]);
 
@@ -2004,6 +2043,33 @@ export default function LavagnaCanvas({
         } catch (strokeSubError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe to stroke events:', strokeSubError);
         }
+
+        const onLaserMove = (msg) => {
+          const { data } = msg || {};
+          const { x, y, colore: laserColor, userId } = data || {};
+          if (!userId || userId === utenteIdRef.current) return;
+          setRemoteLasers(prev => {
+            const next = new Map(prev);
+            next.set(userId, { x, y, color: laserColor || '#ef4444', ts: Date.now() });
+            return next;
+          });
+          // Auto-remove after 3s of inactivity
+          const existing = remoteLaserTimersRef.current.get(userId);
+          if (existing) clearTimeout(existing);
+          const timer = setTimeout(() => {
+            setRemoteLasers(prev => { const next = new Map(prev); next.delete(userId); return next; });
+            remoteLaserTimersRef.current.delete(userId);
+          }, 3000);
+          remoteLaserTimersRef.current.set(userId, timer);
+        };
+        const onLaserEnd = (msg) => {
+          const { data } = msg || {};
+          const { userId } = data || {};
+          if (!userId) return;
+          setRemoteLasers(prev => { const next = new Map(prev); next.delete(userId); return next; });
+          const t = remoteLaserTimersRef.current.get(userId);
+          if (t) { clearTimeout(t); remoteLaserTimersRef.current.delete(userId); }
+        };
 
         const onShapeCreate = (msg) => {
           const { data } = msg || {};
@@ -2216,6 +2282,8 @@ export default function LavagnaCanvas({
         };
 
         try {
+          ch.subscribe('laser:move', onLaserMove);
+          ch.subscribe('laser:end', onLaserEnd);
           ch.subscribe('shape:create', onShapeCreate);
           ch.subscribe('shape:update', onShapeUpdate);
           ch.subscribe('shape:delete', onShapeDelete);
@@ -2246,6 +2314,8 @@ export default function LavagnaCanvas({
                   ch.subscribe('stroke:delete', onDelete);
                   ch.subscribe('stroke:update', onStrokeUpdate);
                   ch.subscribe('clear-lavagna', onClear);
+                  ch.subscribe('laser:move', onLaserMove);
+                  ch.subscribe('laser:end', onLaserEnd);
                   ch.subscribe('shape:create', onShapeCreate);
                   ch.subscribe('shape:update', onShapeUpdate);
                   ch.subscribe('shape:delete', onShapeDelete);
@@ -2278,6 +2348,8 @@ export default function LavagnaCanvas({
             ch.unsubscribe('stroke:delete', onDelete);
             ch.unsubscribe('stroke:update', onStrokeUpdate);
             ch.unsubscribe('clear-lavagna', onClear);
+            ch.unsubscribe('laser:move', onLaserMove);
+            ch.unsubscribe('laser:end', onLaserEnd);
             ch.unsubscribe('shape:create', onShapeCreate);
             ch.unsubscribe('shape:update', onShapeUpdate);
             ch.unsubscribe('shape:delete', onShapeDelete);
@@ -2879,7 +2951,16 @@ export default function LavagnaCanvas({
     };
   }, [selectedItems, tratti, forme, deleteShapeLocal, pasteClipboard, copySelection, cutSelection]);
 
-  // Keyboard shortcuts per cambio strumento (P, G, S, M, F)
+  // Nascondi laser locale e notifica uscita quando si cambia strumento
+  useEffect(() => {
+    if (strumento !== 'laser') {
+      const el = localLaserDomRef.current;
+      if (el) el.style.display = 'none';
+      if (utenteId) emitOrPublish('laser:end', { userId: utenteId });
+    }
+  }, [strumento, emitOrPublish, utenteId]);
+
+  // Keyboard shortcuts per cambio strumento (P, G, S, M, F, L, T)
   useEffect(() => {
     function onToolShortcut(e) {
       const tag = document.activeElement?.tagName?.toUpperCase();
@@ -2892,7 +2973,9 @@ export default function LavagnaCanvas({
         case 'p': setStrumento('penna'); setShowShapesPopover(false); e.preventDefault(); break;
         case 'g': setStrumento('gomma'); setShowPenPopover(false); setShowShapesPopover(false); e.preventDefault(); break;
         case 'f': setShowShapesPopover(v => !v); setShowPenPopover(false); e.preventDefault(); break;
-        case 'escape': setShowPenPopover(false); setShowShapesPopover(false); setShowMoreMenu(false); setShowExportMenu(false); break;
+        case 'l': setStrumento('laser'); setShowPenPopover(false); setShowShapesPopover(false); e.preventDefault(); break;
+        case 't': setStrumento('testo'); setShowPenPopover(false); setShowShapesPopover(false); e.preventDefault(); break;
+        case 'escape': setTextInput(null); setShowPenPopover(false); setShowShapesPopover(false); setShowMoreMenu(false); setShowExportMenu(false); break;
       }
     }
     window.addEventListener('keydown', onToolShortcut);
@@ -3369,6 +3452,10 @@ export default function LavagnaCanvas({
       // keep values in world units; if missing, provide a default visible size
       if (shape.w == null) shape.w = 160;
       if (shape.h == null) shape.h = 28;
+    }
+    if (kind === 'testo') {
+      if (shape.w == null) shape.w = 200;
+      if (shape.h == null) shape.h = Math.max(20, (shape.spessore || 24) + 8);
     }
     if (kind === 'linea' || kind === 'freccia' || kind === 'segmento') {
       const startX = Number(shape.x1 ?? shape.x ?? shape.startX ?? 0);
@@ -4137,6 +4224,23 @@ export default function LavagnaCanvas({
       console.warn('[lavagna] pointerDown: invalid point, aborting');
       return;
     }
+
+    // Testo: mostra input overlay, non avviare tratto
+    if (strumento === 'testo') {
+      setDisegnando(false);
+      const sPos = screenFromWorld(punto);
+      const cx = sPos ? sPos.clientX : e.nativeEvent.clientX;
+      const cy = sPos ? sPos.clientY : e.nativeEvent.clientY;
+      setTextInput({ worldX: punto.x, worldY: punto.y, screenX: cx, screenY: cy });
+      return;
+    }
+    // Laser: emetti posizione, non avviare tratto
+    if (strumento === 'laser') {
+      setDisegnando(false);
+      emitOrPublish('laser:move', { x: punto.x, y: punto.y, colore, userId: utenteId, ts: Date.now() });
+      return;
+    }
+
     if (strumento === 'gomma' && gommaPuntuale) {
       eraseShapesAt(punto.x, punto.y);
     }
@@ -4216,7 +4320,25 @@ export default function LavagnaCanvas({
 
   function pointerMove(e) {
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
-    
+
+    // Laser pointer: aggiorna posizione locale e trasmetti agli altri
+    if (strumento === 'laser' && !spectatorLocked) {
+      const native = e?.nativeEvent;
+      const el = localLaserDomRef.current;
+      if (el && native) {
+        el.style.left = `${native.clientX - 10}px`;
+        el.style.top = `${native.clientY - 10}px`;
+        el.style.display = 'block';
+      }
+      const now = Date.now();
+      if (now - laserThrottleRef.current > 40) {
+        laserThrottleRef.current = now;
+        const pt = getPoint(e);
+        if (pt) emitOrPublish('laser:move', { x: pt.x, y: pt.y, colore, userId: utenteId, ts: now });
+      }
+      return;
+    }
+
     // If panning active (hand) update pan
     if (panningRef.current.active) {
       if (spectatorLocked) {
@@ -6075,6 +6197,57 @@ export default function LavagnaCanvas({
                 />
               </svg>
             </button>
+            <button
+              type="button"
+              style={iconBtn(strumento === 'laser')}
+              onClick={() => {
+                setStrumento('laser');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Puntatore laser"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="3" fill={strumento==='laser' ? '#ef4444' : '#ef4444'} opacity={strumento==='laser' ? '1' : '0.7'}/>
+                <circle cx="12" cy="12" r="8" stroke={strumento==='laser' ? '#ef4444' : '#ef4444'} strokeWidth="1.5" fill="none" opacity={strumento==='laser' ? '1' : '0.6'}/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              style={iconBtn(strumento === 'testo')}
+              onClick={() => {
+                setStrumento('testo');
+                setShowPenPopover(false);
+                setShowMoreMenu(false);
+                setShowShapesPopover(false);
+                setShowExportMenu(false);
+              }}
+              title="Testo"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M6 5h12M8 5v12M16 5v12M6 17h12" stroke={strumento==='testo' ? '#0f1f53' : '#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {!isAdmin && (
+              <button
+                type="button"
+                style={iconBtn(spectatorMode)}
+                onClick={() => {
+                  setSpectatorMode(v => !v);
+                  setShowPenPopover(false);
+                  setShowMoreMenu(false);
+                  setShowShapesPopover(false);
+                  setShowExportMenu(false);
+                }}
+                title={spectatorMode ? "Smetti di seguire il professore" : "Segui il professore"}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill={spectatorMode ? '#20489a' : '#20489a'} opacity={spectatorMode ? '1' : '0.6'}/>
+                </svg>
+              </button>
+            )}
             <div style={{ position:'relative' }}>
               <button
                 type="button"
@@ -6322,24 +6495,28 @@ export default function LavagnaCanvas({
       )}
       <div style={st.canvasBox}>
         {/* Pannello modifica selezione: colore, spessore, z-order */}
-        {!isMobile && strumento === 'selezione' && hasSelection && (
+        {strumento === 'selezione' && hasSelection && (
           <div style={{
             position: 'absolute',
-            bottom: 90,
-            left: '50%',
-            transform: 'translateX(-50%)',
+            bottom: isMobile ? 80 : 90,
+            left: isMobile ? 8 : '50%',
+            right: isMobile ? 8 : 'auto',
+            transform: isMobile ? 'none' : 'translateX(-50%)',
             zIndex: 4,
-            background: 'rgba(255,255,255,0.96)',
+            background: 'rgba(255,255,255,0.97)',
             border: '1px solid #dbe6f5',
             borderRadius: 14,
-            padding: '7px 12px',
+            padding: isMobile ? '5px 8px' : '7px 12px',
             boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
             backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: isMobile ? 4 : 6,
             userSelect: 'none',
             pointerEvents: 'auto',
+            overflowX: isMobile ? 'auto' : 'visible',
+            overflowY: 'hidden',
+            maxWidth: isMobile ? 'calc(100% - 16px)' : 'none',
           }}>
             {/* Contatore selezione */}
             <span style={{ fontSize: 11, color: '#20489a', fontWeight: 700, marginRight: 2, minWidth: 30 }}>
@@ -6354,10 +6531,11 @@ export default function LavagnaCanvas({
                 title={entry.label}
                 onClick={() => applyColorToSelection(entry.value)}
                 style={{
-                  width: 18, height: 18, borderRadius: '50%',
+                  width: isMobile ? 22 : 18, height: isMobile ? 22 : 18, borderRadius: '50%',
                   background: entry.value,
                   border: '1.5px solid rgba(0,0,0,0.18)',
                   cursor: 'pointer', flexShrink: 0, padding: 0,
+                  touchAction: 'manipulation',
                 }}
               />
             ))}
@@ -6366,10 +6544,11 @@ export default function LavagnaCanvas({
               title="Colore personalizzato"
               onClick={() => selectionColorInputRef.current?.click()}
               style={{
-                width: 18, height: 18, borderRadius: '50%',
+                width: isMobile ? 22 : 18, height: isMobile ? 22 : 18, borderRadius: '50%',
                 background: 'conic-gradient(red,orange,yellow,green,cyan,blue,violet,red)',
                 border: '1.5px solid rgba(0,0,0,0.18)',
                 cursor: 'pointer', flexShrink: 0, padding: 0,
+                touchAction: 'manipulation',
               }}
             />
             <input
@@ -6380,15 +6559,15 @@ export default function LavagnaCanvas({
             />
             <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(212,223,246,0.9)', margin: '0 4px' }} />
             {/* Spessore */}
-            <span style={{ fontSize: 11, color: '#20489a', fontWeight: 600 }}>Spess.</span>
+            {!isMobile && <span style={{ fontSize: 11, color: '#20489a', fontWeight: 600 }}>Spess.</span>}
             <input
               type="range" min={1} max={25}
               value={selectionSpessore ?? 2}
               onChange={e => applySpessoreToSelection(Number(e.target.value))}
-              style={{ width: 72, accentColor: '#1c7df7' }}
+              style={{ width: isMobile ? 56 : 72, accentColor: '#1c7df7', flexShrink: 0 }}
             />
-            <span style={{ fontSize: 11, color: '#20489a', minWidth: 26 }}>
-              {selectionSpessore !== null ? `${selectionSpessore}px` : '—'}
+            <span style={{ fontSize: 11, color: '#20489a', minWidth: 24, flexShrink: 0 }}>
+              {selectionSpessore !== null ? `${selectionSpessore}` : '—'}
             </span>
             <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(212,223,246,0.9)', margin: '0 4px' }} />
             {/* Z-order */}
@@ -6540,6 +6719,76 @@ export default function LavagnaCanvas({
           />
         </div>
       </div>
+      
+      {/* Text input modal overlay */}
+      {textInput && (
+        <div style={{
+          position: 'fixed',
+          left: textInput.screenX,
+          top: textInput.screenY,
+          zIndex: 5000,
+          pointerEvents: 'auto'
+        }}>
+          <input
+            type="text"
+            autoFocus
+            defaultValue=""
+            placeholder="Digita testo..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                const text = e.currentTarget.value.trim();
+                if (utenteId) {
+                  emitOrPublish('shape:create', {
+                    kind: 'testo',
+                    x: textInput.worldX,
+                    y: textInput.worldY,
+                    titolo: text,
+                    colore: colore,
+                    spessore: Math.max(12, Math.min(48, 16 * Math.pow(1.2, spessore - 1)))
+                  });
+                }
+                setTextInput(null);
+              } else if (e.key === 'Escape') {
+                setTextInput(null);
+              }
+            }}
+            onBlur={() => setTextInput(null)}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '2px solid #20489a',
+              background: '#ffffff',
+              fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
+              fontSize: '14px',
+              boxShadow: '0 4px 12px rgba(32,72,154,0.25)',
+              minWidth: 200,
+              color: '#000000'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Local laser dot overlay */}
+      {strumento === 'laser' && !spectatorModeRef.current && (
+        <div
+          ref={localLaserDomRef}
+          style={{
+            position: 'fixed',
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            background: '#ef4444',
+            boxShadow: '0 0 8px rgba(239,68,68,0.8)',
+            pointerEvents: 'none',
+            zIndex: 4999,
+            display: 'none', // Shown dynamically via pointerMove
+            opacity: 0.9
+          }}
+        />
+      )}
     </div>
   );
 };
