@@ -134,6 +134,16 @@ export default function LavagnaCanvas({
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
+  // Snapshot per renderLoop veloce: blit + solo tratto corrente invece di drawAll ogni frame
+  const drawingSnapshotRef = useRef(null); // HTMLCanvasElement (bitmap dello stato statico)
+  // Refs per valori usati nel renderLoop senza rientrare nelle deps di drawAll
+  const coloreRef = useRef(colore);
+  const spessoreRef = useRef(spessore);
+  const strumentoRef = useRef(strumento);
+  useEffect(() => { coloreRef.current = colore; }, [colore]);
+  useEffect(() => { spessoreRef.current = spessore; }, [spessore]);
+  useEffect(() => { strumentoRef.current = strumento; }, [strumento]);
+
   // Laser pointer
   const [remoteLasers, setRemoteLasers] = useState(new Map()); // userId -> {x, y, color, ts}
   const remoteLaserTimersRef = useRef(new Map()); // userId -> timeoutId
@@ -1117,8 +1127,8 @@ export default function LavagnaCanvas({
     // Tratto locale in corso (unità mondo)
     const puntiLocali = puntiCorrentiRef.current;
     if (puntiLocali.length >= 2) {
-      ctx.globalCompositeOperation = (strumento === 'gomma' && gommaPuntuale) ? 'destination-out' : 'source-over';
-  ctx.strokeStyle = strumento === 'gomma' ? '#fff' : colore;
+      ctx.globalCompositeOperation = strumento === 'gomma' ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = strumento === 'gomma' ? 'rgba(0,0,0,1)' : colore;
   ctx.lineWidth = spessore;
       ctx.beginPath();
       puntiLocali.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
@@ -1396,32 +1406,9 @@ export default function LavagnaCanvas({
           }
       } catch (_) {}
 
-      // Remote laser pointers (world space)
-      try {
-        if (remoteLasers && remoteLasers.size > 0) {
-          remoteLasers.forEach((laser) => {
-            const { x, y, color } = laser;
-            const r = 7 / safeZoom;
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fillStyle = color || '#ef4444';
-            ctx.globalAlpha = 0.9;
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(x, y, r * 2.2, 0, Math.PI * 2);
-            ctx.strokeStyle = color || '#ef4444';
-            ctx.lineWidth = 1.5 / safeZoom;
-            ctx.globalAlpha = 0.4;
-            ctx.stroke();
-            ctx.restore();
-          });
-        }
-      } catch (_) {}
-
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y, remoteLasers]);
+  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
 
   // Reset forme/tratti quando cambia lavagnaId (fix ghost lavagne vecchie)
   useEffect(() => {
@@ -1451,8 +1438,37 @@ export default function LavagnaCanvas({
   }, [lavagnaId, formeIniziali, trattiIniziali]); // Include props per avere valori aggiornati
 
   // Loop di rendering per il disegno locale
+  // Fast path: blit snapshot + disegna solo il tratto corrente invece di drawAll ogni frame
   const renderLoop = useCallback(() => {
-    drawAll();
+    const ctx = ctxRef.current;
+    const canvas = canvasRef.current;
+    const snap = drawingSnapshotRef.current;
+    if (ctx && canvas && snap) {
+      // Ripristina snapshot e aggiungi solo il tratto corrente
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(snap, 0, 0);
+      const puntiLocali = puntiCorrentiRef.current;
+      if (puntiLocali.length >= 2) {
+        const dpr = window.devicePixelRatio || 1;
+        const safeZoom = Math.max(zoomRef.current, 0.0001);
+        const worldScale = safeZoom * dpr;
+        const p = panRef.current;
+        ctx.save();
+        ctx.setTransform(worldScale, 0, 0, worldScale, -p.x * worldScale, -p.y * worldScale);
+        ctx.globalCompositeOperation = strumentoRef.current === 'gomma' ? 'destination-out' : 'source-over';
+        ctx.strokeStyle = strumentoRef.current === 'gomma' ? 'rgba(0,0,0,1)' : coloreRef.current;
+        ctx.lineWidth = spessoreRef.current;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        puntiLocali.forEach((pt, i) => { if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y); });
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else {
+      drawAll();
+    }
     animationFrameId.current = requestAnimationFrame(renderLoop);
   }, [drawAll]);
 
@@ -3097,7 +3113,8 @@ export default function LavagnaCanvas({
   }
   function hitTestStroke(x, y, stroke) {
     if (!stroke._bb) return false;
-    const threshold = (stroke.spessore || 3) * 1.2 + 6;
+    // Threshold in world units: usa lo spessore del tratto come base, senza padding fisso eccessivo
+    const threshold = Math.max(4, (stroke.spessore || 3) * 0.6 + 3);
     const bbExp = expandBB(stroke._bb, threshold);
     if (!pointInBB(x, y, bbExp)) return false;
     const pts = stroke.punti;
@@ -4248,6 +4265,17 @@ export default function LavagnaCanvas({
       erasingRef.current = true;
     }
     puntiCorrentiRef.current = [punto];
+    // Cattura snapshot dello stato statico prima di avviare il renderLoop
+    try {
+      const snapCanvas = document.createElement('canvas');
+      const mainCanvas = canvasRef.current;
+      if (mainCanvas) {
+        snapCanvas.width = mainCanvas.width;
+        snapCanvas.height = mainCanvas.height;
+        snapCanvas.getContext('2d')?.drawImage(mainCanvas, 0, 0);
+        drawingSnapshotRef.current = snapCanvas;
+      }
+    } catch (_) {}
     animationFrameId.current = requestAnimationFrame(renderLoop);
     const streamId = `${utenteId}-${Date.now()}`;
     currentStreamId.current = streamId;
@@ -5181,6 +5209,7 @@ export default function LavagnaCanvas({
     currentStreamId.current = null;
     eraseSessionRef.current.strokeIds.clear();
     eraseSessionRef.current.shapeIds.clear();
+    drawingSnapshotRef.current = null;
     drawAll(); // Chiamata finale per pulire il tratto locale
   }
 
@@ -5197,6 +5226,7 @@ export default function LavagnaCanvas({
     }
     outgoingBufferRef.current = [];
     puntiCorrentiRef.current = [];
+    drawingSnapshotRef.current = null;
     if (disegnando) setDisegnando(false);
     if (currentStreamId.current) {
       emitOrPublish('stroke:cancel', { streamId: currentStreamId.current, senderId: utenteId });
@@ -6673,6 +6703,31 @@ export default function LavagnaCanvas({
           alignItems: 'center',
           justifyContent: 'center'
         }}>
+          {/* Remote laser dots DOM overlay (no canvas redraws) */}
+          {remoteLasers.size > 0 && Array.from(remoteLasers.entries()).map(([uid, laser]) => {
+            const lx = (laser.x - pan.x) * zoom;
+            const ly = (laser.y - pan.y) * zoom;
+            return (
+              <div
+                key={uid}
+                style={{
+                  position: 'absolute',
+                  left: lx,
+                  top: ly,
+                  width: 14,
+                  height: 14,
+                  marginLeft: -7,
+                  marginTop: -7,
+                  borderRadius: '50%',
+                  background: laser.color || '#ef4444',
+                  boxShadow: `0 0 10px ${laser.color || '#ef4444'}cc`,
+                  pointerEvents: 'none',
+                  zIndex: 100,
+                  opacity: 0.9,
+                }}
+              />
+            );
+          })}
           <canvas
             ref={canvasRef}
             onPointerDown={pointerDown}
