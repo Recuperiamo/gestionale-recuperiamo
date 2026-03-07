@@ -131,6 +131,8 @@ export default function LavagnaCanvas({
   }, [attivitaId, lavagnaId]);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
+  const panDrawRAFRef = useRef(null); // rAF per redraw durante panning (evita React re-render ogni frame)
+  const disegnandoRef = useRef(false); // mirror di disegnando per accesso senza closure stale
   const spectatorRosterRef = useRef(new Set());
   const [spectatorCount, setSpectatorCount] = useState(0);
   const exportMenuRef = useRef(null);
@@ -160,18 +162,31 @@ export default function LavagnaCanvas({
   const lavagnaIdRef = useRef(lavagnaId);
   const attivitaIdRef = useRef(attivitaId);
   
-  // Supporto pointerrawupdate per input ultra-fluido
+  // Mantieni disegnandoRef sincronizzato con lo stato React
+  useEffect(() => {
+    disegnandoRef.current = disegnando;
+  }, [disegnando]);
+
+  // pointerrawupdate: raccoglie solo i punti del tratto corrente (nessuna logica extra)
+  // Usa ref per evitare chiusure stale e non chiamare pointerMove completo (troppo costoso a 200Hz)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const handlePointerRawUpdate = (e) => {
-      if (!disegnando) return;
-      if (panningRef.current && panningRef.current.active) return;
-      try { pointerMove(e); } catch (_) {}
+      if (!disegnandoRef.current) return;
+      if (panningRef.current?.active) return;
+      if (e.pointerType === 'touch') return; // touch gestito dal sistema eventi React
+      try {
+        const pt = getPoint(e);
+        if (!pt) return;
+        puntiCorrentiRef.current.push(pt);
+        const sid = currentStreamId.current;
+        if (sid) outgoingBufferRef.current.push({ streamId: sid, point: pt });
+      } catch (_) {}
     };
-    canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate);
+    canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate, { passive: true });
     return () => canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
-  }, [disegnando]);
+  }, [getPoint]); // getPoint è stabile ([] deps), questo effect gira solo al mount
 
   useEffect(() => {
     utenteIdRef.current = utenteId;
@@ -447,13 +462,14 @@ export default function LavagnaCanvas({
     
     const canvas = ctx.canvas;
     const dpr = window.devicePixelRatio || 1;
-    const safeZoom = Math.max(zoom, 0.0001);
+    const safeZoom = Math.max(zoomRef.current, 0.0001);
     const worldScale = safeZoom * dpr;
-    
+    const currentPan = panRef.current;
+
     // Applica la stessa trasformazione world di drawAll
     ctx.save();
-    ctx.setTransform(worldScale, 0, 0, worldScale, (-pan.x) * worldScale, (-pan.y) * worldScale);
-    
+    ctx.setTransform(worldScale, 0, 0, worldScale, (-currentPan.x) * worldScale, (-currentPan.y) * worldScale);
+
   ctx.globalCompositeOperation = streamData.strumento === 'gomma' ? 'destination-out' : 'source-over';
   ctx.strokeStyle = streamData.strumento === 'gomma' ? '#fff' : streamData.colore || '#111827';
   ctx.lineWidth = streamData.spessore || 1;
@@ -474,7 +490,12 @@ export default function LavagnaCanvas({
     }
     
     ctx.restore();
-  }, [zoom, pan]);
+  }, []);
+
+  // Mantieni drawIncrementalStrokeRef aggiornato (usato da handler Ably fuori dalla closure)
+  useEffect(() => {
+    drawIncrementalStrokeRef.current = drawIncrementalStroke;
+  }, [drawIncrementalStroke]);
 
   // Disegno completo
   const drawAll = useCallback(() => {
@@ -501,11 +522,13 @@ export default function LavagnaCanvas({
     ctx.fillRect(0, 0, cssW, cssH);
     ctx.restore();
 
-    // World transform (pan/zoom + DPR in a single matrix)
-  const safeZoom = Math.max(zoom, 0.0001);
+    // World transform (pan/zoom + DPR in a single matrix) — letti dai ref per evitare
+    // di ricreare drawAll ad ogni pan/zoom e la cascata di re-render che ne deriva
+    const currentPan = panRef.current;
+    const safeZoom = Math.max(zoomRef.current, 0.0001);
   const worldScale = safeZoom * dpr;
   ctx.save();
-  ctx.setTransform(worldScale, 0, 0, worldScale, (-pan.x) * worldScale, (-pan.y) * worldScale);
+  ctx.setTransform(worldScale, 0, 0, worldScale, (-currentPan.x) * worldScale, (-currentPan.y) * worldScale);
   const viewW = cssW / safeZoom;
   const viewH = cssH / safeZoom;
     // sfondo pattern (disegniamo un pattern ripetuto di grandi dimensioni
@@ -552,8 +575,8 @@ export default function LavagnaCanvas({
         ctx.fillStyle = pattern;
         // estendi molto oltre la vista corrente per dare effetto di sfondo infinito
         const big = Math.max(viewW, viewH) * 4 + 2000;
-        const rx = pan.x - big;
-        const ry = pan.y - big;
+        const rx = currentPan.x - big;
+        const ry = currentPan.y - big;
         const rw = viewW + big * 2;
         const rh = viewH + big * 2;
         ctx.fillRect(rx, ry, rw, rh);
@@ -1408,7 +1431,12 @@ export default function LavagnaCanvas({
 
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, zoom, pan.x, pan.y]);
+  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo]);
+
+  // Mantieni drawAllRef aggiornato (usato da rAF callbacks fuori dalla closure React)
+  useEffect(() => {
+    drawAllRef.current = drawAll;
+  }, [drawAll]);
 
   // Reset forme/tratti quando cambia lavagnaId (fix ghost lavagne vecchie)
   useEffect(() => {
@@ -1475,6 +1503,11 @@ export default function LavagnaCanvas({
   useEffect(() => {
     drawAll();
   }, [drawAll]);
+
+  // Ridisegna quando pan/zoom cambiano (drawAll legge dai ref quindi non li ha nelle sue deps)
+  useEffect(() => {
+    drawAllRef.current?.();
+  }, [zoom, pan.x, pan.y]);
 
   useEffect(() => {
     sfondoRef.current = sfondo;
@@ -4319,28 +4352,6 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
 
-    // Diagnostic: ensure computed world->screen mapping matches pointer client coords
-    try {
-      const lastPoint = punto;
-      const expected = screenFromWorld(lastPoint);
-      if (expected) {
-        const dx = Math.abs(expected.clientX - (e.nativeEvent.clientX));
-        const dy = Math.abs(expected.clientY - (e.nativeEvent.clientY));
-        const dist = Math.hypot(dx, dy);
-        if (dist > 8) {
-          // If mismatch present, log rich details for debugging
-          console.warn('[lavagna][diag] pointerDown mismatch', {
-            distPx: Math.round(dist * 10) / 10,
-            dx: Math.round(dx * 10) / 10,
-            dy: Math.round(dy * 10) / 10,
-            client: { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY },
-            expected: { x: expected.clientX, y: expected.clientY },
-            pan: { ...pan },
-            zoom
-          });
-        }
-      }
-    } catch (_) {}
     } catch (err) {
       console.error('[lavagna] pointerDown error:', err);
     }
@@ -4373,6 +4384,7 @@ export default function LavagnaCanvas({
         panningRef.current.active = false;
         setIsPanning(false);
         setContextPanning(false);
+        setPan(panRef.current);
         return;
       }
       // ensure overlay hidden while panning
@@ -4389,11 +4401,17 @@ export default function LavagnaCanvas({
       
       panningRef.current.lastX = e.nativeEvent.clientX;
       panningRef.current.lastY = e.nativeEvent.clientY;
-      setPan((p) => {
-        const nuovo = { x: p.x - dx / zoom, y: p.y - dy / zoom };
-        setTimeout(drawAll, 0);
-        return nuovo;
-      });
+      // Aggiorna il ref direttamente (senza setState → nessun React re-render ogni frame)
+      const currentPan = panRef.current;
+      const currentZoom = zoomRef.current;
+      panRef.current = { x: currentPan.x - dx / currentZoom, y: currentPan.y - dy / currentZoom };
+      // Schedula un unico rAF per ridisegnare (non un draw per ogni evento)
+      if (!panDrawRAFRef.current) {
+        panDrawRAFRef.current = requestAnimationFrame(() => {
+          panDrawRAFRef.current = null;
+          drawAllRef.current?.();
+        });
+      }
       if (!isPanning) setIsPanning(true);
       return;
     }
@@ -4794,30 +4812,6 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
 
-    // Occasional diagnostic: compare expected screen position for the last point
-    try {
-      if (disegnando) {
-        const currentWorld = ensurePoint();
-        const expected = screenFromWorld(currentWorld);
-        if (expected) {
-          const dx = expected.clientX - e.nativeEvent.clientX;
-          const dy = expected.clientY - e.nativeEvent.clientY;
-          const dist = Math.hypot(dx, dy);
-          if (dist > 8) {
-            console.warn('[lavagna][diag] pointerMove mismatch', {
-              distPx: Math.round(dist * 10) / 10,
-              dx: Math.round(dx * 10) / 10,
-              dy: Math.round(dy * 10) / 10,
-              client: { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY },
-              expected: { x: expected.clientX, y: expected.clientY },
-              pan: { ...pan },
-              zoom
-            });
-          }
-        }
-      }
-    } catch (_) {}
-
     if (!disegnando) return;
     
     // Stop drawing if multitouch gesture started (2+ fingers)
@@ -5009,6 +5003,8 @@ export default function LavagnaCanvas({
       panningRef.current.viaContext = false;
       setIsPanning(false);
       setContextPanning(false);
+      // Sincronizza React state con il valore finale del ref (aggiornato senza setState durante il drag)
+      setPan(panRef.current);
       // restore original tool if we temporarily switched on right-click
       try {
         if (contextTempToolRef.current) {
@@ -5239,6 +5235,7 @@ export default function LavagnaCanvas({
       panningRef.current.viaContext = false;
       setIsPanning(false);
       setContextPanning(false);
+      setPan(panRef.current);
       // restore original tool if we temporarily switched on right-click
       try {
         if (contextTempToolRef.current) {
