@@ -186,7 +186,7 @@ export default function LavagnaCanvas({
     };
     canvas.addEventListener('pointerrawupdate', handlePointerRawUpdate, { passive: true });
     return () => canvas.removeEventListener('pointerrawupdate', handlePointerRawUpdate);
-  }, [getPoint]); // getPoint è stabile ([] deps), questo effect gira solo al mount
+  }, []); // dipendenze vuote: canvasRef/panningRef/disegnandoRef/puntiCorrentiRef/outgoingBufferRef sono tutti ref stabili
 
   useEffect(() => {
     utenteIdRef.current = utenteId;
