@@ -138,6 +138,7 @@ export default function LavagnaCanvas({
   const exportMenuRef = useRef(null);
   // Snapshot per renderLoop veloce: blit + solo tratto corrente invece di drawAll ogni frame
   const drawingSnapshotRef = useRef(null); // HTMLCanvasElement (bitmap dello stato statico)
+  const snapshotBakeCountRef = useRef(0); // contatore per baking periodico dello snapshot
   // Refs per valori usati nel renderLoop senza rientrare nelle deps di drawAll
   const coloreRef = useRef(colore);
   const spessoreRef = useRef(spessore);
@@ -1493,6 +1494,22 @@ export default function LavagnaCanvas({
         puntiLocali.forEach((pt, i) => { if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y); });
         ctx.stroke();
         ctx.restore();
+
+        // Baking periodico: ogni 60 frame (≈1s a 60fps) bake il canvas corrente nello snapshot
+        // e taglia puntiCorrentiRef all'ultimo punto. Mantiene il renderLoop O(1) invece di O(n)
+        // indipendentemente dalla lunghezza del tratto.
+        snapshotBakeCountRef.current++;
+        if (snapshotBakeCountRef.current >= 60) {
+          snapshotBakeCountRef.current = 0;
+          try {
+            const snapCtx = snap.getContext('2d');
+            if (snapCtx) {
+              snapCtx.drawImage(canvas, 0, 0);
+              const last = puntiCorrentiRef.current[puntiCorrentiRef.current.length - 1];
+              puntiCorrentiRef.current = last ? [last] : [];
+            }
+          } catch (_) {}
+        }
       }
     } else {
       drawAll();
@@ -1998,6 +2015,11 @@ export default function LavagnaCanvas({
           if (!st) return;
           st.punti.push(...points);
           drawIncrementalStroke(st, points);
+          // Dopo aver disegnato incrementalmente, teniamo solo l'ultimo punto per la continuità.
+          // drawAll non deve iterare migliaia di punti per ogni remote stream attivo.
+          if (st.punti.length > 2) {
+            st.punti = [st.punti[st.punti.length - 1]];
+          }
         };
 
         const onDone = (msg) => {
@@ -4298,6 +4320,7 @@ export default function LavagnaCanvas({
       erasingRef.current = true;
     }
     puntiCorrentiRef.current = [punto];
+    snapshotBakeCountRef.current = 0; // reset contatore baking per il nuovo tratto
     // Cattura snapshot dello stato statico prima di avviare il renderLoop
     try {
       const snapCanvas = document.createElement('canvas');
