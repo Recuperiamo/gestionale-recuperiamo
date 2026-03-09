@@ -3,50 +3,48 @@
 /**
  * LavagnaCanvasClient — implementazione tldraw con sync real-time via Ably.
  *
+ * Pattern: onMount={setEditor} (riferimento stabile) + useEffect per il setup.
+ * Questo evita il bug in cui tldraw ri-chiama onMount ad ogni re-render,
+ * causando la sparizione del canvas.
+ *
  * Flusso:
- * 1. tldraw monta il canvas e chiama onMount(editor)
- * 2. Viene caricato lo snapshot dal DB (GET /api/lavagna/snapshot)
+ * 1. tldraw monta e chiama setEditor(editor)
+ * 2. useEffect si attiva → carica snapshot dal DB
  * 3. Si connette al canale Ably "lavagna:{lavagnaId}"
  * 4. Le modifiche locali vengono pubblicate come diff su Ably
  * 5. Le modifiche remote vengono applicate con store.mergeRemoteChanges()
- * 6. Auto-save ogni 20s e al momento dell'unmount
+ * 6. Auto-save ogni 5s e all'unmount
  */
+import { useState, useEffect, useRef } from "react";
 import { Tldraw } from "tldraw";
 import "tldraw/tldraw.css";
 import { getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
-const SAVE_INTERVAL_MS = 5_000; // 5 secondi — snapshot frequente per chi apre a metà sessione
-
-interface LavagnaCanvasProps {
-  lavagnaId: number;
-  attivitaId: number;
-  clienteId?: number;
-  utenteId: number | string;
-  ruolo: string;
-  altezza?: number;
-  openInNewWindow?: boolean;
-  // Legacy — non usati con tldraw, mantenuti per compatibilità prop
-  trattiIniziali?: unknown[];
-  formeIniziali?: unknown[];
-}
+const SAVE_INTERVAL_MS = 5_000; // 5 secondi
 
 export default function LavagnaCanvasClient({
   lavagnaId,
   attivitaId,
   utenteId,
-  ruolo,
   altezza = 600,
   openInNewWindow = false,
-}: LavagnaCanvasProps) {
-  /**
-   * onMount viene chiamato da tldraw una volta sola quando l'editor è pronto.
-   * Restituisce una funzione di cleanup chiamata al momento dell'unmount.
-   */
-  function handleMount(editor) {
+  // Legacy — non usati con tldraw, mantenuti per compatibilità prop
+  trattiIniziali,
+  formeIniziali,
+  clienteId,
+  ruolo,
+}) {
+  // setEditor è una funzione stabile (React garantisce stabilità dei setter)
+  // → nessun re-firing di onMount ad ogni render
+  const [editor, setEditor] = useState(null);
+  const channelRef = useRef(null);
+
+  useEffect(() => {
+    if (!editor) return;
+
     let cancelled = false;
-    let unsubStore: (() => void) | null = null;
-    let channel: Awaited<ReturnType<typeof getAblyChannelAsync>> | null = null;
-    let saveTimer: ReturnType<typeof setInterval> | null = null;
+    let unsubStore = null;
+    let saveTimer = null;
 
     /** Salva l'intero snapshot tldraw nel DB. */
     async function saveSnapshot() {
@@ -68,9 +66,14 @@ export default function LavagnaCanvasClient({
       try {
         const r = await fetch(`/api/lavagna/snapshot?lavagnaId=${lavagnaId}`);
         if (!cancelled && r.ok) {
-          const { snapshot } = await r.json();
-          if (snapshot) {
-            editor.loadSnapshot(snapshot);
+          const data = await r.json();
+          // Controlla che lo snapshot sia un oggetto valido con contenuto
+          if (
+            data.snapshot &&
+            typeof data.snapshot === "object" &&
+            Object.keys(data.snapshot).length > 0
+          ) {
+            editor.loadSnapshot(data.snapshot);
           }
         }
       } catch (e) {
@@ -80,8 +83,9 @@ export default function LavagnaCanvasClient({
       if (cancelled) return;
 
       // ── 2. Connetti canale Ably ───────────────────────────────────────────
-      channel = await getAblyChannelAsync(`lavagna:${lavagnaId}`);
+      const channel = await getAblyChannelAsync(`lavagna:${lavagnaId}`);
       if (cancelled || !channel) return;
+      channelRef.current = channel;
 
       // ── 3. Ricevi modifiche remote → applica allo store ──────────────────
       channel.subscribe("tldraw:diff", (msg) => {
@@ -110,24 +114,23 @@ export default function LavagnaCanvasClient({
         { source: "user", scope: "document" }
       );
 
-      // ── 5. Auto-save ogni 20 secondi ─────────────────────────────────────
+      // ── 5. Auto-save ogni 5 secondi ──────────────────────────────────────
       saveTimer = setInterval(saveSnapshot, SAVE_INTERVAL_MS);
     }
 
     setup();
 
-    // Cleanup: chiamato da tldraw quando il componente si smonta
     return () => {
       cancelled = true;
-      saveSnapshot(); // fire-and-forget — il browser completa la fetch
+      saveSnapshot(); // fire-and-forget
       if (unsubStore) unsubStore();
       if (saveTimer) clearInterval(saveTimer);
-      if (channel) {
-        channel.detach();
-        channel = null;
+      if (channelRef.current) {
+        channelRef.current.detach();
+        channelRef.current = null;
       }
     };
-  }
+  }, [editor, lavagnaId, utenteId]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: altezza }}>
@@ -141,12 +144,15 @@ export default function LavagnaCanvasClient({
           ⛶ Apri a schermo intero
         </button>
       )}
-      <Tldraw onMount={handleMount} />
+      <Tldraw
+        onMount={setEditor}
+        licenseKey={process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY}
+      />
     </div>
   );
 }
 
-const openBtnStyle: React.CSSProperties = {
+const openBtnStyle = {
   position: "absolute",
   top: 10,
   right: 10,
