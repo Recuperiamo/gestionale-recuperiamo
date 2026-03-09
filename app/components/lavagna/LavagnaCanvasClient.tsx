@@ -6,9 +6,9 @@
  * Flusso:
  * 1. Carica snapshot dal DB (GET /api/lavagna/snapshot)
  * 2. Renderizza Excalidraw con i dati caricati come initialData
- * 3. onChange → pubblica elementi su Ably (throttle 30ms)
+ * 3. onChange → pubblica elementi su Ably (throttle 30ms) — solo insegnante
  * 4. Ably → updateScene() per applicare modifiche remote
- * 5. Auto-save ogni 5s e all'unmount
+ * 5. Auto-save ogni 5s e all'unmount — solo insegnante
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Excalidraw } from "@excalidraw/excalidraw";
@@ -24,11 +24,11 @@ export default function LavagnaCanvasClient({
   utenteId,
   altezza = 600,
   openInNewWindow = false,
+  ruolo,
   // Legacy — ignorati con Excalidraw
   trattiIniziali,
   formeIniziali,
   clienteId,
-  ruolo,
 }) {
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
   const [initialData, setInitialData] = useState(undefined);
@@ -38,6 +38,8 @@ export default function LavagnaCanvasClient({
   const isApplyingRemoteRef = useRef(false);
   const publishTimerRef = useRef(null);
   const pendingElementsRef = useRef(null);
+
+  const isCliente = ruolo === "cliente";
 
   // ── 1. Carica snapshot dal DB ─────────────────────────────────────────────
   useEffect(() => {
@@ -54,6 +56,9 @@ export default function LavagnaCanvasClient({
                 // Non ripristinare la selezione attiva al caricamento
                 selectedElementIds: {},
                 selectedGroupIds: {},
+                // collaborators è una Map in Excalidraw ma JSON la serializza come oggetto
+                // → reinizializzare sempre come Map per evitare il crash .forEach
+                collaborators: new Map(),
               },
               scrollToContent: true,
             });
@@ -76,16 +81,18 @@ export default function LavagnaCanvasClient({
     let saveTimer = null;
 
     async function saveSnapshot() {
-      if (!excalidrawAPI || cancelled) return;
+      if (!excalidrawAPI || cancelled || isCliente) return;
       try {
         const elements = [...excalidrawAPI.getSceneElements()];
-        const appState = excalidrawAPI.getAppState();
+        // Rimuovere collaborators prima di serializzare: è una Map, non
+        // serializzabile correttamente in JSON (causa crash .forEach al reload)
+        const { collaborators, ...appStateToSave } = excalidrawAPI.getAppState();
         await fetch("/api/lavagna/snapshot", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lavagnaId,
-            snapshot: { elements, appState },
+            snapshot: { elements, appState: appStateToSave },
           }),
         });
       } catch (e) {
@@ -110,15 +117,17 @@ export default function LavagnaCanvasClient({
         }, 100);
       });
 
-      // Auto-save ogni 5s
-      saveTimer = setInterval(saveSnapshot, SAVE_INTERVAL_MS);
+      // Auto-save ogni 5s (solo insegnante)
+      if (!isCliente) {
+        saveTimer = setInterval(saveSnapshot, SAVE_INTERVAL_MS);
+      }
     }
 
     setup();
 
     return () => {
       cancelled = true;
-      saveSnapshot(); // salva all'unmount (fire-and-forget)
+      if (!isCliente) saveSnapshot(); // salva all'unmount (fire-and-forget)
       if (saveTimer) clearInterval(saveTimer);
       if (publishTimerRef.current) clearTimeout(publishTimerRef.current);
       if (channelRef.current) {
@@ -126,11 +135,12 @@ export default function LavagnaCanvasClient({
         channelRef.current = null;
       }
     };
-  }, [excalidrawAPI, dataLoaded, lavagnaId, utenteId]);
+  }, [excalidrawAPI, dataLoaded, lavagnaId, utenteId, isCliente]);
 
-  // ── 3. Pubblica modifiche locali su Ably (throttle 30ms) ─────────────────
+  // ── 3. Pubblica modifiche locali su Ably (throttle 30ms) — solo insegnante ─
   const onChange = useCallback(
     (elements) => {
+      if (isCliente) return; // studenti non pubblicano
       if (isApplyingRemoteRef.current) return; // evita echo loop
       if (!channelRef.current) return;
 
@@ -146,7 +156,7 @@ export default function LavagnaCanvasClient({
         });
       }, PUBLISH_THROTTLE_MS);
     },
-    [utenteId]
+    [utenteId, isCliente]
   );
 
   // Stato di caricamento
@@ -188,6 +198,7 @@ export default function LavagnaCanvasClient({
         initialData={initialData}
         onChange={onChange}
         langCode="it"
+        viewModeEnabled={isCliente}
       />
     </div>
   );
