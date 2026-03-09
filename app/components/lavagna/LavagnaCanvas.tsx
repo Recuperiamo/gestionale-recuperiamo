@@ -2,7 +2,7 @@
 "use client";
 /**
  * LavagnaCanvas — wrapper con dynamic import (no SSR) per Next.js App Router.
- * L'implementazione reale è in LavagnaCanvasClient.tsx.
+ * L'implementazione è in LavagnaCanvasClient.tsx (Excalidraw + Ably).
  */
 import dynamic from "next/dynamic";
 

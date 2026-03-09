@@ -20,6 +20,7 @@
     "postinstall": "prisma generate --schema=prisma/schema.prisma"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
     "@fullcalendar/core": "^6.1.19",
     "@fullcalendar/daygrid": "^6.1.19",
     "@fullcalendar/interaction": "^6.1.19",
@@ -45,7 +46,6 @@
     "react-dom": "18.2.0",
     "react-tooltip": "^5.29.1",
     "tailwindcss": "^3.4.17",
-    "tldraw": "^4.4.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

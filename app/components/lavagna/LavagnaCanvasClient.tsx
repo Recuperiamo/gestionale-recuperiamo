@@ -1,26 +1,22 @@
 // @ts-nocheck
 "use client";
 /**
- * LavagnaCanvasClient — implementazione tldraw con sync real-time via Ably.
- *
- * Pattern: onMount={setEditor} (riferimento stabile) + useEffect per il setup.
- * Questo evita il bug in cui tldraw ri-chiama onMount ad ogni re-render,
- * causando la sparizione del canvas.
+ * LavagnaCanvasClient — lavagna collaborativa con Excalidraw (MIT) + Ably.
  *
  * Flusso:
- * 1. tldraw monta e chiama setEditor(editor)
- * 2. useEffect si attiva → carica snapshot dal DB
- * 3. Si connette al canale Ably "lavagna:{lavagnaId}"
- * 4. Le modifiche locali vengono pubblicate come diff su Ably
- * 5. Le modifiche remote vengono applicate con store.mergeRemoteChanges()
- * 6. Auto-save ogni 5s e all'unmount
+ * 1. Carica snapshot dal DB (GET /api/lavagna/snapshot)
+ * 2. Renderizza Excalidraw con i dati caricati come initialData
+ * 3. onChange → pubblica elementi su Ably (throttle 30ms)
+ * 4. Ably → updateScene() per applicare modifiche remote
+ * 5. Auto-save ogni 5s e all'unmount
  */
-import { useState, useEffect, useRef } from "react";
-import { Tldraw } from "tldraw";
-import "tldraw/tldraw.css";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Excalidraw } from "@excalidraw/excalidraw";
+import "@excalidraw/excalidraw/index.css";
 import { getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
-const SAVE_INTERVAL_MS = 5_000; // 5 secondi
+const SAVE_INTERVAL_MS = 5_000;   // salvataggio DB ogni 5s
+const PUBLISH_THROTTLE_MS = 30;   // throttle Ably: max ~33 msg/s durante il disegno
 
 export default function LavagnaCanvasClient({
   lavagnaId,
@@ -28,93 +24,93 @@ export default function LavagnaCanvasClient({
   utenteId,
   altezza = 600,
   openInNewWindow = false,
-  // Legacy — non usati con tldraw, mantenuti per compatibilità prop
+  // Legacy — ignorati con Excalidraw
   trattiIniziali,
   formeIniziali,
   clienteId,
   ruolo,
 }) {
-  // setEditor è una funzione stabile (React garantisce stabilità dei setter)
-  // → nessun re-firing di onMount ad ogni render
-  const [editor, setEditor] = useState(null);
+  const [excalidrawAPI, setExcalidrawAPI] = useState(null);
+  const [initialData, setInitialData] = useState(undefined);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   const channelRef = useRef(null);
+  const isApplyingRemoteRef = useRef(false);
+  const publishTimerRef = useRef(null);
+  const pendingElementsRef = useRef(null);
 
+  // ── 1. Carica snapshot dal DB ─────────────────────────────────────────────
   useEffect(() => {
-    if (!editor) return;
-
-    let cancelled = false;
-    let unsubStore = null;
-    let saveTimer = null;
-
-    /** Salva l'intero snapshot tldraw nel DB. */
-    async function saveSnapshot() {
-      if (!editor || cancelled) return;
-      try {
-        const snapshot = editor.getSnapshot();
-        await fetch("/api/lavagna/snapshot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lavagnaId, snapshot }),
-        });
-      } catch (e) {
-        console.error("[Lavagna] Errore salvataggio snapshot:", e);
-      }
-    }
-
-    async function setup() {
-      // ── 1. Carica snapshot esistente dal DB ──────────────────────────────
+    async function load() {
       try {
         const r = await fetch(`/api/lavagna/snapshot?lavagnaId=${lavagnaId}`);
-        if (!cancelled && r.ok) {
+        if (r.ok) {
           const data = await r.json();
-          // Controlla che lo snapshot sia un oggetto valido con contenuto
-          if (
-            data.snapshot &&
-            typeof data.snapshot === "object" &&
-            Object.keys(data.snapshot).length > 0
-          ) {
-            editor.loadSnapshot(data.snapshot);
+          if (data.snapshot && Array.isArray(data.snapshot.elements)) {
+            setInitialData({
+              elements: data.snapshot.elements,
+              appState: {
+                ...(data.snapshot.appState || {}),
+                // Non ripristinare la selezione attiva al caricamento
+                selectedElementIds: {},
+                selectedGroupIds: {},
+              },
+              scrollToContent: true,
+            });
           }
         }
       } catch (e) {
         console.error("[Lavagna] Errore caricamento snapshot:", e);
+      } finally {
+        setDataLoaded(true);
       }
+    }
+    load();
+  }, [lavagnaId]);
 
-      if (cancelled) return;
+  // ── 2. Setup Ably + auto-save quando API e dati sono pronti ──────────────
+  useEffect(() => {
+    if (!excalidrawAPI || !dataLoaded) return;
 
-      // ── 2. Connetti canale Ably ───────────────────────────────────────────
+    let cancelled = false;
+    let saveTimer = null;
+
+    async function saveSnapshot() {
+      if (!excalidrawAPI || cancelled) return;
+      try {
+        const elements = [...excalidrawAPI.getSceneElements()];
+        const appState = excalidrawAPI.getAppState();
+        await fetch("/api/lavagna/snapshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lavagnaId,
+            snapshot: { elements, appState },
+          }),
+        });
+      } catch (e) {
+        console.error("[Lavagna] Errore salvataggio:", e);
+      }
+    }
+
+    async function setup() {
       const channel = await getAblyChannelAsync(`lavagna:${lavagnaId}`);
       if (cancelled || !channel) return;
       channelRef.current = channel;
 
-      // ── 3. Ricevi modifiche remote → applica allo store ──────────────────
-      channel.subscribe("tldraw:diff", (msg) => {
-        const { senderId, changes } = msg.data;
-        // Ignora i messaggi che abbiamo pubblicato noi stessi
-        if (senderId === String(utenteId)) return;
-
-        editor.store.mergeRemoteChanges(() => {
-          const { added, updated, removed } = changes;
-          if (added) editor.store.put(Object.values(added));
-          if (updated)
-            editor.store.put(Object.values(updated).map(([, after]) => after));
-          if (removed) editor.store.remove(Object.keys(removed));
-        });
+      // Ricevi modifiche remote → applica al canvas
+      channel.subscribe("excalidraw:scene", (msg) => {
+        const { senderId, elements } = msg.data;
+        if (senderId === String(utenteId)) return; // ignora echo
+        isApplyingRemoteRef.current = true;
+        excalidrawAPI.updateScene({ elements });
+        // Resetta il flag dopo che React ha processato l'aggiornamento
+        setTimeout(() => {
+          isApplyingRemoteRef.current = false;
+        }, 100);
       });
 
-      // ── 4. Pubblica modifiche locali su Ably ─────────────────────────────
-      unsubStore = editor.store.listen(
-        (entry) => {
-          if (entry.source !== "user") return;
-          channel.publish("tldraw:diff", {
-            senderId: String(utenteId),
-            changes: entry.changes,
-          });
-        },
-        { source: "user", scope: "document" }
-      );
-
-      // ── 5. Auto-save ogni 5 secondi ──────────────────────────────────────
+      // Auto-save ogni 5s
       saveTimer = setInterval(saveSnapshot, SAVE_INTERVAL_MS);
     }
 
@@ -122,15 +118,58 @@ export default function LavagnaCanvasClient({
 
     return () => {
       cancelled = true;
-      saveSnapshot(); // fire-and-forget
-      if (unsubStore) unsubStore();
+      saveSnapshot(); // salva all'unmount (fire-and-forget)
       if (saveTimer) clearInterval(saveTimer);
+      if (publishTimerRef.current) clearTimeout(publishTimerRef.current);
       if (channelRef.current) {
         channelRef.current.detach();
         channelRef.current = null;
       }
     };
-  }, [editor, lavagnaId, utenteId]);
+  }, [excalidrawAPI, dataLoaded, lavagnaId, utenteId]);
+
+  // ── 3. Pubblica modifiche locali su Ably (throttle 30ms) ─────────────────
+  const onChange = useCallback(
+    (elements) => {
+      if (isApplyingRemoteRef.current) return; // evita echo loop
+      if (!channelRef.current) return;
+
+      // Accumula gli elementi più recenti e pubblica al massimo ogni 30ms
+      pendingElementsRef.current = elements;
+      if (publishTimerRef.current) return;
+      publishTimerRef.current = setTimeout(() => {
+        publishTimerRef.current = null;
+        if (!channelRef.current || !pendingElementsRef.current) return;
+        channelRef.current.publish("excalidraw:scene", {
+          senderId: String(utenteId),
+          elements: [...pendingElementsRef.current],
+        });
+      }, PUBLISH_THROTTLE_MS);
+    },
+    [utenteId]
+  );
+
+  // Stato di caricamento
+  if (!dataLoaded) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: altezza,
+          background: "#f5f8ff",
+          color: "#20489a",
+          fontSize: 14,
+          fontWeight: 600,
+          fontFamily: "'Inter','Segoe UI',Arial,sans-serif",
+        }}
+      >
+        Caricamento lavagna…
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative", width: "100%", height: altezza }}>
@@ -144,9 +183,11 @@ export default function LavagnaCanvasClient({
           ⛶ Apri a schermo intero
         </button>
       )}
-      <Tldraw
-        onMount={setEditor}
-        licenseKey={process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY}
+      <Excalidraw
+        excalidrawAPI={(api) => setExcalidrawAPI(api)}
+        initialData={initialData}
+        onChange={onChange}
+        langCode="it"
       />
     </div>
   );
