@@ -3,12 +3,17 @@
 /**
  * LavagnaCanvasClient — lavagna collaborativa con Excalidraw (MIT) + Ably.
  *
- * Flusso:
+ * Flusso docente:
  * 1. Carica snapshot dal DB (GET /api/lavagna/snapshot)
  * 2. Renderizza Excalidraw con i dati caricati come initialData
- * 3. onChange → pubblica elementi su Ably (throttle 30ms) — solo insegnante
- * 4. Ably → updateScene() per applicare modifiche remote
- * 5. Auto-save ogni 5s e all'unmount — solo insegnante
+ * 3. onChange → pubblica elementi + viewport su Ably (throttle 30ms)
+ * 4. Auto-save ogni 5s e all'unmount
+ *
+ * Flusso studente (ruolo === 'cliente'):
+ * 1. Carica snapshot dal DB come sopra
+ * 2. Excalidraw in viewModeEnabled (sola lettura)
+ * 3. Ably → updateScene(elements) + segue il viewport del docente in tempo reale
+ * 4. Non pubblica, non salva
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Excalidraw } from "@excalidraw/excalidraw";
@@ -38,6 +43,7 @@ export default function LavagnaCanvasClient({
   const isApplyingRemoteRef = useRef(false);
   const publishTimerRef = useRef(null);
   const pendingElementsRef = useRef(null);
+  const pendingViewportRef = useRef(null);
 
   const isCliente = ruolo === "cliente";
 
@@ -107,17 +113,32 @@ export default function LavagnaCanvasClient({
 
       // Ricevi modifiche remote → applica al canvas
       channel.subscribe("excalidraw:scene", (msg) => {
-        const { senderId, elements } = msg.data;
+        const { senderId, elements, viewport } = msg.data;
         if (senderId === String(utenteId)) return; // ignora echo
+
         isApplyingRemoteRef.current = true;
-        excalidrawAPI.updateScene({ elements });
-        // Resetta il flag dopo che React ha processato l'aggiornamento
+
+        // Studente: segue anche il viewport del docente (scrollX, scrollY, zoom)
+        const appStateUpdate =
+          isCliente && viewport
+            ? {
+                scrollX: viewport.scrollX,
+                scrollY: viewport.scrollY,
+                zoom: viewport.zoom,
+              }
+            : undefined;
+
+        excalidrawAPI.updateScene({
+          elements,
+          ...(appStateUpdate ? { appState: appStateUpdate } : {}),
+        });
+
         setTimeout(() => {
           isApplyingRemoteRef.current = false;
         }, 100);
       });
 
-      // Auto-save ogni 5s (solo insegnante)
+      // Auto-save ogni 5s (solo docente)
       if (!isCliente) {
         saveTimer = setInterval(saveSnapshot, SAVE_INTERVAL_MS);
       }
@@ -137,15 +158,23 @@ export default function LavagnaCanvasClient({
     };
   }, [excalidrawAPI, dataLoaded, lavagnaId, utenteId, isCliente]);
 
-  // ── 3. Pubblica modifiche locali su Ably (throttle 30ms) — solo insegnante ─
+  // ── 3. Pubblica elementi + viewport su Ably (throttle 30ms) — solo docente ─
   const onChange = useCallback(
-    (elements) => {
+    (elements, appState) => {
       if (isCliente) return; // studenti non pubblicano
       if (isApplyingRemoteRef.current) return; // evita echo loop
       if (!channelRef.current) return;
 
-      // Accumula gli elementi più recenti e pubblica al massimo ogni 30ms
+      // Accumula elementi e viewport più recenti
       pendingElementsRef.current = elements;
+      if (appState) {
+        pendingViewportRef.current = {
+          scrollX: appState.scrollX,
+          scrollY: appState.scrollY,
+          zoom: appState.zoom,
+        };
+      }
+
       if (publishTimerRef.current) return;
       publishTimerRef.current = setTimeout(() => {
         publishTimerRef.current = null;
@@ -153,6 +182,7 @@ export default function LavagnaCanvasClient({
         channelRef.current.publish("excalidraw:scene", {
           senderId: String(utenteId),
           elements: [...pendingElementsRef.current],
+          viewport: pendingViewportRef.current,
         });
       }, PUBLISH_THROTTLE_MS);
     },
@@ -199,6 +229,15 @@ export default function LavagnaCanvasClient({
         onChange={onChange}
         langCode="it"
         viewModeEnabled={isCliente}
+        UIOptions={{
+          // Nasconde lo strumento immagine (non utile per una lavagna)
+          tools: { image: false },
+          canvasActions: {
+            // Nasconde le azioni meno rilevanti per uso didattico
+            saveToActiveFile: false,
+            loadScene: false,
+          },
+        }}
       />
     </div>
   );
