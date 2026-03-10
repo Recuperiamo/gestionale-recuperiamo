@@ -175,6 +175,12 @@ export default function LavagnaCanvasClient({
             toolType === "freedraw"
           );
         }
+        // Chiudi menù aperti quando cambia lo strumento di disegno
+        if (excalidrawAPI && toolType && !toolType.includes('selection')) {
+          if (appState?.openMenu) {
+            excalidrawAPI.updateScene({ appState: { openMenu: null } });
+          }
+        }
       }
 
       if (isCliente) return;
