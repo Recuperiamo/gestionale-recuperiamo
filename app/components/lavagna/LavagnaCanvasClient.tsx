@@ -20,8 +20,17 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import { getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
-const SAVE_INTERVAL_MS = 5_000;   // salvataggio DB ogni 5s
-const PUBLISH_THROTTLE_MS = 30;   // throttle Ably: max ~33 msg/s durante il disegno
+const SAVE_INTERVAL_MS = 5_000;
+const PUBLISH_THROTTLE_MS = 30;
+
+// Cursore a forma di penna per lo strumento disegno libero.
+// Hotspot in (4,20): la punta della penna.
+const PEN_CURSOR_URL =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E" +
+  "%3Cpath d='M4 20 L8 20 L20 8 L16 4 L4 16 Z' fill='%23111' stroke='white' stroke-width='0.8'/%3E" +
+  "%3Cpath d='M4 20 L8 20 L4 16 Z' fill='%23555'/%3E" +
+  "%3Ccircle cx='4' cy='20' r='1' fill='%23111'/%3E" +
+  "%3C/svg%3E\") 4 20, crosshair";
 
 export default function LavagnaCanvasClient({
   lavagnaId,
@@ -39,11 +48,13 @@ export default function LavagnaCanvasClient({
   const [initialData, setInitialData] = useState(undefined);
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  const wrapperRef = useRef(null);
   const channelRef = useRef(null);
   const isApplyingRemoteRef = useRef(false);
   const publishTimerRef = useRef(null);
   const pendingElementsRef = useRef(null);
   const pendingViewportRef = useRef(null);
+  const activeToolRef = useRef(null);
 
   const isCliente = ruolo === "cliente";
 
@@ -59,7 +70,6 @@ export default function LavagnaCanvasClient({
               elements: data.snapshot.elements,
               appState: {
                 ...(data.snapshot.appState || {}),
-                // Non ripristinare la selezione attiva al caricamento
                 selectedElementIds: {},
                 selectedGroupIds: {},
                 // collaborators è una Map in Excalidraw ma JSON la serializza come oggetto
@@ -111,21 +121,16 @@ export default function LavagnaCanvasClient({
       if (cancelled || !channel) return;
       channelRef.current = channel;
 
-      // Ricevi modifiche remote → applica al canvas
       channel.subscribe("excalidraw:scene", (msg) => {
         const { senderId, elements, viewport } = msg.data;
-        if (senderId === String(utenteId)) return; // ignora echo
+        if (senderId === String(utenteId)) return;
 
         isApplyingRemoteRef.current = true;
 
         // Studente: segue anche il viewport del docente (scrollX, scrollY, zoom)
         const appStateUpdate =
           isCliente && viewport
-            ? {
-                scrollX: viewport.scrollX,
-                scrollY: viewport.scrollY,
-                zoom: viewport.zoom,
-              }
+            ? { scrollX: viewport.scrollX, scrollY: viewport.scrollY, zoom: viewport.zoom }
             : undefined;
 
         excalidrawAPI.updateScene({
@@ -138,7 +143,6 @@ export default function LavagnaCanvasClient({
         }, 100);
       });
 
-      // Auto-save ogni 5s (solo docente)
       if (!isCliente) {
         saveTimer = setInterval(saveSnapshot, SAVE_INTERVAL_MS);
       }
@@ -148,7 +152,7 @@ export default function LavagnaCanvasClient({
 
     return () => {
       cancelled = true;
-      if (!isCliente) saveSnapshot(); // salva all'unmount (fire-and-forget)
+      if (!isCliente) saveSnapshot();
       if (saveTimer) clearInterval(saveTimer);
       if (publishTimerRef.current) clearTimeout(publishTimerRef.current);
       if (channelRef.current) {
@@ -158,14 +162,25 @@ export default function LavagnaCanvasClient({
     };
   }, [excalidrawAPI, dataLoaded, lavagnaId, utenteId, isCliente]);
 
-  // ── 3. Pubblica elementi + viewport su Ably (throttle 30ms) — solo docente ─
+  // ── 3. onChange: cursore penna + pubblica su Ably (solo docente) ──────────
   const onChange = useCallback(
     (elements, appState) => {
-      if (isCliente) return; // studenti non pubblicano
-      if (isApplyingRemoteRef.current) return; // evita echo loop
+      // Aggiorna il cursore quando si cambia strumento
+      const toolType = appState?.activeTool?.type;
+      if (toolType !== activeToolRef.current) {
+        activeToolRef.current = toolType;
+        if (wrapperRef.current) {
+          wrapperRef.current.classList.toggle(
+            "lavagna-freedraw-active",
+            toolType === "freedraw"
+          );
+        }
+      }
+
+      if (isCliente) return;
+      if (isApplyingRemoteRef.current) return;
       if (!channelRef.current) return;
 
-      // Accumula elementi e viewport più recenti
       pendingElementsRef.current = elements;
       if (appState) {
         pendingViewportRef.current = {
@@ -189,7 +204,6 @@ export default function LavagnaCanvasClient({
     [utenteId, isCliente]
   );
 
-  // Stato di caricamento
   if (!dataLoaded) {
     return (
       <div
@@ -212,7 +226,17 @@ export default function LavagnaCanvasClient({
   }
 
   return (
-    <div style={{ position: "relative", width: "100%", height: altezza }}>
+    <div
+      ref={wrapperRef}
+      style={{ position: "relative", width: "100%", height: altezza }}
+    >
+      {/* Cursore a penna quando lo strumento freedraw è attivo */}
+      <style>{`
+        .lavagna-freedraw-active .excalidraw canvas.interactive {
+          cursor: ${PEN_CURSOR_URL} !important;
+        }
+      `}</style>
+
       {openInNewWindow && (
         <button
           style={openBtnStyle}
@@ -223,6 +247,7 @@ export default function LavagnaCanvasClient({
           ⛶ Apri a schermo intero
         </button>
       )}
+
       <Excalidraw
         excalidrawAPI={(api) => setExcalidrawAPI(api)}
         initialData={initialData}
@@ -230,10 +255,8 @@ export default function LavagnaCanvasClient({
         langCode="it"
         viewModeEnabled={isCliente}
         UIOptions={{
-          // Nasconde lo strumento immagine (non utile per una lavagna)
           tools: { image: false },
           canvasActions: {
-            // Nasconde le azioni meno rilevanti per uso didattico
             saveToActiveFile: false,
             loadScene: false,
           },
