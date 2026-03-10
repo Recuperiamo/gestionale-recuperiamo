@@ -39,7 +39,10 @@ export function getStatoCompleto(stato, sottostato) {
  * @param {number} graceMs - Tempo di grazia in ms (default 5 min)
  * @returns {object} - { oreAcquistate, orePrenotate, oreSvolte, oreProgrammate, oreResidue }
  */
-export function calcolaStatsPacchetto(pacchetto, attivita = [], graceMs = 5 * 60 * 1000) {
+/** Finestra temporale entro cui un'attività appena iniziata è ancora "in corso" */
+export const GRACE_MS = 5 * 60 * 1000; // 5 minuti
+
+export function calcolaStatsPacchetto(pacchetto, attivita = [], graceMs = GRACE_MS) {
   const now = Date.now();
   const stats = {
     oreAcquistate: pacchetto.oreAcquistate || 0,

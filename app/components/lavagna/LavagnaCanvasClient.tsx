@@ -255,7 +255,7 @@ export default function LavagnaCanvasClient({
         langCode="it"
         viewModeEnabled={isCliente}
         UIOptions={{
-          tools: { image: false },
+          tools: { image: true },
           canvasActions: {
             saveToActiveFile: false,
             loadScene: false,
