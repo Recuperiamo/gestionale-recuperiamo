@@ -72,8 +72,7 @@ export default function LavagnaCanvasClient({
                 ...(data.snapshot.appState || {}),
                 selectedElementIds: {},
                 selectedGroupIds: {},
-                // collaborators è una Map in Excalidraw ma JSON la serializza come oggetto
-                // → reinizializzare sempre come Map per evitare il crash .forEach
+                // collaborators è una Map in Excalidraw
                 collaborators: new Map(),
               },
               scrollToContent: true,
@@ -100,9 +99,9 @@ export default function LavagnaCanvasClient({
       if (!excalidrawAPI || cancelled || isCliente) return;
       try {
         const elements = [...excalidrawAPI.getSceneElements()];
-        // Rimuovere collaborators prima di serializzare: è una Map, non
-        // serializzabile correttamente in JSON (causa crash .forEach al reload)
-        const { collaborators, ...appStateToSave } = excalidrawAPI.getAppState();
+        const appState = excalidrawAPI.getAppState();
+        const { collaborators, ...appStateToSave } = appState;
+        
         await fetch("/api/lavagna/snapshot", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
