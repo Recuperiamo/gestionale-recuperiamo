@@ -21,7 +21,7 @@ import "@excalidraw/excalidraw/index.css";
 import { getAblyChannelAsync } from "../../lib/realtime/ablyClient";
 
 const SAVE_INTERVAL_MS = 5_000;
-const PUBLISH_THROTTLE_MS = 150; // Aumentato da 30ms per ridurre carico CPU durante disegno
+const PUBLISH_THROTTLE_MS = 80; // Equilibrio: ridotto per i tratti, ma ancora protegge da lag
 
 // Cursore a forma di penna per lo strumento disegno libero.
 // Hotspot in (4,20): la punta della penna.
@@ -112,7 +112,7 @@ export default function LavagnaCanvasClient({
           }),
         });
       } catch (e) {
-        console.error("[Lavagna] Errore salvataggio:", e);
+        console.error("[Lavagna] Errore salvataggio snapshot:", e);
       }
     }
 
@@ -201,23 +201,9 @@ export default function LavagnaCanvasClient({
         publishTimerRef.current = null;
         if (!channelRef.current || !pendingElementsRef.current) return;
         
-        // Filtra elementi immagine con data URL enormi che non dovrebbero sincronizzarsi via Ably.
-        // Solo immagini dal DB (con fileId e src remoto) vengono sincronizzate via realtime.
-        // Le immagini incollate (data URL) verranno salvate al DB al prossimo salvataggio periodico.
-        const elementsToSync = pendingElementsRef.current.filter(el => {
-          // Non è immagine: invia sempre
-          if (el.type !== 'image') return true;
-          // È immagine, ma ha data URL incollato: filtra (non inviare)
-          if (el.src && el.src.startsWith('data:')) return false;
-          // È immagine dal DB con fileId: invia
-          if (el.fileId) return true;
-          // Tutto il resto: non inviare
-          return false;
-        });
-        
         channelRef.current.publish("excalidraw:scene", {
           senderId: String(utenteId),
-          elements: elementsToSync,
+          elements: [...pendingElementsRef.current],
           viewport: pendingViewportRef.current,
         });
       }, PUBLISH_THROTTLE_MS);
