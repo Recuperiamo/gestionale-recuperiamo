@@ -5293,8 +5293,15 @@ export default function LavagnaCanvas({
     currentStreamId.current = null;
     eraseSessionRef.current.strokeIds.clear();
     eraseSessionRef.current.shapeIds.clear();
+    // Ferma il renderLoop rAF prima di azzerare lo snapshot:
+    // evita che il loop chiami drawAll() con i tratti vecchi (setTratti è ancora in coda React)
+    // causando il flash visivo al termine del tratto.
+    // Il re-render di setTratti triggerà il useEffect(() => drawAll(), [drawAll]) con i tratti corretti.
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
     drawingSnapshotRef.current = null;
-    drawAll(); // Chiamata finale per pulire il tratto locale
   }
 
   function pointerCancel(e) {
@@ -6342,22 +6349,6 @@ export default function LavagnaCanvas({
                 <line x1="19" y1="3" x2="22" y2="2" stroke="#ef4444" strokeWidth="1.2" strokeLinecap="round" opacity={strumento==='laser' ? '0.7' : '0.4'}/>
               </svg>
             </button>
-            <button
-              type="button"
-              style={iconBtn(strumento === 'testo')}
-              onClick={() => {
-                setStrumento('testo');
-                setShowPenPopover(false);
-                setShowMoreMenu(false);
-                setShowShapesPopover(false);
-                setShowExportMenu(false);
-              }}
-              title="Testo"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M4 7h16M12 7v12M9 19h6" stroke={strumento==='testo' ? '#fff' : '#20489a'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
             {!isAdmin && (
               <button
                 type="button"
@@ -6414,6 +6405,27 @@ export default function LavagnaCanvas({
                       <span style={st.readOnlyValue}>{sfondoLabels[sfondo] || sfondo}</span>
                     </div>
                   )}
+                  <div style={{ ...st.toggleWrap, marginBottom:8 }}>
+                    <button
+                      type="button"
+                      style={{
+                        ...btn(strumento === 'testo'),
+                        display:'flex', alignItems:'center', gap:6, width:'100%', justifyContent:'flex-start'
+                      }}
+                      onClick={() => {
+                        setStrumento('testo');
+                        setShowMoreMenu(false);
+                        setShowPenPopover(false);
+                        setShowShapesPopover(false);
+                        setShowExportMenu(false);
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 7h16M12 7v12M9 19h6"/>
+                      </svg>
+                      Strumento testo
+                    </button>
+                  </div>
                   <div style={{ ...st.toggleWrap, marginBottom:8 }}>
                     <input
                       id="gomma-puntuale-toggle"
