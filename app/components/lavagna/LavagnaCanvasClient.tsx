@@ -102,12 +102,36 @@ export default function LavagnaCanvasClient({
         const appState = excalidrawAPI.getAppState();
         const { collaborators, ...appStateToSave } = appState;
         
+        // Estrai i dati delle immagini incollate per salvarle
+        // Excalidraw memorizza i file in collaborators[userId].files (Map)
+        const imageFiles = {};
+        if (appState.collaborators instanceof Map) {
+          for (const [userId, userData] of appState.collaborators.entries()) {
+            if (userData?.files instanceof Map) {
+              for (const [fileId, file] of userData.files.entries()) {
+                if (file?.mimeType && file?.mimeType.startsWith('image/')) {
+                  // Salva il file con il suo ID per la ricostruzione al reload
+                  imageFiles[fileId] = {
+                    mimeType: file.mimeType,
+                    id: fileId,
+                    // data può essere un Blob o ArrayBuffer - lo gestiamo come-is
+                  };
+                }
+              }
+            }
+          }
+        }
+        
         await fetch("/api/lavagna/snapshot", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lavagnaId,
-            snapshot: { elements, appState: appStateToSave },
+            snapshot: { 
+              elements, 
+              appState: appStateToSave,
+              imageFiles: Object.keys(imageFiles).length > 0 ? imageFiles : undefined,
+            },
           }),
         });
       } catch (e) {
