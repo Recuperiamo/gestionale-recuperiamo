@@ -67,6 +67,10 @@ export default function LavagnaCanvas({
   // true se pointerrawupdate ha già aggiunto punti per questo evento pointermove
   // (evita duplicati su Chrome quando si aggiunge getCoalescedEvents come fallback)
   const rawUpdateFiredRef = useRef(false);
+  // Accumula TUTTI i punti del tratto corrente (mai tagliata dal baking).
+  // puntiCorrentiRef viene tagliata ogni ~1s per performance rendering;
+  // fullStrokePuntiRef è usata solo al pointerUp per il salvataggio DB.
+  const fullStrokePuntiRef = useRef([]);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [gommaPuntuale, setGommaPuntuale] = useState(false);
@@ -192,6 +196,7 @@ export default function LavagnaCanvas({
         const pt = getPoint(e);
         if (!pt) return;
         puntiCorrentiRef.current.push(pt);
+        fullStrokePuntiRef.current.push(pt); // accumulo completo (mai tagliato)
         rawUpdateFiredRef.current = true; // segnala a pointerMove che i punti sono già stati raccolti
         const sid = currentStreamId.current;
         if (sid) outgoingBufferRef.current.push({ streamId: sid, point: pt });
@@ -1754,6 +1759,7 @@ export default function LavagnaCanvas({
     outgoingBufferRef.current = [];
     remoteStreams.current.clear();
     puntiCorrentiRef.current = [];
+    fullStrokePuntiRef.current = [];
     currentStreamId.current = null;
     eraseSessionRef.current.strokeIds.clear();
     eraseSessionRef.current.shapeIds.clear();
@@ -4332,6 +4338,7 @@ export default function LavagnaCanvas({
       erasingRef.current = true;
     }
     puntiCorrentiRef.current = [punto];
+    fullStrokePuntiRef.current = [punto]; // reset accumulo completo per nuovo tratto
     snapshotBakeCountRef.current = 0; // reset contatore baking per il nuovo tratto
     // Cattura snapshot dello stato statico prima di avviare il renderLoop
     try {
@@ -4853,6 +4860,7 @@ export default function LavagnaCanvas({
     if (e.nativeEvent.pointerType === 'touch' && touchesRef.current.size >= 2) {
       setDisegnando(false);
       puntiCorrentiRef.current = [];
+      fullStrokePuntiRef.current = [];
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = null;
@@ -4890,6 +4898,7 @@ export default function LavagnaCanvas({
           const pt = getPoint(ce);
           if (pt) {
             puntiCorrentiRef.current.push(pt);
+            fullStrokePuntiRef.current.push(pt); // accumulo completo
             if (currentStreamId.current) {
               outgoingBufferRef.current.push({ streamId: currentStreamId.current, point: pt });
             }
@@ -4902,6 +4911,7 @@ export default function LavagnaCanvas({
     rawUpdateFiredRef.current = false;
 
     puntiCorrentiRef.current.push(punto);
+    fullStrokePuntiRef.current.push(punto); // accumulo completo
     // Bufferizza il punto corrente per invio batch
     outgoingBufferRef.current.push({ streamId: currentStreamId.current, point: punto });
   }
@@ -5198,7 +5208,11 @@ export default function LavagnaCanvas({
 
   // Apply lightweight smoothing to the collected points so handwriting
   // strokes (S, E, etc.) render more naturally and jitter is reduced.
-  const rawPunti = puntiCorrentiRef.current;
+  // Usa fullStrokePuntiRef (mai tagliata dal baking del renderLoop) per avere
+  // tutti i punti del tratto anche se scritto per più di ~1 secondo.
+  const rawPunti = fullStrokePuntiRef.current.length > 1
+    ? fullStrokePuntiRef.current
+    : puntiCorrentiRef.current;
   const puntiFinali = simplifyAndSmooth(rawPunti);
   
     // SUPPORTO TRATTI ULTRA-CORTI (es. puntini su i, :, ×, ÷)
@@ -5262,6 +5276,7 @@ export default function LavagnaCanvas({
     } catch (_) {}
 
     puntiCorrentiRef.current = [];
+    fullStrokePuntiRef.current = [];
     currentStreamId.current = null;
     eraseSessionRef.current.strokeIds.clear();
     eraseSessionRef.current.shapeIds.clear();
@@ -5282,6 +5297,7 @@ export default function LavagnaCanvas({
     }
     outgoingBufferRef.current = [];
     puntiCorrentiRef.current = [];
+    fullStrokePuntiRef.current = [];
     drawingSnapshotRef.current = null;
     if (disegnando) setDisegnando(false);
     if (currentStreamId.current) {
@@ -5853,48 +5869,58 @@ export default function LavagnaCanvas({
     if (!showTools) return null;
     if (!isAdmin && spectatorMode) return null;
 
-    // Responsive button styles
+    // Responsive button styles — look moderno, pill shape, palette blu/grigio
     const iconBtn = (active) => ({
-      width: isMobile ? 32 : 36,
-      height: isMobile ? 32 : 36,
-      minWidth: isMobile ? 32 : 36,
+      width: isMobile ? 34 : 38,
+      height: isMobile ? 34 : 38,
+      minWidth: isMobile ? 34 : 38,
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: isMobile ? 8 : 12,
-      border: active ? '1px solid rgba(27,102,220,0.2)' : '1px solid rgba(212,223,246,0.9)',
-      background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(248,251,255,0.96)',
-      color: active ? '#fff' : '#20489a',
-      boxShadow: active ? '0 14px 26px rgba(28,125,247,0.28)' : '0 8px 20px rgba(15,42,105,0.15)',
+      borderRadius: isMobile ? 10 : 11,
+      border: active ? 'none' : '1.5px solid rgba(32,72,154,0.12)',
+      background: active
+        ? 'linear-gradient(145deg, #2563eb 0%, #3b82f6 100%)'
+        : 'rgba(255,255,255,0.85)',
+      color: active ? '#fff' : '#334155',
+      boxShadow: active
+        ? '0 4px 12px rgba(37,99,235,0.38), inset 0 1px 0 rgba(255,255,255,0.18)'
+        : '0 1px 3px rgba(15,42,105,0.10)',
       cursor: 'pointer',
-      transition: 'transform .15s ease, box-shadow .2s ease',
+      transition: 'background .14s, box-shadow .14s, color .14s',
       fontWeight: 700,
-      fontSize: isMobile ? 16 : 18,
-      touchAction: isMobile ? 'manipulation' : 'auto'
+      fontSize: isMobile ? 16 : 17,
+      touchAction: isMobile ? 'manipulation' : 'auto',
+      flexShrink: 0,
     });
 
     const shapeBtn = (active) => ({
-      width: isMobile ? 36 : 46,
-      height: isMobile ? 36 : 46,
+      width: isMobile ? 38 : 46,
+      height: isMobile ? 38 : 46,
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: isMobile ? 8 : 12,
-      border: active ? '1.5px solid rgba(27,102,220,0.3)' : '1px solid rgba(212,223,246,0.9)',
-      background: active ? 'linear-gradient(135deg, #1c7df7 0%, #5bb5ff 100%)' : 'rgba(255,255,255,0.9)',
-      color: active ? '#fff' : '#20489a',
-      boxShadow: active ? '0 8px 18px rgba(28,125,247,0.25)' : '0 2px 8px rgba(15,42,105,0.1)',
+      borderRadius: isMobile ? 10 : 12,
+      border: active ? 'none' : '1.5px solid rgba(32,72,154,0.12)',
+      background: active
+        ? 'linear-gradient(145deg, #2563eb 0%, #3b82f6 100%)'
+        : 'rgba(255,255,255,0.85)',
+      color: active ? '#fff' : '#334155',
+      boxShadow: active
+        ? '0 4px 12px rgba(37,99,235,0.38)'
+        : '0 1px 3px rgba(15,42,105,0.10)',
       cursor: 'pointer',
-      transition: 'all .15s ease',
+      transition: 'all .14s ease',
       padding: 0,
-      touchAction: isMobile ? 'manipulation' : 'auto'
+      touchAction: isMobile ? 'manipulation' : 'auto',
+      flexShrink: 0,
     });
 
     // Responsive toolbar styles
     const bottomToolbarDock = {
       position: "absolute",
       left: isMobile ? 0 : "50%",
-      bottom: isMobile ? 8 : 18,
+      bottom: isMobile ? 8 : 16,
       transform: isMobile ? "none" : "translateX(-50%)",
       zIndex: 3,
       ...(isMobile && {
@@ -5909,13 +5935,13 @@ export default function LavagnaCanvas({
     const commandBar = {
       display: 'flex',
       alignItems: 'center',
-      gap: isMobile ? 4 : 10,
-      padding: isMobile ? '6px 8px' : '10px 14px',
-      borderRadius: isMobile ? 12 : 16,
-      background: 'rgba(255,255,255,0.92)',
-      border: '1px solid #d4dff6',
-      boxShadow: '0 14px 28px rgba(20,53,120,0.16)',
-      backdropFilter: 'blur(8px)',
+      gap: isMobile ? 3 : 6,
+      padding: isMobile ? '6px 10px' : '8px 12px',
+      borderRadius: isMobile ? 16 : 20,
+      background: 'rgba(248,250,255,0.97)',
+      border: '1.5px solid rgba(37,99,235,0.13)',
+      boxShadow: '0 8px 32px rgba(15,42,105,0.18), 0 1.5px 0 rgba(255,255,255,0.9) inset',
+      backdropFilter: 'blur(12px)',
       userSelect: 'none',
       ...(isMobile && {
         flexWrap: 'wrap',
@@ -6911,14 +6937,15 @@ const st = {
   toolGroup: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '0 4px'
+    gap: 4,
+    padding: '0 2px'
   },
   commandDivider: {
     width: 1,
     alignSelf: 'stretch',
-    background: 'rgba(212,223,246,0.9)',
-    margin: '0 12px'
+    background: 'rgba(37,99,235,0.12)',
+    margin: '0 6px',
+    borderRadius: 2,
   },
   popover: {
     position: 'absolute',
