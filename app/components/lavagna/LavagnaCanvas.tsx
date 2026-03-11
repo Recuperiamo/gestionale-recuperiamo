@@ -130,6 +130,8 @@ export default function LavagnaCanvas({
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
+  // Admin: controlla se gli studenti possono scrivere sulla lavagna
+  const [studentWriteEnabled, setStudentWriteEnabled] = useState(false);
   const latestAdminViewportRef = useRef(null);
   const pendingViewportRef = useRef(null);
   const viewportApplyRAFRef = useRef(null);
@@ -1665,11 +1667,12 @@ export default function LavagnaCanvas({
     if (isAdmin) return;
     try {
       const stored = window.localStorage.getItem(spectatorStorageKey);
-      if (stored === '1') {
-        setSpectatorMode(true);
-      } else {
-        // Default: modalità spettatore DISABILITATA (da rifare da capo)
+      if (stored === '0') {
+        // L'utente ha disattivato manualmente la modalità spettatore
         setSpectatorMode(false);
+      } else {
+        // Default per studenti: segui il professore automaticamente
+        setSpectatorMode(true);
       }
     } catch (_) {}
   }, [spectatorStorageKey, isAdmin]);
@@ -2369,6 +2372,13 @@ export default function LavagnaCanvas({
             ts: Date.now()
           });
         };
+        // Admin → studenti: abilita/revoca scrittura
+        const onStudentWrite = (msg) => {
+          if (isAdminRef.current) return; // admin non riceve il proprio messaggio
+          const { data } = msg || {};
+          const enabled = !!data?.enabled;
+          setSpectatorMode(!enabled);
+        };
 
         try {
           ch.subscribe('laser:move', onLaserMove);
@@ -2382,6 +2392,7 @@ export default function LavagnaCanvas({
           ch.subscribe('viewport:request', onViewportRequest);
           ch.subscribe('spectator:toggle', onSpectatorToggle);
           ch.subscribe('spectator:request', onSpectatorRequest);
+          ch.subscribe('student:write', onStudentWrite);
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
@@ -2414,6 +2425,7 @@ export default function LavagnaCanvas({
                   ch.subscribe('viewport:request', onViewportRequest);
                   ch.subscribe('spectator:toggle', onSpectatorToggle);
                   ch.subscribe('spectator:request', onSpectatorRequest);
+                  ch.subscribe('student:write', onStudentWrite);
                 } catch (err) {
                   console.error('[LAVAGNA-SUB-ERROR] Re-subscribe failed after reconnect:', err?.message || err);
                 }
@@ -2448,6 +2460,7 @@ export default function LavagnaCanvas({
             ch.unsubscribe('viewport:request', onViewportRequest);
             ch.unsubscribe('spectator:toggle', onSpectatorToggle);
             ch.unsubscribe('spectator:request', onSpectatorRequest);
+            ch.unsubscribe('student:write', onStudentWrite);
           } catch (_) {}
         };
       } catch (e) {
@@ -6323,8 +6336,10 @@ export default function LavagnaCanvas({
               title="Puntatore laser"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="3" fill={strumento==='laser' ? '#ef4444' : '#ef4444'} opacity={strumento==='laser' ? '1' : '0.7'}/>
-                <circle cx="12" cy="12" r="8" stroke={strumento==='laser' ? '#ef4444' : '#ef4444'} strokeWidth="1.5" fill="none" opacity={strumento==='laser' ? '1' : '0.6'}/>
+                <circle cx="9" cy="15" r="2.5" fill="#ef4444" opacity={strumento==='laser' ? '1' : '0.65'}/>
+                <circle cx="9" cy="15" r="4.5" stroke="#ef4444" strokeWidth="1.2" fill="none" opacity={strumento==='laser' ? '0.5' : '0.3'}/>
+                <line x1="11" y1="13" x2="20" y2="4" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" opacity={strumento==='laser' ? '1' : '0.7'}/>
+                <line x1="19" y1="3" x2="22" y2="2" stroke="#ef4444" strokeWidth="1.2" strokeLinecap="round" opacity={strumento==='laser' ? '0.7' : '0.4'}/>
               </svg>
             </button>
             <button
@@ -6340,7 +6355,7 @@ export default function LavagnaCanvas({
               title="Testo"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M6 5h12M8 5v12M16 5v12M6 17h12" stroke={strumento==='testo' ? '#0f1f53' : '#20489a'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4 7h16M12 7v12M9 19h6" stroke={strumento==='testo' ? '#fff' : '#20489a'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
             {!isAdmin && (
@@ -6356,8 +6371,9 @@ export default function LavagnaCanvas({
                 }}
                 title={spectatorMode ? "Smetti di seguire il professore" : "Segui il professore"}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill={spectatorMode ? '#20489a' : '#20489a'} opacity={spectatorMode ? '1' : '0.6'}/>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={spectatorMode ? '#fff' : '#20489a'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" opacity={spectatorMode ? '1' : '0.75'}>
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                  <circle cx="12" cy="12" r="3"/>
                 </svg>
               </button>
             )}
@@ -6373,7 +6389,11 @@ export default function LavagnaCanvas({
                 }}
                 title="Altro"
               >
-                ...
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="12" cy="19" r="2"/>
+                </svg>
               </button>
               {showMoreMenu && (
                 <div style={st.popover}>
@@ -6417,7 +6437,43 @@ export default function LavagnaCanvas({
                     </div>
                   )}
                   {isAdmin && (
-                    <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:8 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
+                    <div style={{ ...st.toggleWrap, marginBottom: 8 }}>
+                      <button
+                        type="button"
+                        style={{
+                          ...btn(studentWriteEnabled),
+                          width: '100%',
+                          justifyContent: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: studentWriteEnabled ? '#16a34a' : '#e3eefe',
+                          color: studentWriteEnabled ? '#fff' : '#20489a',
+                          border: studentWriteEnabled ? 'none' : '1px solid #4268b3',
+                        }}
+                        onClick={() => {
+                          const next = !studentWriteEnabled;
+                          setStudentWriteEnabled(next);
+                          emitOrPublish('student:write', {
+                            lavagnaId,
+                            attivitaId,
+                            enabled: next,
+                            ts: Date.now()
+                          });
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          {studentWriteEnabled
+                            ? <path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2zm0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z" fill="currentColor"/>
+                            : <><rect x="6" y="11" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" fill="none"/><path d="M8 11V7a4 4 0 1 1 8 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></>
+                          }
+                        </svg>
+                        {studentWriteEnabled ? 'Scrittura studenti: ON' : 'Abilita scrittura studenti'}
+                      </button>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:4 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
                   )}
                 </div>
               )}
@@ -6445,6 +6501,8 @@ export default function LavagnaCanvas({
     handleChangeSfondo,
     spectatorToggleId,
     pulisciLavagna,
+    studentWriteEnabled,
+    emitOrPublish,
     undoStack,
     redoStack,
     undo,
