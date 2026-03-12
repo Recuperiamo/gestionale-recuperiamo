@@ -1662,19 +1662,10 @@ export default function LavagnaCanvas({
   }, [backgroundStorageKey, sfondo]);
 
   useEffect(() => {
-    if (!spectatorStorageKey) return;
-    if (typeof window === 'undefined') return;
-    if (isAdmin) return;
-    try {
-      const stored = window.localStorage.getItem(spectatorStorageKey);
-      if (stored === '0') {
-        // L'utente ha disattivato manualmente la modalità spettatore
-        setSpectatorMode(false);
-      } else {
-        // Default per studenti: segui il professore automaticamente
-        setSpectatorMode(true);
-      }
-    } catch (_) {}
+    // Spectator mode ora è gestito esclusivamente da admin:presence (Ably).
+    // Non auto-abilitare da localStorage: lo studente parte libero e diventa
+    // spettatore solo quando l'admin è sulla stessa lavagna.
+    if (isAdmin) setSpectatorMode(false);
   }, [spectatorStorageKey, isAdmin]);
 
   useEffect(() => {
@@ -1995,19 +1986,7 @@ export default function LavagnaCanvas({
           console.warn('[LavagnaCanvas] nessun canale realtime disponibile; la lavagna funzionerà solo localmente');
           return;
         }
-        
-        // Svuota la queue dei messaggi pendenti
-        if (pendingMessages.current.length > 0) {
-          pendingMessages.current.forEach(({ name, data }) => {
-            try {
-              ch.publish(name, data);
-            } catch (e) {
-              console.error('[LAVAGNA-QUEUE-ERROR]', { event: name, error: e.message || e });
-            }
-          });
-          pendingMessages.current = [];
-        }
-        
+
         whenChannelAttachedAsync(channelName).catch((err) => {
           console.warn('[LavagnaCanvas] channel attach failed', err?.message);
         });
@@ -2022,7 +2001,8 @@ export default function LavagnaCanvas({
             strumento,
             colore,
             spessore,
-            punti: [start]
+            punti: [start],
+            allPunti: [start] // accumulo completo per il commit finale in onDone
           });
         };
 
@@ -2034,9 +2014,12 @@ export default function LavagnaCanvas({
           if (senderId && senderId === utenteIdRef.current) return;
           const st = remoteStreams.current.get(streamId);
           if (!st) return;
+          // allPunti accumula tutti i punti senza mai essere tagliata (serve in onDone)
+          if (!st.allPunti) st.allPunti = [...st.punti];
+          st.allPunti.push(...points);
           st.punti.push(...points);
           drawIncrementalStroke(st, points);
-          // Dopo aver disegnato incrementalmente, teniamo solo l'ultimo punto per la continuità.
+          // Teniamo solo l'ultimo punto in punti per la continuità del rendering incrementale.
           // drawAll non deve iterare migliaia di punti per ogni remote stream attivo.
           if (st.punti.length > 2) {
             st.punti = [st.punti[st.punti.length - 1]];
@@ -2054,13 +2037,15 @@ export default function LavagnaCanvas({
           }
           
           const st = remoteStreams.current.get(streamId);
-          if (st && st.punti.length >= 2) {
+          // Usa allPunti (accumulo completo) invece di punti (tagliata a 1 punto dal rendering)
+          const puntiFinali = st?.allPunti?.length >= 2 ? st.allPunti : st?.punti;
+          if (st && puntiFinali && puntiFinali.length >= 2) {
             const definitivo = prepareStroke({
               id: streamId,
               strumento: st.strumento,
               colore: st.colore,
               spessore: st.spessore,
-              punti: st.punti,
+              punti: puntiFinali,
               autoreUserId: 'remote'
             });
             setTratti((prev) => {
@@ -2374,10 +2359,32 @@ export default function LavagnaCanvas({
         };
         // Admin → studenti: abilita/revoca scrittura
         const onStudentWrite = (msg) => {
-          if (isAdminRef.current) return; // admin non riceve il proprio messaggio
+          if (isAdminRef.current) return;
           const { data } = msg || {};
           const enabled = !!data?.enabled;
+          // Se admin abilita scrittura → esci da spectator; se revoca → rientra in spectator
           setSpectatorMode(!enabled);
+        };
+
+        // Admin annuncia la propria presenza sulla lavagna
+        const onAdminPresence = (msg) => {
+          if (isAdminRef.current) return;
+          const { data } = msg || {};
+          const online = !!data?.online;
+          setSpectatorMode(online);
+          // Se admin è andato offline, lo studente torna libero
+        };
+
+        // Studente chiede se admin è online (utile quando studente si connette tardi)
+        const onPresenceRequest = (msg) => {
+          if (!isAdminRef.current) return;
+          try {
+            ch.publish('admin:presence', {
+              online: true,
+              lavagnaId: lavagnaIdRef.current,
+              attivitaId: attivitaIdRef.current
+            });
+          } catch (_) {}
         };
 
         try {
@@ -2393,9 +2400,40 @@ export default function LavagnaCanvas({
           ch.subscribe('spectator:toggle', onSpectatorToggle);
           ch.subscribe('spectator:request', onSpectatorRequest);
           ch.subscribe('student:write', onStudentWrite);
+          ch.subscribe('admin:presence', onAdminPresence);
+          ch.subscribe('presence:request', onPresenceRequest);
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
+
+        // Flush messaggi pendenti DOPO le subscription per evitare race condition:
+        // es. viewport:request inviato prima che lo studente sia iscritto a viewport:update
+        if (pendingMessages.current.length > 0) {
+          pendingMessages.current.forEach(({ name, data }) => {
+            try { ch.publish(name, data); } catch (e) {
+              console.error('[LAVAGNA-QUEUE-ERROR]', { event: name, error: e.message || e });
+            }
+          });
+          pendingMessages.current = [];
+        }
+
+        // Admin: annuncia presenza agli studenti già connessi
+        // Studente: chiede all'admin se è online (per entrare in spectator se arriva dopo)
+        try {
+          if (isAdminRef.current) {
+            ch.publish('admin:presence', {
+              online: true,
+              lavagnaId,
+              attivitaId
+            });
+          } else {
+            ch.publish('presence:request', {
+              lavagnaId,
+              attivitaId,
+              requesterId: utenteId
+            });
+          }
+        } catch (_) {}
 
         // Connection state listener to auto resubscribe after reconnect
         let ablyConnListener = null;
@@ -2426,6 +2464,8 @@ export default function LavagnaCanvas({
                   ch.subscribe('spectator:toggle', onSpectatorToggle);
                   ch.subscribe('spectator:request', onSpectatorRequest);
                   ch.subscribe('student:write', onStudentWrite);
+                  ch.subscribe('admin:presence', onAdminPresence);
+                  ch.subscribe('presence:request', onPresenceRequest);
                 } catch (err) {
                   console.error('[LAVAGNA-SUB-ERROR] Re-subscribe failed after reconnect:', err?.message || err);
                 }
@@ -2461,7 +2501,15 @@ export default function LavagnaCanvas({
             ch.unsubscribe('spectator:toggle', onSpectatorToggle);
             ch.unsubscribe('spectator:request', onSpectatorRequest);
             ch.unsubscribe('student:write', onStudentWrite);
+            ch.unsubscribe('admin:presence', onAdminPresence);
+            ch.unsubscribe('presence:request', onPresenceRequest);
           } catch (_) {}
+          // Admin: notifica studenti che ha lasciato la lavagna
+          if (isAdminRef.current) {
+            try {
+              ch.publish('admin:presence', { online: false, lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current });
+            } catch (_) {}
+          }
         };
       } catch (e) {
         // If something went wrong loading ably, we simply won't attach realtime handlers.
