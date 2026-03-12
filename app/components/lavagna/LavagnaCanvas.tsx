@@ -232,6 +232,7 @@ export default function LavagnaCanvas({
   const drawIncrementalStrokeRef = useRef(null);
   const prepareStrokeRef = useRef(null);
   const applyViewportRef = useRef(null);
+  const prevAdminVisibleRectRef = useRef(null); // ultimo visibleRect ricevuto da admin
   const normalizeShapeRef = useRef(null);
   const clearLavagnaStateRef = useRef(null);
 
@@ -1823,8 +1824,11 @@ export default function LavagnaCanvas({
     if (!view) return;
     const { pan: remotePan, zoom: remoteZoom, visibleRect } = view;
 
-    // Usa il visibleRect dell'admin (area mondo che sta guardando) e adattala
-    // allo schermo locale — questo garantisce following corretto su qualsiasi dimensione schermo
+    const prev = prevAdminVisibleRectRef.current;
+    if (visibleRect && visibleRect.width > 0 && visibleRect.height > 0) {
+      prevAdminVisibleRectRef.current = visibleRect;
+    }
+
     try {
       const canvas = canvasRef.current;
       if (canvas && visibleRect && visibleRect.width > 0 && visibleRect.height > 0) {
@@ -1832,18 +1836,46 @@ export default function LavagnaCanvas({
         const cssW = rect.width;
         const cssH = rect.height;
         if (cssW > 0 && cssH > 0) {
-          // Scala per mostrare esattamente la stessa area mondo, adattata al proprio schermo
-          const fitZoom = Math.min(cssW / visibleRect.width, cssH / visibleRect.height);
-          const newZoom = Math.max(0.05, Math.min(10, fitZoom));
-          // Centra la stessa area mondo
-          const worldCenterX = visibleRect.x + visibleRect.width / 2;
-          const worldCenterY = visibleRect.y + visibleRect.height / 2;
+          if (!prev || prev.width <= 0 || prev.height <= 0) {
+            // Prima sincronizzazione: allinea completamente alla vista admin adattata allo schermo
+            const fitZoom = Math.min(cssW / visibleRect.width, cssH / visibleRect.height);
+            const newZoom = Math.max(0.05, Math.min(10, fitZoom));
+            const worldCenterX = visibleRect.x + visibleRect.width / 2;
+            const worldCenterY = visibleRect.y + visibleRect.height / 2;
+            const newPan = {
+              x: worldCenterX - cssW / (2 * newZoom),
+              y: worldCenterY - cssH / (2 * newZoom)
+            };
+            setPan((p) => (p.x === newPan.x && p.y === newPan.y ? p : newPan));
+            setZoom((z) => (z === newZoom ? z : newZoom));
+            return;
+          }
+
+          // Aggiornamenti successivi: applica il DELTA relativo allo zoom/pan corrente dello studente.
+          // Così lo studente mantiene il proprio livello di zoom ma segue i movimenti dell'admin.
+          const zoomFactor = prev.width / visibleRect.width; // >1 se admin ha zoomato in, <1 se zoom out
+          const prevCx = prev.x + prev.width / 2;
+          const prevCy = prev.y + prev.height / 2;
+          const newCx = visibleRect.x + visibleRect.width / 2;
+          const newCy = visibleRect.y + visibleRect.height / 2;
+          const dx = newCx - prevCx; // spostamento mondo orizzontale admin
+          const dy = newCy - prevCy; // spostamento mondo verticale admin
+
+          const curZoom = zoomRef.current;
+          const curPan = panRef.current;
+          const newZoom = Math.max(0.05, Math.min(10, curZoom * zoomFactor));
+          // Centro vista studente corrente (world space)
+          const studentCx = curPan.x + cssW / (2 * curZoom);
+          const studentCy = curPan.y + cssH / (2 * curZoom);
+          // Applica lo stesso spostamento world dell'admin
+          const newStudentCx = studentCx + dx;
+          const newStudentCy = studentCy + dy;
           const newPan = {
-            x: worldCenterX - cssW / (2 * newZoom),
-            y: worldCenterY - cssH / (2 * newZoom)
+            x: newStudentCx - cssW / (2 * newZoom),
+            y: newStudentCy - cssH / (2 * newZoom)
           };
-          setPan((prev) => (prev.x === newPan.x && prev.y === newPan.y ? prev : newPan));
-          setZoom((prev) => (prev === newZoom ? prev : newZoom));
+          setPan((p) => (p.x === newPan.x && p.y === newPan.y ? p : newPan));
+          setZoom((z) => (z === newZoom ? z : newZoom));
           return;
         }
       }
@@ -1859,7 +1891,11 @@ export default function LavagnaCanvas({
   }, []);
 
   useEffect(() => {
-    if (!spectatorMode || isAdmin) return;
+    if (!spectatorMode || isAdmin) {
+      // Reset: prossima entrata in spectator farà sync completo
+      prevAdminVisibleRectRef.current = null;
+      return;
+    }
     const latest = latestAdminViewportRef.current;
     if (latest) {
       applyViewport(latest);

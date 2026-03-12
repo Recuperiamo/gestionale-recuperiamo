@@ -18,6 +18,9 @@ export default function LavagnaFullScreenPage() {
   const { data: session, status } = useSession();
   const [lavagna, setLavagna] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [canvasActions, setCanvasActions] = useState(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef(null);
   const [canvasH, setCanvasH] = useState(
     typeof window !== "undefined"
       ? (window.visualViewport?.height ?? window.innerHeight) - TOP_BAR_H_DESKTOP
@@ -75,6 +78,18 @@ export default function LavagnaFullScreenPage() {
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
+
+  // Chiudi menu export cliccando fuori
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function onClickOutside(e) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [showExportMenu]);
 
   function toggleFullscreen() {
     if (isIOS()) {
@@ -178,6 +193,33 @@ export default function LavagnaFullScreenPage() {
               )}
               {!isMobile && <span style={{ marginLeft: 6 }}>{isFullscreen ? "Esci" : "Fullscreen"}</span>}
             </button>
+            {canvasActions && (
+              <div ref={exportMenuRef} style={{ position: "relative" }}>
+                <button
+                  style={{ ...btn, padding: isMobile ? "5px 10px" : "8px 16px", fontSize: isMobile ? 12 : 13 }}
+                  onClick={() => setShowExportMenu(v => !v)}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  {!isMobile && <span style={{ marginLeft: 6 }}>Esporta</span>}
+                </button>
+                {showExportMenu && (
+                  <div style={{
+                    position: "absolute", top: "calc(100% + 6px)", right: 0,
+                    background: "#fff", borderRadius: 10, border: "1px solid #dbe6f5",
+                    boxShadow: "0 12px 28px rgba(15,36,92,0.18)",
+                    display: "flex", flexDirection: "column", overflow: "hidden",
+                    zIndex: 200, minWidth: 140,
+                  }}>
+                    <button style={exportItem} onClick={() => { setShowExportMenu(false); canvasActions.esportaPNG(); }}>
+                      Scarica PNG
+                    </button>
+                    <button style={exportItem} onClick={() => { setShowExportMenu(false); canvasActions.esportaPDF(); }}>
+                      Scarica PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {!isMobile && (
               <button style={btn} onClick={() => window.close()}>Chiudi</button>
             )}
@@ -219,6 +261,8 @@ export default function LavagnaFullScreenPage() {
             ruolo={session.user.role}
             altezza={canvasHFinal}
             openInNewWindow={false}
+            topRightPlacement="external"
+            onActionsChange={setCanvasActions}
           />
         </div>
       )}
@@ -275,4 +319,14 @@ const fsWrap = {
   background: "#f5f8ff",
   color: "#20489a",
   fontWeight: 600
+};
+const exportItem = {
+  padding: "10px 16px",
+  background: "transparent",
+  border: "none",
+  textAlign: "left",
+  cursor: "pointer",
+  fontSize: 13,
+  color: "#20489a",
+  fontWeight: 500,
 };
