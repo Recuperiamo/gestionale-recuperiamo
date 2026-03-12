@@ -250,15 +250,16 @@ export default function CalendarioAttivita({
     if (mode === "week") {
       recomputeWeekLayout(currentDate);
     } else if (mode === "month") {
+      // Normalizza start a Date (gli eventi allDay hanno start come stringa)
+      const toDate = (s) => s instanceof Date ? s : new Date(s);
       const currentMonthEvents = events.filter(event => {
-        const eventDate = event.start;
-        // Check if the event falls within the current month and year
+        const eventDate = toDate(event.start);
         return eventDate.getMonth() === currentDate.getMonth() &&
                eventDate.getFullYear() === currentDate.getFullYear();
       });
 
-      const hasSatEvents = currentMonthEvents.some(event => event.start.getDay() === 6);
-      const hasSunEvents = currentMonthEvents.some(event => event.start.getDay() === 0);
+      const hasSatEvents = currentMonthEvents.some(event => toDate(event.start).getDay() === 6);
+      const hasSunEvents = currentMonthEvents.some(event => toDate(event.start).getDay() === 0);
 
       const newHiddenDays = [];
       if (!hasSunEvents) newHiddenDays.push(0); // Sunday
