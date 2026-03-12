@@ -332,6 +332,44 @@ export default function LavagnaCanvas({
     [channelName]
   );
 
+  // Broadcast viewport corrente dell'admin usando refs (nessun setState, sicuro da chiamare ovunque).
+  // Throttlato con rAF tramite viewportBroadcastRef per non spammare Ably.
+  const broadcastViewportFromRefs = useCallback(() => {
+    if (!isAdminRef.current) return;
+    const ch = ablyRef.current.ch;
+    if (!ch) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const p = panRef.current;
+    const z = zoomRef.current;
+    let cssW = 0, cssH = 0;
+    try {
+      const r = canvas.getBoundingClientRect();
+      cssW = r.width;
+      cssH = r.height;
+    } catch (_) { return; }
+    if (cssW <= 0 || cssH <= 0 || z <= 0) return;
+    viewportBroadcastRef.current.payload = {
+      lavagnaId: lavagnaIdRef.current,
+      attivitaId: attivitaIdRef.current,
+      senderId: utenteIdRef.current,
+      pan: { x: p.x, y: p.y },
+      zoom: z,
+      canvasSize: { width: cssW, height: cssH },
+      visibleRect: { x: p.x, y: p.y, width: cssW / z, height: cssH / z },
+      ts: Date.now()
+    };
+    if (!viewportBroadcastRef.current.rafId) {
+      viewportBroadcastRef.current.rafId = requestAnimationFrame(() => {
+        const pending = viewportBroadcastRef.current.payload;
+        viewportBroadcastRef.current.rafId = null;
+        if (pending && ablyRef.current.ch) {
+          try { ablyRef.current.ch.publish('viewport:update', pending); } catch (_) {}
+        }
+      });
+    }
+  }, []);
+
   // Raggruppa i punti in buffer e li invia in batch per ridurre i publish verso Ably
   const flushOutgoing = useCallback(() => {
     try {
@@ -3921,11 +3959,15 @@ export default function LavagnaCanvas({
       const pointerId = native?.pointerId;
       const canvas = canvasRef.current;
       const spectatorLocked = spectatorModeRef.current && !isAdmin;
-      
+
       // Block all interactions in spectator mode (except eye button handled in UI)
       if (spectatorLocked) {
         return;
       }
+
+      // Admin: broadcast viewport corrente a ogni pointerDown (qualsiasi strumento)
+      // Garantisce che studenti in spectator mode vedano sempre la vista corretta
+      broadcastViewportFromRefs();
       
       selectionClickRef.current = null;
 
@@ -4431,6 +4473,8 @@ export default function LavagnaCanvas({
         laserThrottleRef.current = now;
         const pt = getPoint(e);
         if (pt) emitOrPublish('laser:move', { x: pt.x, y: pt.y, colore, userId: utenteId, ts: now });
+        // Admin: broadcast viewport durante laser così studenti seguono il punto guardato
+        broadcastViewportFromRefs();
       }
       return;
     }
@@ -4470,32 +4514,7 @@ export default function LavagnaCanvas({
         });
       }
       // Admin: broadcast viewport durante panning per following fluido degli spettatori
-      if (isAdminRef.current && ablyRef.current.ch) {
-        const newPan = panRef.current;
-        const curZoom = zoomRef.current;
-        const canvas = canvasRef.current;
-        if (canvas && !viewportBroadcastRef.current.rafId) {
-          viewportBroadcastRef.current.rafId = requestAnimationFrame(() => {
-            viewportBroadcastRef.current.rafId = null;
-            try {
-              const rect = canvas.getBoundingClientRect();
-              const cssW = rect.width;
-              const cssH = rect.height;
-              const vr = { x: newPan.x, y: newPan.y, width: cssW / curZoom, height: cssH / curZoom };
-              ablyRef.current.ch?.publish('viewport:update', {
-                lavagnaId: lavagnaIdRef.current,
-                attivitaId: attivitaIdRef.current,
-                senderId: utenteIdRef.current,
-                pan: newPan,
-                zoom: curZoom,
-                canvasSize: { width: cssW, height: cssH },
-                visibleRect: vr,
-                ts: Date.now()
-              });
-            } catch (_) {}
-          });
-        }
-      }
+      broadcastViewportFromRefs();
       if (!isPanning) setIsPanning(true);
       return;
     }
@@ -4749,26 +4768,35 @@ export default function LavagnaCanvas({
         const rect = canvasRef.current.getBoundingClientRect();
         const midOff = { x: mid.x - rect.left, y: mid.y - rect.top };
         
-        // Initialize gesture on first detection
+        // Initialize gesture on first detection — usa refs per evitare stale closure
         if (gestureRef.current.mode !== 'panzoom') {
-          const midWorld = { x: pan.x + midOff.x / zoom, y: pan.y + midOff.y / zoom };
-          gestureRef.current = { mode: 'panzoom', startZoom: zoom, startPan: { ...pan }, startDist: dist, startMidWorld: midWorld };
+          const curZ = zoomRef.current;
+          const curP = panRef.current;
+          const midWorld = { x: curP.x + midOff.x / curZ, y: curP.y + midOff.y / curZ };
+          gestureRef.current = { mode: 'panzoom', startZoom: curZ, startPan: { ...curP }, startDist: dist, startMidWorld: midWorld };
           setDisegnando(false);
         } else {
-          // Apply pinch-to-zoom
+          // Apply pinch-to-zoom con refs (nessun setState → nessun re-render per frame → fluido)
           const g = gestureRef.current;
           const scale = dist / g.startDist;
           let newZoom = g.startZoom * scale;
-          newZoom = Math.max(0.1, Math.min(5, newZoom)); // Clamp between 0.1x and 5x
-          
-          // Keep the midpoint fixed in world coordinates
+          newZoom = Math.max(0.1, Math.min(5, newZoom));
           const newPan = {
             x: g.startMidWorld.x - midOff.x / newZoom,
             y: g.startMidWorld.y - midOff.y / newZoom
           };
-          
-          setZoom(newZoom);
-          setPan(newPan);
+          // Aggiorna refs direttamente (come panning con mano)
+          zoomRef.current = newZoom;
+          panRef.current = newPan;
+          // Redraw throttlato con rAF (non ogni evento)
+          if (!panDrawRAFRef.current) {
+            panDrawRAFRef.current = requestAnimationFrame(() => {
+              panDrawRAFRef.current = null;
+              drawAllRef.current?.();
+            });
+          }
+          // Broadcast viewport agli spettatori
+          broadcastViewportFromRefs();
         }
         return;
       }
@@ -5201,6 +5229,9 @@ export default function LavagnaCanvas({
         touchesRef.current.delete(e.nativeEvent.pointerId);
         if (touchesRef.current.size < 2 && gestureRef.current.mode === 'panzoom') {
           gestureRef.current.mode = 'none';
+          // Sincronizza stato React con i valori finali dei ref (aggiornati senza setState durante pinch)
+          setPan(panRef.current);
+          setZoom(zoomRef.current);
         }
       }
       
@@ -5374,6 +5405,9 @@ export default function LavagnaCanvas({
       touchesRef.current.delete(e.nativeEvent.pointerId);
       if (touchesRef.current.size < 2 && gestureRef.current.mode === 'panzoom') {
         gestureRef.current.mode = 'none';
+        // Sincronizza stato React con i valori finali dei ref (aggiornati senza setState durante pinch)
+        setPan(panRef.current);
+        setZoom(zoomRef.current);
       }
     }
     if (draggingSelectionRef.current) {
