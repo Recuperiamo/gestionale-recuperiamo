@@ -77,6 +77,7 @@ export default function LavagnaCanvas({
   const [enablePinchZoom, setEnablePinchZoom] = useState(true);
   const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
   const [showTools, setShowTools] = useState(true);
+  const [toolbarVisible, setToolbarVisible] = useState(true);
   const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
   const sfondoRef = useRef(sfondo);
   const backgroundStorageKey = useMemo(() => {
@@ -4755,10 +4756,8 @@ export default function LavagnaCanvas({
     // Multitouch pan/zoom
     if (e.nativeEvent.pointerType === 'touch') {
       touchesRef.current.set(e.nativeEvent.pointerId, { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
-      if (spectatorLocked) {
-        return;
-      }
-      // Only handle pinch if enabled
+      // Pinch zoom: consentito anche in spectator mode — studenti possono zoomare
+      // per vedere i dettagli anche mentre seguono l'admin
       if (enablePinchZoomRef.current && touchesRef.current.size === 2) {
         const pts = Array.from(touchesRef.current.values());
         const dx = pts[1].x - pts[0].x;
@@ -4800,6 +4799,8 @@ export default function LavagnaCanvas({
         }
         return;
       }
+      // Dopo il pinch, blocca altre interazioni touch in spectator mode
+      if (spectatorLocked) return;
     }
 
     // Update shape preview if drawing a shape (or right-click line in pen mode)
@@ -5999,19 +6000,21 @@ export default function LavagnaCanvas({
       flexShrink: 0,
     });
 
-    // Responsive toolbar styles
+    // Responsive toolbar styles — position: fixed per essere sempre visibile
+    // indipendentemente dallo scroll della pagina
     const bottomToolbarDock = {
-      position: "absolute",
-      left: isMobile ? 0 : "50%",
-      bottom: isMobile ? 8 : 16,
-      transform: isMobile ? "none" : "translateX(-50%)",
-      zIndex: 3,
+      position: "fixed",
+      left: "50%",
+      bottom: isMobile ? 18 : 24,
+      transform: "translateX(-50%)",
+      zIndex: 1200,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 4,
       ...(isMobile && {
-        right: 0,
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        padding: '0 8px'
+        width: 'calc(100% - 16px)',
+        maxWidth: 560,
       })
     };
 
@@ -6039,9 +6042,31 @@ export default function LavagnaCanvas({
     const redoAvailable = redoStack.length > 0;
     const isCustomPenColor = !penPalette.some(entry => entry.value === colore);
 
+    // Pill-button per mostrare/nascondere la toolbar
+    const togglePillStyle = {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      height: isMobile ? 26 : 24,
+      padding: isMobile ? '0 14px' : '0 12px',
+      borderRadius: 20,
+      background: 'rgba(248,250,255,0.97)',
+      border: '1.5px solid rgba(37,99,235,0.13)',
+      boxShadow: '0 2px 8px rgba(15,42,105,0.14)',
+      backdropFilter: 'blur(10px)',
+      cursor: 'pointer',
+      fontSize: 11,
+      fontWeight: 600,
+      color: '#334155',
+      letterSpacing: 0.2,
+      userSelect: 'none',
+      touchAction: 'manipulation',
+    };
+
     return (
       <div style={bottomToolbarDock}>
-        <div ref={toolbarRef} style={commandBar}>
+        {toolbarVisible && <div ref={toolbarRef} style={commandBar}>
           <button
             type="button"
             style={undoButtonStyle(undoDisabled, 'undo', isMobile)}
@@ -6555,13 +6580,30 @@ export default function LavagnaCanvas({
             </div>
           </div>
 
-        </div>
+        </div>}
+        {/* Toggle mostra/nascondi toolbar */}
+        <button
+          type="button"
+          style={togglePillStyle}
+          onClick={() => setToolbarVisible(v => !v)}
+          title={toolbarVisible ? 'Nascondi toolbar' : 'Mostra toolbar'}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            {toolbarVisible
+              ? <path d="M6 15l6-6 6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+              : <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            }
+          </svg>
+          {toolbarVisible ? 'Nascondi' : 'Strumenti'}
+        </button>
       </div>
     );
   }, [
     showTools,
     isAdmin,
     spectatorMode,
+    toolbarVisible,
+    setToolbarVisible,
     strumento,
     showShapesPopover,
     showPenPopover,
@@ -6634,7 +6676,7 @@ export default function LavagnaCanvas({
     : 'Modalità spettatore attiva';
   const showInCanvasActions = topRightPlacement === 'in-canvas' && (!spectatorMode || isAdmin);
   const showTopRightBar = showInCanvasActions || spectatorIndicatorVisible;
-  const zoomDisabled = spectatorMode && !isAdmin;
+  const zoomDisabled = false; // zoom sempre abilitato (anche in spectator mode)
   const canZoomOut = zoom > 0.21;
   const canZoomIn = zoom < 1.99;
   const canResetView = zoom < 0.99 || zoom > 1.01 || Math.abs(pan.x) > 0.5 || Math.abs(pan.y) > 0.5;
@@ -6840,8 +6882,8 @@ export default function LavagnaCanvas({
           </div>
         )}
         {toolbar}
-        {/* Nascondi zoom controls se mobile E non admin (spectator o studente) */}
-        {!(isMobile && !isAdmin) && (
+        {/* Zoom controls: visibili sempre su desktop, su mobile solo se admin o spectator */}
+        {(!isMobile || isAdmin || spectatorMode) && (
           <div ref={zoomControlsRef} style={{
             ...st.zoomControls,
             ...(isMobile && {
