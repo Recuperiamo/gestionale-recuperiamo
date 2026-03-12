@@ -4436,18 +4436,25 @@ export default function LavagnaCanvas({
     puntiCorrentiRef.current = [punto];
     fullStrokePuntiRef.current = [punto]; // reset accumulo completo per nuovo tratto
     snapshotBakeCountRef.current = 0; // reset contatore baking per il nuovo tratto
-    // Cattura snapshot dello stato statico prima di avviare il renderLoop
-    try {
-      const snapCanvas = document.createElement('canvas');
-      const mainCanvas = canvasRef.current;
-      if (mainCanvas) {
-        snapCanvas.width = mainCanvas.width;
-        snapCanvas.height = mainCanvas.height;
-        snapCanvas.getContext('2d')?.drawImage(mainCanvas, 0, 0);
-        drawingSnapshotRef.current = snapCanvas;
-      }
-    } catch (_) {}
-    animationFrameId.current = requestAnimationFrame(renderLoop);
+
+    // La gomma "intero tratto" (!gommaPuntuale) NON usa renderLoop:
+    // eraseStrokeAt() aggiorna direttamente tratti/forme → React re-render → drawAll.
+    // Il renderLoop ripristinerebbe lo snapshot vecchio ogni frame, sovrascrivendo
+    // la cancellazione e causando lag visivo e cursor stuttering.
+    const needsRenderLoop = !(strumento === 'gomma' && !gommaPuntuale);
+    if (needsRenderLoop) {
+      try {
+        const snapCanvas = document.createElement('canvas');
+        const mainCanvas = canvasRef.current;
+        if (mainCanvas) {
+          snapCanvas.width = mainCanvas.width;
+          snapCanvas.height = mainCanvas.height;
+          snapCanvas.getContext('2d')?.drawImage(mainCanvas, 0, 0);
+          drawingSnapshotRef.current = snapCanvas;
+        }
+      } catch (_) {}
+      animationFrameId.current = requestAnimationFrame(renderLoop);
+    }
     const streamId = `${utenteId}-${Date.now()}`;
     currentStreamId.current = streamId;
     const strokeColor = strumento === 'gomma' ? '#ffffff' : colore;
