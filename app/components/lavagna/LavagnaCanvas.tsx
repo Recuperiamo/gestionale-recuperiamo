@@ -4496,6 +4496,10 @@ export default function LavagnaCanvas({
   }
 
   function pointerMove(e) {
+    // Admin: broadcast viewport su ogni movimento — copre penna, laser, gomma, forme, selezione.
+    // Il rAF interno deduplica a 1 invio per frame (non spedisce ogni singolo evento).
+    if (isAdminRef.current) broadcastViewportFromRefs();
+
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
 
     // Laser pointer: aggiorna posizione locale e trasmetti agli altri
