@@ -14,10 +14,6 @@ async function fetchPacchetti() {
   return res.json();
 }
 
-async function fetchAttivitaByPacchetto(pacchettoId) {
-  const res = await fetch(`/api/attivita?pacchettoId=${pacchettoId}`);
-  return res.json();
-}
 
 async function fetchAlertLetti() {
   const res = await fetch("/api/pacchetti/alert-letto", {
@@ -54,16 +50,12 @@ export default function PacchettiCardsAdmin() {
     async function load() {
       const packs = await fetchPacchetti();
       setPacchetti(packs || []);
-      
-      // Carica attività per ogni pacchetto
+
+      // Le attività sono già incluse in ogni pacchetto dalla GET /api/pacchetti (include: { attivita: true })
+      // Non serve una fetch separata per pacchetto
       const attMap = {};
       for (const p of packs || []) {
-        try {
-          const att = await fetchAttivitaByPacchetto(p.id);
-          attMap[p.id] = Array.isArray(att) ? att : [];
-        } catch (e) {
-          attMap[p.id] = [];
-        }
+        attMap[p.id] = Array.isArray(p.attivita) ? p.attivita : [];
       }
       setAttivitaMap(attMap);
       
@@ -107,15 +99,11 @@ export default function PacchettiCardsAdmin() {
     // Ricarica
     fetchPacchetti().then((packs) => {
       setPacchetti(packs || []);
-      const loadAtt = async () => {
-        const attMap = {};
-        for (const p of packs || []) {
-          const att = await fetchAttivitaByPacchetto(p.id);
-          attMap[p.id] = Array.isArray(att) ? att : [];
-        }
-        setAttivitaMap(attMap);
-      };
-      loadAtt();
+      const attMap = {};
+      for (const p of packs || []) {
+        attMap[p.id] = Array.isArray(p.attivita) ? p.attivita : [];
+      }
+      setAttivitaMap(attMap);
     });
   }
 
