@@ -139,22 +139,30 @@ export default function CalendarioAttivita({
   /* Mapping note → eventi FullCalendar */
   const noteEvents = useMemo(() => noteCalendario.map(n => {
     const start = new Date(n.data);
-    const end = n.dataFine ? new Date(n.dataFine) : new Date(start.getTime() + 30 * 60 * 1000);
-    return {
+    // Se l'orario non è specificato (mezzanotte locale) → evento allDay banner
+    const isAllDay = start.getHours() === 0 && start.getMinutes() === 0;
+    const base = {
       id: `nota-${n.id}`,
       title: `📌 ${n.testo}`,
-      start,
-      end,
       backgroundColor: '#EDE9FE',
       borderColor: '#7C3AED',
       textColor: '#4C1D95',
       classNames: ['evt-nota'],
-      extendedProps: {
-        type: 'nota',
-        notaId: n.id,
-        clienteNome: n.cliente?.nomeReferente || null,
-      },
+      extendedProps: { type: 'nota', notaId: n.id, clienteNome: n.cliente?.nomeReferente || null },
     };
+    if (isAllDay) {
+      // end è esclusivo in FullCalendar → aggiungi 1 giorno
+      const startStr = n.data.slice(0, 10);
+      let endStr = startStr;
+      if (n.dataFine) {
+        const endDate = new Date(n.dataFine);
+        endDate.setDate(endDate.getDate() + 1);
+        endStr = endDate.toISOString().slice(0, 10);
+      }
+      return { ...base, start: startStr, end: endStr, allDay: true };
+    }
+    const end = n.dataFine ? new Date(n.dataFine) : new Date(start.getTime() + 30 * 60 * 1000);
+    return { ...base, start, end };
   }), [noteCalendario]);
 
   /* Mapping eventi */
@@ -197,7 +205,7 @@ export default function CalendarioAttivita({
       weekEnd.setDate(weekEnd.getDate() + 7);
 
       const weekEvents = events.filter(
-        e => e.start >= weekStart && e.start < weekEnd
+        e => !e.allDay && e.start >= weekStart && e.start < weekEnd
       );
 
       const hasSat = weekEvents.some(e => e.start.getDay() === 6);
@@ -437,7 +445,7 @@ export default function CalendarioAttivita({
         plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
         initialView={weekView ? "timeGridWeek" : "dayGridMonth"}
         initialDate={currentDate}
-        allDaySlot={false}
+        allDaySlot={true}
         eventDisplay={weekView ? "auto" : "block"}
         slotMinTime={weekView ? slotMinTime : undefined}
         slotMaxTime={weekView ? slotMaxTime : undefined}
