@@ -7,10 +7,13 @@ import Navbar from '../components/Navbar';
 import Alert from '../components/Alert';
 import ClientiForm from '../components/clienti/ClientiForm';
 import AdminOnly from '../components/auth/AdminOnly';
+import dynamic from 'next/dynamic';
+const PacchettiClienteList = dynamic(() => import('../components/clienti/PacchettiClienteList'), { ssr: false });
 
 // ─── card studente/referente ──────────────────────────────────────────────────
 
 function ClienteCard({ cliente, onEdit, onDelete }) {
+  const [showPacchetti, setShowPacchetti] = useState(false);
   const nome = cliente.nomeReferente || cliente.nome || "-";
   const initial = nome.charAt(0).toUpperCase();
   const isStudente = cliente.tipo === 'STUDENTE';
@@ -79,34 +82,33 @@ function ClienteCard({ cliente, onEdit, onDelete }) {
           {cliente.telefono && <div>📞 {cliente.telefono}</div>}
         </div>
 
-        {/* Link videolezione */}
-        {isStudente && cliente.linkVideolezione && (
-          <a
-            href={cliente.linkVideolezione}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, color: color, fontWeight: 600, textDecoration: 'none' }}
-          >
-            🎥 Entra in videolezione
-          </a>
-        )}
-
         {/* Azioni */}
-        <div style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {isStudente && (
             <a href={`/aula/${cliente.id}`} style={linkBtn(color)}>Aula</a>
           )}
-          <a href={`/pacchetti?clienteId=${cliente.id}`} style={linkBtn('#7C3AED')}>Pacchetti</a>
-          <a href={`/storico?clienteId=${cliente.id}`} style={linkBtn('#0ea5e9')}>Storico</a>
-          <button onClick={() => onEdit(cliente)} style={actionBtn('#475569')}>✏️ Modifica</button>
           <button
-            onClick={() => onDelete(cliente.id)}
-            style={{ ...actionBtn('#ef4444'), marginLeft: 'auto' }}
+            onClick={() => setShowPacchetti(p => !p)}
+            style={actionBtn(showPacchetti ? '#7C3AED' : '#475569')}
           >
-            🗑
+            Pacchetti {showPacchetti ? '▲' : '▼'}
           </button>
+          {isStudente && cliente.linkVideolezione && (
+            <a href={cliente.linkVideolezione} target="_blank" rel="noopener noreferrer" style={linkBtn('#0ea5e9')}>
+              Videolezione
+            </a>
+          )}
+          <button onClick={() => onEdit(cliente)} style={actionBtn('#475569')}>✏️ Modifica</button>
+          <button onClick={() => onDelete(cliente.id)} style={actionBtn('#ef4444')}>Elimina</button>
         </div>
       </div>
+
+      {/* Pacchetti espandibili */}
+      {showPacchetti && (
+        <div style={{ borderTop: '1px solid #e2e8f0', padding: '12px 14px', background: '#fafafa' }}>
+          <PacchettiClienteList clienteId={cliente.id} />
+        </div>
+      )}
     </div>
   );
 }
