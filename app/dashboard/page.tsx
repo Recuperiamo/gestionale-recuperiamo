@@ -38,14 +38,18 @@ export default function DashboardPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    // Carica note e lista clienti in parallelo
-    Promise.all([
-      fetch('/api/note').then(r => r.json()),
-      fetch('/api/clienti').then(r => r.json()),
-    ]).then(([noteData, clientiData]) => {
-      setNote(Array.isArray(noteData) ? noteData : []);
-      setClienti(Array.isArray(clientiData) ? clientiData : []);
-    }).catch(() => {}).finally(() => setNoteLoading(false));
+    // Note e clienti caricati separatamente per evitare che un errore blocchi l'altro
+    fetch('/api/note')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setNote(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setNoteLoading(false));
+
+    // Solo referenti per il dropdown (tipo=REFERENTE filtra server-side)
+    fetch('/api/clienti?tipo=REFERENTE')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setClienti(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [session]);
 
   async function handleAddNota(e) {

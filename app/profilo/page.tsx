@@ -6,6 +6,7 @@ import { useSession } from "../lib/auth/hooks";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
+import Link from "next/link";
 
 const MAIN_FONT = `'Segoe UI','Arial','Helvetica',sans-serif`;
 
@@ -15,11 +16,22 @@ export default function ProfiloPage() {
 
   const [calView, setCalView] = useState("week");
   const [msg, setMsg] = useState("");
+  const [note, setNote] = useState([]);
+  const [noteLoading, setNoteLoading] = useState(true);
 
   useEffect(() => {
     if (status === "loading") return;
     if (!session) router.replace("/signin");
   }, [status, session, router]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch('/api/note')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setNote(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setNoteLoading(false));
+  }, [session]);
 
   if (status === "loading" || !session) {
     return (
@@ -108,6 +120,61 @@ export default function ProfiloPage() {
             }}
           >
             {msg}
+          </div>
+        )}
+
+        {/* Note / Promemoria del docente */}
+        {(noteLoading || note.length > 0) && (
+          <div style={{ marginTop: 40 }}>
+            <h3 style={{
+              fontSize: 22, fontWeight: 700, color: "#20489a",
+              marginBottom: 16, paddingBottom: 10,
+              borderBottom: "2px solid #e3eefe",
+            }}>
+              📌 Note dal docente
+            </h3>
+            {noteLoading ? (
+              <div style={{ color: "#64748b", textAlign: "center", padding: 20 }}>
+                Caricamento…
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {note.map(n => {
+                  const hasDate = !!n.data;
+                  const isPast = hasDate && new Date(n.data) < new Date();
+                  const dateStr = hasDate
+                    ? new Date(n.data).toLocaleString("it-IT", {
+                        day: "2-digit", month: "2-digit", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                      })
+                    : null;
+                  return (
+                    <div key={n.id} style={{
+                      display: "flex", alignItems: "flex-start", gap: 12,
+                      background: isPast ? "#f8fafc" : "#faf5ff",
+                      border: `1px solid ${isPast ? "#e2e8f0" : "#e9d5ff"}`,
+                      borderLeft: `4px solid ${isPast ? "#94a3b8" : "#7C3AED"}`,
+                      borderRadius: 8, padding: "12px 16px",
+                      opacity: isPast ? 0.75 : 1,
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, color: "#1e293b", lineHeight: 1.5 }}>
+                          {n.testo}
+                        </div>
+                        {dateStr && (
+                          <div style={{
+                            marginTop: 6, fontSize: 12,
+                            color: isPast ? "#64748b" : "#6d28d9", fontWeight: 500,
+                          }}>
+                            📅 {dateStr}{isPast ? " (passata)" : ""}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </main>

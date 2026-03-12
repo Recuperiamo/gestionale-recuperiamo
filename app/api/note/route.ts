@@ -7,12 +7,29 @@ const prisma = new PrismaClient();
 
 export async function GET(request) {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+  if (!session) return Response.json({ error: 'Non autorizzato' }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+
+  // Studenti vedono solo le note assegnate a loro
+  if (session.user?.role === 'cliente') {
+    const clienteId = session.user?.clienteId;
+    if (!clienteId) return Response.json([]);
+    const note = await prisma.nota.findMany({
+      where: { clienteId: Number(clienteId) },
+      orderBy: [{ data: 'asc' }, { createdAt: 'desc' }],
+      include: {
+        cliente: { select: { id: true, nomeReferente: true, email: true } },
+      },
+    });
+    return Response.json(note);
+  }
+
+  // Admin/operatore: tutte le note (filtrabili per cliente)
+  if (session.user?.role !== 'admin' && session.user?.role !== 'operatore') {
     return Response.json({ error: 'Non autorizzato' }, { status: 401 });
   }
-  const { searchParams } = new URL(request.url);
   const clienteId = searchParams.get("clienteId");
-
   const note = await prisma.nota.findMany({
     where: clienteId ? { clienteId: Number(clienteId) } : undefined,
     orderBy: [{ data: 'asc' }, { createdAt: 'desc' }],
