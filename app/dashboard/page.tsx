@@ -8,27 +8,29 @@ import AuthGuard from '../components/AuthGuard';
 import Navbar from '../components/Navbar';
 import Link from 'next/link';
 
+function resetForm() {
+  return { testo: '', clienteIds: [], date: '', time: '' };
+}
+
 export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [richiestePending, setRichiestePending] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Note state
   const [note, setNote] = useState([]);
   const [clienti, setClienti] = useState([]);
   const [noteLoading, setNoteLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formTesto, setFormTesto] = useState('');
-  const [formClienteId, setFormClienteId] = useState('');
-  const [formData, setFormData] = useState('');
+  const [form, setForm] = useState(resetForm());
   const [formSaving, setFormSaving] = useState(false);
+  const [clientiSearch, setClientiSearch] = useState('');
 
   const isAdmin = ['admin', 'operatore'].includes(session?.user?.role);
 
   useEffect(() => {
     if (!session) return;
-    // Carica solo il conteggio richieste pending
+
     fetch('/api/modifiche')
       .then(r => r.json())
       .then(data => {
@@ -38,49 +40,61 @@ export default function DashboardPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    // Note e clienti caricati separatamente per evitare che un errore blocchi l'altro
     fetch('/api/note')
       .then(r => r.ok ? r.json() : [])
       .then(data => setNote(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setNoteLoading(false));
 
-    // Solo referenti per il dropdown (tipo=REFERENTE filtra server-side)
-    fetch('/api/clienti?tipo=REFERENTE')
+    // Tutti i clienti senza filtro di tipo — il filtro tipo=REFERENTE esclude
+    // clienti il cui campo tipo non è impostato o è diverso da REFERENTE
+    fetch('/api/clienti')
       .then(r => r.ok ? r.json() : [])
       .then(data => setClienti(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [session]);
 
+  function sortNote(arr) {
+    return [...arr].sort((a, b) => {
+      if (a.data && b.data) return new Date(a.data) - new Date(b.data);
+      if (a.data) return -1;
+      if (b.data) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+  }
+
   async function handleAddNota(e) {
     e.preventDefault();
-    if (!formTesto.trim()) return;
+    if (!form.testo.trim()) return;
     setFormSaving(true);
+
+    // Combina data + ora in un ISO string (o null se assente)
+    const dataISO = form.date
+      ? new Date(`${form.date}T${form.time || '00:00'}`).toISOString()
+      : null;
+
+    // Se nessun cliente selezionato → una nota senza cliente
+    // Se più clienti → una nota per ciascuno
+    const targets = form.clienteIds.length > 0 ? form.clienteIds : [null];
+    const nuove = [];
+
     try {
-      const res = await fetch('/api/note', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          testo: formTesto,
-          clienteId: formClienteId || null,
-          data: formData || null,
-        }),
-      });
-      if (res.ok) {
-        const nuova = await res.json();
-        setNote(prev => {
-          const aggiornate = [...prev, nuova];
-          // Ordina: prima quelle con data (asc), poi quelle senza (per createdAt desc)
-          return aggiornate.sort((a, b) => {
-            if (a.data && b.data) return new Date(a.data) - new Date(b.data);
-            if (a.data) return -1;
-            if (b.data) return 1;
-            return new Date(b.createdAt) - new Date(a.createdAt);
-          });
+      for (const cid of targets) {
+        const res = await fetch('/api/note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            testo: form.testo,
+            clienteId: cid || null,
+            data: dataISO,
+          }),
         });
-        setFormTesto('');
-        setFormClienteId('');
-        setFormData('');
+        if (res.ok) nuove.push(await res.json());
+      }
+      if (nuove.length > 0) {
+        setNote(prev => sortNote([...prev, ...nuove]));
+        setForm(resetForm());
+        setClientiSearch('');
         setShowForm(false);
       }
     } finally {
@@ -93,10 +107,24 @@ export default function DashboardPage() {
     setNote(prev => prev.filter(n => n.id !== id));
   }
 
+  function toggleCliente(id) {
+    setForm(prev => ({
+      ...prev,
+      clienteIds: prev.clienteIds.includes(id)
+        ? prev.clienteIds.filter(x => x !== id)
+        : [...prev.clienteIds, id],
+    }));
+  }
+
   if (!isAdmin) {
     if (typeof window !== 'undefined') router.replace('/profilo');
     return null;
   }
+
+  const clientiFiltrati = clienti.filter(c =>
+    !clientiSearch ||
+    c.nomeReferente?.toLowerCase().includes(clientiSearch.toLowerCase())
+  );
 
   return (
     <AuthGuard>
@@ -117,7 +145,6 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Badge richieste pending */}
         {!loading && richiestePending > 0 && (
           <Link href="/richieste" style={{ textDecoration: 'none' }}>
             <div style={{
@@ -135,148 +162,216 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-          gap: 24,
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
           {/* ── NOTE E PROMEMORIA ── */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <Card title="Note e Promemoria">
-              {/* Form aggiungi nota */}
-              {showForm ? (
-                <form onSubmit={handleAddNota} style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <textarea
-                      autoFocus
-                      placeholder="Testo del promemoria..."
-                      value={formTesto}
-                      onChange={e => setFormTesto(e.target.value)}
-                      required
-                      style={{
-                        width: '100%', minHeight: 80, padding: 10,
-                        border: '1px solid #c4b5fd', borderRadius: 8, fontSize: 14,
-                        fontFamily: 'inherit', resize: 'vertical', background: '#faf5ff',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <div style={{ flex: '1 1 200px' }}>
-                        <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
-                          Cliente (opzionale)
-                        </label>
-                        <select
-                          value={formClienteId}
-                          onChange={e => setFormClienteId(e.target.value)}
-                          style={{
-                            width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0',
-                            borderRadius: 8, fontSize: 14, background: '#fff',
-                          }}
-                        >
-                          <option value="">— Nessun cliente —</option>
-                          {clienti.filter(c => c.tipo !== 'STUDENTE').map(c => (
-                            <option key={c.id} value={c.id}>{c.nomeReferente}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div style={{ flex: '1 1 180px' }}>
-                        <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
-                          Data/ora (opzionale – appare nel calendario)
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={formData}
-                          onChange={e => setFormData(e.target.value)}
-                          style={{
-                            width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0',
-                            borderRadius: 8, fontSize: 14, background: '#fff',
-                          }}
-                        />
-                      </div>
+          <Card title="Note e Promemoria">
+            {showForm ? (
+              <form onSubmit={handleAddNota} style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                  {/* Testo */}
+                  <textarea
+                    autoFocus
+                    placeholder="Testo del promemoria..."
+                    value={form.testo}
+                    onChange={e => setForm(p => ({ ...p, testo: e.target.value }))}
+                    required
+                    style={{
+                      width: '100%', minHeight: 80, padding: 10,
+                      border: '1px solid #c4b5fd', borderRadius: 8, fontSize: 14,
+                      fontFamily: 'inherit', resize: 'vertical', background: '#faf5ff',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  {/* Data + Ora */}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 160px' }}>
+                      <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                        Data (opzionale – appare nel calendario)
+                      </label>
+                      <input
+                        type="date"
+                        value={form.date}
+                        onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
+                        style={{
+                          width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0',
+                          borderRadius: 8, fontSize: 14, background: '#fff', boxSizing: 'border-box',
+                        }}
+                      />
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        type="submit"
-                        disabled={formSaving || !formTesto.trim()}
+                    <div style={{ flex: '1 1 130px' }}>
+                      <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                        Ora (opzionale)
+                      </label>
+                      <input
+                        type="time"
+                        value={form.time}
+                        onChange={e => setForm(p => ({ ...p, time: e.target.value }))}
+                        disabled={!form.date}
                         style={{
-                          background: '#7C3AED', color: '#fff', border: 'none',
-                          borderRadius: 8, padding: '9px 20px', fontWeight: 600,
-                          fontSize: 14, cursor: formSaving ? 'not-allowed' : 'pointer',
-                          opacity: formSaving ? 0.7 : 1,
+                          width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0',
+                          borderRadius: 8, fontSize: 14,
+                          background: form.date ? '#fff' : '#f8fafc',
+                          color: form.date ? '#1e293b' : '#94a3b8',
+                          boxSizing: 'border-box',
                         }}
-                      >
-                        {formSaving ? 'Salvataggio…' : 'Salva nota'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowForm(false); setFormTesto(''); setFormClienteId(''); setFormData(''); }}
-                        style={{
-                          background: '#f1f5f9', color: '#64748b', border: 'none',
-                          borderRadius: 8, padding: '9px 16px', fontWeight: 500,
-                          fontSize: 14, cursor: 'pointer',
-                        }}
-                      >
-                        Annulla
-                      </button>
+                      />
                     </div>
                   </div>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setShowForm(true)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: '#f5f3ff', color: '#7C3AED',
-                    border: '2px dashed #c4b5fd', borderRadius: 10,
-                    padding: '10px 18px', fontWeight: 600, fontSize: 14,
-                    cursor: 'pointer', marginBottom: 16, width: '100%',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>+</span> Aggiungi promemoria
-                </button>
-              )}
 
-              {/* Lista note */}
-              {noteLoading ? (
-                <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
-                  Caricamento note…
+                  {/* Selezione clienti (multipla) */}
+                  <div>
+                    <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 6 }}>
+                      Clienti (opzionale – seleziona uno o più)
+                      {form.clienteIds.length > 0 && (
+                        <span style={{
+                          marginLeft: 8, background: '#7C3AED', color: '#fff',
+                          borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 700,
+                        }}>
+                          {form.clienteIds.length} selezionat{form.clienteIds.length === 1 ? 'o' : 'i'}
+                        </span>
+                      )}
+                    </label>
+
+                    {clienti.length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#94a3b8', padding: '8px 0' }}>
+                        Nessun cliente disponibile
+                      </div>
+                    ) : (
+                      <div style={{
+                        border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden',
+                      }}>
+                        {/* Ricerca */}
+                        <div style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                          <input
+                            type="text"
+                            placeholder="Cerca cliente…"
+                            value={clientiSearch}
+                            onChange={e => setClientiSearch(e.target.value)}
+                            style={{
+                              width: '100%', border: 'none', background: 'transparent',
+                              fontSize: 13, outline: 'none', padding: '2px 4px',
+                            }}
+                          />
+                        </div>
+                        {/* Lista checkbox */}
+                        <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                          {clientiFiltrati.length === 0 ? (
+                            <div style={{ padding: '10px 12px', fontSize: 13, color: '#94a3b8' }}>
+                              Nessun risultato
+                            </div>
+                          ) : clientiFiltrati.map(c => (
+                            <label key={c.id} style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '8px 12px', cursor: 'pointer',
+                              background: form.clienteIds.includes(c.id) ? '#f5f3ff' : '#fff',
+                              borderBottom: '1px solid #f1f5f9',
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={form.clienteIds.includes(c.id)}
+                                onChange={() => toggleCliente(c.id)}
+                                style={{ width: 15, height: 15, accentColor: '#7C3AED', cursor: 'pointer' }}
+                              />
+                              <span style={{ fontSize: 14, color: '#1e293b' }}>
+                                {c.nomeReferente}
+                              </span>
+                              {c.tipo === 'STUDENTE' && (
+                                <span style={{
+                                  fontSize: 10, color: '#64748b', background: '#f1f5f9',
+                                  borderRadius: 6, padding: '1px 6px', marginLeft: 'auto',
+                                }}>
+                                  studente
+                                </span>
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button
+                      type="submit"
+                      disabled={formSaving || !form.testo.trim()}
+                      style={{
+                        background: '#7C3AED', color: '#fff', border: 'none',
+                        borderRadius: 8, padding: '9px 20px', fontWeight: 600,
+                        fontSize: 14, cursor: formSaving ? 'not-allowed' : 'pointer',
+                        opacity: formSaving || !form.testo.trim() ? 0.6 : 1,
+                      }}
+                    >
+                      {formSaving
+                        ? 'Salvataggio…'
+                        : form.clienteIds.length > 1
+                          ? `Salva per ${form.clienteIds.length} clienti`
+                          : 'Salva nota'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowForm(false); setForm(resetForm()); setClientiSearch(''); }}
+                      style={{
+                        background: '#f1f5f9', color: '#64748b', border: 'none',
+                        borderRadius: 8, padding: '9px 16px', fontWeight: 500,
+                        fontSize: 14, cursor: 'pointer',
+                      }}
+                    >
+                      Annulla
+                    </button>
+                  </div>
                 </div>
-              ) : note.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontStyle: 'italic' }}>
-                  Nessun promemoria. Aggiungine uno con il pulsante sopra.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {note.map(n => (
-                    <NotaCard
-                      key={n.id}
-                      nota={n}
-                      onDelete={() => handleDeleteNota(n.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setShowForm(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: '#f5f3ff', color: '#7C3AED',
+                  border: '2px dashed #c4b5fd', borderRadius: 10,
+                  padding: '10px 18px', fontWeight: 600, fontSize: 14,
+                  cursor: 'pointer', marginBottom: 16, width: '100%',
+                  justifyContent: 'center',
+                }}
+              >
+                <span style={{ fontSize: 18 }}>+</span> Aggiungi promemoria
+              </button>
+            )}
+
+            {noteLoading ? (
+              <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                Caricamento note…
+              </div>
+            ) : note.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontStyle: 'italic' }}>
+                Nessun promemoria. Aggiungine uno con il pulsante sopra.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {note.map(n => (
+                  <NotaCard key={n.id} nota={n} onDelete={() => handleDeleteNota(n.id)} />
+                ))}
+              </div>
+            )}
+          </Card>
 
           {/* ── AZIONI RAPIDE ── */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <Card title="Azioni Rapide">
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: 12,
-              }}>
-                <QuickLink href="/attivita" icon="➕" label="Crea Nuova Lezione" />
-                <QuickLink href="/clienti" icon="👤" label="Gestisci Clienti" />
-                <QuickLink href="/pacchetti" icon="📦" label="Gestisci Pacchetti" />
-                <QuickLink href="/calendario" icon="📅" label="Visualizza Calendario" />
-                <QuickLink href="/richieste" icon="📋" label="Vedi Richieste" />
-                <QuickLink href="/storico" icon="📊" label="Storico Attività" />
-              </div>
-            </Card>
-          </div>
+          <Card title="Azioni Rapide">
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 12,
+            }}>
+              <QuickLink href="/attivita" icon="➕" label="Crea Nuova Lezione" />
+              <QuickLink href="/clienti" icon="👤" label="Gestisci Clienti" />
+              <QuickLink href="/pacchetti" icon="📦" label="Gestisci Pacchetti" />
+              <QuickLink href="/calendario" icon="📅" label="Visualizza Calendario" />
+              <QuickLink href="/richieste" icon="📋" label="Vedi Richieste" />
+              <QuickLink href="/storico" icon="📊" label="Storico Attività" />
+            </div>
+          </Card>
         </div>
       </main>
     </AuthGuard>
@@ -326,7 +421,7 @@ function NotaCard({ nota, onDelete }) {
               color: isPast ? '#64748b' : '#6d28d9',
               fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 12,
             }}>
-              📅 {dateStr} {isPast ? '(passata)' : ''}
+              📅 {dateStr}{isPast ? ' (passata)' : ''}
             </span>
           )}
         </div>
