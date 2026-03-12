@@ -3817,10 +3817,6 @@ export default function LavagnaCanvas({
 
   // Zoom via rotella mouse
   const handleWheel = useCallback((event) => {
-    if (spectatorModeRef.current && !isAdmin) {
-      event.preventDefault();
-      return;
-    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     event.preventDefault();
@@ -3851,7 +3847,6 @@ export default function LavagnaCanvas({
   }, [handleWheel]);
 
   const applyZoomAt = useCallback((factor, pivot) => {
-    if (spectatorModeRef.current && !isAdmin) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -3878,17 +3873,14 @@ export default function LavagnaCanvas({
   }, [drawAll, isAdmin]);
 
   const handleZoomIn = useCallback(() => {
-    if (spectatorModeRef.current && !isAdmin) return;
     applyZoomAt(1.1);
   }, [applyZoomAt, isAdmin]);
   
   const handleZoomOut = useCallback(() => {
-    if (spectatorModeRef.current && !isAdmin) return;
     applyZoomAt(0.9);
   }, [applyZoomAt, isAdmin]);
 
   const handleResetZoom = useCallback(() => {
-    if (spectatorModeRef.current && !isAdmin) return;
     const nextPan = { x: 0, y: 0 };
     panRef.current = nextPan;
     zoomRef.current = 1;
@@ -6785,12 +6777,12 @@ export default function LavagnaCanvas({
         {/* Pannello modifica selezione: colore, spessore, z-order */}
         {strumento === 'selezione' && hasSelection && (
           <div style={{
-            position: 'absolute',
+            position: 'fixed',
             bottom: isMobile ? 80 : 90,
             left: isMobile ? 8 : '50%',
             right: isMobile ? 8 : 'auto',
             transform: isMobile ? 'none' : 'translateX(-50%)',
-            zIndex: 4,
+            zIndex: 1200,
             background: 'rgba(255,255,255,0.97)',
             border: '1px solid #dbe6f5',
             borderRadius: 14,
@@ -6888,8 +6880,7 @@ export default function LavagnaCanvas({
             ...st.zoomControls,
             ...(isMobile && {
               right: 8,
-              top: 8,
-              bottom: 'auto',
+              bottom: 72,
               padding: '6px 6px 6px 8px',
               gap: 4,
               borderRadius: 12
@@ -7146,20 +7137,21 @@ const st = {
     cursor: "pointer"
   },
   topRightActions: {
-    position: "absolute",
+    position: "fixed",
     right: 12,
-    top: 12,
+    top: 10,
     display: "flex",
-    gap: 12,
-    zIndex: 3
+    gap: 8,
+    zIndex: 1200
   },
   topRightActionsOuter: {
-    position: "relative",
+    position: "fixed",
+    right: 12,
+    top: 10,
     display: "flex",
-    gap: 12,
-    justifyContent: "flex-end",
+    gap: 8,
     alignItems: "center",
-    marginBottom: 8
+    zIndex: 1200
   },
   exportWrapper: {
     position: 'relative'
@@ -7376,9 +7368,9 @@ const st = {
     letterSpacing: ".3px"
   },
   zoomControls: {
-    position: 'absolute',
-    right: 18,
-    bottom: 18,
+    position: 'fixed',
+    right: 12,
+    bottom: 80,
     display: 'flex',
     alignItems: 'center',
     gap: 6,
