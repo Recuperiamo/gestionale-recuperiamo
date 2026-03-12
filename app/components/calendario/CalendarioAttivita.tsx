@@ -139,7 +139,7 @@ export default function CalendarioAttivita({
   /* Mapping note → eventi FullCalendar */
   const noteEvents = useMemo(() => noteCalendario.map(n => {
     const start = new Date(n.data);
-    const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 min
+    const end = n.dataFine ? new Date(n.dataFine) : new Date(start.getTime() + 30 * 60 * 1000);
     return {
       id: `nota-${n.id}`,
       title: `📌 ${n.testo}`,

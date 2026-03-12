@@ -5,27 +5,28 @@ import { authOptions } from "../auth/[...nextauth]/authOptions";
 
 const prisma = new PrismaClient();
 
+const noteInclude = {
+  cliente: { select: { id: true, nomeReferente: true, email: true } },
+};
+
 export async function GET(request) {
   const session = await getServerSession(authOptions);
   if (!session) return Response.json({ error: 'Non autorizzato' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
 
-  // Studenti vedono solo le note assegnate a loro
+  // Studenti: solo note assegnate a loro
   if (session.user?.role === 'cliente') {
     const clienteId = session.user?.clienteId;
     if (!clienteId) return Response.json([]);
     const note = await prisma.nota.findMany({
       where: { clienteId: Number(clienteId) },
       orderBy: [{ data: 'asc' }, { createdAt: 'desc' }],
-      include: {
-        cliente: { select: { id: true, nomeReferente: true, email: true } },
-      },
+      include: noteInclude,
     });
     return Response.json(note);
   }
 
-  // Admin/operatore: tutte le note (filtrabili per cliente)
   if (session.user?.role !== 'admin' && session.user?.role !== 'operatore') {
     return Response.json({ error: 'Non autorizzato' }, { status: 401 });
   }
@@ -33,9 +34,7 @@ export async function GET(request) {
   const note = await prisma.nota.findMany({
     where: clienteId ? { clienteId: Number(clienteId) } : undefined,
     orderBy: [{ data: 'asc' }, { createdAt: 'desc' }],
-    include: {
-      cliente: { select: { id: true, nomeReferente: true, email: true } },
-    },
+    include: noteInclude,
   });
   return Response.json(note);
 }
@@ -46,12 +45,11 @@ export async function POST(request) {
     return Response.json({ error: 'Non autorizzato' }, { status: 401 });
   }
   const body = await request.json();
-  const { testo, clienteId, data, colore } = body;
+  const { testo, clienteId, data, dataFine, colore } = body;
   if (!testo?.trim()) {
     return Response.json({ error: 'Il testo è obbligatorio' }, { status: 400 });
   }
 
-  // Recupera l'ID utente dalla sessione
   const user = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
   if (!user) return Response.json({ error: 'Utente non trovato' }, { status: 404 });
 
@@ -60,12 +58,11 @@ export async function POST(request) {
       testo: testo.trim(),
       clienteId: clienteId ? Number(clienteId) : null,
       data: data ? new Date(data) : null,
+      dataFine: dataFine ? new Date(dataFine) : null,
       colore: colore || '#7C3AED',
       autoreUserId: user.id,
     },
-    include: {
-      cliente: { select: { id: true, nomeReferente: true, email: true } },
-    },
+    include: noteInclude,
   });
   return Response.json(nota, { status: 201 });
 }

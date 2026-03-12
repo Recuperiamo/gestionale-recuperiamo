@@ -405,7 +405,8 @@ model Nota {
   id            Int       @id @default(autoincrement())
   testo         String
   clienteId     Int?      // Opzionale: nota associata ad un cliente specifico
-  data          DateTime? // Se impostata, la nota appare nel calendario
+  data          DateTime? // Data/ora inizio — se impostata appare nel calendario
+  dataFine      DateTime? // Data/ora fine (opzionale)
   colore        String?   @default("#7C3AED")
   autoreUserId  Int
   createdAt     DateTime  @default(now())
