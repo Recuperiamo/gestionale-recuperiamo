@@ -220,6 +220,23 @@ export default function LavagnaFullScreenPage() {
                 )}
               </div>
             )}
+            {canvasActions?.spectatorIndicatorVisible && (
+              <div
+                style={{
+                  ...eyeBadge,
+                  cursor: canvasActions.onToggleSpectator ? 'pointer' : 'default',
+                }}
+                onClick={() => canvasActions.onToggleSpectator?.()}
+                title={canvasActions.spectatorIndicatorTitle || 'Modalità spettatore'}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
+                </svg>
+                {canvasActions.isAdmin && canvasActions.spectatorCount > 0 && (
+                  <span style={eyeCount}>{canvasActions.spectatorCount}</span>
+                )}
+              </div>
+            )}
             {!isMobile && (
               <button style={btn} onClick={() => window.close()}>Chiudi</button>
             )}
@@ -329,4 +346,21 @@ const exportItem = {
   fontSize: 13,
   color: "#20489a",
   fontWeight: 500,
+};
+const eyeBadge = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  padding: "6px 10px",
+  borderRadius: 999,
+  background: "rgba(32,72,154,0.12)",
+  border: "1px solid rgba(32,72,154,0.2)",
+  color: "#20489a",
+  fontSize: 12,
+  fontWeight: 600,
+  position: "relative",
+};
+const eyeCount = {
+  fontSize: 12,
+  fontWeight: 600,
 };

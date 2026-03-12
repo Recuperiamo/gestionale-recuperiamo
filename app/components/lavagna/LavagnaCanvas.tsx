@@ -6728,7 +6728,14 @@ export default function LavagnaCanvas({
     onActionsChange({
       esportaPNG,
       esportaPDF,
-      openNewWindow: openNewWindowHandler
+      openNewWindow: openNewWindowHandler,
+      // stato spettatore per renderizzazione nella topbar parent
+      spectatorIndicatorVisible,
+      spectatorIndicatorTitle,
+      spectatorCount,
+      spectatorMode,
+      isAdmin,
+      onToggleSpectator: (!isAdmin && spectatorMode) ? () => setSpectatorMode(false) : null,
     });
     return () => {
       onActionsChange?.(null);
@@ -6739,7 +6746,12 @@ export default function LavagnaCanvas({
     esportaPNG,
     esportaPDF,
     openInNewWindow,
-    attivitaId
+    attivitaId,
+    spectatorIndicatorVisible,
+    spectatorIndicatorTitle,
+    spectatorCount,
+    spectatorMode,
+    isAdmin,
   ]);
 
   // == RENDER ==
@@ -6802,8 +6814,8 @@ export default function LavagnaCanvas({
           )}
         </div>
       )}
-      {/* Indicatore modalità spettatore — posizionato in basso a destra, sopra i controlli zoom */}
-      {spectatorIndicatorVisible && (
+      {/* Indicatore modalità spettatore — solo in modalità in-canvas (in external lo gestisce il parent) */}
+      {spectatorIndicatorVisible && topRightPlacement !== 'external' && (
         <div
           style={{
             position: 'fixed',
@@ -6933,8 +6945,8 @@ export default function LavagnaCanvas({
           <div ref={zoomControlsRef} style={{
             ...st.zoomControls,
             ...(isMobile && {
-              right: 8,
-              bottom: 72,
+              right: 50,
+              bottom: 16,
               padding: '6px 6px 6px 8px',
               gap: 4,
               borderRadius: 12
@@ -7423,8 +7435,8 @@ const st = {
   },
   zoomControls: {
     position: 'fixed',
-    right: 12,
-    bottom: 80,
+    right: 60,
+    bottom: 20,
     display: 'flex',
     alignItems: 'center',
     gap: 6,
