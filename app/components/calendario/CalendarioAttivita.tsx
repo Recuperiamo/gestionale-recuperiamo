@@ -51,6 +51,7 @@ export default function CalendarioAttivita({
   const [loading, setLoading] = useState(true);
   const [errore, setErrore] = useState(null);
   const [attivita, setAttivita] = useState([]);
+  const [noteCalendario, setNoteCalendario] = useState([]);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   const [hiddenDays, setHiddenDays] = useState([]);
@@ -119,8 +120,46 @@ export default function CalendarioAttivita({
     };
   }, [effectiveClienteId, showCreate, refreshCounter]);
 
+  /* Fetch note (solo admin) — note con data compaiono nel calendario */
+  useEffect(() => {
+    if (!isAdmin) return;
+    const url = effectiveClienteId
+      ? `/api/note?clienteId=${effectiveClienteId}`
+      : '/api/note';
+    fetch(url, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        const arr = Array.isArray(data) ? data : [];
+        // Solo note con data impostata
+        setNoteCalendario(arr.filter(n => !!n.data));
+      })
+      .catch(() => {});
+  }, [isAdmin, effectiveClienteId, refreshCounter]);
+
+  /* Mapping note → eventi FullCalendar */
+  const noteEvents = useMemo(() => noteCalendario.map(n => {
+    const start = new Date(n.data);
+    const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 min
+    return {
+      id: `nota-${n.id}`,
+      title: `📌 ${n.testo}`,
+      start,
+      end,
+      backgroundColor: '#EDE9FE',
+      borderColor: '#7C3AED',
+      textColor: '#4C1D95',
+      classNames: ['evt-nota'],
+      extendedProps: {
+        type: 'nota',
+        notaId: n.id,
+        clienteNome: n.cliente?.nomeReferente || null,
+      },
+    };
+  }), [noteCalendario]);
+
   /* Mapping eventi */
-  const { events } = useMemo(() => mapAttivita(attivita), [attivita]);
+  const { events: attivitaEvents } = useMemo(() => mapAttivita(attivita), [attivita]);
+  const events = useMemo(() => [...attivitaEvents, ...noteEvents], [attivitaEvents, noteEvents]);
 
   /* Pre-creazione lavagne 5 minuti prima */
   useEffect(() => {
@@ -308,9 +347,21 @@ export default function CalendarioAttivita({
     info.el.setAttribute("data-event-id", info.event.id);
   }, [enableAdminRequests, isAdmin, openRequestByAttId]);
 
-  const renderEventContent = useCallback(arg => (
-    <div className="cal-event-inner">{arg.event.title}</div>
-  ), []);
+  const renderEventContent = useCallback(arg => {
+    const isNota = arg.event.extendedProps?.type === 'nota';
+    if (isNota) {
+      const clienteNome = arg.event.extendedProps?.clienteNome;
+      return (
+        <div className="cal-event-inner" style={{ fontSize: 12, lineHeight: 1.3 }}>
+          <span>{arg.event.title}</span>
+          {clienteNome && (
+            <span style={{ opacity: 0.75, marginLeft: 4 }}>— {clienteNome}</span>
+          )}
+        </div>
+      );
+    }
+    return <div className="cal-event-inner">{arg.event.title}</div>;
+  }, []);
 
   /* Range label */
   const headerRange = useMemo(() => {

@@ -24,6 +24,7 @@ model User {
   passwordResetRequests  PasswordResetRequest[]   @relation("UserPasswordResetRequests")
   passwordResetReviews   PasswordResetRequest[]   @relation("UserPasswordResetReviews")
   programmiCreati        Programma[]
+  note                   Nota[]
 }
 
 model Role {
@@ -87,6 +88,7 @@ model Client {
   pacchetti         PacchettoOre[]
   richiesteModifica RichiestaModifica[]
   programmi          Programma[]
+  promemoria        Nota[]   @relation("ClienteNote")
 
   @@index([email])
   @@index([referenteId])
@@ -395,4 +397,24 @@ model Programma {
 
   @@index([clienteId])
   @@index([materia])
+}
+
+/// *
+///  * ====================== NOTE / PROMEMORIA ======================
+model Nota {
+  id            Int       @id @default(autoincrement())
+  testo         String
+  clienteId     Int?      // Opzionale: nota associata ad un cliente specifico
+  data          DateTime? // Se impostata, la nota appare nel calendario
+  colore        String?   @default("#7C3AED")
+  autoreUserId  Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  cliente       Client?   @relation("ClienteNote", fields: [clienteId], references: [id], onDelete: SetNull)
+  autoreUser    User      @relation(fields: [autoreUserId], references: [id])
+
+  @@index([clienteId])
+  @@index([data])
+  @@index([autoreUserId])
 }

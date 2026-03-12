@@ -11,135 +11,86 @@ import Link from 'next/link';
 export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [stats, setStats] = useState(null);
+  const [richiestePending, setRichiestePending] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState('');
+
+  // Note state
+  const [note, setNote] = useState([]);
+  const [clienti, setClienti] = useState([]);
+  const [noteLoading, setNoteLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formTesto, setFormTesto] = useState('');
+  const [formClienteId, setFormClienteId] = useState('');
+  const [formData, setFormData] = useState('');
+  const [formSaving, setFormSaving] = useState(false);
 
   const isAdmin = ['admin', 'operatore'].includes(session?.user?.role);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('dashboard-notes');
-    if (stored) setNotes(stored);
-  }, []);
-
-  useEffect(() => {
     if (!session) return;
-    loadStats();
+    // Carica solo il conteggio richieste pending
+    fetch('/api/modifiche')
+      .then(r => r.json())
+      .then(data => {
+        const arr = Array.isArray(data.richieste) ? data.richieste : [];
+        setRichiestePending(arr.filter(r => ['pending', 'in_review'].includes(r.stato)).length);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+
+    // Carica note e lista clienti in parallelo
+    Promise.all([
+      fetch('/api/note').then(r => r.json()),
+      fetch('/api/clienti').then(r => r.json()),
+    ]).then(([noteData, clientiData]) => {
+      setNote(Array.isArray(noteData) ? noteData : []);
+      setClienti(Array.isArray(clientiData) ? clientiData : []);
+    }).catch(() => {}).finally(() => setNoteLoading(false));
   }, [session]);
 
-  async function loadStats() {
+  async function handleAddNota(e) {
+    e.preventDefault();
+    if (!formTesto.trim()) return;
+    setFormSaving(true);
     try {
-      setLoading(true);
-      
-      // Carica dati in parallelo
-      const [attivitaRes, clientiRes, pacchettiRes, richiesteRes] = await Promise.all([
-        fetch('/api/attivita'),
-        fetch('/api/clienti'),
-        fetch('/api/pacchetti'),
-        fetch('/api/modifiche')
-      ]);
-
-      const attivita = await attivitaRes.json();
-      const clienti = await clientiRes.json();
-      const pacchetti = await pacchettiRes.json();
-      const richieste = await richiesteRes.json();
-
-      // Calcola statistiche
-      const now = new Date();
-      const oggi = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const settimanaFa = new Date(oggi);
-      settimanaFa.setDate(settimanaFa.getDate() - 7);
-      const meseFa = new Date(oggi);
-      meseFa.setMonth(meseFa.getMonth() - 1);
-
-      const attivitaArray = Array.isArray(attivita) ? attivita : [];
-      const clientiArray = Array.isArray(clienti) ? clienti : [];
-      const pacchettiArray = Array.isArray(pacchetti) ? pacchetti : [];
-      const richiesteArray = Array.isArray(richieste.richieste) ? richieste.richieste : [];
-
-      // Filtra attività
-      const lezioniOggi = attivitaArray.filter(a => {
-        const orario = new Date(a.orario);
-        return orario >= oggi && orario < new Date(oggi.getTime() + 24*60*60*1000);
+      const res = await fetch('/api/note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          testo: formTesto,
+          clienteId: formClienteId || null,
+          data: formData || null,
+        }),
       });
-
-      const lezioniSettimana = attivitaArray.filter(a => {
-        const orario = new Date(a.orario);
-        return orario >= oggi && orario < new Date(oggi.getTime() + 7*24*60*60*1000);
-      });
-
-      const lezioniPassate = attivitaArray.filter(a => {
-        const orario = new Date(a.orario);
-        return orario < oggi && a.stato !== 'cancellata';
-      });
-
-      const lezioniFuture = attivitaArray.filter(a => {
-        const orario = new Date(a.orario);
-        return orario >= oggi && a.stato !== 'cancellata';
-      });
-
-      const lezioniCancellate = attivitaArray.filter(a => a.stato === 'cancellata');
-
-      // Richieste pending
-      const richiestePending = richiesteArray.filter(r => 
-        ['pending', 'in_review'].includes(r.stato)
-      );
-
-      // Pacchetti attivi
-      const pacchettiAttivi = pacchettiArray.filter(p => {
-        const scadenza = p.scadenza ? new Date(p.scadenza) : null;
-        return !scadenza || scadenza > now;
-      });
-
-      // Pacchetti con problemi
-      const pacchettiEsauriti = pacchettiArray.filter(p => p.oreResidue === 0);
-      const pacchettiInEsaurimento = pacchettiArray.filter(p => {
-        const sogliaAlert = p.sogliaOreResidue || 5;
-        return p.oreResidue > 0 && p.oreResidue <= sogliaAlert;
-      });
-
-      // Ore totali erogate ultimo mese
-      const oreMese = attivitaArray
-        .filter(a => {
-          const orario = new Date(a.orario);
-          return orario >= meseFa && orario <= now && a.stato !== 'cancellata';
-        })
-        .reduce((sum, a) => sum + (a.oreConsumate || a.durataOre || 0), 0);
-
-      setStats({
-        totaleClienti: clientiArray.length,
-        totalePacchetti: pacchettiArray.length,
-        pacchettiAttivi: pacchettiAttivi.length,
-        pacchettiEsauriti: pacchettiEsauriti,
-        pacchettiInEsaurimento: pacchettiInEsaurimento,
-        totaleLezioni: attivitaArray.length,
-        lezioniOggi: lezioniOggi.length,
-        lezioniOggiDettaglio: lezioniOggi, // Aggiungo array completo
-        lezioniSettimana: lezioniSettimana.length,
-        lezioniFuture: lezioniFuture.length,
-        lezioniPassate: lezioniPassate.length,
-        lezioniCancellate: lezioniCancellate.length,
-        richiestePending: richiestePending.length,
-        oreMese: oreMese,
-        prossimaLezione: lezioniFuture.sort((a, b) => 
-          new Date(a.orario) - new Date(b.orario)
-        )[0],
-        ultimaLezione: lezioniPassate.sort((a, b) => 
-          new Date(b.orario) - new Date(a.orario)
-        )[0]
-      });
-    } catch (e) {
-      console.error('Errore caricamento stats:', e);
+      if (res.ok) {
+        const nuova = await res.json();
+        setNote(prev => {
+          const aggiornate = [...prev, nuova];
+          // Ordina: prima quelle con data (asc), poi quelle senza (per createdAt desc)
+          return aggiornate.sort((a, b) => {
+            if (a.data && b.data) return new Date(a.data) - new Date(b.data);
+            if (a.data) return -1;
+            if (b.data) return 1;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
+        });
+        setFormTesto('');
+        setFormClienteId('');
+        setFormData('');
+        setShowForm(false);
+      }
     } finally {
-      setLoading(false);
+      setFormSaving(false);
     }
   }
 
+  async function handleDeleteNota(id) {
+    await fetch(`/api/note/${id}`, { method: 'DELETE' });
+    setNote(prev => prev.filter(n => n.id !== id));
+  }
+
   if (!isAdmin) {
-    if (typeof window !== 'undefined') {
-      router.replace('/profilo');
-    }
+    if (typeof window !== 'undefined') router.replace('/profilo');
     return null;
   }
 
@@ -150,214 +101,168 @@ export default function DashboardPage() {
         maxWidth: 1400,
         margin: '0 auto',
         padding: '32px 24px',
-        background: '#f8fafc'
+        background: '#f8fafc',
+        minHeight: '100vh',
       }}>
-        <div style={{
-          marginBottom: 32
-        }}>
-          <h1 style={{
-            fontSize: 32,
-            fontWeight: 700,
-            color: '#1e293b',
-            marginBottom: 8
-          }}>
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>
             Dashboard
           </h1>
-          <p style={{
-            fontSize: 16,
-            color: '#64748b'
-          }}>
+          <p style={{ fontSize: 16, color: '#64748b' }}>
             Benvenuto, {session?.user?.name || 'Admin'}
           </p>
         </div>
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
-            Caricamento statistiche...
-          </div>
-        ) : stats ? (
-          <>
-            {/* Alert Pacchetti in Alto */}
-            {(stats.pacchettiEsauriti.length > 0 || stats.pacchettiInEsaurimento.length > 0) && (
-              <div style={{ marginBottom: 24 }}>
-                {stats.pacchettiEsauriti.length > 0 && (
-                  <div style={{
-                    background: '#fee2e2',
-                    border: '2px solid #ef4444',
-                    borderRadius: 8,
-                    padding: '16px 20px',
-                    marginBottom: 12
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                      <span style={{ fontSize: 24 }}>🚨</span>
-                      <h3 style={{ margin: 0, color: '#b91c1c', fontWeight: 700, fontSize: 16 }}>
-                        Pacchetti Esauriti ({stats.pacchettiEsauriti.length})
-                      </h3>
-                    </div>
-                    <div style={{ fontSize: 14, color: '#7f1d1d', lineHeight: 1.6 }}>
-                      {stats.pacchettiEsauriti.map(p => (
-                        <div key={p.id} style={{ marginBottom: 4 }}>
-                          📦 <b>{p.descrizione}</b> - Cliente: {p.cliente?.nomeReferente || p.cliente?.email}
-                        </div>
-                      ))}
-                      <div style={{ marginTop: 8, fontStyle: 'italic' }}>
-                        Contattare i referenti per rinnovo pacchetto
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {stats.pacchettiInEsaurimento.length > 0 && (
-                  <div style={{
-                    background: '#fef3c7',
-                    border: '2px solid #f59e0b',
-                    borderRadius: 8,
-                    padding: '16px 20px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                      <span style={{ fontSize: 24 }}>⚠️</span>
-                      <h3 style={{ margin: 0, color: '#92400e', fontWeight: 700, fontSize: 16 }}>
-                        Pacchetti in Esaurimento ({stats.pacchettiInEsaurimento.length})
-                      </h3>
-                    </div>
-                    <div style={{ fontSize: 14, color: '#78350f', lineHeight: 1.6 }}>
-                      {stats.pacchettiInEsaurimento.map(p => (
-                        <div key={p.id} style={{ marginBottom: 4 }}>
-                          📦 <b>{p.descrizione}</b> - Ore residue: <b style={{ color: '#f59e0b' }}>{p.oreResidue}</b> - Cliente: {p.cliente?.nomeReferente || p.cliente?.email}
-                        </div>
-                      ))}
-                      <div style={{ marginTop: 8, fontStyle: 'italic' }}>
-                        Ore limitate, considerare di contattare i referenti
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Statistiche Principali */}
+        {/* Badge richieste pending */}
+        {!loading && richiestePending > 0 && (
+          <Link href="/richieste" style={{ textDecoration: 'none' }}>
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: 20,
-              marginBottom: 32
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              background: '#fee2e2', border: '2px solid #ef4444',
+              borderRadius: 10, padding: '12px 20px', marginBottom: 28,
+              cursor: 'pointer',
             }}>
-              <StatCard
-                title="Clienti Totali"
-                value={stats.totaleClienti}
-                icon="�"
-                color="#3b82f6"
-                link="/clienti"
-              />
-              <StatCard
-                title="Pacchetti Attivi"
-                value={`${stats.pacchettiAttivi}/${stats.totalePacchetti}`}
-                icon="📦"
-                color="#10b981"
-                link="/pacchetti"
-              />
-              <StatCard
-                title="Richieste Pending"
-                value={stats.richiestePending}
-                icon="⚠️"
-                color="#ef4444"
-                link="/richieste"
-                highlight={stats.richiestePending > 0}
-              />
+              <span style={{ fontSize: 20 }}>⚠️</span>
+              <span style={{ fontWeight: 700, color: '#b91c1c', fontSize: 15 }}>
+                {richiestePending} richiesta{richiestePending > 1 ? 'e' : ''} in attesa di revisione
+              </span>
+              <span style={{ color: '#b91c1c', fontSize: 13 }}>→ Vai alle richieste</span>
             </div>
+          </Link>
+        )}
 
-            {/* Grafici e Dettagli */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-              gap: 24,
-              marginBottom: 32
-            }}>
-              {/* Lezioni del Giorno */}
-              <Card title="Prossime Lezioni (Oggi)">
-                {stats.lezioniOggiDettaglio && stats.lezioniOggiDettaglio.length > 0 ? (
-                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                    {stats.lezioniOggiDettaglio
-                      .sort((a, b) => new Date(a.orario) - new Date(b.orario))
-                      .map((lez, idx) => (
-                        <div key={lez.id} style={{
-                          padding: '12px',
-                          background: idx % 2 === 0 ? '#f8fafc' : '#fff',
-                          borderLeft: '3px solid #f59e0b',
-                          marginBottom: 8,
-                          borderRadius: 4
-                        }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
-                            🕐 {new Date(lez.orario).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                          <div style={{ fontSize: 13, color: '#64748b' }}>
-                            {lez.descrizione || `Lezione #${lez.id}`}
-                          </div>
-                          {lez.cliente && (
-                            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                              👤 {lez.cliente.nomeReferente || lez.cliente.email}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
-                    Nessuna lezione programmata per oggi
-                  </div>
-                )}
-              </Card>
-
-              {/* Ore Erogate */}
-              <Card title="Ore Erogate">
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <div style={{ fontSize: 48, fontWeight: 700, color: '#3b82f6' }}>
-                    {stats.oreMese.toFixed(1)}
-                  </div>
-                  <div style={{ fontSize: 14, color: '#64748b', marginTop: 8 }}>
-                    Ore nell'ultimo mese
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Sezione Note */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
+          gap: 24,
+        }}>
+          {/* ── NOTE E PROMEMORIA ── */}
+          <div style={{ gridColumn: '1 / -1' }}>
             <Card title="Note e Promemoria">
-              <div style={{ padding: 12 }}>
-                <textarea
-                  placeholder="Aggiungi note, promemoria o informazioni importanti..."
+              {/* Form aggiungi nota */}
+              {showForm ? (
+                <form onSubmit={handleAddNota} style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <textarea
+                      autoFocus
+                      placeholder="Testo del promemoria..."
+                      value={formTesto}
+                      onChange={e => setFormTesto(e.target.value)}
+                      required
+                      style={{
+                        width: '100%', minHeight: 80, padding: 10,
+                        border: '1px solid #c4b5fd', borderRadius: 8, fontSize: 14,
+                        fontFamily: 'inherit', resize: 'vertical', background: '#faf5ff',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 200px' }}>
+                        <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                          Cliente (opzionale)
+                        </label>
+                        <select
+                          value={formClienteId}
+                          onChange={e => setFormClienteId(e.target.value)}
+                          style={{
+                            width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0',
+                            borderRadius: 8, fontSize: 14, background: '#fff',
+                          }}
+                        >
+                          <option value="">— Nessun cliente —</option>
+                          {clienti.filter(c => c.tipo !== 'STUDENTE').map(c => (
+                            <option key={c.id} value={c.id}>{c.nomeReferente}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: '1 1 180px' }}>
+                        <label style={{ fontSize: 12, color: '#64748b', display: 'block', marginBottom: 4 }}>
+                          Data/ora (opzionale – appare nel calendario)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={formData}
+                          onChange={e => setFormData(e.target.value)}
+                          style={{
+                            width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0',
+                            borderRadius: 8, fontSize: 14, background: '#fff',
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        type="submit"
+                        disabled={formSaving || !formTesto.trim()}
+                        style={{
+                          background: '#7C3AED', color: '#fff', border: 'none',
+                          borderRadius: 8, padding: '9px 20px', fontWeight: 600,
+                          fontSize: 14, cursor: formSaving ? 'not-allowed' : 'pointer',
+                          opacity: formSaving ? 0.7 : 1,
+                        }}
+                      >
+                        {formSaving ? 'Salvataggio…' : 'Salva nota'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowForm(false); setFormTesto(''); setFormClienteId(''); setFormData(''); }}
+                        style={{
+                          background: '#f1f5f9', color: '#64748b', border: 'none',
+                          borderRadius: 8, padding: '9px 16px', fontWeight: 500,
+                          fontSize: 14, cursor: 'pointer',
+                        }}
+                      >
+                        Annulla
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  onClick={() => setShowForm(true)}
                   style={{
-                    width: '100%',
-                    minHeight: 120,
-                    padding: 12,
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 8,
-                    fontSize: 14,
-                    fontFamily: 'inherit',
-                    resize: 'vertical',
-                    background: '#f8fafc'
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: '#f5f3ff', color: '#7C3AED',
+                    border: '2px dashed #c4b5fd', borderRadius: 10,
+                    padding: '10px 18px', fontWeight: 600, fontSize: 14,
+                    cursor: 'pointer', marginBottom: 16, width: '100%',
+                    justifyContent: 'center',
                   }}
-                  value={notes}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNotes(val);
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('dashboard-notes', val);
-                    }
-                  }}
-                />
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>
-                  Le note vengono salvate automaticamente nel browser
-                </div>
-              </div>
-            </Card>
+                >
+                  <span style={{ fontSize: 18 }}>+</span> Aggiungi promemoria
+                </button>
+              )}
 
-            {/* Link Rapidi */}
+              {/* Lista note */}
+              {noteLoading ? (
+                <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                  Caricamento note…
+                </div>
+              ) : note.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontStyle: 'italic' }}>
+                  Nessun promemoria. Aggiungine uno con il pulsante sopra.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {note.map(n => (
+                    <NotaCard
+                      key={n.id}
+                      nota={n}
+                      onDelete={() => handleDeleteNota(n.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* ── AZIONI RAPIDE ── */}
+          <div style={{ gridColumn: '1 / -1' }}>
             <Card title="Azioni Rapide">
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: 12
+                gap: 12,
               }}>
                 <QuickLink href="/attivita" icon="➕" label="Crea Nuova Lezione" />
                 <QuickLink href="/clienti" icon="👤" label="Gestisci Clienti" />
@@ -367,81 +272,110 @@ export default function DashboardPage() {
                 <QuickLink href="/storico" icon="📊" label="Storico Attività" />
               </div>
             </Card>
-          </>
-        ) : (
-          <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
-            Errore nel caricamento delle statistiche
           </div>
-        )}
+        </div>
       </main>
     </AuthGuard>
   );
 }
 
-function StatCard({ title, value, icon, color, link, highlight, alert }) {
-  const card = (
+function NotaCard({ nota, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const hasDate = !!nota.data;
+  const isPast = hasDate && new Date(nota.data) < new Date();
+  const dateStr = hasDate
+    ? new Date(nota.data).toLocaleString('it-IT', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : null;
+
+  return (
     <div style={{
-      background: '#fff',
-      borderRadius: 12,
-      padding: 24,
-      position: 'relative',
-      boxShadow: highlight 
-        ? '0 4px 6px -1px rgba(239, 68, 68, 0.2), 0 2px 4px -1px rgba(239, 68, 68, 0.1)'
-        : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-      border: highlight ? '2px solid #ef4444' : 'none',
-      cursor: link ? 'pointer' : 'default',
-      transition: 'all 0.2s',
-      ':hover': link ? { transform: 'translateY(-2px)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' } : {}
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+      background: isPast ? '#f8fafc' : '#faf5ff',
+      border: `1px solid ${isPast ? '#e2e8f0' : '#e9d5ff'}`,
+      borderLeft: `4px solid ${isPast ? '#94a3b8' : '#7C3AED'}`,
+      borderRadius: 8, padding: '12px 14px',
+      opacity: isPast ? 0.75 : 1,
     }}>
-      {alert && (
-        <div style={{
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          background: '#ef4444',
-          color: '#fff',
-          fontSize: 10,
-          fontWeight: 700,
-          padding: '4px 10px',
-          borderRadius: 12,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)',
-          animation: 'pulse 2s infinite'
-        }}>
-          Alert
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, color: '#1e293b', lineHeight: 1.5, wordBreak: 'break-word' }}>
+          {nota.testo}
         </div>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 32 }}>{icon}</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {title}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+          {nota.cliente && (
+            <Link href={`/clienti/${nota.cliente.id}`} style={{ textDecoration: 'none' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: '#dbeafe', color: '#1d4ed8',
+                fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
+              }}>
+                👤 {nota.cliente.nomeReferente}
+              </span>
+            </Link>
+          )}
+          {dateStr && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: isPast ? '#f1f5f9' : '#ede9fe',
+              color: isPast ? '#64748b' : '#6d28d9',
+              fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 12,
+            }}>
+              📅 {dateStr} {isPast ? '(passata)' : ''}
+            </span>
+          )}
         </div>
       </div>
-      <div style={{ fontSize: 36, fontWeight: 700, color: color }}>
-        {value}
+      <div style={{ flexShrink: 0 }}>
+        {confirmDelete ? (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={onDelete}
+              style={{
+                background: '#ef4444', color: '#fff', border: 'none',
+                borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Conferma
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              style={{
+                background: '#f1f5f9', color: '#64748b', border: 'none',
+                borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              Annulla
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            title="Elimina nota"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#94a3b8', fontSize: 16, padding: '2px 6px', borderRadius: 4,
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
     </div>
   );
-
-  return link ? <Link href={link} style={{ textDecoration: 'none' }}>{card}</Link> : card;
 }
 
 function Card({ title, children }) {
   return (
     <div style={{
-      background: '#fff',
-      borderRadius: 12,
-      padding: 24,
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+      background: '#fff', borderRadius: 12, padding: 24,
+      boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06)',
     }}>
       <h2 style={{
-        fontSize: 18,
-        fontWeight: 600,
-        color: '#1e293b',
-        marginBottom: 16,
-        paddingBottom: 12,
-        borderBottom: '2px solid #e2e8f0'
+        fontSize: 18, fontWeight: 600, color: '#1e293b',
+        marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid #e2e8f0',
       }}>
         {title}
       </h2>
@@ -450,43 +384,20 @@ function Card({ title, children }) {
   );
 }
 
-function InfoRow({ label, value, color = '#1e293b' }) {
-  return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '12px 0',
-      borderBottom: '1px solid #f1f5f9'
-    }}>
-      <span style={{ fontSize: 14, color: '#64748b' }}>{label}</span>
-      <span style={{ fontSize: 16, fontWeight: 600, color }}>{value}</span>
-    </div>
-  );
-}
-
 function QuickLink({ href, icon, label }) {
   return (
     <Link href={href} style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      padding: '12px 16px',
-      background: '#f8fafc',
-      borderRadius: 8,
-      textDecoration: 'none',
-      color: '#1e293b',
-      fontWeight: 500,
-      fontSize: 14,
-      transition: 'all 0.2s',
-      border: '1px solid #e2e8f0'
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 16px', background: '#f8fafc', borderRadius: 8,
+      textDecoration: 'none', color: '#1e293b', fontWeight: 500,
+      fontSize: 14, border: '1px solid #e2e8f0',
     }}
-    onMouseEnter={(e) => {
+    onMouseEnter={e => {
       e.currentTarget.style.background = '#3b82f6';
       e.currentTarget.style.color = '#fff';
       e.currentTarget.style.borderColor = '#3b82f6';
     }}
-    onMouseLeave={(e) => {
+    onMouseLeave={e => {
       e.currentTarget.style.background = '#f8fafc';
       e.currentTarget.style.color = '#1e293b';
       e.currentTarget.style.borderColor = '#e2e8f0';
@@ -496,4 +407,3 @@ function QuickLink({ href, icon, label }) {
     </Link>
   );
 }
-
