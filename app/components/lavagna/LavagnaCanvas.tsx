@@ -233,6 +233,10 @@ export default function LavagnaCanvas({
   const prepareStrokeRef = useRef(null);
   const applyViewportRef = useRef(null);
   const prevAdminVisibleRectRef = useRef(null); // ultimo visibleRect ricevuto da admin
+  // Refs sincroni per pan/zoom studente: aggiornati immediatamente in applyViewport
+  // (panRef/zoomRef si aggiornano solo dopo il re-render React → stale se arrivano più msg prima del render)
+  const spectatorPanRef = useRef({ x: 0, y: 0 });
+  const spectatorZoomRef = useRef(1);
   const normalizeShapeRef = useRef(null);
   const clearLavagnaStateRef = useRef(null);
 
@@ -1846,34 +1850,40 @@ export default function LavagnaCanvas({
               x: worldCenterX - cssW / (2 * newZoom),
               y: worldCenterY - cssH / (2 * newZoom)
             };
+            // Aggiorna i ref sincroni subito — i React ref (panRef/zoomRef) si aggiornano
+            // solo dopo il re-render, causando stale reads se arrivano più msg prima del render
+            spectatorPanRef.current = newPan;
+            spectatorZoomRef.current = newZoom;
             setPan((p) => (p.x === newPan.x && p.y === newPan.y ? p : newPan));
             setZoom((z) => (z === newZoom ? z : newZoom));
             return;
           }
 
           // Aggiornamenti successivi: applica il DELTA relativo allo zoom/pan corrente dello studente.
-          // Così lo studente mantiene il proprio livello di zoom ma segue i movimenti dell'admin.
+          // Usa spectatorPanRef/spectatorZoomRef (aggiornati sincrono) invece di panRef/zoomRef
+          // (che rimangono stale fino al prossimo re-render React).
           const zoomFactor = prev.width / visibleRect.width; // >1 se admin ha zoomato in, <1 se zoom out
           const prevCx = prev.x + prev.width / 2;
           const prevCy = prev.y + prev.height / 2;
           const newCx = visibleRect.x + visibleRect.width / 2;
           const newCy = visibleRect.y + visibleRect.height / 2;
-          const dx = newCx - prevCx; // spostamento mondo orizzontale admin
-          const dy = newCy - prevCy; // spostamento mondo verticale admin
+          const dx = newCx - prevCx;
+          const dy = newCy - prevCy;
 
-          const curZoom = zoomRef.current;
-          const curPan = panRef.current;
+          const curZoom = spectatorZoomRef.current;
+          const curPan = spectatorPanRef.current;
           const newZoom = Math.max(0.05, Math.min(10, curZoom * zoomFactor));
-          // Centro vista studente corrente (world space)
           const studentCx = curPan.x + cssW / (2 * curZoom);
           const studentCy = curPan.y + cssH / (2 * curZoom);
-          // Applica lo stesso spostamento world dell'admin
           const newStudentCx = studentCx + dx;
           const newStudentCy = studentCy + dy;
           const newPan = {
             x: newStudentCx - cssW / (2 * newZoom),
             y: newStudentCy - cssH / (2 * newZoom)
           };
+          // Aggiorna i ref sincroni prima di setPan/setZoom
+          spectatorPanRef.current = newPan;
+          spectatorZoomRef.current = newZoom;
           setPan((p) => (p.x === newPan.x && p.y === newPan.y ? p : newPan));
           setZoom((z) => (z === newZoom ? z : newZoom));
           return;
@@ -1894,6 +1904,8 @@ export default function LavagnaCanvas({
     if (!spectatorMode || isAdmin) {
       // Reset: prossima entrata in spectator farà sync completo
       prevAdminVisibleRectRef.current = null;
+      spectatorPanRef.current = { x: 0, y: 0 };
+      spectatorZoomRef.current = 1;
       return;
     }
     const latest = latestAdminViewportRef.current;
@@ -3956,9 +3968,8 @@ export default function LavagnaCanvas({
           fetch(`/api/lavagna/tratto/${delId}`, { method: "DELETE" }).catch(() => {});
         }
       }
-      if (removed) {
-        drawAll();
-      }
+      // Non chiamare drawAll() qui: userebbe il closure stale (tratti pre-cancellazione)
+      // causando un flash del vecchio stato. React re-renderizza automaticamente dopo setTratti.
       return removed;
     },
     [tratti, drawAll, attivitaId, emitOrPublish, isAdmin, utenteId]
@@ -4771,9 +4782,7 @@ export default function LavagnaCanvas({
     if (erasingRef.current) {
       const p = getPoint(e);
       pointerWorldRef.current = p;
-      eraseShapesAt(p.x, p.y);
-      eraseStrokeAt(p.x, p.y);
-      // Update overlay position so the visual eraser follows the real input
+      // Aggiorna il cursore PRIMA dell'erase: così non aspetta il re-render React
       try {
         const ov = overlayRef.current;
         const canvas = canvasRef.current;
@@ -4781,7 +4790,6 @@ export default function LavagnaCanvas({
           const expected = screenFromWorld(p) || { clientX: e.nativeEvent.clientX, clientY: e.nativeEvent.clientY };
           const clientX = expected.clientX;
           const clientY = expected.clientY;
-          // Only show overlay for eraser, not pen
           const shouldShow = (strumento === 'gomma') && !panningRef.current.active && !inToolbar;
           if (shouldShow) {
             ov.style.display = 'block';
@@ -4799,6 +4807,10 @@ export default function LavagnaCanvas({
           }
         }
       } catch (_) {}
+      // Erase dopo l'aggiornamento cursore: la UI è già reattiva
+      eraseShapesAt(p.x, p.y);
+      eraseStrokeAt(p.x, p.y);
+      rawUpdateFiredRef.current = false;
       return;
     }
 
