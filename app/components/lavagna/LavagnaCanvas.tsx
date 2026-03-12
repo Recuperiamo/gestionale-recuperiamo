@@ -3276,8 +3276,18 @@ export default function LavagnaCanvas({
   }
   function hitTestStroke(x, y, stroke) {
     if (!stroke._bb) return false;
-    // Threshold in world units: usa lo spessore del tratto come base, senza padding fisso eccessivo
-    const threshold = Math.max(4, (stroke.spessore || 3) * 0.6 + 3);
+    // Threshold in world units: base = metà spessore del tratto
+    const strokeHalfWidth = (stroke.spessore || 3) / 2;
+    // Se siamo in modalità gomma, aggiungi il raggio visivo della gomma (matchando overlaySize)
+    let eraserRadius = 0;
+    if (strumentoRef.current === 'gomma') {
+      const z = zoomRef.current || 1;
+      const sp = spessoreRef.current || 3;
+      const desiredPx = Math.max(8, Math.min(sp * 2 * z, 48));
+      const eraserPx = Math.max(desiredPx, 38); // corrisponde a overlaySize per gomma
+      eraserRadius = eraserPx / (2 * z);
+    }
+    const threshold = Math.max(4, strokeHalfWidth + 3 + eraserRadius);
     const bbExp = expandBB(stroke._bb, threshold);
     if (!pointInBB(x, y, bbExp)) return false;
     const pts = stroke.punti;
@@ -6703,7 +6713,7 @@ export default function LavagnaCanvas({
     ? (spectatorCount > 0 ? `Modalità spettatore attiva (${spectatorCount})` : '')
     : 'Modalità spettatore attiva';
   const showInCanvasActions = topRightPlacement === 'in-canvas' && (!spectatorMode || isAdmin);
-  const showTopRightBar = showInCanvasActions || spectatorIndicatorVisible;
+  const showTopRightBar = showInCanvasActions; // spectatorIndicatorVisible ora renderizzato separatamente
   const zoomDisabled = false; // zoom sempre abilitato (anche in spectator mode)
   const canZoomOut = zoom > 0.21;
   const canZoomIn = zoom < 1.99;
@@ -6790,23 +6800,31 @@ export default function LavagnaCanvas({
               </div>
             </div>
           )}
-          {spectatorIndicatorVisible && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <div
-                style={{
-                  ...st.eyeBadge,
-                  cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
-                }}
-                onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
-                title={spectatorIndicatorTitle}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
-                </svg>
-                {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
-              </div>
-            </div>
-          )}
+        </div>
+      )}
+      {/* Indicatore modalità spettatore — posizionato in basso a destra, sopra i controlli zoom */}
+      {spectatorIndicatorVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            right: isMobile ? 8 : 12,
+            bottom: isMobile ? 122 : 132,
+            zIndex: 1200,
+          }}
+        >
+          <div
+            style={{
+              ...st.eyeBadge,
+              cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
+            }}
+            onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
+            title={spectatorIndicatorTitle}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
+            </svg>
+            {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
+          </div>
         </div>
       )}
       <div style={st.canvasBox}>
