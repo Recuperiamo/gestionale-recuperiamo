@@ -134,6 +134,7 @@ export default function LavagnaCanvas({
   const [studentWriteEnabled, setStudentWriteEnabled] = useState(false);
   const latestAdminViewportRef = useRef(null);
   const pendingViewportRef = useRef(null);
+  const lastAdminHeartbeatRef = useRef(0); // timestamp ultimo heartbeat admin (0 = mai ricevuto)
   const viewportApplyRAFRef = useRef(null);
   const viewportBroadcastRef = useRef({ rafId: null, payload: null });
   const pointerWorldRef = useRef(null);
@@ -1780,115 +1781,43 @@ export default function LavagnaCanvas({
 
   // Setup Ably helpers and subscriptions
   const applyViewport = useCallback((view) => {
-
     if (!view) return;
     const { pan: remotePan, zoom: remoteZoom, visibleRect } = view;
-    
-    // MOBILE SPECTATOR FIX: Invece di usare visibleRect admin (troppo grande),
-    // calcola bbox del contenuto REALE (forme + tratti)
+
+    // Usa il visibleRect dell'admin (area mondo che sta guardando) e adattala
+    // allo schermo locale — questo garantisce following corretto su qualsiasi dimensione schermo
     try {
       const canvas = canvasRef.current;
-      if (canvas && (forme.length > 0 || tratti.length > 0)) {
-        // Calcola bounding box del contenuto reale
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        
-        // Include forme
-        forme.forEach(f => {
-          const bounds = f._bb ?? getShapeBounds(f);
-          if (bounds) {
-            minX = Math.min(minX, bounds.minX);
-            minY = Math.min(minY, bounds.minY);
-            maxX = Math.max(maxX, bounds.maxX);
-            maxY = Math.max(maxY, bounds.maxY);
-          }
-        });
-        
-        // Include tratti
-        tratti.forEach(t => {
-          if (t._bb) {
-            minX = Math.min(minX, t._bb.minX);
-            minY = Math.min(minY, t._bb.minY);
-            maxX = Math.max(maxX, t._bb.maxX);
-            maxY = Math.max(maxY, t._bb.maxY);
-          }
-        });
-        
-        if (Number.isFinite(minX) && Number.isFinite(maxX)) {
-          // Aggiungi margine 10% attorno al contenuto
-          const contentW = maxX - minX;
-          const contentH = maxY - minY;
-          const margin = 0.1;
-          const contentRect = {
-            x: minX - contentW * margin,
-            y: minY - contentH * margin,
-            width: contentW * (1 + 2 * margin),
-            height: contentH * (1 + 2 * margin)
+      if (canvas && visibleRect && visibleRect.width > 0 && visibleRect.height > 0) {
+        const rect = canvas.getBoundingClientRect();
+        const cssW = rect.width;
+        const cssH = rect.height;
+        if (cssW > 0 && cssH > 0) {
+          // Scala per mostrare esattamente la stessa area mondo, adattata al proprio schermo
+          const fitZoom = Math.min(cssW / visibleRect.width, cssH / visibleRect.height);
+          const newZoom = Math.max(0.05, Math.min(10, fitZoom));
+          // Centra la stessa area mondo
+          const worldCenterX = visibleRect.x + visibleRect.width / 2;
+          const worldCenterY = visibleRect.y + visibleRect.height / 2;
+          const newPan = {
+            x: worldCenterX - cssW / (2 * newZoom),
+            y: worldCenterY - cssH / (2 * newZoom)
           };
-          
-
-          
-          const rect = canvas.getBoundingClientRect();
-          let localW = rect.width;
-          let localH = rect.height;
-          
-
-          
-          // Se mobile ruotato 90°, swap dimensions per calcolo fit corretto
-          if (canvasRotation === 90 || canvasRotation === 270) {
-            [localW, localH] = [localH, localW];
-
-          }
-          
-          if (localW > 0 && localH > 0 && contentRect.width > 0 && contentRect.height > 0) {
-            // Fit-to-view del contenuto reale
-            const fitScaleX = localW / contentRect.width;
-            const fitScaleY = localH / contentRect.height;
-            const targetZoom = Math.min(fitScaleX, fitScaleY);
-            
-            const safetyFactor = 0.95; // margine 5% per evitare clipping
-            const clampedZoom = Math.max(0.1, Math.min(5, targetZoom * safetyFactor));
-
-
-            
-            // Centra il contenuto
-            const centerX = contentRect.x + contentRect.width / 2;
-            const centerY = contentRect.y + contentRect.height / 2;
-            
-            const canvasW = canvas.width;
-            const canvasH = canvas.height;
-            
-            const newPan = {
-              x: centerX - (canvasW / 2) / clampedZoom,
-              y: centerY - (canvasH / 2) / clampedZoom
-            };
-            
-
-            
-            setPan((prev) => {
-              if (prev.x === newPan.x && prev.y === newPan.y) return prev;
-              return newPan;
-            });
-            setZoom((prev) => (prev === clampedZoom ? prev : clampedZoom));
-            return;
-          }
+          setPan((prev) => (prev.x === newPan.x && prev.y === newPan.y ? prev : newPan));
+          setZoom((prev) => (prev === newZoom ? prev : newZoom));
+          return;
         }
       }
-    } catch (err) {
-      console.error('[SPECTATOR] Error calculating content bbox:', err);
-    }
-    
-    // Fallback: if no visibleRect, apply admin pan/zoom directly (old behavior)
+    } catch (_) {}
 
-    if (remotePan && typeof remotePan.x === 'number' && typeof remotePan.y === 'number') {
-      setPan((prev) => {
-        if (prev.x === remotePan.x && prev.y === remotePan.y) return prev;
-        return { x: remotePan.x, y: remotePan.y };
-      });
+    // Fallback: applica direttamente pan/zoom admin
+    if (remotePan && typeof remotePan.x === 'number') {
+      setPan((prev) => (prev.x === remotePan.x && prev.y === remotePan.y ? prev : { x: remotePan.x, y: remotePan.y }));
     }
     if (typeof remoteZoom === 'number' && !Number.isNaN(remoteZoom)) {
       setZoom((prev) => (prev === remoteZoom ? prev : remoteZoom));
     }
-  }, [canvasRotation, forme, tratti]);  // Include forme/tratti per ricalcolare bbox quando contenuto cambia
+  }, []);
 
   useEffect(() => {
     if (!spectatorMode || isAdmin) return;
@@ -2371,8 +2300,10 @@ export default function LavagnaCanvas({
           if (isAdminRef.current) return;
           const { data } = msg || {};
           const online = !!data?.online;
+          if (online) {
+            lastAdminHeartbeatRef.current = Date.now();
+          }
           setSpectatorMode(online);
-          // Se admin è andato offline, lo studente torna libero
         };
 
         // Studente chiede se admin è online (utile quando studente si connette tardi)
@@ -2385,6 +2316,14 @@ export default function LavagnaCanvas({
               attivitaId: attivitaIdRef.current
             });
           } catch (_) {}
+        };
+
+        // Heartbeat admin → studenti: segnala presenza continua (necessario per rilevare tab close)
+        const onAdminHeartbeat = (msg) => {
+          if (isAdminRef.current) return;
+          lastAdminHeartbeatRef.current = Date.now();
+          // Se già in spectator mode, nessuna azione; altrimenti attiva (caso reconnect)
+          if (!spectatorModeRef.current) setSpectatorMode(true);
         };
 
         try {
@@ -2402,6 +2341,7 @@ export default function LavagnaCanvas({
           ch.subscribe('student:write', onStudentWrite);
           ch.subscribe('admin:presence', onAdminPresence);
           ch.subscribe('presence:request', onPresenceRequest);
+          ch.subscribe('admin:heartbeat', onAdminHeartbeat);
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
@@ -2417,21 +2357,30 @@ export default function LavagnaCanvas({
           pendingMessages.current = [];
         }
 
-        // Admin: annuncia presenza agli studenti già connessi
+        // Admin: annuncia presenza agli studenti già connessi + avvia heartbeat
         // Studente: chiede all'admin se è online (per entrare in spectator se arriva dopo)
+        let heartbeatIntervalId = null;
+        let staleCheckIntervalId = null;
         try {
           if (isAdminRef.current) {
-            ch.publish('admin:presence', {
-              online: true,
-              lavagnaId,
-              attivitaId
-            });
+            ch.publish('admin:presence', { online: true, lavagnaId, attivitaId });
+            // Heartbeat ogni 5s: permette allo studente di rilevare se admin chiude il tab
+            heartbeatIntervalId = setInterval(() => {
+              if (!isAdminRef.current || !ablyRef.current.ch) return;
+              try { ablyRef.current.ch.publish('admin:heartbeat', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current }); } catch (_) {}
+            }, 5000);
           } else {
-            ch.publish('presence:request', {
-              lavagnaId,
-              attivitaId,
-              requesterId: utenteId
-            });
+            ch.publish('presence:request', { lavagnaId, attivitaId, requesterId: utenteId });
+            // Controlla ogni 3s se il heartbeat è troppo vecchio (>10s) → admin è andato offline
+            staleCheckIntervalId = setInterval(() => {
+              if (isAdminRef.current) return;
+              if (!spectatorModeRef.current) return;
+              const last = lastAdminHeartbeatRef.current;
+              if (last > 0 && Date.now() - last > 10000) {
+                setSpectatorMode(false);
+                lastAdminHeartbeatRef.current = 0;
+              }
+            }, 3000);
           }
         } catch (_) {}
 
@@ -2466,6 +2415,7 @@ export default function LavagnaCanvas({
                   ch.subscribe('student:write', onStudentWrite);
                   ch.subscribe('admin:presence', onAdminPresence);
                   ch.subscribe('presence:request', onPresenceRequest);
+                  ch.subscribe('admin:heartbeat', onAdminHeartbeat);
                 } catch (err) {
                   console.error('[LAVAGNA-SUB-ERROR] Re-subscribe failed after reconnect:', err?.message || err);
                 }
@@ -2503,7 +2453,11 @@ export default function LavagnaCanvas({
             ch.unsubscribe('student:write', onStudentWrite);
             ch.unsubscribe('admin:presence', onAdminPresence);
             ch.unsubscribe('presence:request', onPresenceRequest);
+            ch.unsubscribe('admin:heartbeat', onAdminHeartbeat);
           } catch (_) {}
+          // Pulisci interval heartbeat e stale-check
+          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+          if (staleCheckIntervalId) clearInterval(staleCheckIntervalId);
           // Admin: notifica studenti che ha lasciato la lavagna
           if (isAdminRef.current) {
             try {
@@ -4514,6 +4468,33 @@ export default function LavagnaCanvas({
           panDrawRAFRef.current = null;
           drawAllRef.current?.();
         });
+      }
+      // Admin: broadcast viewport durante panning per following fluido degli spettatori
+      if (isAdminRef.current && ablyRef.current.ch) {
+        const newPan = panRef.current;
+        const curZoom = zoomRef.current;
+        const canvas = canvasRef.current;
+        if (canvas && !viewportBroadcastRef.current.rafId) {
+          viewportBroadcastRef.current.rafId = requestAnimationFrame(() => {
+            viewportBroadcastRef.current.rafId = null;
+            try {
+              const rect = canvas.getBoundingClientRect();
+              const cssW = rect.width;
+              const cssH = rect.height;
+              const vr = { x: newPan.x, y: newPan.y, width: cssW / curZoom, height: cssH / curZoom };
+              ablyRef.current.ch?.publish('viewport:update', {
+                lavagnaId: lavagnaIdRef.current,
+                attivitaId: attivitaIdRef.current,
+                senderId: utenteIdRef.current,
+                pan: newPan,
+                zoom: curZoom,
+                canvasSize: { width: cssW, height: cssH },
+                visibleRect: vr,
+                ts: Date.now()
+              });
+            } catch (_) {}
+          });
+        }
       }
       if (!isPanning) setIsPanning(true);
       return;
