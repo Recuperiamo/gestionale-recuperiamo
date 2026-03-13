@@ -5,6 +5,13 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+const MATERIE = [
+  "Matematica", "Fisica", "Chimica", "Biologia", "Scienze naturali", "Informatica",
+  "Italiano", "Latino", "Storia", "Filosofia", "Inglese", "Storia dell'arte",
+  "Scienze motorie", "Religione", "Altra materia",
+];
+const ANNI = ["I anno", "II anno", "III anno", "IV anno", "V anno"];
+
 // ── Utility: legge file HTML ──────────────────────────────────────────────────
 function readHtmlFile(file) {
   return new Promise((resolve, reject) => {
@@ -211,6 +218,50 @@ function LezioneDetailPageInner() {
   const [tab, setTab] = useState(searchParams?.get("tab") || null);
   const [saving, setSaving] = useState(false);
 
+  // Modifica info (titolo, materia, anno, tags)
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [infoForm, setInfoForm] = useState(null);
+  const [tagInputDetail, setTagInputDetail] = useState("");
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  function openEditInfo() {
+    setInfoForm({
+      titolo: argomento.titolo,
+      materia: argomento.materia,
+      anno: argomento.anno || "",
+      tags: argomento.tags || [],
+    });
+    setTagInputDetail("");
+    setEditingInfo(true);
+  }
+
+  function addTagDetail(raw) {
+    const t = raw.trim();
+    if (!t || infoForm.tags.includes(t)) { setTagInputDetail(""); return; }
+    setInfoForm(f => ({ ...f, tags: [...f.tags, t] }));
+    setTagInputDetail("");
+  }
+
+  async function handleSaveInfo() {
+    if (!infoForm.titolo.trim()) return;
+    setSavingInfo(true);
+    try {
+      const res = await fetch("/api/lezioni/" + id, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(infoForm),
+      });
+      if (!res.ok) throw new Error("Errore salvataggio");
+      const updated = await res.json();
+      setArgomento(prev => ({ ...prev, ...updated }));
+      setEditingInfo(false);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingInfo(false);
+    }
+  }
+
   // Suggerisci link
   const [allArgomenti, setAllArgomenti] = useState(null);
   const [loadingArgs, setLoadingArgs] = useState(false);
@@ -342,6 +393,9 @@ function LezioneDetailPageInner() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 13, color: "#4268b3", background: "#e3eefe", padding: "2px 10px", borderRadius: 20, fontWeight: 600 }}>{argomento.materia}</span>
           {argomento.anno && <span style={{ fontSize: 13, color: "#4268b3", background: "#e3eefe", padding: "2px 10px", borderRadius: 20, fontWeight: 600 }}>{argomento.anno}</span>}
+          {argomento.tags?.map(t => (
+            <span key={t} style={{ fontSize: 12, color: "#20489a", background: "#f0f7ff", border: "1px solid #c3d9f0", padding: "2px 10px", borderRadius: 20, fontWeight: 600 }}>{t}</span>
+          ))}
         </div>
       </div>
 
@@ -350,8 +404,73 @@ function LezioneDetailPageInner() {
         <div style={{ background: "#f8faff", border: "1px solid #dbe4f1", borderRadius: 12, padding: "14px 18px", marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#20489a" }}>Gestione contenuti</span>
-            {saving && <span style={{ fontSize: 12, color: "#1cb0f6" }}>Salvataggio...</span>}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {saving && <span style={{ fontSize: 12, color: "#1cb0f6" }}>Salvataggio...</span>}
+              <button onClick={editingInfo ? () => setEditingInfo(false) : openEditInfo}
+                style={{ background: editingInfo ? "#e3eefe" : "#fff", color: "#20489a", border: "1.5px solid #dbe4f1", borderRadius: 7, padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                {editingInfo ? "Chiudi" : "✏️ Modifica info"}
+              </button>
+            </div>
           </div>
+
+          {/* Form modifica info */}
+          {editingInfo && infoForm && (
+            <div style={{ background: "#fff", border: "1px solid #dbe4f1", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+              {(() => {
+                const inp = { display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", marginTop: 3 };
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
+                      Titolo
+                      <input value={infoForm.titolo} onChange={e => setInfoForm(f => ({ ...f, titolo: e.target.value }))} style={inp} />
+                    </label>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a", flex: 1 }}>
+                        Materia
+                        <select value={infoForm.materia} onChange={e => setInfoForm(f => ({ ...f, materia: e.target.value }))} style={inp}>
+                          {MATERIE.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </label>
+                      <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a", flex: 1 }}>
+                        Anno
+                        <select value={infoForm.anno} onChange={e => setInfoForm(f => ({ ...f, anno: e.target.value }))} style={inp}>
+                          <option value="">— Tutti gli anni —</option>
+                          {ANNI.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
+                      Tag disciplinari
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 5, marginBottom: 5 }}>
+                        {infoForm.tags.map(t => (
+                          <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#e3eefe", color: "#20489a", borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 600 }}>
+                            {t}
+                            <button type="button" onClick={() => setInfoForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))}
+                              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#4268b3", fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input value={tagInputDetail} onChange={e => setTagInputDetail(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTagDetail(tagInputDetail); } }}
+                          style={{ ...inp, marginTop: 0, flex: 1 }} placeholder="es. Algebra (Invio per aggiungere)" />
+                        <button type="button" onClick={() => addTagDetail(tagInputDetail)}
+                          style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "0 12px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+</button>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button onClick={() => setEditingInfo(false)} style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 7, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Annulla</button>
+                      <button onClick={handleSaveInfo} disabled={savingInfo || !infoForm.titolo.trim()}
+                        style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 7, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                        {savingInfo ? "Salvataggio..." : "Salva"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <UploadSection label="Mappa" htmlKey="mappaHtml" value={argomento.mappaHtml} onUploaded={handleUploaded} />
             <UploadSection label="Teoria" htmlKey="teoriaHtml" value={argomento.teoriaHtml} onUploaded={handleUploaded} />
