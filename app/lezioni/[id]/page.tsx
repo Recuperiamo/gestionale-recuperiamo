@@ -1,10 +1,11 @@
 // @ts-nocheck
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+// ── Utility: legge file HTML ──────────────────────────────────────────────────
 function readHtmlFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -14,6 +15,91 @@ function readHtmlFile(file) {
   });
 }
 
+// ── Utility: scansiona HTML per titoli di altri argomenti ─────────────────────
+const ARTICLES_RE = /^(la |il |lo |le |i |gli |un |una |l'|l'|delle |degli |dei |del |della |dello )/i;
+
+function scanHtmlForLinks(html, allArgomenti, currentId) {
+  if (!html || !allArgomenti?.length) return [];
+  // Estrai testo puro
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  const plainText = div.innerText || div.textContent || "";
+  const lowerText = plainText.toLowerCase();
+
+  const results = [];
+  for (const arg of allArgomenti) {
+    if (arg.id === Number(currentId)) continue;
+
+    const candidates = [];
+    const full = arg.titolo.trim();
+    if (full.length >= 3) candidates.push(full);
+    const short = full.replace(ARTICLES_RE, "").trim();
+    if (short !== full && short.length >= 3) candidates.push(short);
+
+    for (const term of candidates) {
+      const idx = lowerText.indexOf(term.toLowerCase());
+      if (idx !== -1) {
+        // Recupera il testo originale con la capitalizzazione originale
+        const originalTerm = plainText.slice(idx, idx + term.length);
+        results.push({ term: originalTerm, argomento: arg, approved: true });
+        break; // una sola corrispondenza per argomento
+      }
+    }
+  }
+  return results;
+}
+
+// ── Utility: inserisce link alla prima occorrenza in ogni text node ───────────
+function insertFirstLink(doc, searchText, argId) {
+  const walker = doc.createTreeWalker(
+    doc.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        // Salta nodi dentro <a>
+        let p = node.parentElement;
+        while (p && p !== doc.body) {
+          if (p.tagName === "A") return NodeFilter.FILTER_REJECT;
+          p = p.parentElement;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+  let node;
+  while ((node = walker.nextNode())) {
+    const lower = node.textContent.toLowerCase();
+    const idx = lower.indexOf(searchText.toLowerCase());
+    if (idx !== -1) {
+      const before = node.textContent.slice(0, idx);
+      const match = node.textContent.slice(idx, idx + searchText.length);
+      const after = node.textContent.slice(idx + searchText.length);
+      const a = doc.createElement("a");
+      a.href = "/lezioni/" + argId;
+      a.textContent = match;
+      a.style.cssText = "color:#1cb0f6;font-weight:600;text-decoration:underline;";
+      const parent = node.parentNode;
+      if (before) parent.insertBefore(doc.createTextNode(before), node);
+      parent.insertBefore(a, node);
+      if (after) parent.insertBefore(doc.createTextNode(after), node);
+      parent.removeChild(node);
+      return true;
+    }
+  }
+  return false;
+}
+
+function applyLinksToHtml(htmlString, approvedSuggestions) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlString, "text/html");
+  for (const s of approvedSuggestions) {
+    if (s.approved) insertFirstLink(doc, s.term, s.argomento.id);
+  }
+  const isFullDoc = /<html/i.test(htmlString);
+  return isFullDoc ? doc.documentElement.outerHTML : doc.body.innerHTML;
+}
+
+// ── Componente upload sezione ─────────────────────────────────────────────────
 function UploadSection({ label, htmlKey, value, onUploaded }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -56,7 +142,62 @@ function UploadSection({ label, htmlKey, value, onUploaded }) {
   );
 }
 
-export default function LezioneDetailPage() {
+// ── Pannello suggerimenti link ────────────────────────────────────────────────
+function SuggestLinksPanel({ suggestions, setSuggestions, onApply, applying }) {
+  if (!suggestions) return null;
+
+  if (suggestions.length === 0) {
+    return (
+      <div style={{ background: "#f0f7ff", border: "1px solid #c3d9f0", borderRadius: 10, padding: "12px 16px", marginTop: 10, fontSize: 13, color: "#4268b3" }}>
+        Nessuna corrispondenza trovata con altri argomenti pubblicati.
+      </div>
+    );
+  }
+
+  const anyApproved = suggestions.some(s => s.approved);
+
+  return (
+    <div style={{ background: "#f8faff", border: "1.5px solid #1cb0f6", borderRadius: 10, padding: "14px 16px", marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#20489a" }}>
+          {suggestions.length} corrispondenz{suggestions.length === 1 ? "a" : "e"} trovata{suggestions.length === 1 ? "" : "e"}
+        </span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setSuggestions(null)}
+            style={{ background: "transparent", border: "none", fontSize: 12, color: "#aaa", cursor: "pointer", fontWeight: 600 }}>
+            Chiudi
+          </button>
+          <button onClick={onApply} disabled={!anyApproved || applying}
+            style={{ background: anyApproved ? "#1cb0f6" : "#ddd", color: "#fff", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: anyApproved ? "pointer" : "not-allowed" }}>
+            {applying ? "Applicazione..." : "Applica selezionati"}
+          </button>
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {suggestions.map((s, i) => (
+          <label key={i} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "8px 10px", borderRadius: 8, background: s.approved ? "#e0f4ff" : "#f5f5f5", border: "1px solid " + (s.approved ? "#90caf9" : "#e0e0e0") }}>
+            <input type="checkbox" checked={s.approved}
+              onChange={e => setSuggestions(prev => prev.map((x, j) => j === i ? { ...x, approved: e.target.checked } : x))} />
+            <span style={{ fontFamily: "monospace", background: "#fff3cd", borderRadius: 4, padding: "1px 6px", fontSize: 13, fontWeight: 700, color: "#20489a" }}>
+              "{s.term}"
+            </span>
+            <span style={{ fontSize: 12, color: "#666" }}>→</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#20489a" }}>{s.argomento.titolo}</span>
+            <span style={{ fontSize: 11, color: "#4268b3", background: "#e3eefe", borderRadius: 12, padding: "1px 8px" }}>
+              {s.argomento.materia}{s.argomento.anno ? " · " + s.argomento.anno : ""}
+            </span>
+          </label>
+        ))}
+      </div>
+      <p style={{ margin: "10px 0 0", fontSize: 11, color: "#aaa" }}>
+        Verrà inserito un link alla prima occorrenza di ogni termine nel testo.
+      </p>
+    </div>
+  );
+}
+
+// ── Pagina dettaglio (inner, uses useSearchParams) ────────────────────────────
+function LezioneDetailPageInner() {
   const { data: session } = useSession();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -69,6 +210,12 @@ export default function LezioneDetailPage() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(searchParams?.get("tab") || null);
   const [saving, setSaving] = useState(false);
+
+  // Suggerisci link
+  const [allArgomenti, setAllArgomenti] = useState(null);
+  const [loadingArgs, setLoadingArgs] = useState(false);
+  const [suggestions, setSuggestions] = useState(null); // null = non scansionato
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -90,6 +237,9 @@ export default function LezioneDetailPage() {
     if (available.length > 0) setTab(available[0]);
   }, [argomento, searchParams]);
 
+  // Reset suggerimenti quando cambia tab
+  useEffect(() => { setSuggestions(null); }, [tab]);
+
   async function handleUploaded(key, html) {
     setSaving(true);
     try {
@@ -101,12 +251,53 @@ export default function LezioneDetailPage() {
       if (!res.ok) throw new Error("Errore salvataggio");
       const updated = await res.json();
       setArgomento(prev => ({ ...prev, ...updated }));
-      // Seleziona il tab appena caricato (se non vuoto)
       if (html) setTab(key.replace("Html", ""));
     } catch (e) {
       alert(e.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSuggest() {
+    const htmlKey = tab + "Html";
+    const html = argomento?.[htmlKey];
+    if (!html) return;
+
+    // Carica tutti gli argomenti se non già caricati
+    let args = allArgomenti;
+    if (!args) {
+      setLoadingArgs(true);
+      try {
+        const r = await fetch("/api/lezioni", { credentials: "include" });
+        args = r.ok ? await r.json() : [];
+        setAllArgomenti(args);
+      } catch {
+        args = [];
+      } finally {
+        setLoadingArgs(false);
+      }
+    }
+
+    const found = scanHtmlForLinks(html, args, id);
+    setSuggestions(found);
+  }
+
+  async function handleApplySuggestions() {
+    const htmlKey = tab + "Html";
+    const html = argomento?.[htmlKey];
+    if (!html || !suggestions) return;
+
+    const approved = suggestions.filter(s => s.approved);
+    if (approved.length === 0) return;
+
+    setApplying(true);
+    try {
+      const newHtml = applyLinksToHtml(html, approved);
+      await handleUploaded(htmlKey, newHtml);
+      setSuggestions(null);
+    } finally {
+      setApplying(false);
     }
   }
 
@@ -132,7 +323,7 @@ export default function LezioneDetailPage() {
 
   return (
     <div style={pageStyle}>
-      {/* Breadcrumb cliccabile */}
+      {/* Breadcrumb */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <Link href="/lezioni" style={{ color: "#1cb0f6", fontWeight: 600, textDecoration: "none", fontSize: 14 }}>← Lezioni</Link>
         <span style={{ color: "#ccc" }}>/</span>
@@ -154,7 +345,7 @@ export default function LezioneDetailPage() {
         </div>
       </div>
 
-      {/* Sezione upload per admin */}
+      {/* Gestione contenuti (admin) */}
       {isAdmin && (
         <div style={{ background: "#f8faff", border: "1px solid #dbe4f1", borderRadius: 12, padding: "14px 18px", marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -166,6 +357,30 @@ export default function LezioneDetailPage() {
             <UploadSection label="Teoria" htmlKey="teoriaHtml" value={argomento.teoriaHtml} onUploaded={handleUploaded} />
             <UploadSection label="Esercizi" htmlKey="eserciziHtml" value={argomento.eserciziHtml} onUploaded={handleUploaded} />
           </div>
+
+          {/* Pulsante suggerisci link — visibile solo se c'è contenuto nel tab corrente */}
+          {currentHtml && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #dbe4f1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={handleSuggest}
+                  disabled={loadingArgs}
+                  style={{ background: "#fff", color: "#20489a", border: "1.5px solid #20489a", borderRadius: 7, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  {loadingArgs ? "Caricamento..." : "🔗 Suggerisci link interni"}
+                </button>
+                <span style={{ fontSize: 11, color: "#999" }}>
+                  Cerca corrispondenze con altri argomenti pubblicati nella sezione "{tab}"
+                </span>
+              </div>
+
+              <SuggestLinksPanel
+                suggestions={suggestions}
+                setSuggestions={setSuggestions}
+                onApply={handleApplySuggestions}
+                applying={applying}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -193,5 +408,14 @@ export default function LezioneDetailPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ── Export con Suspense (richiesto da useSearchParams in Next.js 15) ───────────
+export default function LezioneDetailPage() {
+  return (
+    <Suspense fallback={<div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}><p style={{ color: "#20489a" }}>Caricamento...</p></div>}>
+      <LezioneDetailPageInner />
+    </Suspense>
   );
 }
