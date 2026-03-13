@@ -1,6 +1,6 @@
 // @ts-nocheck
 "use client";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -356,6 +356,14 @@ function ArgomentoCard({ a, isAdmin, deleting, onEdit, onDelete }) {
 
 // ── Pagina principale ─────────────────────────────────────────────────────────
 export default function LezioniPage() {
+  return (
+    <Suspense fallback={<div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}><p style={{ color: "#20489a" }}>Caricamento...</p></div>}>
+      <LezioniPageInner />
+    </Suspense>
+  );
+}
+
+function LezioniPageInner() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const role = session?.user?.role;
