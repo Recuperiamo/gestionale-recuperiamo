@@ -45,13 +45,14 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
   }
 
-  const { titolo, materia, mappaHtml, teoriaHtml, eserciziHtml } = await req.json();
+  const { titolo, materia, anno, mappaHtml, teoriaHtml, eserciziHtml } = await req.json();
   if (!titolo?.trim()) return NextResponse.json({ error: 'Titolo obbligatorio' }, { status: 400 });
 
   const argomento = await prisma.argomentoDidattico.create({
     data: {
       titolo: titolo.trim(),
       materia: materia?.trim() || 'Generale',
+      anno: anno?.trim() || null,
       mappaHtml: mappaHtml || null,
       teoriaHtml: teoriaHtml || null,
       eserciziHtml: eserciziHtml || null,

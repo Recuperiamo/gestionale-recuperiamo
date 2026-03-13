@@ -428,6 +428,7 @@ model ArgomentoDidattico {
   id           Int                     @id @default(autoincrement())
   titolo       String
   materia      String                  @default("Generale")
+  anno         String?                 // es. "I", "II", "III", "IV", "V"
   mappaHtml    String?                 // HTML sezione "Mappe"
   teoriaHtml   String?                 // HTML sezione "Teoria"
   eserciziHtml String?                 // HTML sezione "Esercizi"
@@ -436,6 +437,7 @@ model ArgomentoDidattico {
   assegnazioni AssegnazioneArgomento[]
 
   @@index([materia])
+  @@index([anno])
 }
 
 model AssegnazioneArgomento {
