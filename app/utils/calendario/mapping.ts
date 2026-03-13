@@ -44,6 +44,9 @@ export function colorsForStato(stato) {
     case "Ripianificata":
       return {
         bg: "linear-gradient(135deg,#FFF3B0 45%,#1CB0F6 100%)",
+        // fcBg: colore solido passato a FullCalendar (non supporta gradient su backgroundColor)
+        // Il gradient viene applicato in handleEventDidMount via info.el.style.background
+        fcBg: "#FFF3B0",
         border: "#1CB0F6",
         text: "#20489A"
       };
@@ -101,6 +104,8 @@ export function mapAttivita(attivitaArray = []) {
     }
 
     const colors = colorsForStato(stato);
+    // FullCalendar non supporta gradient su backgroundColor — usa colore solido se disponibile
+    const fcBg = (colors as any).fcBg || colors.bg;
     const titolo =
       ev.raw.titolo?.trim() ||
       ev.raw.descrizione?.trim() ||
@@ -112,7 +117,7 @@ export function mapAttivita(attivitaArray = []) {
       title: titolo,
       start: ev.startDate,
       end: endDate,
-      backgroundColor: colors.bg,
+      backgroundColor: fcBg,
       borderColor: colors.border,
       textColor: colors.text,
       classNames: ["evt-stato-" + stato.toLowerCase()],

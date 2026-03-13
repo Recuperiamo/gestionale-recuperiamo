@@ -180,8 +180,12 @@ export default function CalendarioAttivita({
     const fiveMinMs = 5 * 60 * 1000;
 
     for (const ev of events) {
-      const start = ev.start?.getTime();
-      if (!start) continue;
+      // start può essere Date (attività) o stringa ISO (note allDay) — normalizza
+      const startMs = ev.start instanceof Date
+        ? ev.start.getTime()
+        : ev.start ? new Date(ev.start).getTime() : 0;
+      if (!startMs || isNaN(startMs)) continue;
+      const start = startMs;
       const diff = start - now;
       if (diff > 0 && diff <= fiveMinMs) {
         upcomingIds.push(Number(ev.id));
