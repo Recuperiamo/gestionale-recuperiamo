@@ -90,6 +90,7 @@ model Client {
   richiesteModifica RichiestaModifica[]
   programmi          Programma[]
   promemoria        Nota[]   @relation("ClienteNote")
+  argomentiAssegnati AssegnazioneArgomento[]
 
   @@index([email])
   @@index([referenteId])
@@ -419,4 +420,32 @@ model Nota {
   @@index([clienteId])
   @@index([data])
   @@index([autoreUserId])
+}
+
+/// *
+///  * ====================== MATERIALE DIDATTICO ======================
+model ArgomentoDidattico {
+  id           Int                     @id @default(autoincrement())
+  titolo       String
+  materia      String                  @default("Generale")
+  mappaHtml    String?                 // HTML sezione "Mappe"
+  teoriaHtml   String?                 // HTML sezione "Teoria"
+  eserciziHtml String?                 // HTML sezione "Esercizi"
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  assegnazioni AssegnazioneArgomento[]
+
+  @@index([materia])
+}
+
+model AssegnazioneArgomento {
+  id          Int                @id @default(autoincrement())
+  argomentoId Int
+  clienteId   Int
+  createdAt   DateTime           @default(now())
+  argomento   ArgomentoDidattico @relation(fields: [argomentoId], references: [id], onDelete: Cascade)
+  cliente     Client             @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([argomentoId, clienteId])
+  @@index([clienteId])
 }

@@ -29,6 +29,7 @@ export default function Navbar() {
     { href: "/calendario", label: "Calendario" },
     { href: "/lavagna", label: "Lavagna" },
     { href: "/aule", label: "Aule" },
+    { href: "/lezioni", label: "Lezioni" },
     { href: "/richieste", label: "Richieste" }
   ];
 
@@ -44,6 +45,7 @@ export default function Navbar() {
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/lavagna", label: "Lavagna" },
     { href: "/aula", label: "Aula" },
+    { href: "/lezioni", label: "Lezioni" },
     { href: "/richieste", label: "Richieste" }
   ];
 
