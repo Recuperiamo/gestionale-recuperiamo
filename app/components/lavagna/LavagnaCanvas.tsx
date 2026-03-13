@@ -2034,7 +2034,7 @@ export default function LavagnaCanvas({
           if (!st.allPunti) st.allPunti = [...st.punti];
           st.allPunti.push(...points);
           st.punti.push(...points);
-          drawIncrementalStroke(st, points);
+          (drawIncrementalStrokeRef.current || drawIncrementalStroke)(st, points);
           // Teniamo solo l'ultimo punto in punti per la continuità del rendering incrementale.
           // drawAll non deve iterare migliaia di punti per ogni remote stream attivo.
           if (st.punti.length > 2) {
@@ -2478,8 +2478,10 @@ export default function LavagnaCanvas({
             ablyConnListener = (stateChange) => {
 
               if (stateChange.current === 'connected') {
-                // When reconnected, re-subscribe to events
-                try { cleanup(); } catch (_) {}
+                // When reconnected, unsubscribe existing handlers (evita doppi) e ri-iscrive.
+                // NON chiamare cleanup() qui: rimuoverebbe anche questo listener, rompendo
+                // la gestione delle reconnect successive (il bug che costringeva reload).
+                try { ch.unsubscribe(); } catch (_) {}
                 try {
                   ch.subscribe('stroke:start', onStart);
                   ch.subscribe('stroke:points', onPoints);
