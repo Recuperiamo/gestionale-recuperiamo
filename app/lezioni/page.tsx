@@ -78,15 +78,24 @@ function ArgomentoModal({ argomento, clienti, initialTab, onClose, onSaved }) {
     titolo: argomento?.titolo || "",
     materia: argomento?.materia || MATERIE[0],
     anno: argomento?.anno || "",
+    tags: argomento?.tags || [],
     mappaHtml: argomento?.mappaHtml || "",
     teoriaHtml: argomento?.teoriaHtml || "",
     eserciziHtml: argomento?.eserciziHtml || "",
   });
+  const [tagInput, setTagInput] = useState("");
   const [assegnati, setAssegnati] = useState([]);
   const [tab, setTab] = useState(initialTab || "info");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
   const [search, setSearch] = useState("");
+
+  function addTag(raw) {
+    const t = raw.trim();
+    if (!t || form.tags.includes(t)) { setTagInput(""); return; }
+    setForm(f => ({ ...f, tags: [...f.tags, t] }));
+    setTagInput("");
+  }
 
   useEffect(() => {
     if (!isEdit) return;
@@ -170,6 +179,35 @@ function ArgomentoModal({ argomento, clienti, initialTab, onClose, onSaved }) {
                 {ANNI.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </label>
+
+            <div style={{ display: "flex", flexDirection: "column", fontSize: 13, fontWeight: 600, color: "#20489a" }}>
+              Tag (branche disciplinari)
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 6 }}>
+                {form.tags.map(t => (
+                  <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#e3eefe", color: "#20489a", borderRadius: 20, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
+                    {t}
+                    <button type="button" onClick={() => setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))}
+                      style={{ background: "transparent", border: "none", cursor: "pointer", color: "#4268b3", fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagInput); } }}
+                  style={{ ...inp, marginTop: 0, flex: 1 }}
+                  placeholder="es. Algebra, Geometria analitica… (Invio per aggiungere)"
+                />
+                <button type="button" onClick={() => addTag(tagInput)}
+                  style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "0 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  +
+                </button>
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: 11, color: "#aaa", fontWeight: 400 }}>
+                I tag alimentano l'indice disciplinare trasversale agli anni
+              </p>
+            </div>
           </div>
         )}
         {tab === "mappa" && <HtmlFilePicker value={form.mappaHtml} onChange={v => setForm(f => ({ ...f, mappaHtml: v }))} />}
@@ -484,18 +522,24 @@ function LezioniPageInner() {
             {isAdmin ? "Gestisci argomenti e assegnali agli studenti" : "Argomenti di studio assegnati dal tuo docente"}
           </p>
         </div>
-        {isAdmin && (
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={() => setAssegnaModal(true)}
-              style={{ background: "#fff", color: "#20489a", border: "1.5px solid #20489a", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-              Assegna argomento
-            </button>
-            <button onClick={() => setModal({ argomento: null })}
-              style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-              + Aggiungi lezione
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <Link href="/lezioni/indice"
+            style={{ background: "#f0f7ff", color: "#20489a", border: "1.5px solid #c3d9f0", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
+            Indice disciplinare
+          </Link>
+          {isAdmin && (
+            <>
+              <button onClick={() => setAssegnaModal(true)}
+                style={{ background: "#fff", color: "#20489a", border: "1.5px solid #20489a", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                Assegna argomento
+              </button>
+              <button onClick={() => setModal({ argomento: null })}
+                style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                + Aggiungi lezione
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Contenuto */}

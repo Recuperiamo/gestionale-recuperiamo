@@ -428,7 +428,8 @@ model ArgomentoDidattico {
   id           Int                     @id @default(autoincrement())
   titolo       String
   materia      String                  @default("Generale")
-  anno         String?                 // es. "I", "II", "III", "IV", "V"
+  anno         String?                 // es. "I anno", "II anno", ecc.
+  tags         String[]                @default([]) // branche disciplinari (es. "Algebra", "Geometria analitica")
   mappaHtml    String?                 // HTML sezione "Mappe"
   teoriaHtml   String?                 // HTML sezione "Teoria"
   eserciziHtml String?                 // HTML sezione "Esercizi"

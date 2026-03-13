@@ -44,6 +44,7 @@ export async function PATCH(req, { params }) {
   if (body.titolo !== undefined) data.titolo = body.titolo.trim();
   if (body.materia !== undefined) data.materia = body.materia.trim() || 'Generale';
   if (body.anno !== undefined) data.anno = body.anno?.trim() || null;
+  if (body.tags !== undefined) data.tags = Array.isArray(body.tags) ? body.tags.map(t => t.trim()).filter(Boolean) : [];
   if (body.mappaHtml !== undefined) data.mappaHtml = body.mappaHtml || null;
   if (body.teoriaHtml !== undefined) data.teoriaHtml = body.teoriaHtml || null;
   if (body.eserciziHtml !== undefined) data.eserciziHtml = body.eserciziHtml || null;
