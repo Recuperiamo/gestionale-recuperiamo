@@ -516,12 +516,26 @@ function LezioneDetailPageInner() {
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 0, borderBottom: "2px solid #dbe4f1" }}>
+          <div style={{ display: "flex", alignItems: "center", borderBottom: "2px solid #dbe4f1" }}>
             {sezioniConContenuto.map(s => (
               <button key={s.key} onClick={() => setTab(s.key)} style={{ border: "none", borderBottom: tab === s.key ? "3px solid #1cb0f6" : "3px solid transparent", borderRadius: 0, padding: "10px 22px", fontWeight: 600, fontSize: 14, cursor: "pointer", background: "transparent", color: tab === s.key ? "#1cb0f6" : "#4268b3", marginBottom: -2 }}>
                 {s.label}
               </button>
             ))}
+            {currentHtml && (
+              <div style={{ marginLeft: "auto", display: "flex", gap: 6, paddingRight: 8 }}>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([currentHtml], { type: "text/html" });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, "_blank");
+                  }}
+                  title="Apri in nuova scheda"
+                  style={{ background: "transparent", border: "1px solid #dbe4f1", borderRadius: 6, padding: "4px 10px", fontSize: 12, color: "#4268b3", cursor: "pointer", fontWeight: 600 }}>
+                  ↗ Nuova scheda
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ border: "1px solid #dbe4f1", borderTop: "none", borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
             {currentHtml ? (

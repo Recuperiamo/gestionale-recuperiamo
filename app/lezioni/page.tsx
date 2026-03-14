@@ -447,10 +447,13 @@ function LezioniPageInner() {
           );
         })}
 
-        {/* Lezioni non classificate */}
-        {isAdmin && lezioniNonClass.length>0 && (
+        {/* Lezioni non classificate — admin vede warning, studente vede semplicemente le sue lezioni */}
+        {lezioniNonClass.length>0 && (
           <div style={{ marginBottom:24 }}>
-            <h2 style={{ fontSize:16,color:C.yellow,fontWeight:700,margin:"0 0 10px" }}>⚠️ Lezioni non classificate</h2>
+            {isAdmin
+              ? <h2 style={{ fontSize:16,color:C.yellow,fontWeight:700,margin:"0 0 10px" }}>⚠️ Lezioni non classificate</h2>
+              : <h2 style={{ fontSize:16,color:C.primary,fontWeight:700,margin:"0 0 10px" }}>Le tue lezioni</h2>
+            }
             {lezioniNonClass.map(l=>(
               <LezioneRow key={l.id} l={l} isAdmin={isAdmin}
                 onEdit={()=>setModalLezione(l)}
