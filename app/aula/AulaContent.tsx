@@ -1109,13 +1109,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
       <style>{`
         @media (max-width: 767px) {
-          .aula-page-grid { flex-direction: column !important; padding: 0 10px !important; }
-          .aula-sidebar-wrap { min-width: 0 !important; max-width: 100% !important; width: 100% !important; margin: 12px 0 0 !important; order: 3; }
-          .aula-main { min-width: 0 !important; max-width: 100% !important; width: 100%; order: 1; }
-          .aula-right-aside { min-width: 0 !important; max-width: 100% !important; width: 100% !important; margin: 12px 0 !important; order: 2; }
+          .aula-page-grid { padding: 0 10px !important; }
           .aula-tabs { display: flex !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
           .aula-tabs::-webkit-scrollbar { display: none; }
-          .aula-tabs button { flex-shrink: 0 !important; padding: 10px 10px !important; font-size: 13px !important; }
           .aula-preview-overlay { padding: 0 !important; }
           .aula-preview-dialog { width: 100vw !important; max-width: 100% !important; height: 100dvh !important; max-height: 100% !important; border-radius: 0 !important; }
           .aula-preview-dialog-wide { width: 100vw !important; max-width: 100% !important; height: 100dvh !important; max-height: 100% !important; border-radius: 0 !important; }
@@ -1128,17 +1124,24 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         background: `linear-gradient(135deg, ${coloreTema} 0%, ${adjustColorBrightness(coloreTema, -30)} 100%)`
       }}>
         <div style={headerBanner}>
-          <div style={{ fontSize:32, fontWeight:800, color:"#fff" }}>
-            {titoloAula}
-          </div>
-          <div style={{ fontSize:16, color:"#e7ecfa", marginTop:6 }}>
-            Spazio Aula per condividere e scaricare materiali didattici.
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", width: "100%", flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: "#fff" }}>{titoloAula}</div>
+              <div style={{ fontSize: 15, color: "#e7ecfa", marginTop: 6 }}>Spazio Aula per condividere e scaricare materiali didattici.</div>
+            </div>
+            {targetClienteId && studenteCorrente?.linkVideolezione && (
+              <button
+                onClick={() => window.open(studenteCorrente.linkVideolezione, '_blank', 'noopener,noreferrer')}
+                style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.65)", color: "#fff", borderRadius: 12, padding: "10px 22px", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}
+              >
+                ▶ Videolezione
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <div style={pageGrid} className="aula-page-grid">
-        {hasTarget && !hideSidebar && activeTab !== 'programma' && <div style={sidebarWrap} className="aula-sidebar-wrap">{sidebar}</div>}
         <main style={mainStyle} className="aula-main">
           {(!hasTarget && isAdmin) ? (
             <div style={{ ...emptyBox, marginTop: 0 }}>
@@ -1183,6 +1186,32 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                     </button>
                   );
                 })}
+            </div>
+          )}
+
+          {/* Filtri inline: materie + sottocategoria + ricerca */}
+          {hasTarget && activeTab !== 'programma' && (materieSidebar.length > 0 || items.some(it => it.sottocategoria)) && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "12px 0 4px", borderBottom: "1px solid #f0f4f8", marginBottom: 4 }}>
+              {materieSidebar.length > 0 && <>
+                <button onClick={() => setFiltroMateria("")} style={{ ...inlineFilterPill, background: filtroMateria === "" ? coloreTema : `${coloreTema}15`, color: filtroMateria === "" ? "#fff" : coloreTema }}>Tutte</button>
+                {materieSidebar.map(m => (
+                  <button key={m} onClick={() => setFiltroMateria(m)} style={{ ...inlineFilterPill, background: filtroMateria === m ? coloreTema : `${coloreTema}15`, color: filtroMateria === m ? "#fff" : coloreTema }}>{m}</button>
+                ))}
+              </>}
+              {items.some(it => it.sottocategoria) && <>
+                <div style={{ width: 1, height: 16, background: "#e2e8f0", margin: "0 2px" }} />
+                {['TEORIA','SIMULAZIONI','ESERCIZI'].filter(s => items.some(it => it.sottocategoria === s)).map(s => (
+                  <button key={s} onClick={() => setFiltroSottocategoria(filtroSottocategoria === s ? null : s)} style={{ ...inlineFilterPill, background: filtroSottocategoria === s ? coloreTema : `${coloreTema}15`, color: filtroSottocategoria === s ? "#fff" : coloreTema }}>
+                    {s === 'TEORIA' ? 'Teoria' : s === 'SIMULAZIONI' ? 'Simulazioni' : 'Esercizi'}
+                  </button>
+                ))}
+              </>}
+              <input
+                placeholder="Cerca..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, border: "1.5px solid #e2e8f0", fontSize: 13, outline: "none", minWidth: 120, maxWidth: 200, background: "#fff" }}
+              />
             </div>
           )}
 
@@ -1397,25 +1426,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           )}
         </main>
 
-        {activeTab === 'bacheca' && targetClienteId && (
-          <div className="aula-right-aside" style={{ ...rightAsideWrap, margin: `60px 24px 0 0` }}> {/* Adjusted margin for alignment */}
-            <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}>
-              <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
-            </div>
-            {/* Mini-calendar */}
-            <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15' }}>
-              <CalendarioAttivita
-                clienteId={targetClienteId}
-                initialMode="month"
-                allowModeSwitch={false}
-                allowNavigation={true}
-                showLegend={false}
-                enableStudentRequests={false}
-                enableAdminRequests={false}
-              />
-            </div>
-          </div>
-        )}
+        {/* Sidebar destra e sinistra rimosse — layout a colonna singola */}
 
       </div>
       {/* Modale upload */}
@@ -1659,16 +1670,15 @@ function CommentiBox({ materialeId, lista, addCommento, user, coloreTema = "#1cb
 
 /* --- STILI OTTIMIZZATI STREAM CLASSROOM + SIDEBAR --- */
 const headerStyle = {background:"#20489a",padding:"0",marginBottom:0};
-const headerBanner = {padding:"38px 6vw 28px",display:"flex",flexDirection:"column",alignItems:"start"};
-const pageGrid = {display:"flex",flexDirection:"row",maxWidth:1920,margin:"0 auto",padding:"0 2vw", alignItems: 'flex-start'};
-// ...
+const headerBanner = {padding:"32px 6vw 24px",display:"flex",flexDirection:"column",alignItems:"start"};
+const pageGrid = {maxWidth:860,margin:"0 auto",padding:"0 16px"};
 const mainStyle = {
-  flex:1,maxWidth:1400,minWidth:0,margin:"36px 0 0 0",background:"none",padding:0,
+  minWidth:0,margin:"20px 0 40px",background:"none",padding:0,
   display: "flex",
   flexDirection: "column",
 };
-const sidebarWrap = {minWidth:260,maxWidth:320,margin:"36px 0 0 0",display:"block", alignSelf:'flex-start'};
-  const rightAsideWrap = {minWidth:280,maxWidth:360,margin:"36px 24px 0 0",display:"block", alignSelf: 'flex-start'};
+const sidebarWrap = {display:"none"}; // rimosso
+const rightAsideWrap = {display:"none"}; // rimosso
 const sidebarStyle = {display:"flex",flexDirection:"column",gap:22};
 const sidebarBox = {
   background:"#fff",borderRadius:18,padding:"22px 18px",marginBottom:0,
@@ -1777,7 +1787,16 @@ const streamWrap = {
   gap: 14,
   marginTop: 8,
   width: "100%",
-  maxWidth: 740,
+};
+const inlineFilterPill = {
+  padding: "5px 13px",
+  borderRadius: 20,
+  border: "none",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  transition: "all 0.15s",
+  whiteSpace: "nowrap" as const,
 };
 const dayHeaderStyle = { display: "none" }; // sostituito da inline JSX
 const streamCard = {
