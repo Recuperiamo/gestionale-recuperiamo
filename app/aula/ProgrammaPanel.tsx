@@ -125,11 +125,6 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
         throw new Error(js?.error || 'Errore');
       }
       
-      try {
-        const orarioIso = verificaForm.data ? new Date(verificaForm.data).toISOString() : undefined;
-        await fetch('/api/attivita/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, descrizione: `Verifica: ${verificaForm.titolo}`, orario: orarioIso, durataOre: 1 }) });
-      } catch (e) { /* ignore calendar sync error */ }
-
       setVerificaForm({ titolo: '', materia: '', data: '', descrizione: '' });
       await load();
       publishProgrammaUpdate(js.programma);
@@ -186,6 +181,7 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
 
   return (
     <div style={{ display: 'flex', gap: 20 }}>
+      <style>{`@media (max-width: 640px) { .prog-materie-grid { grid-template-columns: 1fr !important; } }`}</style>
       <div style={{ flex: 1 }}>
         {loading && <div>Caricamento…</div>}
           {!loading && (
@@ -196,19 +192,19 @@ export default function ProgrammaPanel({ clienteId, coloreTema = '#1cb0f6', isAd
                 <div>
                 </div>
               </div>
-              <form onSubmit={handleCreateVerifica} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 140px', gap: 10, alignItems: 'center' }}>
-                <input placeholder="Titolo verifica" value={verificaForm.titolo} onChange={e => setVerificaForm(prev => ({ ...prev, titolo: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff' }} />
-                <select value={verificaForm.materia} onChange={e => setVerificaForm(prev => ({ ...prev, materia: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff' }}>
+              <form onSubmit={handleCreateVerifica} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
+                <input placeholder="Titolo verifica" value={verificaForm.titolo} onChange={e => setVerificaForm(prev => ({ ...prev, titolo: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff', flex: '1 1 180px' }} />
+                <select value={verificaForm.materia} onChange={e => setVerificaForm(prev => ({ ...prev, materia: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff', flex: '1 1 140px' }}>
                   <option value="">Materia (opzionale)</option>
                   {materieList.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <input type="date" value={verificaForm.data} onChange={e => setVerificaForm(prev => ({ ...prev, data: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff' }} />
+                <input type="date" value={verificaForm.data} onChange={e => setVerificaForm(prev => ({ ...prev, data: e.target.value }))} style={{ padding: 8, borderRadius: 8, border: '1px solid #eef2ff', flex: '0 0 140px' }} />
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" style={{ padding: '8px 12px', background: coloreTema, color: '#fff', borderRadius: 8 }}>{isAdmin ? 'Aggiungi verifica' : 'Segnala'}</button>
+                  <button type="submit" style={{ padding: '8px 12px', background: coloreTema, color: '#fff', borderRadius: 8, whiteSpace: 'nowrap' }}>{isAdmin ? 'Aggiungi verifica' : 'Segnala'}</button>
                 </div>
               </form>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <div className="prog-materie-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               {materieList.map((m) => {
                 const listForMateria = (programmi || []).filter(p => (p.materia || '').toLowerCase() === (m || '').toLowerCase()).sort((a,b) => new Date(a.data || a.createdAt) - new Date(b.data || b.createdAt));
                 return (

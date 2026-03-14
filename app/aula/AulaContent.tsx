@@ -19,6 +19,7 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const lastTouchDistRef = useRef(null);
 
   const handleWheel = (e) => {
     e.preventDefault();
@@ -67,18 +68,38 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
     setIsDragging(false);
   };
 
-  const resetZoom = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  };
+  const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+  const zoomIn = () => setScale(prev => Math.min(5, prev + 0.25));
+  const zoomOut = () => setScale(prev => Math.max(0.5, prev - 0.25));
 
-  const zoomIn = () => {
-    setScale(prev => Math.min(5, prev + 0.25));
+  // Touch handlers (pinch zoom + drag)
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      lastTouchDistRef.current = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY
+      );
+    } else if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y });
+    }
   };
-
-  const zoomOut = () => {
-    setScale(prev => Math.max(0.5, prev - 0.25));
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY
+      );
+      if (lastTouchDistRef.current) {
+        setScale(prev => Math.max(0.5, Math.min(5, prev * (dist / lastTouchDistRef.current))));
+      }
+      lastTouchDistRef.current = dist;
+    } else if (e.touches.length === 1 && isDragging) {
+      setPosition({ x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y });
+    }
   };
+  const handleTouchEnd = () => { setIsDragging(false); lastTouchDistRef.current = null; };
 
   useEffect(() => {
     if (isDragging) {
@@ -189,7 +210,7 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
           zIndex: 10,
           pointerEvents: 'none'
         }}>
-          Trascina per spostare l'immagine
+          Usa 2 dita per ingrandire · trascina per spostare
         </div>
       )}
 
@@ -197,6 +218,9 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
       <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{
           width: '100%',
           height: '100%',
@@ -204,7 +228,8 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
           alignItems: 'center',
           justifyContent: 'center',
           cursor: isPannable() ? (isDragging ? 'grabbing' : 'grab') : 'default',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          touchAction: 'none'
         }}
       >
         <img
@@ -233,190 +258,25 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
   );
 }
 
-// Componente per visualizzazione PDF con controlli
+// Componente per visualizzazione PDF — usa il viewer nativo del browser
 function PDFPreviewWithControls({ src, title, coloreTema }) {
-  const iframeRef = useRef(null);
-  const [scale, setScale] = useState(100);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Costruisce URL con parametri per controllo PDF
-  const pdfUrl = useMemo(() => {
-    const baseUrl = src;
-    const params = new URLSearchParams();
-    if (currentPage > 1) params.set('page', currentPage.toString());
-    params.set('zoom', scale.toString());
-    const query = params.toString();
-    return query ? `${baseUrl}#${query}` : baseUrl;
-  }, [src, currentPage, scale]);
-
-  const zoomIn = () => setScale(prev => Math.min(200, prev + 25));
-  const zoomOut = () => setScale(prev => Math.max(50, prev - 25));
-  const resetZoom = () => setScale(100);
-  const nextPage = () => setCurrentPage(prev => prev + 1);
-  const prevPage = () => setCurrentPage(prev => Math.max(1, prev - 1));
-
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Barra controlli PDF */}
-      <div style={{
-        display: 'flex',
-        gap: 12,
-        padding: '12px 16px',
-        background: '#f8f9fa',
-        borderRadius: 8,
-        marginBottom: 12,
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        {/* Navigazione pagine */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={prevPage}
-            disabled={currentPage <= 1}
-            style={{
-              background: currentPage <= 1 ? '#e0e0e0' : coloreTema,
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              padding: '6px 12px',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            ← Prec
-          </button>
-          <div style={{
-            padding: '6px 12px',
-            background: '#fff',
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            minWidth: 80,
-            textAlign: 'center',
-            border: '1px solid #e0e0e0'
-          }}>
-            Pag. {currentPage}
-          </div>
-          <button
-            type="button"
-            onClick={nextPage}
-            style={{
-              background: coloreTema,
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              padding: '6px 12px',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            Succ →
-          </button>
-        </div>
-
-        {/* Controlli zoom */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={zoomOut}
-            disabled={scale <= 50}
-            style={{
-              background: scale <= 50 ? '#e0e0e0' : '#6b7b9a',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              padding: '6px 12px',
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: scale <= 50 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            −
-          </button>
-          <div style={{
-            padding: '6px 12px',
-            background: '#fff',
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            minWidth: 70,
-            textAlign: 'center',
-            border: '1px solid #e0e0e0'
-          }}>
-            {scale}%
-          </div>
-          <button
-            type="button"
-            onClick={zoomIn}
-            disabled={scale >= 200}
-            style={{
-              background: scale >= 200 ? '#e0e0e0' : '#6b7b9a',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              padding: '6px 12px',
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: scale >= 200 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            +
-          </button>
-          {scale !== 100 && (
-            <button
-              type="button"
-              onClick={resetZoom}
-              style={{
-                background: '#f59e0b',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 6,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: 10 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
+        <a
+          href={src}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ background: coloreTema, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 13, textDecoration: 'none', cursor: 'pointer' }}
+        >
+          ↗ Apri in nuova scheda
+        </a>
       </div>
-
-      {/* Hint utente */}
-      <div style={{
-        fontSize: 11,
-        color: '#6b7b9a',
-        textAlign: 'center',
-        marginBottom: 8,
-        fontStyle: 'italic',
-        flexShrink: 0
-      }}>
-        Usa i controlli sopra per navigare e ingrandire il PDF
-      </div>
-
-      {/* Iframe PDF */}
-      <div style={{ flex: 1, overflow: 'hidden', borderRadius: 8, border: '1px solid #e0e0e0', minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #e0e0e0' }}>
         <iframe
-          ref={iframeRef}
           title={title || 'PDF'}
-          src={pdfUrl}
-          style={{
-            width: '100%',
-            height: '100%',
-            border: 0,
-            borderRadius: 8
-          }}
+          src={src}
+          style={{ width: '100%', height: '100%', border: 0 }}
         />
       </div>
     </div>
@@ -1241,6 +1101,20 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
+      <style>{`
+        @media (max-width: 767px) {
+          .aula-page-grid { flex-direction: column !important; padding: 0 10px !important; }
+          .aula-sidebar-wrap { min-width: 0 !important; max-width: 100% !important; width: 100% !important; margin: 12px 0 0 !important; order: 3; }
+          .aula-main { min-width: 0 !important; max-width: 100% !important; width: 100%; order: 1; }
+          .aula-right-aside { min-width: 0 !important; max-width: 100% !important; width: 100% !important; margin: 12px 0 !important; order: 2; }
+          .aula-tabs { display: flex !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+          .aula-tabs::-webkit-scrollbar { display: none; }
+          .aula-tabs button { flex-shrink: 0 !important; padding: 10px 10px !important; font-size: 13px !important; }
+          .aula-preview-overlay { padding: 0 !important; }
+          .aula-preview-dialog { width: 100vw !important; max-width: 100% !important; height: 100dvh !important; max-height: 100% !important; border-radius: 0 !important; }
+          .aula-preview-dialog-wide { width: 100vw !important; max-width: 100% !important; height: 100dvh !important; max-height: 100% !important; border-radius: 0 !important; }
+        }
+      `}</style>
       <Navbar />
       {/* HEADER stile classroom con gradiente coloreTema */}
       <header ref={headerRef} style={{
@@ -1257,9 +1131,9 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </div>
       </header>
 
-      <div style={pageGrid}>
-        {hasTarget && !hideSidebar && activeTab !== 'programma' && <div style={sidebarWrap}>{sidebar}</div>}
-        <main style={mainStyle}>
+      <div style={pageGrid} className="aula-page-grid">
+        {hasTarget && !hideSidebar && activeTab !== 'programma' && <div style={sidebarWrap} className="aula-sidebar-wrap">{sidebar}</div>}
+        <main style={mainStyle} className="aula-main">
           {(!hasTarget && isAdmin) ? (
             <div style={{ ...emptyBox, marginTop: 0 }}>
               Seleziona uno studente dalla pagina <a href="/aule" style={{ color: "#20489a", textDecoration: "underline" }}>Aule</a>
@@ -1269,7 +1143,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             <>
           {/* TABS CLASSROOM */}
           {targetClienteId && (
-            <div style={{
+            <div className="aula-tabs" style={{
               display: "inline-flex", /* Modifica: inline-flex per centrare */
               gap: "8px",
               marginTop: "24px",
@@ -1573,7 +1447,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         </main>
 
         {activeTab === 'bacheca' && targetClienteId && (
-          <div style={{ ...rightAsideWrap, margin: `60px 24px 0 0` }}> {/* Adjusted margin for alignment */}
+          <div className="aula-right-aside" style={{ ...rightAsideWrap, margin: `60px 24px 0 0` }}> {/* Adjusted margin for alignment */}
             <div style={{ background: '#fff', padding: 12, borderRadius: 12, boxShadow: '0 2px 10px #20489a15', marginBottom: 24 }}>
               <ProgrammaPreview clienteId={targetClienteId} coloreTema={coloreTema} materie={materieStudente} onOpenProgramma={() => setActiveTab('programma')} noTopPadding={true} />
             </div>
@@ -1596,8 +1470,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
       {/* Modale upload */}
       {/* Modale preview materiale */}
       {previewItem && (
-        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:20}} onClick={() => setPreviewItem(null)} onWheel={(e) => e.stopPropagation()}>
-          <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1000,height:'90vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
+        <div className="aula-preview-overlay" style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:20}} onClick={() => setPreviewItem(null)} onWheel={(e) => e.stopPropagation()}>
+          <div className="aula-preview-dialog" role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1000,height:'90vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.4)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
               <div style={{fontWeight:700,color: coloreTema}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
               <div>
@@ -1630,8 +1504,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
       )}
       {/* Modale preview batch (carousel) */}
       {previewBatch && (
-        <div style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1110,padding:20}} onClick={() => setPreviewBatch(null)}>
-          <div role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1100,height:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.45)'}}>
+        <div className="aula-preview-overlay" style={{position:'fixed',inset:0,background:'rgba(16,24,64,0.65)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1110,padding:20}} onClick={() => setPreviewBatch(null)}>
+          <div className="aula-preview-dialog-wide" role="dialog" aria-modal="true" onClick={(e)=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,maxWidth:'95%',maxHeight:'95vh',width:1100,height:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 10px 40px rgba(0,0,0,0.45)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:12}}>
                 <div style={{fontWeight:700,color: coloreTema}}>{(previewBatch[previewIndex] && (previewBatch[previewIndex].titolo || previewBatch[previewIndex].nomeOriginale)) || 'Anteprima'}</div>
