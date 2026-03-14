@@ -458,9 +458,9 @@ function LezioneDetailPageInner() {
                       </select>
                     </label>
                     <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
-                      Argomento (livello 2)
+                      Argomento <span style={{ fontWeight:400,color:"#6b7280",fontSize:11 }}>(opzionale)</span>
                       <select value={infoForm.argomentoId} onChange={e => setInfoForm(f => ({ ...f, argomentoId: e.target.value }))} style={fi}>
-                        <option value="">— nessuno —</option>
+                        <option value="">— nessuno (la lezione è già l'argomento) —</option>
                         {filteredArg.map(a => <option key={a.id} value={a.id}>{a.nome}{a.macroArgomento ? ` (${a.macroArgomento.nome})` : ""}</option>)}
                       </select>
                     </label>

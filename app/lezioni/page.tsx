@@ -14,6 +14,15 @@ const MATERIE = [
 // ── Anni ─────────────────────────────────────────────────────────────────────
 const ANNI = ["I","II","III","IV","V"];
 
+// ── Macro-argomenti predefiniti per materia ───────────────────────────────────
+const MACRO_PREDEFINITI = {
+  Matematica: [
+    "Il linguaggio della Matematica","Logica","Insiemistica","Gli Insiemi Numerici",
+    "Algebra","Geometria","Geometria Analitica","Calcolo Combinatorio",
+    "Probabilità","Relazioni e Funzioni","Analisi Matematica"
+  ],
+};
+
 // ── Colori ───────────────────────────────────────────────────────────────────
 const C = {
   bg:"#f0f4ff", card:"#fff", primary:"#4f46e5", light:"#e0e7ff",
@@ -33,11 +42,26 @@ function LezioneModal({ lezione, argomenti, macroArgomenti, onClose, onSaved }) 
   const [argomentoId, setArgomentoId] = useState(lezione?.argomentoId ?? "");
   const [macroArgomentoId, setMacroArgomentoId] = useState(lezione?.macroArgomentoId ?? "");
   const [saving, setSaving] = useState(false);
+  const [creatingPredefiniti, setCreatingPredefiniti] = useState(false);
 
   const filteredMacro = macroArgomenti.filter(m=>m.materia===materia);
   const filteredArg = argomenti.filter(a=>
     !macroArgomentoId || a.macroArgomentoId===Number(macroArgomentoId)
   );
+  const predefiniti = MACRO_PREDEFINITI[materia] || [];
+  const mancanti = predefiniti.filter(n=>!macroArgomenti.some(m=>m.materia===materia&&m.nome===n));
+
+  async function creaPredefiniti() {
+    setCreatingPredefiniti(true);
+    for (const nome of mancanti) {
+      await fetch("/api/macro-argomenti", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ nome, materia })
+      });
+    }
+    onSaved(); // ricarica lista
+    setCreatingPredefiniti(false);
+  }
 
   async function handleSave() {
     if (!titolo.trim()) return;
@@ -75,13 +99,21 @@ function LezioneModal({ lezione, argomenti, macroArgomenti, onClose, onSaved }) 
           {ANNI.map(a=><option key={a} value={a}>{a} anno</option>)}
         </select>
 
-        <label style={lbl}>Macro-argomento</label>
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12,marginBottom:4 }}>
+          <span style={{ fontSize:13,color:"#374151",fontWeight:500 }}>Macro-argomento</span>
+          {mancanti.length>0 && (
+            <button type="button" onClick={creaPredefiniti} disabled={creatingPredefiniti}
+              style={{ fontSize:11,background:"#e0e7ff",color:C.primary,border:"none",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:600 }}>
+              {creatingPredefiniti ? "Creo..." : `+ Crea predefiniti (${mancanti.length})`}
+            </button>
+          )}
+        </div>
         <select value={macroArgomentoId} onChange={e=>{setMacroArgomentoId(e.target.value);setArgomentoId("");}} style={inp}>
           <option value="">— nessuno —</option>
           {filteredMacro.map(m=><option key={m.id} value={m.id}>{m.nome}</option>)}
         </select>
 
-        <label style={lbl}>Argomento (livello 2)</label>
+        <label style={lbl}>Argomento <span style={{ fontWeight:400,color:C.sub }}>(opzionale — se assente la lezione è già l'argomento)</span></label>
         <select value={argomentoId} onChange={e=>setArgomentoId(e.target.value)} style={inp}>
           <option value="">— nessuno —</option>
           {filteredArg.map(a=><option key={a.id} value={a.id}>{a.nome}{a.macroArgomento?` (${a.macroArgomento.nome})`:""}</option>)}
