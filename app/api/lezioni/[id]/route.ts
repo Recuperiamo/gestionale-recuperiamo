@@ -14,22 +14,24 @@ export async function GET(req, { params }) {
   const role = session.user?.role;
   const isAdmin = role === 'admin' || role === 'operatore';
 
-  const argomento = await prisma.argomentoDidattico.findUnique({
+  const lezione = await prisma.lezione.findUnique({
     where: { id },
     include: {
+      argomento: { include: { macroArgomento: true } },
+      macroArgomento: true,
       assegnazioni: { include: { cliente: { select: { id: true, nomeReferente: true } } } }
     }
   });
 
-  if (!argomento) return NextResponse.json({ error: 'Non trovato' }, { status: 404 });
+  if (!lezione) return NextResponse.json({ error: 'Non trovato' }, { status: 404 });
 
   if (!isAdmin) {
     const clienteId = Number(session.user?.clienteId);
-    const assegnato = argomento.assegnazioni.some(a => a.clienteId === clienteId);
+    const assegnato = lezione.assegnazioni.some(a => a.clienteId === clienteId);
     if (!assegnato) return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 });
   }
 
-  return NextResponse.json(argomento);
+  return NextResponse.json(lezione);
 }
 
 export async function PATCH(req, { params }) {
@@ -44,12 +46,13 @@ export async function PATCH(req, { params }) {
   if (body.titolo !== undefined) data.titolo = body.titolo.trim();
   if (body.materia !== undefined) data.materia = body.materia.trim() || 'Generale';
   if (body.anno !== undefined) data.anno = body.anno?.trim() || null;
-  if (body.tags !== undefined) data.tags = Array.isArray(body.tags) ? body.tags.map(t => t.trim()).filter(Boolean) : [];
+  if (body.argomentoId !== undefined) data.argomentoId = body.argomentoId ? Number(body.argomentoId) : null;
+  if (body.macroArgomentoId !== undefined) data.macroArgomentoId = body.macroArgomentoId ? Number(body.macroArgomentoId) : null;
   if (body.mappaHtml !== undefined) data.mappaHtml = body.mappaHtml || null;
   if (body.teoriaHtml !== undefined) data.teoriaHtml = body.teoriaHtml || null;
   if (body.eserciziHtml !== undefined) data.eserciziHtml = body.eserciziHtml || null;
 
-  const updated = await prisma.argomentoDidattico.update({ where: { id }, data });
+  const updated = await prisma.lezione.update({ where: { id }, data });
   return NextResponse.json(updated);
 }
 
@@ -59,6 +62,6 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
   }
 
-  await prisma.argomentoDidattico.delete({ where: { id: Number(params.id) } });
+  await prisma.lezione.delete({ where: { id: Number(params.id) } });
   return NextResponse.json({ ok: true });
 }

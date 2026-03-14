@@ -90,7 +90,7 @@ model Client {
   richiesteModifica RichiestaModifica[]
   programmi          Programma[]
   promemoria        Nota[]   @relation("ClienteNote")
-  argomentiAssegnati AssegnazioneArgomento[]
+  lezioniAssegnate   AssegnazioneLezione[]
 
   @@index([email])
   @@index([referenteId])
@@ -423,32 +423,70 @@ model Nota {
 }
 
 /// *
-///  * ====================== MATERIALE DIDATTICO ======================
-model ArgomentoDidattico {
-  id           Int                     @id @default(autoincrement())
-  titolo       String
-  materia      String                  @default("Generale")
-  anno         String?                 // es. "I anno", "II anno", ecc.
-  tags         String[]                @default([]) // branche disciplinari (es. "Algebra", "Geometria analitica")
-  mappaHtml    String?                 // HTML sezione "Mappe"
-  teoriaHtml   String?                 // HTML sezione "Teoria"
-  eserciziHtml String?                 // HTML sezione "Esercizi"
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  assegnazioni AssegnazioneArgomento[]
+///  * ====================== SISTEMA LEZIONI ======================
+
+model MacroArgomento {
+  id        Int          @id @default(autoincrement())
+  nome      String
+  materia   String       @default("Generale")
+  ordine    Int          @default(0)
+  createdAt DateTime     @default(now())
+  argomenti Argomento[]
+  lezioni   Lezione[]
 
   @@index([materia])
-  @@index([anno])
 }
 
-model AssegnazioneArgomento {
-  id          Int                @id @default(autoincrement())
-  argomentoId Int
-  clienteId   Int
-  createdAt   DateTime           @default(now())
-  argomento   ArgomentoDidattico @relation(fields: [argomentoId], references: [id], onDelete: Cascade)
-  cliente     Client             @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+model Argomento {
+  id               Int             @id @default(autoincrement())
+  nome             String
+  macroArgomentoId Int?
+  ordine           Int             @default(0)
+  createdAt        DateTime        @default(now())
+  macroArgomento   MacroArgomento? @relation(fields: [macroArgomentoId], references: [id], onDelete: SetNull)
+  lezioni          Lezione[]
 
-  @@unique([argomentoId, clienteId])
+  @@index([macroArgomentoId])
+}
+
+model Lezione {
+  id               Int                   @id @default(autoincrement())
+  titolo           String
+  materia          String                @default("Generale")
+  anno             String?
+  argomentoId      Int?                  // FK al nuovo Argomento (livello 2)
+  macroArgomentoId Int?                  // FK diretto a MacroArgomento (se senza livello 2)
+  mappaHtml        String?
+  teoriaHtml       String?
+  eserciziHtml     String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  argomento        Argomento?            @relation(fields: [argomentoId], references: [id], onDelete: SetNull)
+  macroArgomento   MacroArgomento?       @relation(fields: [macroArgomentoId], references: [id], onDelete: SetNull)
+  assegnazioni     AssegnazioneLezione[]
+
+  @@index([argomentoId])
+  @@index([macroArgomentoId])
+  @@index([materia])
+  @@index([anno])
+  @@map("ArgomentoDidattico")
+}
+
+model AssegnazioneLezione {
+  id        Int      @id @default(autoincrement())
+  lezioneId Int      @map("argomentoId")
+  clienteId Int
+  createdAt DateTime @default(now())
+  lezione   Lezione  @relation(fields: [lezioneId], references: [id], onDelete: Cascade)
+  cliente   Client   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([lezioneId, clienteId])
   @@index([clienteId])
+  @@map("AssegnazioneArgomento")
+}
+
+model Config {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

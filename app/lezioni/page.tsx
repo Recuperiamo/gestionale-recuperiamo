@@ -1,640 +1,503 @@
-// @ts-nocheck
 "use client";
-import { useEffect, useState, useMemo, useRef, Suspense } from "react";
+// @ts-nocheck
+import { useEffect, useState, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+// ── Materie con ordine fisso ──────────────────────────────────────────────────
 const MATERIE = [
-  "Matematica", "Fisica", "Chimica", "Biologia", "Scienze naturali", "Informatica",
-  "Italiano", "Latino", "Storia", "Filosofia", "Inglese", "Storia dell'arte",
-  "Scienze motorie", "Religione",
-  "Altra materia",
+  "Matematica","Fisica","Chimica","Biologia","Informatica",
+  "Italiano","Latino","Storia","Filosofia","Inglese","Scienze","Generale"
 ];
 
-const ANNI = ["I anno", "II anno", "III anno", "IV anno", "V anno"];
+// ── Anni ─────────────────────────────────────────────────────────────────────
+const ANNI = ["I","II","III","IV","V"];
 
-function readHtmlFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsText(file, "utf-8");
-  });
-}
+// ── Colori ───────────────────────────────────────────────────────────────────
+const C = {
+  bg:"#f0f4ff", card:"#fff", primary:"#4f46e5", light:"#e0e7ff",
+  text:"#1e1b4b", sub:"#6b7280", border:"#e5e7eb",
+  green:"#16a34a", red:"#dc2626", yellow:"#ca8a04",
+  macroRow:"#f8f7ff", argRow:"#fafafa",
+};
 
-// ── Picker file per una sezione HTML ─────────────────────────────────────────
-function HtmlFilePicker({ value, onChange }) {
-  const fileRef = useRef(null);
-  const hasContent = !!value;
-
-  async function handleFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const html = await readHtmlFile(file);
-      onChange(html);
-    } catch {
-      alert("Errore nella lettura del file");
-    }
-    e.target.value = "";
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => fileRef.current?.click()}
-          style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-          Carica file .html
-        </button>
-        {hasContent && (
-          <span style={{ fontSize: 12, color: "#12753a", fontWeight: 600, background: "#c7f7d7", borderRadius: 20, padding: "3px 10px" }}>✓ File caricato</span>
-        )}
-        {hasContent && (
-          <button type="button" onClick={() => onChange("")}
-            style={{ background: "#ffebee", color: "#c62828", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            Rimuovi
-          </button>
-        )}
-        <input ref={fileRef} type="file" accept=".html,.htm" style={{ display: "none" }} onChange={handleFile} />
-      </div>
-      {hasContent && (
-        <details>
-          <summary style={{ cursor: "pointer", fontSize: 13, color: "#20489a", fontWeight: 600 }}>Anteprima</summary>
-          <iframe srcDoc={value} style={{ width: "100%", height: 300, border: "1px solid #dbe4f1", borderRadius: 8, marginTop: 6 }} sandbox="allow-scripts allow-same-origin" />
-        </details>
-      )}
-      {!hasContent && (
-        <p style={{ margin: 0, fontSize: 12, color: "#aaa" }}>Nessun file caricato. Clicca il pulsante per selezionare un file .html.</p>
-      )}
-    </div>
-  );
-}
-
-// ── Modal crea/modifica argomento ─────────────────────────────────────────────
-function ArgomentoModal({ argomento, clienti, initialTab, onClose, onSaved }) {
-  const isEdit = !!argomento?.id;
-  const [form, setForm] = useState({
-    titolo: argomento?.titolo || "",
-    materia: argomento?.materia || MATERIE[0],
-    anno: argomento?.anno || "",
-    tags: argomento?.tags || [],
-    mappaHtml: argomento?.mappaHtml || "",
-    teoriaHtml: argomento?.teoriaHtml || "",
-    eserciziHtml: argomento?.eserciziHtml || "",
-  });
-  const [tagInput, setTagInput] = useState("");
-  const [assegnati, setAssegnati] = useState([]);
-  const [tab, setTab] = useState(initialTab || "info");
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODALE LEZIONE
+// ═══════════════════════════════════════════════════════════════════════════════
+function LezioneModal({ lezione, argomenti, macroArgomenti, onClose, onSaved }) {
+  const isEdit = !!lezione?.id;
+  const [titolo, setTitolo] = useState(lezione?.titolo || "");
+  const [materia, setMateria] = useState(lezione?.materia || "Matematica");
+  const [anno, setAnno] = useState(lezione?.anno || "");
+  const [argomentoId, setArgomentoId] = useState(lezione?.argomentoId ?? "");
+  const [macroArgomentoId, setMacroArgomentoId] = useState(lezione?.macroArgomentoId ?? "");
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState(null);
-  const [search, setSearch] = useState("");
 
-  function addTag(raw) {
-    const t = raw.trim();
-    if (!t || form.tags.includes(t)) { setTagInput(""); return; }
-    setForm(f => ({ ...f, tags: [...f.tags, t] }));
-    setTagInput("");
-  }
-
-  useEffect(() => {
-    if (!isEdit) return;
-    fetch("/api/lezioni/" + argomento.id + "/assegna", { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(setAssegnati)
-      .catch(() => {});
-  }, [argomento?.id, isEdit]);
+  const filteredMacro = macroArgomenti.filter(m=>m.materia===materia);
+  const filteredArg = argomenti.filter(a=>
+    !macroArgomentoId || a.macroArgomentoId===Number(macroArgomentoId)
+  );
 
   async function handleSave() {
-    if (!form.titolo.trim()) { setErr("Titolo obbligatorio"); return; }
-    setSaving(true); setErr(null);
-    try {
-      const url = isEdit ? "/api/lezioni/" + argomento.id : "/api/lezioni";
-      const res = await fetch(url, {
-        method: isEdit ? "PATCH" : "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const saved = await res.json();
-      await fetch("/api/lezioni/" + saved.id + "/assegna", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteIds: assegnati }),
-      });
-      onSaved({ ...saved, assegnazioni: assegnati.map(id => ({ clienteId: id, cliente: clienti.find(c => c.id === id) })) });
-    } catch (e) {
-      setErr(e.message || "Errore");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const TABS = [
-    { key: "info", label: "Info" },
-    { key: "mappa", label: "Mappa" + (form.mappaHtml ? " ✓" : "") },
-    { key: "teoria", label: "Teoria" + (form.teoriaHtml ? " ✓" : "") },
-    { key: "esercizi", label: "Esercizi" + (form.eserciziHtml ? " ✓" : "") },
-    { key: "assegna", label: assegnati.length > 0 ? "Assegna (" + assegnati.length + ")" : "Assegna" },
-  ];
-
-  const inp = { display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "9px 12px", fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginTop: 4 };
-  const filtered = clienti.filter(c => c.nomeReferente?.toLowerCase().includes(search.toLowerCase()));
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", maxWidth: 680, width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 18, color: "#20489a", fontWeight: 800 }}>
-            {isEdit ? "Modifica: " + argomento.titolo : "Nuovo argomento"}
-          </h2>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#aaa", lineHeight: 1 }}>×</button>
-        </div>
-
-        <div style={{ display: "flex", gap: 4, marginBottom: 18, flexWrap: "wrap" }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} style={{ border: "none", borderRadius: 8, padding: "6px 13px", fontWeight: 600, fontSize: 13, cursor: "pointer", background: tab === t.key ? "#1cb0f6" : "#e3eefe", color: tab === t.key ? "#fff" : "#20489a" }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "info" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, fontWeight: 600, color: "#20489a" }}>
-              Titolo *
-              <input value={form.titolo} onChange={e => setForm(f => ({ ...f, titolo: e.target.value }))} style={inp} placeholder="es. La circonferenza" autoFocus />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, fontWeight: 600, color: "#20489a" }}>
-              Materia
-              <select value={form.materia} onChange={e => setForm(f => ({ ...f, materia: e.target.value }))} style={inp}>
-                {MATERIE.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, fontWeight: 600, color: "#20489a" }}>
-              Anno scolastico
-              <select value={form.anno} onChange={e => setForm(f => ({ ...f, anno: e.target.value }))} style={inp}>
-                <option value="">— Tutti gli anni —</option>
-                {ANNI.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </label>
-
-            <div style={{ display: "flex", flexDirection: "column", fontSize: 13, fontWeight: 600, color: "#20489a" }}>
-              Tag (branche disciplinari)
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 6 }}>
-                {form.tags.map(t => (
-                  <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#e3eefe", color: "#20489a", borderRadius: 20, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
-                    {t}
-                    <button type="button" onClick={() => setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))}
-                      style={{ background: "transparent", border: "none", cursor: "pointer", color: "#4268b3", fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
-                  </span>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <input
-                  value={tagInput}
-                  onChange={e => setTagInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagInput); } }}
-                  style={{ ...inp, marginTop: 0, flex: 1 }}
-                  placeholder="es. Algebra, Geometria analitica… (Invio per aggiungere)"
-                />
-                <button type="button" onClick={() => addTag(tagInput)}
-                  style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "0 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                  +
-                </button>
-              </div>
-              <p style={{ margin: "4px 0 0", fontSize: 11, color: "#aaa", fontWeight: 400 }}>
-                I tag alimentano l'indice disciplinare trasversale agli anni
-              </p>
-            </div>
-          </div>
-        )}
-        {tab === "mappa" && <HtmlFilePicker value={form.mappaHtml} onChange={v => setForm(f => ({ ...f, mappaHtml: v }))} />}
-        {tab === "teoria" && <HtmlFilePicker value={form.teoriaHtml} onChange={v => setForm(f => ({ ...f, teoriaHtml: v }))} />}
-        {tab === "esercizi" && <HtmlFilePicker value={form.eserciziHtml} onChange={v => setForm(f => ({ ...f, eserciziHtml: v }))} />}
-
-        {tab === "assegna" && (
-          <div>
-            <p style={{ margin: "0 0 10px", fontSize: 13, color: "#4268b3" }}>Studenti che possono vedere questo argomento</p>
-            <input value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, marginBottom: 10 }} placeholder="Cerca studente..." />
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
-              {filtered.map(c => {
-                const checked = assegnati.includes(c.id);
-                return (
-                  <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "7px 10px", borderRadius: 8, background: checked ? "#e0f4ff" : "#f5f8ff", border: "1px solid " + (checked ? "#90caf9" : "#e3eefe") }}>
-                    <input type="checkbox" checked={checked} onChange={ev => setAssegnati(prev => ev.target.checked ? [...prev, c.id] : prev.filter(x => x !== c.id))} />
-                    <span style={{ fontWeight: 600, fontSize: 14, color: "#20489a" }}>{c.nomeReferente}</span>
-                  </label>
-                );
-              })}
-              {filtered.length === 0 && <p style={{ color: "#aaa", fontSize: 13 }}>Nessun risultato</p>}
-            </div>
-          </div>
-        )}
-
-        {err && <p style={{ color: "#d32f2f", fontSize: 13, marginTop: 10 }}>{err}</p>}
-
-        <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Annulla</button>
-          <button onClick={handleSave} disabled={saving} style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-            {saving ? "Salvataggio..." : isEdit ? "Salva modifiche" : "Crea argomento"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Modal assegna argomento rapido ─────────────────────────────────────────────
-function AssegnaRapidaModal({ argomenti, clienti, onClose }) {
-  const [selectedId, setSelectedId] = useState(null);
-  const [assegnati, setAssegnati] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [searchA, setSearchA] = useState("");
-  const [searchC, setSearchC] = useState("");
-
-  const selectedArg = argomenti.find(a => a.id === selectedId);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    setSaved(false);
-    fetch("/api/lezioni/" + selectedId + "/assegna", { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(setAssegnati)
-      .catch(() => {});
-  }, [selectedId]);
-
-  async function handleSave() {
-    if (!selectedId) return;
+    if (!titolo.trim()) return;
     setSaving(true);
-    try {
-      await fetch("/api/lezioni/" + selectedId + "/assegna", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clienteIds: assegnati }),
-      });
-      setSaved(true);
-    } catch {
-      alert("Errore nel salvataggio");
-    } finally {
-      setSaving(false);
-    }
+    const body = {
+      titolo, materia, anno: anno||null,
+      argomentoId: argomentoId ? Number(argomentoId) : null,
+      macroArgomentoId: (!argomentoId && macroArgomentoId) ? Number(macroArgomentoId) : null,
+    };
+    const res = await fetch(isEdit ? `/api/lezioni/${lezione.id}` : "/api/lezioni", {
+      method: isEdit?"PATCH":"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body),
+    });
+    if (res.ok) { onSaved(); onClose(); }
+    setSaving(false);
   }
 
-  const filteredArgs = argomenti.filter(a => a.titolo?.toLowerCase().includes(searchA.toLowerCase()) || a.materia?.toLowerCase().includes(searchA.toLowerCase()));
-  const filteredClienti = clienti.filter(c => c.nomeReferente?.toLowerCase().includes(searchC.toLowerCase()));
-  const inp = { display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "8px 12px", fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", marginTop: 4 };
-
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", maxWidth: 700, width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.22)" }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontSize: 18, color: "#20489a", fontWeight: 800 }}>Assegna argomento</h2>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#aaa", lineHeight: 1 }}>×</button>
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center" }}>
+      <div style={{ background:C.card,borderRadius:12,padding:28,width:480,maxWidth:"95vw",maxHeight:"90vh",overflowY:"auto" }}>
+        <h3 style={{ margin:"0 0 18px",color:C.text }}>{isEdit?"Modifica lezione":"Nuova lezione"}</h3>
+
+        <label style={lbl}>Titolo *</label>
+        <input value={titolo} onChange={e=>setTitolo(e.target.value)} style={inp} placeholder="es. La circonferenza"/>
+
+        <label style={lbl}>Materia</label>
+        <select value={materia} onChange={e=>{setMateria(e.target.value);setMacroArgomentoId("");setArgomentoId("");}} style={inp}>
+          {MATERIE.map(m=><option key={m}>{m}</option>)}
+        </select>
+
+        <label style={lbl}>Anno scolastico</label>
+        <select value={anno} onChange={e=>setAnno(e.target.value)} style={inp}>
+          <option value="">— nessuno —</option>
+          {ANNI.map(a=><option key={a} value={a}>{a} anno</option>)}
+        </select>
+
+        <label style={lbl}>Macro-argomento</label>
+        <select value={macroArgomentoId} onChange={e=>{setMacroArgomentoId(e.target.value);setArgomentoId("");}} style={inp}>
+          <option value="">— nessuno —</option>
+          {filteredMacro.map(m=><option key={m.id} value={m.id}>{m.nome}</option>)}
+        </select>
+
+        <label style={lbl}>Argomento (livello 2)</label>
+        <select value={argomentoId} onChange={e=>setArgomentoId(e.target.value)} style={inp}>
+          <option value="">— nessuno —</option>
+          {filteredArg.map(a=><option key={a.id} value={a.id}>{a.nome}{a.macroArgomento?` (${a.macroArgomento.nome})`:""}</option>)}
+        </select>
+
+        <div style={{ display:"flex",gap:8,marginTop:20,justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={btnSec}>Annulla</button>
+          <button onClick={handleSave} disabled={saving||!titolo.trim()} style={btnPri}>{saving?"Salvo...":"Salva"}</button>
         </div>
-
-        {/* Step 1: pick argomento */}
-        <div style={{ marginBottom: 18 }}>
-          <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600, color: "#20489a" }}>1. Seleziona un argomento</p>
-          <input value={searchA} onChange={e => setSearchA(e.target.value)} style={inp} placeholder="Cerca per titolo o materia..." />
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto", marginTop: 8 }}>
-            {filteredArgs.map(a => (
-              <button key={a.id} onClick={() => setSelectedId(a.id)} type="button"
-                style={{ textAlign: "left", border: "1.5px solid " + (selectedId === a.id ? "#1cb0f6" : "#e3eefe"), borderRadius: 8, padding: "8px 12px", background: selectedId === a.id ? "#e0f4ff" : "#f8faff", cursor: "pointer", fontSize: 13 }}>
-                <span style={{ fontWeight: 700, color: "#20489a" }}>{a.titolo}</span>
-                <span style={{ fontSize: 11, color: "#4268b3", marginLeft: 8 }}>{a.materia}{a.anno ? " · " + a.anno : ""}</span>
-              </button>
-            ))}
-            {filteredArgs.length === 0 && <p style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Nessun argomento trovato</p>}
-          </div>
-        </div>
-
-        {/* Step 2: assign students */}
-        {selectedArg && (
-          <div>
-            <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600, color: "#20489a" }}>
-              2. Studenti assegnati a <span style={{ color: "#1cb0f6" }}>{selectedArg.titolo}</span>
-            </p>
-            <input value={searchC} onChange={e => setSearchC(e.target.value)} style={inp} placeholder="Cerca studente..." />
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 220, overflowY: "auto", marginTop: 8 }}>
-              {filteredClienti.map(c => {
-                const checked = assegnati.includes(c.id);
-                return (
-                  <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "7px 10px", borderRadius: 8, background: checked ? "#e0f4ff" : "#f5f8ff", border: "1px solid " + (checked ? "#90caf9" : "#e3eefe") }}>
-                    <input type="checkbox" checked={checked} onChange={ev => setAssegnati(prev => ev.target.checked ? [...prev, c.id] : prev.filter(x => x !== c.id))} />
-                    <span style={{ fontWeight: 600, fontSize: 14, color: "#20489a" }}>{c.nomeReferente}</span>
-                  </label>
-                );
-              })}
-              {filteredClienti.length === 0 && <p style={{ color: "#aaa", fontSize: 13 }}>Nessun risultato</p>}
-            </div>
-            {saved && <p style={{ color: "#12753a", fontSize: 13, fontWeight: 600, marginTop: 8 }}>✓ Assegnazioni salvate</p>}
-            <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
-              <button onClick={onClose} style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Chiudi</button>
-              <button onClick={handleSave} disabled={saving} style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                {saving ? "Salvataggio..." : "Salva assegnazioni"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!selectedArg && (
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button onClick={onClose} style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Chiudi</button>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-// ── Card argomento ─────────────────────────────────────────────────────────────
-function ArgomentoCard({ a, isAdmin, deleting, onEdit, onDelete }) {
-  const sezioni = [
-    a.mappaHtml && { key: "mappa", label: "Mappa" },
-    a.teoriaHtml && { key: "teoria", label: "Teoria" },
-    a.eserciziHtml && { key: "esercizi", label: "Esercizi" },
-  ].filter(Boolean);
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODALE MACRO-ARGOMENTO
+// ═══════════════════════════════════════════════════════════════════════════════
+function MacroModal({ macro, onClose, onSaved }) {
+  const isEdit = !!macro?.id;
+  const [nome, setNome] = useState(macro?.nome||"");
+  const [materia, setMateria] = useState(macro?.materia||"Matematica");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!nome.trim()) return;
+    setSaving(true);
+    const res = await fetch(isEdit?`/api/macro-argomenti/${macro.id}`:"/api/macro-argomenti", {
+      method: isEdit?"PATCH":"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ nome, materia }),
+    });
+    if (res.ok) { onSaved(); onClose(); }
+    setSaving(false);
+  }
 
   return (
-    <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", boxShadow: "0 2px 8px #20489a14", border: "1px solid #e3eefe" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <Link href={"/lezioni/" + a.id} style={{ textDecoration: "none", flex: 1 }}>
-          <h3 style={{ margin: 0, fontSize: 14, color: "#20489a", fontWeight: 700, lineHeight: 1.3 }}>{a.titolo}</h3>
-        </Link>
-        {isAdmin && (
-          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button onClick={onEdit} style={{ background: "#e3eefe", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#20489a" }}>Modifica</button>
-            <button onClick={onDelete} disabled={deleting} style={{ background: "#ffebee", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#c62828" }}>Elimina</button>
-          </div>
-        )}
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center" }}>
+      <div style={{ background:C.card,borderRadius:12,padding:28,width:400,maxWidth:"95vw" }}>
+        <h3 style={{ margin:"0 0 18px",color:C.text }}>{isEdit?"Modifica macro-argomento":"Nuovo macro-argomento"}</h3>
+        <label style={lbl}>Nome *</label>
+        <input value={nome} onChange={e=>setNome(e.target.value)} style={inp} placeholder="es. Algebra"/>
+        <label style={lbl}>Materia</label>
+        <select value={materia} onChange={e=>setMateria(e.target.value)} style={inp}>
+          {MATERIE.map(m=><option key={m}>{m}</option>)}
+        </select>
+        <div style={{ display:"flex",gap:8,marginTop:20,justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={btnSec}>Annulla</button>
+          <button onClick={handleSave} disabled={saving||!nome.trim()} style={btnPri}>{saving?"Salvo...":"Salva"}</button>
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
-        {sezioni.length > 0 ? sezioni.map(s => (
-          <Link key={s.key} href={"/lezioni/" + a.id + "?tab=" + s.key}
-            style={{ display: "inline-flex", alignItems: "center", background: "#e3eefe", color: "#20489a", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
-            {s.label}
-          </Link>
-        )) : <span style={{ fontSize: 11, color: "#bbb" }}>Nessun contenuto</span>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODALE ARGOMENTO (livello 2)
+// ═══════════════════════════════════════════════════════════════════════════════
+function ArgomentoModal({ argomento, macroArgomenti, onClose, onSaved }) {
+  const isEdit = !!argomento?.id;
+  const [nome, setNome] = useState(argomento?.nome||"");
+  const [macroId, setMacroId] = useState(argomento?.macroArgomentoId??"");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!nome.trim()) return;
+    setSaving(true);
+    const res = await fetch(isEdit?`/api/argomenti/${argomento.id}`:"/api/argomenti", {
+      method: isEdit?"PATCH":"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ nome, macroArgomentoId: macroId?Number(macroId):null }),
+    });
+    if (res.ok) { onSaved(); onClose(); }
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center" }}>
+      <div style={{ background:C.card,borderRadius:12,padding:28,width:400,maxWidth:"95vw" }}>
+        <h3 style={{ margin:"0 0 18px",color:C.text }}>{isEdit?"Modifica argomento":"Nuovo argomento"}</h3>
+        <label style={lbl}>Nome *</label>
+        <input value={nome} onChange={e=>setNome(e.target.value)} style={inp} placeholder="es. Luoghi geometrici"/>
+        <label style={lbl}>Macro-argomento</label>
+        <select value={macroId} onChange={e=>setMacroId(e.target.value)} style={inp}>
+          <option value="">— nessuno —</option>
+          {macroArgomenti.map(m=><option key={m.id} value={m.id}>{m.nome} ({m.materia})</option>)}
+        </select>
+        <div style={{ display:"flex",gap:8,marginTop:20,justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={btnSec}>Annulla</button>
+          <button onClick={handleSave} disabled={saving||!nome.trim()} style={btnPri}>{saving?"Salvo...":"Salva"}</button>
+        </div>
       </div>
-      {isAdmin && a.assegnazioni?.length > 0 && (
-        <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {a.assegnazioni.map(x => (
-            <span key={x.clienteId} style={{ fontSize: 10, background: "#f0f7ff", border: "1px solid #c3d9f0", borderRadius: 4, padding: "1px 6px", color: "#20489a" }}>
-              {x.cliente?.nomeReferente || "#" + x.clienteId}
-            </span>
-          ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODALE ASSEGNA LEZIONE
+// ═══════════════════════════════════════════════════════════════════════════════
+function AssegnaModal({ lezione, clienti, onClose, onSaved }) {
+  const [selezionati, setSelezionati] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(()=>{
+    fetch(`/api/lezioni/${lezione.id}/assegna`)
+      .then(r=>r.json())
+      .then(ids=>{ setSelezionati(ids.map(Number)); setLoading(false); });
+  },[lezione.id]);
+
+  function toggle(id) { setSelezionati(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]); }
+
+  async function handleSave() {
+    setSaving(true);
+    await fetch(`/api/lezioni/${lezione.id}/assegna`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ clienteIds: selezionati })
+    });
+    onSaved(); onClose();
+  }
+
+  const studenti = clienti.filter(c=>c.tipo==="STUDENTE"||c.tipo==="studente");
+
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center" }}>
+      <div style={{ background:C.card,borderRadius:12,padding:28,width:460,maxWidth:"95vw",maxHeight:"80vh",overflowY:"auto" }}>
+        <h3 style={{ margin:"0 0 4px",color:C.text }}>Assegna lezione</h3>
+        <p style={{ margin:"0 0 16px",color:C.sub,fontSize:13 }}>{lezione.titolo}</p>
+        {loading ? <p>Carico...</p> : studenti.map(s=>(
+          <label key={s.id} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:`1px solid ${C.border}`,cursor:"pointer" }}>
+            <input type="checkbox" checked={selezionati.includes(s.id)} onChange={()=>toggle(s.id)}/>
+            <span style={{ fontSize:14,color:C.text }}>{s.nomeReferente}</span>
+          </label>
+        ))}
+        <div style={{ display:"flex",gap:8,marginTop:20,justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={btnSec}>Annulla</button>
+          <button onClick={handleSave} disabled={saving} style={btnPri}>{saving?"Salvo...":"Salva"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RIGA LEZIONE
+// ═══════════════════════════════════════════════════════════════════════════════
+function LezioneRow({ l, isAdmin, onEdit, onAssegna, onDelete }) {
+  const sezioni = [l.mappaHtml&&"Mappa",l.teoriaHtml&&"Teoria",l.eserciziHtml&&"Esercizi"].filter(Boolean);
+  return (
+    <div style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,background:C.card,marginBottom:4,border:`1px solid ${C.border}` }}>
+      <Link href={`/lezioni/${l.id}`} style={{ flex:1,textDecoration:"none",color:C.text,fontSize:14,fontWeight:500 }}>
+        {l.titolo}
+        {l.anno && <span style={{ marginLeft:8,fontSize:11,background:C.light,color:C.primary,borderRadius:4,padding:"1px 6px" }}>{l.anno}</span>}
+      </Link>
+      {sezioni.map(s=><span key={s} style={{ fontSize:11,background:"#f0fdf4",color:C.green,borderRadius:4,padding:"1px 6px" }}>{s}</span>)}
+      {isAdmin && (
+        <div style={{ display:"flex",gap:4 }}>
+          <button onClick={onAssegna} style={btnXS} title="Assegna studenti">👥</button>
+          <button onClick={onEdit} style={btnXS}>✏️</button>
+          <button onClick={onDelete} style={{...btnXS,color:C.red}}>🗑</button>
         </div>
       )}
     </div>
   );
 }
 
-// ── Pagina principale ─────────────────────────────────────────────────────────
-export default function LezioniPage() {
-  return (
-    <Suspense fallback={<div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}><p style={{ color: "#20489a" }}>Caricamento...</p></div>}>
-      <LezioniPageInner />
-    </Suspense>
-  );
-}
-
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGINA PRINCIPALE
+// ═══════════════════════════════════════════════════════════════════════════════
 function LezioniPageInner() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const role = session?.user?.role;
-  const isAdmin = role === "admin" || role === "operatore";
 
+  const [macroArgomenti, setMacroArgomenti] = useState([]);
   const [argomenti, setArgomenti] = useState([]);
+  const [lezioni, setLezioni] = useState([]);
   const [clienti, setClienti] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // { argomento } | null
-  const [assegnaModal, setAssegnaModal] = useState(false);
-  const [deleting, setDeleting] = useState(null);
 
-  // Accordion state
-  const [openMaterie, setOpenMaterie] = useState(new Set());
-  const [openAnni, setOpenAnni] = useState(new Set()); // key = "materia:::anno"
+  const [modalLezione, setModalLezione] = useState(null);
+  const [modalMacro, setModalMacro] = useState(null);
+  const [modalArgomento, setModalArgomento] = useState(null);
+  const [modalAssegna, setModalAssegna] = useState(null);
 
-  useEffect(() => {
-    fetch("/api/lezioni", { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { setArgomenti(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const [openMacro, setOpenMacro] = useState(new Set());
+  const [openArg, setOpenArg] = useState(new Set());
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    fetch("/api/clienti", { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setClienti(Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, [isAdmin]);
+  const isAdmin = session?.user?.role==="admin"||session?.user?.role==="operatore";
 
-  // Raggruppa: materia → anno → argomenti
-  const perMateria = useMemo(() => {
-    const map = {}; // { materia: { anno: [argomento] } }
-    for (const a of argomenti) {
-      const m = a.materia || "Generale";
-      const anno = a.anno || "—";
-      if (!map[m]) map[m] = {};
-      if (!map[m][anno]) map[m][anno] = [];
-      map[m][anno].push(a);
+  useEffect(()=>{
+    if (status==="unauthenticated"){router.push("/login");return;}
+    if (status!=="authenticated") return;
+    loadAll();
+  },[status]);
+
+  useEffect(()=>{
+    const macroNome = searchParams.get("macro");
+    const argNome = searchParams.get("arg");
+    if (macroNome && macroArgomenti.length) {
+      const m = macroArgomenti.find(m=>m.nome===macroNome);
+      if (m) setOpenMacro(s=>new Set([...s,m.id]));
     }
-    const sorted = Object.entries(map).sort(([a], [b]) => {
-      const ia = MATERIE.indexOf(a), ib = MATERIE.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);
-      if (ia === -1) return 1; if (ib === -1) return -1;
-      return ia - ib;
-    });
-    // Sort anni within each materia
-    return sorted.map(([materia, anniMap]) => {
-      const sortedAnni = Object.entries(anniMap).sort(([a], [b]) => {
-        const ia = ANNI.indexOf(a), ib = ANNI.indexOf(b);
-        if (a === "—") return 1; if (b === "—") return -1;
-        if (ia === -1 && ib === -1) return a.localeCompare(b);
-        if (ia === -1) return 1; if (ib === -1) return -1;
-        return ia - ib;
-      });
-      return [materia, sortedAnni];
-    });
-  }, [argomenti]);
-
-  // Auto-apri materia/anno da URL params
-  useEffect(() => {
-    const urlMateria = searchParams?.get("materia");
-    const urlAnno = searchParams?.get("anno");
-    if (urlMateria) {
-      setOpenMaterie(prev => new Set([...prev, urlMateria]));
-      if (urlAnno) {
-        setOpenAnni(prev => new Set([...prev, urlMateria + ":::" + urlAnno]));
-      }
+    if (argNome && argomenti.length) {
+      const a = argomenti.find(a=>a.nome===argNome);
+      if (a) setOpenArg(s=>new Set([...s,a.id]));
     }
-  }, [searchParams, argomenti]);
+  },[searchParams,macroArgomenti,argomenti]);
 
-  function toggleMateria(m) {
-    setOpenMaterie(prev => {
-      const next = new Set(prev);
-      if (next.has(m)) next.delete(m); else next.add(m);
-      return next;
-    });
+  async function loadAll() {
+    setLoading(true);
+    const [rMacro, rArg, rLezioni] = await Promise.all([
+      fetch("/api/macro-argomenti").then(r=>r.json()),
+      fetch("/api/argomenti").then(r=>r.json()),
+      fetch("/api/lezioni").then(r=>r.json()),
+    ]);
+    setMacroArgomenti(Array.isArray(rMacro)?rMacro:[]);
+    setArgomenti(Array.isArray(rArg)?rArg:[]);
+    setLezioni(Array.isArray(rLezioni)?rLezioni:[]);
+    if (isAdmin) {
+      const rC = await fetch("/api/clienti").then(r=>r.json()).catch(()=>[]);
+      setClienti(Array.isArray(rC)?rC:[]);
+    }
+    setLoading(false);
   }
 
-  function toggleAnno(m, anno) {
-    const key = m + ":::" + anno;
-    setOpenAnni(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
+  function toggleMacro(id){setOpenMacro(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+  function toggleArg(id){setOpenArg(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+
+  async function deleteMacro(id){
+    if(!confirm("Eliminare questo macro-argomento?")) return;
+    await fetch(`/api/macro-argomenti/${id}`,{method:"DELETE"});
+    loadAll();
+  }
+  async function deleteArgomento(id){
+    if(!confirm("Eliminare questo argomento?")) return;
+    await fetch(`/api/argomenti/${id}`,{method:"DELETE"});
+    loadAll();
+  }
+  async function deleteLezione(id){
+    if(!confirm("Eliminare questa lezione?")) return;
+    await fetch(`/api/lezioni/${id}`,{method:"DELETE"});
+    loadAll();
+  }
+  async function promuoviArgomento(arg){
+    if(!confirm(`Promuovere "${arg.nome}" a macro-argomento?`)) return;
+    await fetch(`/api/argomenti/${arg.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:"promuovi"})});
+    loadAll();
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Eliminare questo argomento?")) return;
-    setDeleting(id);
-    await fetch("/api/lezioni/" + id, { method: "DELETE", credentials: "include" });
-    setArgomenti(prev => prev.filter(a => a.id !== id));
-    setDeleting(null);
-  }
+  const materieConMacro = MATERIE.filter(m=>macroArgomenti.some(ma=>ma.materia===m));
+  const lezioniNonClass = lezioni.filter(l=>!l.argomentoId&&!l.macroArgomentoId);
 
-  function handleSaved(saved) {
-    setArgomenti(prev => {
-      const idx = prev.findIndex(a => a.id === saved.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = { ...prev[idx], ...saved }; return next; }
-      return [...prev, saved];
-    });
-    setModal(null);
-  }
-
-  const pageStyle = { maxWidth: 960, margin: "0 auto", padding: "32px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" };
-
-  if (loading) return <div style={pageStyle}><p style={{ color: "#20489a" }}>Caricamento...</p></div>;
+  if (status==="loading"||loading) return <div style={{padding:40,color:C.sub}}>Carico...</div>;
 
   return (
-    <div style={pageStyle}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, color: "#20489a", fontWeight: 800 }}>Lezioni</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#4268b3" }}>
-            {isAdmin ? "Gestisci argomenti e assegnali agli studenti" : "Argomenti di studio assegnati dal tuo docente"}
-          </p>
+    <div style={{ minHeight:"100vh",background:C.bg,padding:"28px 16px" }}>
+      <div style={{ maxWidth:860,margin:"0 auto" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24 }}>
+          <div>
+            <h1 style={{ margin:0,fontSize:24,color:C.text }}>Lezioni</h1>
+            <p style={{ margin:"4px 0 0",color:C.sub,fontSize:13 }}>{lezioni.length} lezioni · {macroArgomenti.length} macro-argomenti</p>
+          </div>
+          <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+            <Link href="/lezioni/indice" style={{ ...btnSec,textDecoration:"none",display:"inline-flex",alignItems:"center" }}>
+              📚 Indice
+            </Link>
+            {isAdmin && <>
+              <button onClick={()=>setModalMacro({})} style={btnSec}>+ Macro-arg.</button>
+              <button onClick={()=>setModalArgomento({})} style={btnSec}>+ Argomento</button>
+              <button onClick={()=>setModalLezione({})} style={btnPri}>+ Nuova lezione</button>
+            </>}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <Link href="/lezioni/indice"
-            style={{ background: "#f0f7ff", color: "#20489a", border: "1.5px solid #c3d9f0", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
-            Indice disciplinare
-          </Link>
-          {isAdmin && (
-            <>
-              <button onClick={() => setAssegnaModal(true)}
-                style={{ background: "#fff", color: "#20489a", border: "1.5px solid #20489a", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                Assegna argomento
-              </button>
-              <button onClick={() => setModal({ argomento: null })}
-                style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                + Aggiungi lezione
-              </button>
-            </>
-          )}
-        </div>
+
+        {/* Gerarchia per materia */}
+        {materieConMacro.map(materia=>{
+          const macroList = macroArgomenti.filter(m=>m.materia===materia).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
+          return (
+            <div key={materia} style={{ marginBottom:28 }}>
+              <h2 style={{ fontSize:17,color:C.primary,fontWeight:700,margin:"0 0 10px",padding:"6px 0",borderBottom:`2px solid ${C.light}` }}>{materia}</h2>
+              {macroList.map(macro=>{
+                const isOpen=openMacro.has(macro.id);
+                const argFigli=argomenti.filter(a=>a.macroArgomentoId===macro.id).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
+                const lezDirette=lezioni.filter(l=>l.macroArgomentoId===macro.id&&!l.argomentoId);
+                const totLezioni=lezDirette.length+argFigli.reduce((s,a)=>s+lezioni.filter(l=>l.argomentoId===a.id).length,0);
+                return (
+                  <div key={macro.id} style={{ marginBottom:8,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
+                    <div style={{ display:"flex",alignItems:"center",gap:8,padding:"12px 16px",background:C.macroRow,cursor:"pointer" }}
+                      onClick={()=>toggleMacro(macro.id)}>
+                      <span style={{ fontSize:15,color:C.primary }}>{isOpen?"▼":"▶"}</span>
+                      <span style={{ fontWeight:600,color:C.text,flex:1 }}>{macro.nome}</span>
+                      <span style={{ fontSize:12,color:C.sub }}>{argFigli.length} arg · {totLezioni} lez</span>
+                      {isAdmin && (
+                        <div style={{ display:"flex",gap:4 }} onClick={e=>e.stopPropagation()}>
+                          <button onClick={()=>setModalMacro(macro)} style={btnXS}>✏️</button>
+                          <button onClick={()=>deleteMacro(macro.id)} style={{...btnXS,color:C.red}}>🗑</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {isOpen && (
+                      <div style={{ padding:"8px 12px 12px" }}>
+                        {argFigli.map(arg=>{
+                          const isArgOpen=openArg.has(arg.id);
+                          const lezArg=lezioni.filter(l=>l.argomentoId===arg.id).sort((a,b)=>a.titolo.localeCompare(b.titolo));
+                          return (
+                            <div key={arg.id} style={{ marginBottom:6,border:`1px solid ${C.border}`,borderRadius:8,overflow:"hidden" }}>
+                              <div style={{ display:"flex",alignItems:"center",gap:8,padding:"9px 14px",background:C.argRow,cursor:"pointer" }}
+                                onClick={()=>toggleArg(arg.id)}>
+                                <span style={{ fontSize:12,color:C.sub }}>{isArgOpen?"▼":"▶"}</span>
+                                <span style={{ fontWeight:500,color:C.text,flex:1,fontSize:14 }}>{arg.nome}</span>
+                                <span style={{ fontSize:11,color:C.sub }}>{lezArg.length} lezioni</span>
+                                {isAdmin && (
+                                  <div style={{ display:"flex",gap:4 }} onClick={e=>e.stopPropagation()}>
+                                    <button title="Promuovi a macro-argomento" onClick={()=>promuoviArgomento(arg)} style={btnXS}>⬆️</button>
+                                    <button onClick={()=>setModalArgomento(arg)} style={btnXS}>✏️</button>
+                                    <button onClick={()=>deleteArgomento(arg.id)} style={{...btnXS,color:C.red}}>🗑</button>
+                                  </div>
+                                )}
+                              </div>
+                              {isArgOpen && (
+                                <div style={{ padding:"6px 14px 10px" }}>
+                                  {lezArg.length===0
+                                    ? <p style={{ color:C.sub,fontSize:13,margin:"6px 0" }}>Nessuna lezione</p>
+                                    : lezArg.map(l=>(
+                                      <LezioneRow key={l.id} l={l} isAdmin={isAdmin}
+                                        onEdit={()=>setModalLezione(l)}
+                                        onAssegna={()=>setModalAssegna(l)}
+                                        onDelete={()=>deleteLezione(l.id)}/>
+                                    ))
+                                  }
+                                  {isAdmin && (
+                                    <button onClick={()=>setModalLezione({argomentoId:arg.id,macroArgomentoId:macro.id,materia})}
+                                      style={{marginTop:6,...btnXS,color:C.primary}}>+ lezione</button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {lezDirette.map(l=>(
+                          <LezioneRow key={l.id} l={l} isAdmin={isAdmin}
+                            onEdit={()=>setModalLezione(l)}
+                            onAssegna={()=>setModalAssegna(l)}
+                            onDelete={()=>deleteLezione(l.id)}/>
+                        ))}
+
+                        {isAdmin && (
+                          <div style={{ display:"flex",gap:8,marginTop:8 }}>
+                            <button onClick={()=>setModalArgomento({macroArgomentoId:macro.id})} style={{...btnXS,color:C.primary}}>+ argomento</button>
+                            <button onClick={()=>setModalLezione({macroArgomentoId:macro.id,materia})} style={{...btnXS,color:C.primary}}>+ lezione diretta</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        {/* Lezioni non classificate */}
+        {isAdmin && lezioniNonClass.length>0 && (
+          <div style={{ marginBottom:24 }}>
+            <h2 style={{ fontSize:16,color:C.yellow,fontWeight:700,margin:"0 0 10px" }}>⚠️ Lezioni non classificate</h2>
+            {lezioniNonClass.map(l=>(
+              <LezioneRow key={l.id} l={l} isAdmin={isAdmin}
+                onEdit={()=>setModalLezione(l)}
+                onAssegna={()=>setModalAssegna(l)}
+                onDelete={()=>deleteLezione(l.id)}/>
+            ))}
+          </div>
+        )}
+
+        {macroArgomenti.length===0 && lezioni.length===0 && (
+          <div style={{ textAlign:"center",padding:60,color:C.sub }}>
+            <p style={{ fontSize:18,margin:"0 0 8px" }}>Nessun contenuto ancora</p>
+            {isAdmin && <p style={{ fontSize:14 }}>Inizia creando un macro-argomento</p>}
+          </div>
+        )}
       </div>
 
-      {/* Contenuto */}
-      {argomenti.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#4268b3" }}>
-          <div style={{ fontSize: 52, marginBottom: 14 }}>📂</div>
-          <p style={{ fontWeight: 600, fontSize: 15 }}>
-            {isAdmin ? "Nessun argomento ancora. Clicca su + Aggiungi lezione per iniziare." : "Nessun materiale di studio assegnato al momento."}
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {perMateria.map(([materia, anni]) => {
-            const isOpenM = openMaterie.has(materia);
-            const totalArgomenti = anni.reduce((acc, [, list]) => acc + list.length, 0);
-            return (
-              <div key={materia} style={{ border: "1.5px solid #dbe4f1", borderRadius: 12, overflow: "hidden" }}>
-                {/* Materia header */}
-                <button
-                  onClick={() => toggleMateria(materia)}
-                  style={{ width: "100%", textAlign: "left", background: isOpenM ? "#20489a" : "#f5f8ff", border: "none", padding: "14px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <span style={{ fontWeight: 700, fontSize: 15, color: isOpenM ? "#fff" : "#20489a" }}>{materia}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 12, color: isOpenM ? "#c8d9ff" : "#4268b3", fontWeight: 600 }}>
-                      {totalArgomenti} {totalArgomenti === 1 ? "argomento" : "argomenti"}
-                    </span>
-                    <span style={{ fontSize: 16, color: isOpenM ? "#fff" : "#4268b3", transition: "transform 0.2s", display: "inline-block", transform: isOpenM ? "rotate(90deg)" : "rotate(0deg)" }}>›</span>
-                  </div>
-                </button>
-
-                {/* Anni accordion */}
-                {isOpenM && (
-                  <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                    {anni.map(([anno, lista]) => {
-                      const annoKey = materia + ":::" + anno;
-                      const isOpenA = openAnni.has(annoKey);
-                      const annoLabel = anno === "—" ? "Tutti gli anni" : anno;
-                      return (
-                        <div key={anno} style={{ border: "1px solid #dbe4f1", borderRadius: 10, overflow: "hidden" }}>
-                          {/* Anno header */}
-                          <button
-                            onClick={() => toggleAnno(materia, anno)}
-                            style={{ width: "100%", textAlign: "left", background: isOpenA ? "#e3eefe" : "#fafbff", border: "none", padding: "10px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                          >
-                            <span style={{ fontWeight: 600, fontSize: 13, color: "#20489a" }}>{annoLabel}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontSize: 11, color: "#4268b3" }}>{lista.length} {lista.length === 1 ? "argomento" : "argomenti"}</span>
-                              <span style={{ fontSize: 14, color: "#4268b3", transition: "transform 0.2s", display: "inline-block", transform: isOpenA ? "rotate(90deg)" : "rotate(0deg)" }}>›</span>
-                            </div>
-                          </button>
-
-                          {/* Argomento cards */}
-                          {isOpenA && (
-                            <div style={{ padding: "10px 12px", display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 10 }}>
-                              {lista.map(a => (
-                                <ArgomentoCard
-                                  key={a.id}
-                                  a={a}
-                                  isAdmin={isAdmin}
-                                  deleting={deleting === a.id}
-                                  onEdit={() => setModal({ argomento: a })}
-                                  onDelete={() => handleDelete(a.id)}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {modalLezione!==null && (
+        <LezioneModal lezione={modalLezione} argomenti={argomenti} macroArgomenti={macroArgomenti}
+          onClose={()=>setModalLezione(null)} onSaved={loadAll}/>
       )}
-
-      {modal && (
-        <ArgomentoModal
-          argomento={modal.argomento}
-          clienti={clienti}
-          initialTab={modal.initialTab}
-          onClose={() => setModal(null)}
-          onSaved={handleSaved}
-        />
+      {modalMacro!==null && (
+        <MacroModal macro={modalMacro} onClose={()=>setModalMacro(null)} onSaved={loadAll}/>
       )}
-
-      {assegnaModal && (
-        <AssegnaRapidaModal
-          argomenti={argomenti}
-          clienti={clienti}
-          onClose={() => setAssegnaModal(false)}
-        />
+      {modalArgomento!==null && (
+        <ArgomentoModal argomento={modalArgomento} macroArgomenti={macroArgomenti}
+          onClose={()=>setModalArgomento(null)} onSaved={loadAll}/>
+      )}
+      {modalAssegna!==null && (
+        <AssegnaModal lezione={modalAssegna} clienti={clienti}
+          onClose={()=>setModalAssegna(null)} onSaved={loadAll}/>
       )}
     </div>
+  );
+}
+
+// Stili
+const lbl = { display:"block",fontSize:13,color:"#374151",marginBottom:4,marginTop:12 };
+const inp = { width:"100%",padding:"8px 10px",borderRadius:7,border:"1px solid #d1d5db",fontSize:14,boxSizing:"border-box" };
+const btnPri = { background:"#4f46e5",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",cursor:"pointer",fontSize:14,fontWeight:600 };
+const btnSec = { background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:14 };
+const btnXS  = { background:"transparent",border:"none",cursor:"pointer",fontSize:15,padding:"2px 4px",borderRadius:4 };
+
+export default function LezioniPage() {
+  return (
+    <Suspense fallback={<div style={{ padding:40 }}>Carico...</div>}>
+      <LezioniPageInner />
+    </Suspense>
   );
 }

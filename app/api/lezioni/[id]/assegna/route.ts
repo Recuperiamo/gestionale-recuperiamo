@@ -12,9 +12,9 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
   }
 
-  const argomentoId = Number(params.id);
-  const assegnazioni = await prisma.assegnazioneArgomento.findMany({
-    where: { argomentoId },
+  const lezioneId = Number(params.id);
+  const assegnazioni = await prisma.assegnazioneLezione.findMany({
+    where: { lezioneId },
     select: { clienteId: true }
   });
   return NextResponse.json(assegnazioni.map(a => a.clienteId));
@@ -27,15 +27,15 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
   }
 
-  const argomentoId = Number(params.id);
+  const lezioneId = Number(params.id);
   const { clienteIds = [] } = await req.json();
   const ids = clienteIds.map(Number).filter(Boolean);
 
   await prisma.$transaction([
-    prisma.assegnazioneArgomento.deleteMany({ where: { argomentoId } }),
+    prisma.assegnazioneLezione.deleteMany({ where: { lezioneId } }),
     ...(ids.length > 0
-      ? [prisma.assegnazioneArgomento.createMany({
-          data: ids.map(clienteId => ({ argomentoId, clienteId })),
+      ? [prisma.assegnazioneLezione.createMany({
+          data: ids.map(clienteId => ({ lezioneId, clienteId })),
           skipDuplicates: true
         })]
       : [])

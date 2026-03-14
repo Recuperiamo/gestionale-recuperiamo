@@ -6,11 +6,10 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const MATERIE = [
-  "Matematica", "Fisica", "Chimica", "Biologia", "Scienze naturali", "Informatica",
-  "Italiano", "Latino", "Storia", "Filosofia", "Inglese", "Storia dell'arte",
-  "Scienze motorie", "Religione", "Altra materia",
+  "Matematica","Fisica","Chimica","Biologia","Informatica",
+  "Italiano","Latino","Storia","Filosofia","Inglese","Scienze","Generale"
 ];
-const ANNI = ["I anno", "II anno", "III anno", "IV anno", "V anno"];
+const ANNI = ["I","II","III","IV","V"];
 
 // ── Utility: legge file HTML ──────────────────────────────────────────────────
 function readHtmlFile(file) {
@@ -212,48 +211,53 @@ function LezioneDetailPageInner() {
   const role = session?.user?.role;
   const isAdmin = role === "admin" || role === "operatore";
 
-  const [argomento, setArgomento] = useState(null);
+  const [lezione, setLezione] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(searchParams?.get("tab") || null);
   const [saving, setSaving] = useState(false);
 
-  // Modifica info (titolo, materia, anno, tags)
+  // Modifica info
   const [editingInfo, setEditingInfo] = useState(false);
   const [infoForm, setInfoForm] = useState(null);
-  const [tagInputDetail, setTagInputDetail] = useState("");
   const [savingInfo, setSavingInfo] = useState(false);
+  const [macroArgomenti, setMacroArgomenti] = useState([]);
+  const [argomenti, setArgomenti] = useState([]);
 
   function openEditInfo() {
     setInfoForm({
-      titolo: argomento.titolo,
-      materia: argomento.materia,
-      anno: argomento.anno || "",
-      tags: argomento.tags || [],
+      titolo: lezione.titolo,
+      materia: lezione.materia,
+      anno: lezione.anno || "",
+      argomentoId: lezione.argomentoId ?? "",
+      macroArgomentoId: lezione.macroArgomentoId ?? "",
     });
-    setTagInputDetail("");
     setEditingInfo(true);
-  }
-
-  function addTagDetail(raw) {
-    const t = raw.trim();
-    if (!t || infoForm.tags.includes(t)) { setTagInputDetail(""); return; }
-    setInfoForm(f => ({ ...f, tags: [...f.tags, t] }));
-    setTagInputDetail("");
+    if (!macroArgomenti.length) {
+      fetch("/api/macro-argomenti").then(r=>r.json()).then(d=>setMacroArgomenti(Array.isArray(d)?d:[]));
+      fetch("/api/argomenti").then(r=>r.json()).then(d=>setArgomenti(Array.isArray(d)?d:[]));
+    }
   }
 
   async function handleSaveInfo() {
     if (!infoForm.titolo.trim()) return;
     setSavingInfo(true);
     try {
+      const body = {
+        titolo: infoForm.titolo,
+        materia: infoForm.materia,
+        anno: infoForm.anno || null,
+        argomentoId: infoForm.argomentoId ? Number(infoForm.argomentoId) : null,
+        macroArgomentoId: (!infoForm.argomentoId && infoForm.macroArgomentoId) ? Number(infoForm.macroArgomentoId) : null,
+      };
       const res = await fetch("/api/lezioni/" + id, {
         method: "PATCH", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(infoForm),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Errore salvataggio");
       const updated = await res.json();
-      setArgomento(prev => ({ ...prev, ...updated }));
+      setLezione(prev => ({ ...prev, ...updated }));
       setEditingInfo(false);
     } catch (e) {
       alert(e.message);
@@ -261,6 +265,9 @@ function LezioneDetailPageInner() {
       setSavingInfo(false);
     }
   }
+
+  // Alias per compatibilità con il resto del codice
+  const argomento = lezione;
 
   // Suggerisci link
   const [allArgomenti, setAllArgomenti] = useState(null);
@@ -272,7 +279,7 @@ function LezioneDetailPageInner() {
     if (!id) return;
     fetch("/api/lezioni/" + id, { credentials: "include" })
       .then(r => { if (!r.ok) throw new Error("Non autorizzato o non trovato"); return r.json(); })
-      .then(data => { setArgomento(data); setLoading(false); })
+      .then(data => { setLezione(data); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [id]);
 
@@ -301,7 +308,7 @@ function LezioneDetailPageInner() {
       });
       if (!res.ok) throw new Error("Errore salvataggio");
       const updated = await res.json();
-      setArgomento(prev => ({ ...prev, ...updated }));
+      setLezione(prev => ({ ...prev, ...updated }));
       if (html) setTab(key.replace("Html", ""));
     } catch (e) {
       alert(e.message);
@@ -377,11 +384,13 @@ function LezioneDetailPageInner() {
       {/* Breadcrumb */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <Link href="/lezioni" style={{ color: "#1cb0f6", fontWeight: 600, textDecoration: "none", fontSize: 14 }}>← Lezioni</Link>
-        <span style={{ color: "#ccc" }}>/</span>
-        <Link href={"/lezioni?materia=" + encodeURIComponent(argomento.materia)} style={{ color: "#4268b3", fontSize: 14, textDecoration: "none", fontWeight: 600 }}>{argomento.materia}</Link>
-        {argomento.anno && <>
+        {argomento.macroArgomento && <>
           <span style={{ color: "#ccc" }}>/</span>
-          <Link href={"/lezioni?materia=" + encodeURIComponent(argomento.materia) + "&anno=" + encodeURIComponent(argomento.anno)} style={{ color: "#4268b3", fontSize: 14, textDecoration: "none", fontWeight: 600 }}>{argomento.anno}</Link>
+          <Link href={"/lezioni?macro=" + encodeURIComponent(argomento.macroArgomento.nome)} style={{ color: "#4268b3", fontSize: 14, textDecoration: "none", fontWeight: 600 }}>{argomento.macroArgomento.nome}</Link>
+        </>}
+        {argomento.argomento && <>
+          <span style={{ color: "#ccc" }}>/</span>
+          <Link href={"/lezioni?macro=" + encodeURIComponent(argomento.argomento.macroArgomento?.nome||"") + "&arg=" + encodeURIComponent(argomento.argomento.nome)} style={{ color: "#4268b3", fontSize: 14, textDecoration: "none", fontWeight: 600 }}>{argomento.argomento.nome}</Link>
         </>}
         <span style={{ color: "#ccc" }}>/</span>
         <span style={{ color: "#20489a", fontWeight: 700, fontSize: 14 }}>{argomento.titolo}</span>
@@ -417,47 +426,44 @@ function LezioneDetailPageInner() {
           {editingInfo && infoForm && (
             <div style={{ background: "#fff", border: "1px solid #dbe4f1", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
               {(() => {
-                const inp = { display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", marginTop: 3 };
+                const fi = { display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", marginTop: 3 };
+                const filteredMacro = macroArgomenti.filter(m => m.materia === infoForm.materia);
+                const filteredArg = argomenti.filter(a => !infoForm.macroArgomentoId || a.macroArgomentoId === Number(infoForm.macroArgomentoId));
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
                       Titolo
-                      <input value={infoForm.titolo} onChange={e => setInfoForm(f => ({ ...f, titolo: e.target.value }))} style={inp} />
+                      <input value={infoForm.titolo} onChange={e => setInfoForm(f => ({ ...f, titolo: e.target.value }))} style={fi} />
                     </label>
                     <div style={{ display: "flex", gap: 10 }}>
                       <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a", flex: 1 }}>
                         Materia
-                        <select value={infoForm.materia} onChange={e => setInfoForm(f => ({ ...f, materia: e.target.value }))} style={inp}>
+                        <select value={infoForm.materia} onChange={e => setInfoForm(f => ({ ...f, materia: e.target.value, macroArgomentoId: "", argomentoId: "" }))} style={fi}>
                           {MATERIE.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
                       </label>
                       <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a", flex: 1 }}>
                         Anno
-                        <select value={infoForm.anno} onChange={e => setInfoForm(f => ({ ...f, anno: e.target.value }))} style={inp}>
-                          <option value="">— Tutti gli anni —</option>
-                          {ANNI.map(a => <option key={a} value={a}>{a}</option>)}
+                        <select value={infoForm.anno} onChange={e => setInfoForm(f => ({ ...f, anno: e.target.value }))} style={fi}>
+                          <option value="">— nessuno —</option>
+                          {ANNI.map(a => <option key={a} value={a}>{a} anno</option>)}
                         </select>
                       </label>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
-                      Tag disciplinari
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 5, marginBottom: 5 }}>
-                        {infoForm.tags.map(t => (
-                          <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#e3eefe", color: "#20489a", borderRadius: 20, padding: "2px 9px", fontSize: 11, fontWeight: 600 }}>
-                            {t}
-                            <button type="button" onClick={() => setInfoForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))}
-                              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#4268b3", fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
-                          </span>
-                        ))}
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <input value={tagInputDetail} onChange={e => setTagInputDetail(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTagDetail(tagInputDetail); } }}
-                          style={{ ...inp, marginTop: 0, flex: 1 }} placeholder="es. Algebra (Invio per aggiungere)" />
-                        <button type="button" onClick={() => addTagDetail(tagInputDetail)}
-                          style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 8, padding: "0 12px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+</button>
-                      </div>
-                    </div>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
+                      Macro-argomento
+                      <select value={infoForm.macroArgomentoId} onChange={e => setInfoForm(f => ({ ...f, macroArgomentoId: e.target.value, argomentoId: "" }))} style={fi}>
+                        <option value="">— nessuno —</option>
+                        {filteredMacro.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#20489a" }}>
+                      Argomento (livello 2)
+                      <select value={infoForm.argomentoId} onChange={e => setInfoForm(f => ({ ...f, argomentoId: e.target.value }))} style={fi}>
+                        <option value="">— nessuno —</option>
+                        {filteredArg.map(a => <option key={a.id} value={a.id}>{a.nome}{a.macroArgomento ? ` (${a.macroArgomento.nome})` : ""}</option>)}
+                      </select>
+                    </label>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button onClick={() => setEditingInfo(false)} style={{ background: "#e3eefe", color: "#20489a", border: "none", borderRadius: 7, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Annulla</button>
                       <button onClick={handleSaveInfo} disabled={savingInfo || !infoForm.titolo.trim()}
