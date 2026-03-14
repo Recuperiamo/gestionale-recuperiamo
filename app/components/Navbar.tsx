@@ -12,14 +12,13 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const menuRef = useRef(null);
 
   const role = session?.user?.role ? String(session.user.role).toLowerCase() : undefined;
-
   const isStaff = role === "admin" || role === "operatore";
   const isAdmin = role === "admin";
 
-  // Staff (admin/operatore) base links
   const navLinksStaffBase = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/clienti", label: "Clienti" },
@@ -33,13 +32,11 @@ export default function Navbar() {
     { href: "/richieste", label: "Richieste" }
   ];
 
-  // Admin-only links
   const adminOnlyLinks = [
     { href: "/storico", label: "Storico" },
     { href: "/admin/password-resets", label: "Reset Password" }
   ];
 
-  // Client links (niente "Storico")
   const navLinksCliente = [
     { href: "/profilo", label: "Profilo" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
@@ -49,7 +46,6 @@ export default function Navbar() {
     { href: "/richieste", label: "Richieste" }
   ];
 
-  // Costruzione finale dei link: "Storico" + "Reset Password" SOLO per admin
   const links = isStaff ? [...navLinksStaffBase, ...(isAdmin ? adminOnlyLinks : [])] : navLinksCliente;
 
   const isActive = (href) => {
@@ -58,7 +54,6 @@ export default function Navbar() {
     return pathname === href;
   };
 
-  // Chiudi menu quando si clicca fuori
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -69,157 +64,198 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Chiudi mobile menu al cambio pagina
+  useEffect(() => { setShowMobileMenu(false); }, [pathname]);
+
   if (status === "loading") return null;
 
   function linkStyle(active) {
     return {
       textDecoration: "none",
-      color: active ? "#fff" : "#20489a",
-      background: active ? "#1cb0f6" : "#fff",
+      color: active ? "#fff" : "#c8d8f0",
+      background: active ? "rgba(28,176,246,0.35)" : "transparent",
       border: "none",
       borderRadius: 6,
-      padding: "8px 16px",
+      padding: "7px 13px",
       fontWeight: 600,
-      fontSize: 14,
-      transition: "all 0.2s",
-      boxShadow: active ? "0 2px 8px #1cb0f640" : "none"
+      fontSize: 13,
+      transition: "all 0.15s",
+      whiteSpace: "nowrap",
+    };
+  }
+
+  function mobileLinkStyle(active) {
+    return {
+      textDecoration: "none",
+      color: "#fff",
+      background: active ? "rgba(28,176,246,0.35)" : "transparent",
+      borderRadius: 8,
+      padding: "13px 18px",
+      fontWeight: active ? 700 : 500,
+      fontSize: 15,
+      display: "block",
+      borderLeft: active ? "3px solid #1cb0f6" : "3px solid transparent",
+      transition: "background 0.15s",
     };
   }
 
   return (
-    <nav
-      style={{
+    <>
+      <style>{`
+        .nb-links { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; }
+        .nb-links::-webkit-scrollbar { display: none; }
+        .nb-hamburger { display: none !important; }
+        @media (max-width: 767px) {
+          .nb-links { display: none !important; }
+          .nb-hamburger { display: flex !important; }
+        }
+      `}</style>
+
+      <nav style={{
         background: "#20489a",
-        padding: "12px 28px",
+        padding: "0 16px",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        borderBottom: "1.5px solid #dbe4f1",
-        minHeight: 60,
-        flexWrap: "wrap",
-        gap: 16
-      }}
-    >
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {links.map((l) => (
-          <Link key={l.href} href={l.href} style={linkStyle(isActive(l.href))}>
-            {l.label}
-          </Link>
-        ))}
-      </div>
+        borderBottom: "1.5px solid #1a3a7a",
+        minHeight: 56,
+        position: "relative",
+        zIndex: 200,
+      }}>
+        {/* Desktop links */}
+        <div className="nb-links">
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} style={linkStyle(isActive(l.href))}>
+              {l.label}
+            </Link>
+          ))}
+        </div>
 
-      {session && (
-        <div style={{ display: "flex", alignItems: "center", gap: 14, position: "relative" }} ref={menuRef}>
-          <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              background: "transparent",
-              color: "#fff",
-              border: "1.5px solid #fff",
-              borderRadius: 8,
-              padding: "8px 14px",
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8
-            }}
-          >
-            <span>{session.user?.name || "Utente"}</span>
-            <span style={{ fontSize: 12 }}>▼</span>
-          </button>
+        {/* Mobile: hamburger button */}
+        <button
+          className="nb-hamburger"
+          onClick={() => setShowMobileMenu(v => !v)}
+          style={{
+            background: "transparent",
+            border: "1.5px solid rgba(255,255,255,0.5)",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "7px 12px",
+            cursor: "pointer",
+            fontSize: 18,
+            lineHeight: 1,
+            alignItems: "center",
+          }}
+          aria-label="Menu"
+        >
+          {showMobileMenu ? "✕" : "☰"}
+        </button>
 
-          {showUserMenu && (
-            <div
+        {/* User menu (sempre visibile) */}
+        {session && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }} ref={menuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
               style={{
+                background: "transparent",
+                color: "#fff",
+                border: "1.5px solid rgba(255,255,255,0.5)",
+                borderRadius: 8,
+                padding: "7px 12px",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span>{session.user?.name || "Utente"}</span>
+              <span style={{ fontSize: 10 }}>▼</span>
+            </button>
+
+            {showUserMenu && (
+              <div style={{
                 position: "absolute",
-                top: "100%",
+                top: "calc(100% + 8px)",
                 right: 0,
-                marginTop: 8,
                 background: "#fff",
                 border: "1.5px solid #dbe4f1",
                 borderRadius: 10,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
                 minWidth: 220,
                 zIndex: 1000,
-                overflow: "hidden"
-              }}
-            >
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "1px solid #e8ecf3",
-                  background: "#f5f8ff"
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a" }}>
-                  {session.user?.name || "Utente"}
+                overflow: "hidden",
+              }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #e8ecf3", background: "#f5f8ff" }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a" }}>{session.user?.name || "Utente"}</div>
+                  <div style={{ fontSize: 12, color: "#4268b3", marginTop: 2 }}>{session.user?.email}</div>
                 </div>
-                <div style={{ fontSize: 12, color: "#4268b3", marginTop: 2 }}>
-                  {session.user?.email}
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  setShowUserMenu(false);
-                  router.push("/settings");
-                }}
-                style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: "none",
-                  padding: "12px 16px",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#20489a",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  transition: "background 0.2s"
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = "#f5f8ff"}
-                onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-              >
-                <span>⚙️</span>
-                <span>Accesso e Sicurezza</span>
-              </button>
-
-              <div style={{ borderTop: "1px solid #e8ecf3" }}>
                 <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    signOut({ callbackUrl: "/signin" });
-                  }}
-                  style={{
-                    width: "100%",
-                    background: "transparent",
-                    border: "none",
-                    padding: "12px 16px",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "#d32f2f",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    transition: "background 0.2s"
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.background = "#ffebee"}
+                  onClick={() => { setShowUserMenu(false); router.push("/settings"); }}
+                  style={{ width: "100%", background: "transparent", border: "none", padding: "12px 16px", textAlign: "left", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#20489a", display: "flex", alignItems: "center", gap: 10 }}
+                  onMouseOver={(e) => e.currentTarget.style.background = "#f5f8ff"}
                   onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
                 >
-                  <span>🚪</span>
-                  <span>Esci</span>
+                  <span>⚙️</span><span>Accesso e Sicurezza</span>
                 </button>
+                <div style={{ borderTop: "1px solid #e8ecf3" }}>
+                  <button
+                    onClick={() => { setShowUserMenu(false); signOut({ callbackUrl: "/signin" }); }}
+                    style={{ width: "100%", background: "transparent", border: "none", padding: "12px 16px", textAlign: "left", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#d32f2f", display: "flex", alignItems: "center", gap: 10 }}
+                    onMouseOver={(e) => e.currentTarget.style.background = "#ffebee"}
+                    onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    <span>🚪</span><span>Esci</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+        )}
+      </nav>
+
+      {/* Mobile dropdown menu (sotto la navbar) */}
+      {showMobileMenu && (
+        <div style={{
+          position: "fixed",
+          top: 56,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "#20489a",
+          zIndex: 199,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          padding: "8px 0 24px",
+          borderTop: "1px solid rgba(255,255,255,0.15)",
+        }}>
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} style={mobileLinkStyle(isActive(l.href))} onClick={() => setShowMobileMenu(false)}>
+              {l.label}
+            </Link>
+          ))}
+          <div style={{ height: 1, background: "rgba(255,255,255,0.15)", margin: "12px 18px" }} />
+          {session && (
+            <>
+              <button
+                onClick={() => { setShowMobileMenu(false); router.push("/settings"); }}
+                style={{ ...mobileLinkStyle(false), background: "transparent", border: "none", cursor: "pointer", textAlign: "left", width: "100%" }}
+              >
+                ⚙️ Impostazioni
+              </button>
+              <button
+                onClick={() => { setShowMobileMenu(false); signOut({ callbackUrl: "/signin" }); }}
+                style={{ ...mobileLinkStyle(false), background: "transparent", border: "none", cursor: "pointer", textAlign: "left", width: "100%", color: "#ff8080" }}
+              >
+                🚪 Esci
+              </button>
+            </>
           )}
         </div>
       )}
-    </nav>
+    </>
   );
 }
