@@ -583,7 +583,13 @@ function groupByDay(list) {
       }
     });
     grouped.push(...singles);
-    
+    // Riordina per timestamp (più recente prima) dopo aver raggruppato
+    grouped.sort((a, b) => {
+      const at = a.isBatch ? new Date(a.items[0].updatedAt) : new Date(a.updatedAt);
+      const bt = b.isBatch ? new Date(b.items[0].updatedAt) : new Date(b.updatedAt);
+      return bt - at;
+    });
+
     return [day, grouped];
   });
 }
@@ -1144,12 +1150,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {/* TABS CLASSROOM */}
           {targetClienteId && (
             <div className="aula-tabs" style={{
-              display: "inline-flex", /* Modifica: inline-flex per centrare */
-              gap: "8px",
-              marginTop: "24px",
-              marginBottom: "8px",
+              display: "flex",
+              width: "100%",
+              marginTop: "20px",
+              marginBottom: "0",
               borderBottom: "2px solid #e0e4f0",
-              paddingBottom: "0"
             }}>
                 {["bacheca", "compiti", "materiale", "programma", "voti"].map((tab) => {
                   const isActive = activeTab === tab;
@@ -1158,17 +1163,20 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                       key={tab}
                       onClick={() => setActiveTab(tab)}
                       style={{
+                        flex: 1,
                         background: "transparent",
                         border: "none",
                         borderBottom: isActive ? `3px solid ${coloreTema}` : "3px solid transparent",
                         color: isActive ? coloreTema : "#5a6c8f",
-                        padding: "12px 20px",
-                        fontSize: "15px",
+                        padding: "14px 6px",
+                        fontSize: "14px",
                         fontWeight: isActive ? 700 : 500,
                         cursor: "pointer",
                         textTransform: "capitalize",
-                        transition: "all 0.2s ease",
-                        marginBottom: "-2px"
+                        transition: "color 0.2s ease, border-color 0.2s ease",
+                        marginBottom: "-2px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1234,7 +1242,11 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           <div style={streamWrap}>
             {grouped.map(([giorno, items]) => (
               <React.Fragment key={giorno}>
-                <div style={{...dayHeaderStyle, color: coloreTema}}>{formatDayHeader(giorno)}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "28px 0 10px" }}>
+                  <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.6px", whiteSpace: "nowrap" }}>{formatDayHeader(giorno)}</span>
+                  <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+                </div>
                 {items.map((item, idx) => {
                   // Batch di file multipli
                   if (item.isBatch) {
@@ -1242,128 +1254,72 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                     const firstItem = batchItems[0];
                     return (
                       <div key={`batch-${firstItem.uploadBatchId}`} style={streamCard}>
-                        <div style={streamCardHead}>
-                          <div style={{display:"flex",alignItems:"center",gap:10}}>
-                            <h3 style={{...streamCardTitle, color: coloreTema}}>{firstItem.titolo}</h3>
-                            {firstItem.sezione && (
-                              <span style={{...badgeTipo(firstItem.sezione), background: coloreTema}}>
-                                {String(firstItem.sezione).toUpperCase()}
-                              </span>
-                            )}
-                            <span style={{fontSize:13,color:"#5a6d90"}}>({batchItems.length} file)</span>
+                        {/* Accent bar */}
+                        <div style={{ height: 3, background: coloreTema }} />
+                        {/* Header */}
+                        <div style={{ padding: "14px 18px 10px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                          <div style={{ width: 38, height: 38, borderRadius: "50%", background: `${coloreTema}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, fontWeight: 800, color: coloreTema }}>{batchItems.length}F</span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h3 style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 700, color: "#1a202c", lineHeight: 1.3 }}>{firstItem.titolo} <span style={{ fontWeight: 400, color: "#94a3b8", fontSize: 13 }}>({batchItems.length} file)</span></h3>
+                            <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                              {firstItem.sezione && <span style={{ fontSize: 11, background: coloreTema, color: "#fff", padding: "2px 8px", borderRadius: 8, fontWeight: 700 }}>{firstItem.sezione}</span>}
+                              {firstItem.materia && <span style={{ fontSize: 11, background: `${coloreTema}18`, color: coloreTema, padding: "2px 8px", borderRadius: 8, fontWeight: 600 }}>{firstItem.materia}</span>}
+                              {firstItem.sottocategoria && <span style={{ fontSize: 11, color: "#94a3b8" }}>{firstItem.sottocategoria === 'TEORIA' ? 'Teoria' : firstItem.sottocategoria === 'SIMULAZIONI' ? 'Simulazioni' : 'Esercizi'}</span>}
+                              {isAdmin && <span style={clientePill}>{getStudenteLabel(firstItem.clienteId)}</span>}
+                              <span style={{ fontSize: 11, color: "#94a3b8" }}>{formatAggDate(firstItem.updatedAt)}</span>
+                            </div>
                           </div>
                           {isAdmin && (
-                            <button
-                              style={streamMenuBtn}
-                              title="Elimina tutti"
-                              onClick={() => {
-                                if (window.confirm(`Eliminare tutti i ${batchItems.length} file?`)) {
-                                  batchItems.forEach(m => handleDeleteMateriale(m.id));
-                                }
-                              }}
-                            >✕</button>
+                            <button style={{ background: "none", border: "none", color: "#cbd5e0", fontSize: 16, cursor: "pointer", padding: "2px 6px", lineHeight: 1 }} title="Elimina tutti" onClick={() => { if (window.confirm(`Eliminare tutti i ${batchItems.length} file?`)) batchItems.forEach(m => handleDeleteMateriale(m.id)); }}>✕</button>
                           )}
                         </div>
-                        <div style={streamCardBody}>
-                          {/* Griglia immagini batch */}
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: batchItems.length === 2 ? 'repeat(2, 1fr)' : batchItems.length === 3 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(150px, 1fr))',
-                            gap: 10,
-                            marginBottom: 12
-                          }}>
+                        {/* Griglia file */}
+                        <div style={{ padding: "0 18px 12px" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: batchItems.length === 2 ? "repeat(2,1fr)" : "repeat(auto-fill, minmax(120px, 1fr))", gap: 8 }}>
                             {batchItems.slice(0, 4).map((m, idx) => {
                               const isImage = ["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase());
                               return (
-                                <div 
-                                  key={m.id}
-                                  role="button"
-                                  tabIndex={0}
+                                <div key={m.id} role="button" tabIndex={0}
                                   onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(idx); }}
-                                  onKeyDown={(e)=>{ if(e.key==='Enter') { setPreviewBatch(batchItems); setPreviewIndex(idx); } }}
-                                  style={{
-                                    cursor: 'pointer',
-                                    position: 'relative',
-                                    aspectRatio: '1',
-                                    borderRadius: 8,
-                                    overflow: 'hidden',
-                                    background: '#f5f7fa',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    border: '1px solid #e0e0e0'
-                                  }}
-                                >
+                                  onKeyDown={(e) => { if (e.key === 'Enter') { setPreviewBatch(batchItems); setPreviewIndex(idx); } }}
+                                  style={{ cursor: "pointer", aspectRatio: "1", borderRadius: 10, overflow: "hidden", background: "#f8fafd", border: "1px solid #e8edf5", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                   {isImage ? (
-                                    <img
-                                      src={`/api/materiale?fileId=${m.id}`}
-                                      alt={m.nomeOriginale}
-                                      style={{width:'100%',height:'100%',objectFit:'cover'}}
-                                    />
+                                    <img src={`/api/materiale?fileId=${m.id}`} alt={m.nomeOriginale} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                   ) : (
-                                    <div style={{textAlign:'center',padding:10}}>
+                                    <div style={{ textAlign: "center", padding: 10 }}>
                                       <FileIcon tipo={m.tipo} />
-                                      <div style={{fontSize:11,color:'#5a6d90',marginTop:5,wordBreak:'break-word'}}>
-                                        {m.nomeOriginale}
-                                      </div>
+                                      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4, wordBreak: "break-word" }}>{m.nomeOriginale}</div>
                                     </div>
                                   )}
                                 </div>
                               );
                             })}
                             {batchItems.length > 4 && (
-                              <div
-                                role="button"
-                                tabIndex={0}
+                              <div role="button" tabIndex={0}
                                 onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(4); }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') { setPreviewBatch(batchItems); setPreviewIndex(4); } }}
-                                style={{
-                                cursor: 'pointer',
-                                position: 'relative',
-                                aspectRatio: '1',
-                                borderRadius: 8,
-                                background: '#f5f7fa',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                border: '1px solid #e0e0e0',
-                                fontSize: 24,
-                                fontWeight: 700,
-                                color: coloreTema
-                              }}>
+                                style={{ cursor: "pointer", aspectRatio: "1", borderRadius: 10, background: `${coloreTema}12`, border: `1px solid ${coloreTema}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: coloreTema }}>
                                 +{batchItems.length - 4}
                               </div>
                             )}
                           </div>
-                          
-                          <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                            {firstItem.materia && <span style={{...categoria, background: `${coloreTema}20`, color: coloreTema}}>{firstItem.materia}</span>}
-                            {firstItem.sottocategoria && <span style={{...categoria, background: `${coloreTema}15`, color: coloreTema, fontSize: 11, fontWeight: 500}}>{
-                              firstItem.sottocategoria === 'TEORIA' ? 'Teoria' :
-                              firstItem.sottocategoria === 'SIMULAZIONI' ? 'Simulazioni' :
-                              firstItem.sottocategoria === 'ESERCIZI' ? 'Esercizi' : firstItem.sottocategoria
-                            }</span>}
-                            {isAdmin && <span style={clientePill}>{getStudenteLabel(firstItem.clienteId)}</span>}
-                          </div>
-                          <div style={{fontSize:13,color:"#5a6d90",marginBottom:7}}>
-                            Caricato il {formatAggDate(firstItem.updatedAt)}
-                          </div>
-                          <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                                  {((firstItem.sezione || '').toUpperCase() !== 'PROGRAMMA' && activeTab !== 'programma') && (
-                                    <button type="button" style={btnGhost} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
-                                Vedi file
-                              </button>
-                                  )}
-                          </div>
-                          
-                          {/* Commenti batch */}
-                          <CommentiBox
-                            materialeId={firstItem.id}
-                            lista={commenti[firstItem.id] || []}
-                            user={session?.user}
-                            addCommento={addCommento}
-                            coloreTema={coloreTema}
-                          />
+                        </div>
+                        {/* Azioni */}
+                        <div style={{ padding: "0 18px 12px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                          <button type="button" style={{ background: `${coloreTema}15`, color: coloreTema, border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }} onClick={() => { setPreviewBatch(batchItems); setPreviewIndex(0); }}>
+                            Sfoglia file
+                          </button>
+                          {isAdmin && (
+                            <button style={{ background: "#fff5f5", color: "#c53030", border: "1px solid #fed7d7", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer", marginLeft: "auto" }} onClick={() => { if (window.confirm(`Eliminare tutti i ${batchItems.length} file?`)) batchItems.forEach(m => handleDeleteMateriale(m.id)); }}>
+                              Elimina tutti
+                            </button>
+                          )}
+                        </div>
+                        {/* Commenti */}
+                        <div style={{ borderTop: "1px solid #f1f5f9", padding: "10px 18px 14px" }}>
+                          <CommentiBox materialeId={firstItem.id} lista={commenti[firstItem.id] || []} user={session?.user} addCommento={addCommento} coloreTema={coloreTema} />
                         </div>
                       </div>
                     );
@@ -1371,70 +1327,65 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                   
                   // File singolo
                   const m = item;
+                  const isImg = ["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase());
                   return (
                   <div key={m.id} style={streamCard}>
-                    <div style={streamCardHead}>
-                      <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <h3 style={{...streamCardTitle, color: coloreTema}}>{m.titolo}</h3>
-                        {m.sezione && (
-                          <span style={{...badgeTipo(m.sezione), background: coloreTema}}>{String(m.sezione).toUpperCase()}</span>
-                        )}
+                    {/* Accent bar */}
+                    <div style={{ height: 3, background: coloreTema }} />
+                    {/* Header */}
+                    <div style={{ padding: "14px 18px 10px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: "50%", background: `${coloreTema}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: coloreTema }}>{isImg ? "IMG" : (m.tipo||"FILE").toUpperCase().slice(0,3)}</span>
                       </div>
-                      {isAdmin && (
-                        <button
-                          style={streamMenuBtn}
-                          title="Azioni"
-                          onClick={()=>handleDeleteMateriale(m.id)}
-                        >✕</button>
-                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{ margin: "0 0 5px", fontSize: 15, fontWeight: 700, color: "#1a202c", lineHeight: 1.3 }}>{m.titolo}</h3>
+                        <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                          {m.sezione && <span style={{ fontSize: 11, background: coloreTema, color: "#fff", padding: "2px 8px", borderRadius: 8, fontWeight: 700 }}>{m.sezione}</span>}
+                          {m.materia && <span style={{ fontSize: 11, background: `${coloreTema}18`, color: coloreTema, padding: "2px 8px", borderRadius: 8, fontWeight: 600 }}>{m.materia}</span>}
+                          {m.sottocategoria && <span style={{ fontSize: 11, color: "#94a3b8" }}>{m.sottocategoria === 'TEORIA' ? 'Teoria' : m.sottocategoria === 'SIMULAZIONI' ? 'Simulazioni' : 'Esercizi'}</span>}
+                          {isAdmin && <span style={clientePill}>{getStudenteLabel(m.clienteId)}</span>}
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>{formatAggDate(m.updatedAt)}</span>
+                        </div>
+                      </div>
+                      {isAdmin && <button style={{ background: "none", border: "none", color: "#cbd5e0", fontSize: 16, cursor: "pointer", padding: "2px 6px", lineHeight: 1 }} title="Elimina" onClick={() => handleDeleteMateriale(m.id)}>✕</button>}
                     </div>
-                    <div style={streamCardBody}>
-                      {/* Preview immagini */}
-                      {(["jpg","jpeg","png","gif","bmp","webp"].includes((m.tipo||"").toLowerCase()) && ((m.sezione || '').toUpperCase() !== 'PROGRAMMA') && activeTab !== 'programma') && (
-                        <div role="button" tabIndex={0} onClick={() => setPreviewItem(m)} onKeyDown={(e)=>{ if(e.key==='Enter') setPreviewItem(m); }} style={{cursor:'pointer'}}>
-                          <img
-                            src={`/api/materiale?fileId=${m.id}`}
-                            alt={m.titolo}
-                            style={{maxWidth:"100%",maxHeight:240,borderRadius:12,marginBottom:10,boxShadow:"0 2px 10px #20489a22"}}
-                          />
+                    {/* Contenuto: immagine o chip file */}
+                    <div style={{ padding: "0 18px 12px" }}>
+                      {isImg ? (
+                        <div role="button" tabIndex={0} onClick={() => setPreviewItem(m)} onKeyDown={(e) => { if (e.key === 'Enter') setPreviewItem(m); }} style={{ cursor: "pointer", borderRadius: 10, overflow: "hidden" }}>
+                          <img src={`/api/materiale?fileId=${m.id}`} alt={m.titolo} style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 10, display: "block" }} />
+                        </div>
+                      ) : (
+                        <div role="button" tabIndex={0} onClick={() => setPreviewItem(m)} onKeyDown={(e) => { if (e.key === 'Enter') setPreviewItem(m); }}
+                          style={{ display: "flex", alignItems: "center", gap: 12, background: "#f8fafd", border: "1px solid #e8edf5", borderRadius: 10, padding: "11px 15px", cursor: "pointer" }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: `${coloreTema}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <FileIcon tipo={m.tipo} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nomeOriginale || m.titolo}</div>
+                            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>{(m.tipo||"FILE").toUpperCase()} · clicca per aprire</div>
+                          </div>
+                          <span style={{ fontSize: 12, color: coloreTema, fontWeight: 700, flexShrink: 0 }}>Apri →</span>
                         </div>
                       )}
-                      <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                        {m.materia && <span style={{...categoria, background: `${coloreTema}20`, color: coloreTema}}>{m.materia}</span>}
-                        {m.sottocategoria && <span style={{...categoria, background: `${coloreTema}15`, color: coloreTema, fontSize: 11, fontWeight: 500}}>{
-                          m.sottocategoria === 'TEORIA' ? 'Teoria' :
-                          m.sottocategoria === 'SIMULAZIONI' ? 'Simulazioni' :
-                          m.sottocategoria === 'ESERCIZI' ? 'Esercizi' : m.sottocategoria
-                        }</span>}
-                        {isAdmin && <span style={clientePill}>{getStudenteLabel(m.clienteId)}</span>}
-                        {typeof m.tipo === "string" && m.tipo.trim() && m.tipo !== "undefined" && !["jpg","jpeg","png","gif","bmp","webp"].includes(m.tipo.toLowerCase()) &&
-                          <FileIcon tipo={m.tipo} />
-                        }
-                      </div>
-                      <div style={{fontSize:13,color:"#5a6d90",marginBottom:7}}>
-                        Caricato il {formatAggDate(m.updatedAt)}
-                      </div>
-                      <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-                        {((m.sezione || '').toUpperCase() !== 'PROGRAMMA' && activeTab !== 'programma') && (
-                          <button type="button" style={btnGhost} onClick={() => setPreviewItem(m)}>Anteprima</button>
-                        )}
-                        {isAdmin && (
-                          <button
-                            style={{...btnOutline, color:"#c33", borderColor:"#ea8484", fontWeight:700}}
-                            onClick={()=>handleDeleteMateriale(m.id)}
-                          >
-                            Elimina
-                          </button>
-                        )}
-                      </div>
-                      {/* Commenti */}
-                      <CommentiBox
-                        materialeId={m.id}
-                        lista={commenti[m.id] || []}
-                        user={session?.user}
-                        addCommento={addCommento}
-                        coloreTema={coloreTema}
-                      />
+                    </div>
+                    {/* Azioni */}
+                    <div style={{ padding: "0 18px 12px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <button type="button" style={{ background: `${coloreTema}15`, color: coloreTema, border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }} onClick={() => setPreviewItem(m)}>
+                        {isImg ? "Ingrandisci" : "Anteprima"}
+                      </button>
+                      <a href={`/api/materiale?fileId=${m.id}`} download={m.nomeOriginale} style={{ background: "#f1f5f9", color: "#475569", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                        Scarica
+                      </a>
+                      {isAdmin && (
+                        <button style={{ background: "#fff5f5", color: "#c53030", border: "1px solid #fed7d7", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer", marginLeft: "auto" }} onClick={() => handleDeleteMateriale(m.id)}>
+                          Elimina
+                        </button>
+                      )}
+                    </div>
+                    {/* Commenti */}
+                    <div style={{ borderTop: "1px solid #f1f5f9", padding: "10px 18px 14px" }}>
+                      <CommentiBox materialeId={m.id} lista={commenti[m.id] || []} user={session?.user} addCommento={addCommento} coloreTema={coloreTema} />
                     </div>
                   </div>
                   );
@@ -1821,46 +1772,26 @@ const emptyBox = {
   marginTop:10
 };
 const streamWrap = {
-  display:"flex",
-  flexDirection:"column",
-  gap:34,
-  marginTop: 10,
-  margin: "0 auto", // Centra il contenitore
-  maxWidth: 600, // Definisce la larghezza massima della colonna centrale
-  width: '100%' // Assicura che sia responsivo
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+  marginTop: 8,
+  width: "100%",
+  maxWidth: 740,
 };
-const dayHeaderStyle = {
-  fontWeight:800,
-  fontSize:18,
-  color:"#20489a",
-  margin:"34px 0 10px 0", // Rimosso paddingLeft per allineare con le card
-  letterSpacing:".5px"
-};
+const dayHeaderStyle = { display: "none" }; // sostituito da inline JSX
 const streamCard = {
-  background:"#fff",
-  borderRadius:22,
-  boxShadow:"0 3px 22px #20489a22",
-  width: '100%', // Ogni card occupa il 100% del contenitore streamWrap
-  border:"1.4px solid #eaeaf0"
+  background: "#fff",
+  borderRadius: 12,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05)",
+  border: "1px solid #e8edf5",
+  width: "100%",
+  overflow: "hidden",
 };
-const streamCardHead = {
-  display:"flex",
-  alignItems:"center",
-  justifyContent:"space-between",
-  padding:"22px 32px 0 32px"
-};
-const streamCardTitle = { margin:0, fontSize:19, fontWeight:700, lineHeight:1.25, color:"#20489a"};
-const streamMenuBtn = {
-  background:"none",
-  border:"none",
-  color:"#8399b2",
-  fontSize:30,
-  cursor:"pointer",
-  padding:0,
-  margin:0,
-  lineHeight:1
-};
-const streamCardBody = {padding:"14px 32px 20px 32px"};
+const streamCardHead = { display: "none" }; // sostituito da inline JSX
+const streamCardTitle = { margin: 0, fontSize: 15, fontWeight: 700, color: "#1a202c" };
+const streamMenuBtn = { background: "none", border: "none", color: "#cbd5e0", fontSize: 16, cursor: "pointer", padding: "2px 6px", lineHeight: 1 };
+const streamCardBody = { padding: "0 18px 16px" };
 const badgeTipo = tipo => ({
   background:"#1e3a8a",
   color:"#fff",
