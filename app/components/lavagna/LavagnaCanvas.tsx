@@ -131,6 +131,10 @@ export default function LavagnaCanvas({
   const imageCacheRef = useRef(new Map()); // src -> HTMLImageElement
   const [spectatorMode, setSpectatorMode] = useState(false);
   const spectatorModeRef = useRef(false);
+  // Cursori remoti: mappa userId → {x, y, ruolo, ts}
+  const [remoteCursors, setRemoteCursors] = useState({});
+  const cursorEmitThrottleRef = useRef(0);
+  const remoteCursorTimeoutsRef = useRef({});
   // Admin: controlla se gli studenti possono scrivere sulla lavagna
   const [studentWriteEnabled, setStudentWriteEnabled] = useState(false);
   const latestAdminViewportRef = useRef(null);
@@ -1494,9 +1498,31 @@ export default function LavagnaCanvas({
           }
       } catch (_) {}
 
+    // Disegna cursori remoti in coordinate mondo
+    try {
+      const entries = Object.values(remoteCursors);
+      for (const cur of entries) {
+        if (typeof cur.x !== 'number' || typeof cur.y !== 'number') continue;
+        const isAdminCursor = cur.ruolo === 'admin' || cur.ruolo === 'operatore';
+        const cursorColor = isAdminCursor ? '#ef4444' : '#16a34a';
+        const r = 6 / safeZoom; // raggio costante in screen pixels
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cur.x, cur.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = cursorColor;
+        ctx.globalAlpha = 0.85;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5 / safeZoom;
+        ctx.stroke();
+        ctx.restore();
+      }
+    } catch (_) {}
+
   ctx.restore();
   ctx.globalCompositeOperation = 'source-over';
-  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo]);
+  }, [tratti, forme, selectionBox, selectedItems, strumento, gommaPuntuale, colore, spessore, sfondo, remoteCursors]);
 
   // Mantieni drawAllRef aggiornato (usato da rAF callbacks fuori dalla closure React)
   useEffect(() => {
@@ -2361,6 +2387,29 @@ export default function LavagnaCanvas({
           }
           setSpectatorCount(roster.size);
         };
+        // Cursori remoti: aggiorna posizione cursore dell'altro utente
+        const onCursorMove = (msg) => {
+          const { data } = msg || {};
+          if (!data || data.userId === utenteIdRef.current) return;
+          const uid = data.userId;
+          setRemoteCursors(prev => ({ ...prev, [uid]: { x: data.x, y: data.y, ruolo: data.ruolo, ts: data.ts } }));
+          // Rimuovi cursore dopo 3s di inattività
+          if (remoteCursorTimeoutsRef.current[uid]) clearTimeout(remoteCursorTimeoutsRef.current[uid]);
+          remoteCursorTimeoutsRef.current[uid] = setTimeout(() => {
+            setRemoteCursors(prev => { const n = { ...prev }; delete n[uid]; return n; });
+          }, 3000);
+        };
+
+        // Sincronizza viewport forzato (da admin via tasto "Sincronizza View")
+        const onForceSyncViewport = (msg) => {
+          if (isAdminRef.current) return;
+          const { data } = msg || {};
+          if (!data) return;
+          // Reset prevAdminVisibleRect per fare un sync assoluto (non delta)
+          prevAdminVisibleRectRef.current = null;
+          applyViewport({ pan: data.pan, zoom: data.zoom, visibleRect: data.visibleRect });
+        };
+
         const onSpectatorRequest = () => {
           if (isAdminRef.current) return;
           if (!spectatorModeRef.current) return;
@@ -2376,10 +2425,7 @@ export default function LavagnaCanvas({
         // Admin → studenti: abilita/revoca scrittura
         const onStudentWrite = (msg) => {
           if (isAdminRef.current) return;
-          const { data } = msg || {};
-          const enabled = !!data?.enabled;
-          // Se admin abilita scrittura → esci da spectator; se revoca → rientra in spectator
-          setSpectatorMode(!enabled);
+          // spectator mode rimosso — studente ha sempre accesso in scrittura
         };
 
         // Admin annuncia la propria presenza sulla lavagna
@@ -2390,7 +2436,7 @@ export default function LavagnaCanvas({
           if (online) {
             lastAdminHeartbeatRef.current = Date.now();
           }
-          setSpectatorMode(online);
+          // spectator mode rimosso — non auto-attivare
         };
 
         // Studente chiede se admin è online (utile quando studente si connette tardi)
@@ -2409,8 +2455,7 @@ export default function LavagnaCanvas({
         const onAdminHeartbeat = (msg) => {
           if (isAdminRef.current) return;
           lastAdminHeartbeatRef.current = Date.now();
-          // Se già in spectator mode, nessuna azione; altrimenti attiva (caso reconnect)
-          if (!spectatorModeRef.current) setSpectatorMode(true);
+          // spectator mode rimosso — nessuna azione all'heartbeat
         };
 
         try {
@@ -2429,6 +2474,8 @@ export default function LavagnaCanvas({
           ch.subscribe('admin:presence', onAdminPresence);
           ch.subscribe('presence:request', onPresenceRequest);
           ch.subscribe('admin:heartbeat', onAdminHeartbeat);
+          ch.subscribe('cursor:move', onCursorMove);
+          ch.subscribe('viewport:force-sync', onForceSyncViewport);
         } catch (subscribeError) {
           console.error('[LAVAGNA-SUB-ERROR] Failed to subscribe:', subscribeError);
         }
@@ -2539,6 +2586,8 @@ export default function LavagnaCanvas({
             ch.unsubscribe('viewport:request', onViewportRequest);
             ch.unsubscribe('spectator:toggle', onSpectatorToggle);
             ch.unsubscribe('spectator:request', onSpectatorRequest);
+            ch.unsubscribe('cursor:move', onCursorMove);
+            ch.unsubscribe('viewport:force-sync', onForceSyncViewport);
             ch.unsubscribe('student:write', onStudentWrite);
             ch.unsubscribe('admin:presence', onAdminPresence);
             ch.unsubscribe('presence:request', onPresenceRequest);
@@ -4520,6 +4569,16 @@ export default function LavagnaCanvas({
     // Il rAF interno deduplica a 1 invio per frame (non spedisce ogni singolo evento).
     if (isAdminRef.current) broadcastViewportFromRefs();
 
+    // Emetti posizione cursore ai partecipanti (throttled ~50ms)
+    {
+      const nowMs = Date.now();
+      if (nowMs - cursorEmitThrottleRef.current > 50) {
+        cursorEmitThrottleRef.current = nowMs;
+        const pt = getPoint(e);
+        if (pt) emitOrPublish('cursor:move', { x: pt.x, y: pt.y, userId: utenteId, ruolo, ts: nowMs });
+      }
+    }
+
     const spectatorLocked = spectatorModeRef.current && !isAdmin;
 
     // Laser pointer: aggiorna posizione locale e trasmetti agli altri
@@ -5287,7 +5346,7 @@ export default function LavagnaCanvas({
       return;
     }
 
-    if (!disegnando) {
+    if (!disegnandoRef.current) {
       // Clean up touch tracking and gesture mode
       if (e?.nativeEvent?.pointerType === 'touch') {
         touchesRef.current.delete(e.nativeEvent.pointerId);
@@ -6500,25 +6559,6 @@ export default function LavagnaCanvas({
                 <line x1="19" y1="3" x2="22" y2="2" stroke="#ef4444" strokeWidth="1.2" strokeLinecap="round" opacity={strumento==='laser' ? '0.7' : '0.4'}/>
               </svg>
             </button>
-            {!isAdmin && (
-              <button
-                type="button"
-                style={iconBtn(spectatorMode)}
-                onClick={() => {
-                  setSpectatorMode(v => !v);
-                  setShowPenPopover(false);
-                  setShowMoreMenu(false);
-                  setShowShapesPopover(false);
-                  setShowExportMenu(false);
-                }}
-                title={spectatorMode ? "Smetti di seguire il professore" : "Segui il professore"}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={spectatorMode ? '#fff' : '#20489a'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" opacity={spectatorMode ? '1' : '0.75'}>
-                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              </button>
-            )}
             <div style={{ position:'relative' }}>
               <button
                 type="button"
@@ -6587,18 +6627,6 @@ export default function LavagnaCanvas({
                     />
                     <label htmlFor="gomma-puntuale-toggle" style={st.toggleLbl}>Gomma puntuale</label>
                   </div>
-                  {!isAdmin && (
-                    <div style={{ ...st.toggleWrap, marginBottom:8 }}>
-                      <input
-                        id={spectatorToggleId}
-                        type="checkbox"
-                        checked={spectatorMode}
-                        onChange={(e)=>setSpectatorMode(e.target.checked)}
-                        style={{ margin:0, accentColor:'#1cb0f6', cursor:'pointer' }}
-                      />
-                      <label htmlFor={spectatorToggleId} style={st.toggleLbl}>Modalità spettatore</label>
-                    </div>
-                  )}
                   {isAdmin && (
                     <div style={{ ...st.toggleWrap, marginBottom: 8 }}>
                       <button
@@ -6632,6 +6660,50 @@ export default function LavagnaCanvas({
                           }
                         </svg>
                         {studentWriteEnabled ? 'Scrittura studenti: ON' : 'Abilita scrittura studenti'}
+                      </button>
+                    </div>
+                    <div style={{ ...st.toggleWrap, marginBottom: 8 }}>
+                      <button
+                        type="button"
+                        style={{
+                          ...btn(false),
+                          width: '100%',
+                          justifyContent: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: '#e3eefe',
+                          color: '#20489a',
+                          border: '1px solid #4268b3',
+                        }}
+                        onClick={() => {
+                          // Pubblica viewport:force-sync con la vista corrente
+                          const canvas = canvasRef.current;
+                          if (!canvas) return;
+                          try {
+                            const rect = canvas.getBoundingClientRect();
+                            const cssW = rect.width;
+                            const cssH = rect.height;
+                            const z = zoomRef.current;
+                            const p = panRef.current;
+                            emitOrPublish('viewport:force-sync', {
+                              lavagnaId,
+                              attivitaId,
+                              senderId: utenteId,
+                              pan: { x: p.x, y: p.y },
+                              zoom: z,
+                              visibleRect: { x: p.x, y: p.y, width: cssW / z, height: cssH / z },
+                              ts: Date.now()
+                            });
+                          } catch (_) {}
+                          setShowMoreMenu(false);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        Sincronizza View
                       </button>
                     </div>
                   )}
@@ -6839,31 +6911,52 @@ export default function LavagnaCanvas({
           )}
         </div>
       )}
-      {/* Indicatore modalità spettatore — solo in modalità in-canvas (in external lo gestisce il parent) */}
-      {spectatorIndicatorVisible && topRightPlacement !== 'external' && (
-        <div
-          style={{
-            position: 'fixed',
-            right: isMobile ? 8 : 12,
-            bottom: isMobile ? 122 : 132,
-            zIndex: 1200,
-          }}
-        >
-          <div
-            style={{
-              ...st.eyeBadge,
-              cursor: (!isAdmin && spectatorMode) ? 'pointer' : 'default'
-            }}
-            onClick={() => { if (!isAdmin && spectatorMode) setSpectatorMode(false); }}
-            title={spectatorIndicatorTitle}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5c-5 0-9 4.5-9 7s4 7 9 7 9-4.5 9-7-4-7-9-7zm0 12c-2.757 0-5-2.016-5-4.5S9.243 8 12 8s5 2.016 5 4.5S14.757 17 12 17zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="#20489a"/>
-            </svg>
-            {isAdmin && spectatorCount > 0 && <span style={st.eyeCount}>{spectatorCount}</span>}
-          </div>
-        </div>
-      )}
+      {/* Indicatori cursori remoti fuori schermata */}
+      {Object.entries(remoteCursors).map(([uid, cur]) => {
+        const canvas = canvasRef.current;
+        if (!canvas || typeof cur.x !== 'number') return null;
+        try {
+          const rect = canvas.getBoundingClientRect();
+          const cssW = rect.width;
+          const cssH = rect.height;
+          const z = zoomRef.current || 1;
+          const p = panRef.current || { x: 0, y: 0 };
+          // Converti coordinate mondo in screen
+          const screenX = (cur.x - p.x) * z;
+          const screenY = (cur.y - p.y) * z;
+          const isVisible = screenX >= 0 && screenX <= cssW && screenY >= 0 && screenY <= cssH;
+          if (isVisible) return null;
+          // Calcola direzione (clamp agli edge)
+          const clampedX = Math.max(20, Math.min(cssW - 20, screenX));
+          const clampedY = Math.max(20, Math.min(cssH - 20, screenY));
+          const isAdminCursor = cur.ruolo === 'admin' || cur.ruolo === 'operatore';
+          const color = isAdminCursor ? '#ef4444' : '#16a34a';
+          const label = isAdminCursor ? 'Prof' : 'Studente';
+          return (
+            <div
+              key={uid}
+              style={{
+                position: 'fixed',
+                left: rect.left + clampedX,
+                top: rect.top + clampedY,
+                zIndex: 1300,
+                transform: 'translate(-50%, -50%)',
+                background: color,
+                color: '#fff',
+                borderRadius: 20,
+                padding: '3px 8px',
+                fontSize: 11,
+                fontWeight: 700,
+                pointerEvents: 'none',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                opacity: 0.9,
+              }}
+            >
+              {label} ↗
+            </div>
+          );
+        } catch (_) { return null; }
+      })}
       <div style={st.canvasBox}>
         {/* Pannello modifica selezione: colore, spessore, z-order */}
         {strumento === 'selezione' && hasSelection && (
