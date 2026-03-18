@@ -2,7 +2,9 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../auth/[...nextauth]/authOptions'
-import { prisma } from '../../../lib/prisma'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 /** GET — leggi stato accesso lavagna v2 del cliente */
 export async function GET(req, { params }) {
