@@ -18,6 +18,8 @@ import { usePointerHandlers } from './hooks/usePointerHandlers'
 import { useAblySync } from './sync/useAblySync'
 import { usePersistence } from './sync/usePersistence'
 import Toolbar from './toolbar/Toolbar'
+import { useTextTool } from './hooks/useTextTool'
+import { useSelectionTool } from './hooks/useSelectionTool'
 
 interface Props {
   lavagnaId: string
@@ -169,6 +171,28 @@ export default function LavagnaCanvas({
     readOnly: false,
   })
 
+  // ── Selection tool ───────────────────────────────────────────────────────────
+  const { onPointerDown: selDown, onPointerMove: selMove, onPointerUp: selUp } = useSelectionTool(
+    engineRef,
+    () => { /* future: persist moved items positions */ }
+  )
+
+  // ── Text tool ────────────────────────────────────────────────────────────────
+  const { session: textSession, value: textValue, setValue: setTextValue,
+    startText, commit: commitText, cancel: cancelText } = useTextTool(engineRef, async (shape) => {
+    try {
+      const res = await fetch('/api/lavagna/shape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...shape, lavagnaId }),
+      })
+      if (res.ok) {
+        const js = await res.json()
+        if (js.shape?.id) store.updateShape(shape.id, { dbId: js.shape.id })
+      }
+    } catch (_) {}
+  })
+
   // ── Export PNG ───────────────────────────────────────────────────────────────
   const exportPNG = useCallback(() => {
     const base = baseRef.current
@@ -203,9 +227,23 @@ export default function LavagnaCanvas({
       <canvas
         ref={liveRef}
         style={{ ...canvasStyle, zIndex: 2 }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerDown={(e) => {
+          if (store.tool === 'text') {
+            const rect = liveRef.current?.getBoundingClientRect()
+            if (rect) startText(e.clientX - rect.left, e.clientY - rect.top)
+            return
+          }
+          if (store.tool === 'select') { selDown(e); return }
+          onPointerDown(e)
+        }}
+        onPointerMove={(e) => {
+          if (store.tool === 'select') { selMove(e); return }
+          onPointerMove(e)
+        }}
+        onPointerUp={(e) => {
+          if (store.tool === 'select') { selUp(e); return }
+          onPointerUp(e)
+        }}
         onPointerLeave={onPointerUp}
         onPointerCancel={onPointerCancel}
         onWheel={onWheel}
@@ -214,6 +252,47 @@ export default function LavagnaCanvas({
         onTouchEnd={onTouchEnd}
         onContextMenu={e => e.preventDefault()}
       />
+
+      {/* Text input overlay */}
+      {textSession && (
+        <TextOverlay
+          screenX={textSession.screenX}
+          screenY={textSession.screenY}
+          value={textValue}
+          onChange={setTextValue}
+          onCommit={commitText}
+          onCancel={cancelText}
+          color={store.color}
+          fontSize={Math.max(14, store.strokeWidth * 5)}
+        />
+      )}
+
+      {/* Selection action bar */}
+      {store.tool === 'select' && (store.selectedStrokeIds.length > 0 || store.selectedShapeIds.length > 0) && (
+        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 30, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)', border: '1px solid #e5e7eb', borderRadius: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+          <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+            {store.selectedStrokeIds.length + store.selectedShapeIds.length} selezionati
+          </span>
+          <div style={{ width: 1, height: 20, background: '#e5e7eb' }} />
+          <label title="Colore" style={{ width: 22, height: 22, borderRadius: '50%', background: store.color, cursor: 'pointer', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }}>
+            <input type="color" value={store.color} onChange={e => store.setColor(e.target.value)} style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }} />
+          </label>
+          <button
+            onClick={() => {
+              store.selectedStrokeIds.forEach(id => { const s = store.strokes.find(x => x.id === id); store.deleteStroke(id); if (s) store.pushUndo({ type: 'delete-stroke', stroke: s }) })
+              store.selectedShapeIds.forEach(id => { const s = store.shapes.find(x => x.id === id); store.deleteShape(id); if (s) store.pushUndo({ type: 'delete-shape', shape: s }) })
+              store.clearSelection()
+            }}
+            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '4px 10px', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Elimina
+          </button>
+          <button
+            onClick={() => store.clearSelection()}
+            style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}
+          >×</button>
+        </div>
+      )}
 
       {/* Saving indicator */}
       {store.saving && (
@@ -240,6 +319,43 @@ export default function LavagnaCanvas({
         canvas { -webkit-tap-highlight-color: transparent; }
       `}</style>
     </div>
+  )
+}
+
+// ─── Text input overlay ───────────────────────────────────────────────────────
+
+function TextOverlay({ screenX, screenY, value, onChange, onCommit, onCancel, color, fontSize }) {
+  return (
+    <textarea
+      autoFocus
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onCommit() }
+        if (e.key === 'Escape') onCancel()
+      }}
+      onBlur={onCommit}
+      style={{
+        position: 'absolute',
+        left: screenX,
+        top: screenY,
+        zIndex: 30,
+        minWidth: 120,
+        minHeight: 36,
+        background: 'rgba(255,255,255,0.92)',
+        border: `2px solid ${color}`,
+        borderRadius: 6,
+        padding: '4px 8px',
+        fontSize,
+        fontFamily: 'Inter, sans-serif',
+        color,
+        outline: 'none',
+        resize: 'both',
+        lineHeight: 1.4,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+      }}
+      placeholder="Scrivi testo…"
+    />
   )
 }
 

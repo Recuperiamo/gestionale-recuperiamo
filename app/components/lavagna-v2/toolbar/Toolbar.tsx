@@ -146,6 +146,11 @@ const Icon = {
       <path d="M5 3l14 9-7 1-4 7z"/>
     </svg>
   ),
+  Text: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16M12 7v12M9 19h6"/>
+    </svg>
+  ),
   Laser: () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
       <circle cx="8" cy="14" r="2.5" fill="currentColor" opacity="0.85"/>
@@ -300,9 +305,15 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
 
         <div style={S.divider} />
 
-        {/* ── Hand / Select ── */}
+        {/* ── Hand / Select / Text ── */}
         <button style={S.btn(tool === 'hand')} onClick={() => { setTool('hand'); closePop() }} title="Sposta (Spazio)">
           <Icon.Hand />
+        </button>
+        <button style={S.btn(tool === 'select')} onClick={() => { setTool('select'); closePop() }} title="Selezione (S)">
+          <Icon.Select />
+        </button>
+        <button style={S.btn(tool === 'text')} onClick={() => { setTool('text'); closePop() }} title="Testo (T)">
+          <Icon.Text />
         </button>
         <button style={S.btn(tool === 'laser')} onClick={() => { setTool('laser'); closePop() }} title="Laser">
           <Icon.Laser />

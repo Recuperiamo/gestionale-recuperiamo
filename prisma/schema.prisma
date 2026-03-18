@@ -91,6 +91,7 @@ model Client {
   programmi          Programma[]
   promemoria        Nota[]   @relation("ClienteNote")
   lezioniAssegnate   AssegnazioneLezione[]
+  lavagnaV2Abilitata Boolean              @default(false)
 
   @@index([email])
   @@index([referenteId])
