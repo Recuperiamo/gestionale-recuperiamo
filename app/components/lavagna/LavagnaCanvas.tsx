@@ -6628,6 +6628,7 @@ export default function LavagnaCanvas({
                     <label htmlFor="gomma-puntuale-toggle" style={st.toggleLbl}>Gomma puntuale</label>
                   </div>
                   {isAdmin && (
+                    <>
                     <div style={{ ...st.toggleWrap, marginBottom: 8 }}>
                       <button
                         type="button"
@@ -6706,6 +6707,7 @@ export default function LavagnaCanvas({
                         Sincronizza View
                       </button>
                     </div>
+                    </>
                   )}
                   {isAdmin && (
                     <button type="button" style={{ ...btn(false), background:'#ff6464', color:'#fff', fontWeight:700, marginTop:4 }} onClick={pulisciLavagna}>Pulisci lavagna</button>
