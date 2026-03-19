@@ -27,6 +27,7 @@ export default function Navbar() {
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/calendario", label: "Calendario" },
     { href: "/lavagna", label: "Lavagna" },
+    { href: "/lavagna-v2", label: "Lavagna v2", beta: true },
     { href: "/aule", label: "Aule" },
     { href: "/lezioni", label: "Lezioni" },
     { href: "/richieste", label: "Richieste" }
@@ -127,6 +128,13 @@ export default function Navbar() {
           {links.map((l) => (
             <Link key={l.href} href={l.href} style={linkStyle(isActive(l.href))}>
               {l.label}
+              {l.beta && (
+                <span style={{
+                  marginLeft: 4, fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                  background: '#f59e0b', color: '#fff', borderRadius: 4,
+                  padding: '1px 4px', verticalAlign: 'middle', lineHeight: 1.5,
+                }}>BETA</span>
+              )}
             </Link>
           ))}
         </div>
@@ -235,6 +243,13 @@ export default function Navbar() {
           {links.map((l) => (
             <Link key={l.href} href={l.href} style={mobileLinkStyle(isActive(l.href))} onClick={() => setShowMobileMenu(false)}>
               {l.label}
+              {l.beta && (
+                <span style={{
+                  marginLeft: 6, fontSize: 9, fontWeight: 700,
+                  background: '#f59e0b', color: '#fff', borderRadius: 4,
+                  padding: '1px 4px', verticalAlign: 'middle',
+                }}>BETA</span>
+              )}
             </Link>
           ))}
           <div style={{ height: 1, background: "rgba(255,255,255,0.15)", margin: "12px 18px" }} />
