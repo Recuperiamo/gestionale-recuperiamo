@@ -65,6 +65,7 @@ interface WBState {
   setColor: (c: string) => void
   setStrokeWidth: (w: number) => void
   setBackground: (b: Background) => void
+  setEraserMode: (m: 'stroke' | 'point') => void
 
   addStroke: (s: Stroke, fromRemote?: boolean) => void
   updateStroke: (id: string, patch: Partial<Stroke>) => void
@@ -120,6 +121,7 @@ export const useWhiteboardStore = create<WBState>((set, get) => ({
   setColor: (color) => set({ color }),
   setStrokeWidth: (strokeWidth) => set({ strokeWidth }),
   setBackground: (background) => set({ background }),
+  setEraserMode: (eraserMode) => set({ eraserMode }),
 
   // ── Strokes ──
   addStroke: (s) => {

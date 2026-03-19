@@ -7,7 +7,7 @@
  */
 import { useRef, useCallback } from 'react'
 import { CanvasEngine } from '../engine/CanvasEngine'
-import { simplifyPoints, generateId } from '../engine/strokeUtils'
+import { simplifyPoints, generateId, hitTestStroke } from '../engine/strokeUtils'
 import { useWhiteboardStore } from '../store/whiteboardStore'
 
 interface Options {
@@ -117,6 +117,24 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     if (!drawing.current) return
     if (native.pointerId !== activePointerId.current) return
 
+    // Stroke-erase mode: delete entire strokes under cursor
+    const { tool, eraserMode } = useWhiteboardStore.getState()
+    if (tool === 'eraser' && eraserMode === 'stroke') {
+      const pt = getPoint(e)
+      if (pt) {
+        eng.updateLiveStroke([pt]) // cursor circle only
+        const currentStrokes = useWhiteboardStore.getState().strokes
+        for (const s of currentStrokes) {
+          if (hitTestStroke(s, pt.x, pt.y, eng.zoom)) {
+            useWhiteboardStore.getState().deleteStroke(s.id)
+            useWhiteboardStore.getState().pushUndo({ type: 'delete-stroke', stroke: s })
+            onStrokeCommit?.({ type: 'delete-stroke', stroke: s })
+          }
+        }
+      }
+      return
+    }
+
     // Coalesced events for smoother strokes
     const evts = native.getCoalescedEvents ? native.getCoalescedEvents() : [native]
     for (const ev of evts) {
@@ -163,6 +181,14 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       return
     }
     isLaser.current = false
+
+    // Stroke-erase mode: strokes already deleted in onPointerMove, nothing to commit
+    const { tool: currentTool, eraserMode } = useWhiteboardStore.getState()
+    if (currentTool === 'eraser' && eraserMode === 'stroke') {
+      allPoints.current = []
+      streamId.current = null
+      return
+    }
 
     const raw = allPoints.current
     allPoints.current = []

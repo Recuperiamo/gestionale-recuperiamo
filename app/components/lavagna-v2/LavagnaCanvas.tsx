@@ -162,7 +162,10 @@ export default function LavagnaCanvas({
       const stroke = { ...event.stroke, authorId: utenteId }
       await saveStroke(stroke)
     }
-  }, [emitStrokeEvent, saveStroke, utenteId])
+    if (event.type === 'delete-stroke' && event.stroke?.dbId) {
+      await deleteStroke(event.stroke.dbId)
+    }
+  }, [emitStrokeEvent, saveStroke, deleteStroke, utenteId])
 
   const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel,
     onWheel, onTouchStart, onTouchMove, onTouchEnd } = usePointerHandlers({

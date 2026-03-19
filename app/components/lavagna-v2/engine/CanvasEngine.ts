@@ -436,11 +436,24 @@ export class CanvasEngine {
           ctx.stroke()
         }
       } else if (ls.tool === 'laser') {
-        ctx.globalCompositeOperation = 'source-over'
-        ctx.globalAlpha = 0.7
-        ctx.strokeStyle = '#ef4444'
-        ctx.fillStyle = '#ef4444'
-        drawStrokePath(ctx, ls.points, Math.max(ls.width, 3))
+        const lastPt = ls.points[ls.points.length - 1]
+        if (lastPt) {
+          ctx.globalCompositeOperation = 'source-over'
+          // Inner solid dot
+          ctx.globalAlpha = 0.95
+          ctx.fillStyle = '#ef4444'
+          ctx.beginPath()
+          ctx.arc(lastPt.x, lastPt.y, 7 / this.zoom, 0, Math.PI * 2)
+          ctx.fill()
+          // Outer faint ring
+          ctx.globalAlpha = 0.35
+          ctx.strokeStyle = '#ef4444'
+          ctx.lineWidth = 1.5 / this.zoom
+          ctx.setLineDash([])
+          ctx.beginPath()
+          ctx.arc(lastPt.x, lastPt.y, 13 / this.zoom, 0, Math.PI * 2)
+          ctx.stroke()
+        }
       } else {
         ctx.globalCompositeOperation = 'source-over'
         ctx.globalAlpha = ls.opacity ?? 1

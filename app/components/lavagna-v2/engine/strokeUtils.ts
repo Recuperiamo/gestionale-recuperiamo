@@ -100,6 +100,13 @@ export function shapeBBox(s: Shape): BBox {
       maxY: Math.max(s.y, s.y2 ?? s.y) + hw,
     }
   }
+  if (s.type === 'text') {
+    const fontSize = s.fontSize || 18
+    const lines = (s.text || '').split('\n')
+    const w = Math.max(...lines.map(l => l.length), 1) * fontSize * 0.6
+    const h = lines.length * fontSize * 1.4
+    return { minX: s.x - 4, minY: s.y - 4, maxX: s.x + w + 4, maxY: s.y + h + 4 }
+  }
   const w = s.width ?? 0, h = s.height ?? 0
   if (!s.rotation) {
     return { minX: s.x - hw, minY: s.y - hw, maxX: s.x + w + hw, maxY: s.y + h + hw }

@@ -210,7 +210,7 @@ const Icon = {
 
 export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewport, onExportPNG }: Props) {
   const { tool, color, strokeWidth, opacity, background, undoStack, redoStack,
-    setTool, setColor, setStrokeWidth, setBackground } = useWhiteboardStore()
+    setTool, setColor, setStrokeWidth, setBackground, setEraserMode } = useWhiteboardStore()
 
   const [openPopover, setOpenPopover] = useState<string | null>(null)
   const [popoverRect, setPopoverRect] = useState<DOMRect | null>(null)
@@ -270,6 +270,23 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
       {/* Click outside to close popovers */}
       {openPopover && <div style={{ position: 'fixed', inset: 0, zIndex: 1099 }} onClick={closePop} />}
 
+      {/* ── Popovers — OUTSIDE the transform container so position:fixed works relative to viewport ── */}
+      {openPopover === 'pen' && popoverRect && <InkPopover type="pen" rect={popoverRect} onClose={closePop} />}
+      {openPopover === 'hl' && popoverRect && <InkPopover type="highlighter" rect={popoverRect} onClose={closePop} />}
+      {openPopover === 'eraser' && popoverRect && <EraserPopover rect={popoverRect} onClose={closePop} />}
+      {openPopover === 'shapes' && popoverRect && <ShapesPopover rect={popoverRect} onClose={closePop} />}
+      {openPopover === 'color' && popoverRect && <ColorPopover rect={popoverRect} onClose={closePop} />}
+      {openPopover === 'more' && popoverRect && (
+        <MorePopover
+          rect={popoverRect}
+          isAdmin={isAdmin}
+          onClear={onClear}
+          onForceSyncViewport={onForceSyncViewport}
+          onExportPNG={onExportPNG}
+          onClose={closePop}
+        />
+      )}
+
       <div style={S.toolbar} onPointerDown={e => e.stopPropagation()}>
 
         {/* ── Undo / Redo ── */}
@@ -291,7 +308,6 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
         >
           <Icon.Pen />
         </button>
-        {openPopover === 'pen' && popoverRect && <InkPopover type="pen" rect={popoverRect} onClose={closePop} />}
 
         {/* ── Highlighter ── */}
         <button
@@ -302,13 +318,11 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
         >
           <Icon.Highlighter />
         </button>
-        {openPopover === 'hl' && popoverRect && <InkPopover type="highlighter" rect={popoverRect} onClose={closePop} />}
 
         {/* ── Eraser ── */}
         <button ref={eraserBtnRef} style={S.btn(tool === 'eraser')} onClick={() => { setTool('eraser'); togglePop('eraser', eraserBtnRef) }} title="Gomma (E)">
           <Icon.Eraser />
         </button>
-        {openPopover === 'eraser' && popoverRect && <EraserPopover rect={popoverRect} onClose={closePop} />}
 
         <div style={S.divider} />
 
@@ -316,7 +330,6 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
         <button ref={shapesBtnRef} style={S.btn(['rect','ellipse','line','arrow','diamond','triangle'].includes(tool))} onClick={() => togglePop('shapes', shapesBtnRef)} title="Forme">
           <Icon.Shapes />
         </button>
-        {openPopover === 'shapes' && popoverRect && <ShapesPopover rect={popoverRect} onClose={closePop} />}
 
         <div style={S.divider} />
 
@@ -338,12 +351,9 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
 
         {/* ── Color swatch (quick picker) ── */}
         {isInkTool && (
-          <>
-            <button ref={colorBtnRef} style={{ ...S.btn(false), gap: 0 }} onClick={() => togglePop('color', colorBtnRef)} title="Colore">
-              <span style={{ width: 18, height: 18, borderRadius: '50%', background: color, border: color === '#ffffff' ? '1.5px solid #e5e7eb' : 'none', display: 'block' }} />
-            </button>
-            {openPopover === 'color' && popoverRect && <ColorPopover rect={popoverRect} onClose={closePop} />}
-          </>
+          <button ref={colorBtnRef} style={{ ...S.btn(false), gap: 0 }} onClick={() => togglePop('color', colorBtnRef)} title="Colore">
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: color, border: color === '#ffffff' ? '1.5px solid #e5e7eb' : 'none', display: 'block' }} />
+          </button>
         )}
 
         <div style={S.divider} />
@@ -362,16 +372,6 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
         <button ref={moreBtnRef} style={S.btn(openPopover === 'more')} onClick={() => togglePop('more', moreBtnRef)} title="Altro">
           <Icon.More />
         </button>
-        {openPopover === 'more' && popoverRect && (
-          <MorePopover
-            rect={popoverRect}
-            isAdmin={isAdmin}
-            onClear={onClear}
-            onForceSyncViewport={onForceSyncViewport}
-            onExportPNG={onExportPNG}
-            onClose={closePop}
-          />
-        )}
 
       </div>
     </>
@@ -414,18 +414,34 @@ function InkPopover({ type, rect, onClose }) {
 }
 
 function EraserPopover({ rect, onClose }) {
-  const { strokeWidth, setStrokeWidth } = useWhiteboardStore()
+  const { strokeWidth, setStrokeWidth, eraserMode, setEraserMode } = useWhiteboardStore()
   const ERASER_SIZES = [4, 8, 16, 32]
+  const modeBtn = (label: string, value: 'stroke' | 'point') => ({
+    padding: '5px 10px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+    fontWeight: eraserMode === value ? 600 : 400,
+    border: eraserMode === value ? '1.5px solid #0078d4' : '1.5px solid #e5e7eb',
+    background: eraserMode === value ? '#eff6ff' : '#f9fafb',
+    color: eraserMode === value ? '#0078d4' : '#374151',
+  })
   return (
     <div style={S.popover(rect)}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>DIMENSIONE GOMMA</div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        {ERASER_SIZES.map(w => (
-          <button key={w} style={S.widthBtn(w === strokeWidth)} onClick={() => { setStrokeWidth(w); onClose() }}>
-            <div style={{ width: w > 24 ? 24 : w, height: w > 24 ? 24 : w, borderRadius: '50%', background: '#d1d5db', border: '1.5px solid #9ca3af' }} />
-          </button>
-        ))}
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>MODALITÀ</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <button style={modeBtn('Cancella tratto', 'stroke')} onClick={() => setEraserMode('stroke')}>Cancella tratto</button>
+        <button style={modeBtn('Puntuale', 'point')} onClick={() => setEraserMode('point')}>Puntuale</button>
       </div>
+      {eraserMode === 'point' && (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>DIMENSIONE</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {ERASER_SIZES.map(w => (
+              <button key={w} style={S.widthBtn(w === strokeWidth)} onClick={() => setStrokeWidth(w)}>
+                <div style={{ width: w > 24 ? 24 : w, height: w > 24 ? 24 : w, borderRadius: '50%', background: '#d1d5db', border: '1.5px solid #9ca3af' }} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
