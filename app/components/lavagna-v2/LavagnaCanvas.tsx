@@ -458,47 +458,98 @@ function TextOverlay({ screenX, screenY, value, onChange, onCommit, onCancel, co
 
 function OffscreenCursors({ engineRef }: { engineRef: React.RefObject<CanvasEngine> }) {
   const remoteCursors = useWhiteboardStore(s => s.remoteCursors)
-  const [bounds, setBounds] = useState<DOMRect | null>(null)
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
 
+  // Initialize and update canvas size via ResizeObserver on the live canvas
   useEffect(() => {
     const eng = engineRef.current
     if (!eng) return
-    const fn = () => setBounds(eng['liveCanvas']?.getBoundingClientRect?.() ?? null)
-    eng.on(fn)
-    return () => eng.off(fn)
+    const canvas = eng['liveCanvas'] as HTMLCanvasElement | null
+    if (!canvas) return
+    const ro = new ResizeObserver(() => {
+      const r = canvas.getBoundingClientRect()
+      setSize({ w: r.width, h: r.height })
+    })
+    ro.observe(canvas)
+    const r = canvas.getBoundingClientRect()
+    setSize({ w: r.width, h: r.height })
+    return () => ro.disconnect()
   }, [engineRef])
 
-  if (!bounds) return null
+  if (!size) return null
+  const { w, h } = size
+  const MARGIN = 14
 
   return (
     <>
       {Object.entries(remoteCursors).map(([uid, cur]) => {
         const eng = engineRef.current
         if (!eng) return null
-        const screen = eng.worldToScreen(cur.x, cur.y)
-        const inView = screen.x >= 0 && screen.x <= bounds.width && screen.y >= 0 && screen.y <= bounds.height
-        if (inView) return null
-        const cx = Math.max(20, Math.min(bounds.width - 20, screen.x))
-        const cy = Math.max(20, Math.min(bounds.height - 20, screen.y))
+        const sc = eng.worldToScreen(cur.x, cur.y)
+        const inView = sc.x >= -10 && sc.x <= w + 10 && sc.y >= -10 && sc.y <= h + 10
         const isAdminCursor = cur.role === 'admin' || cur.role === 'operatore'
         const bg = isAdminCursor ? '#ef4444' : '#16a34a'
+        const label = isAdminCursor ? 'Prof' : 'Stud'
+
+        if (inView) {
+          // Cursore visibile in viewport: mostra un piccolo badge sul posto
+          return (
+            <div key={uid} style={{
+              position: 'absolute',
+              left: sc.x + 8, top: sc.y - 22,
+              background: bg, color: '#fff',
+              borderRadius: 8, padding: '2px 6px',
+              fontSize: 10, fontWeight: 700,
+              pointerEvents: 'none', zIndex: 20,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+              whiteSpace: 'nowrap', opacity: 0.92,
+            }}>{label}</div>
+          )
+        }
+
+        // Cursore fuori viewport: freccia direzionale sul bordo
+        const dx = sc.x - w / 2
+        const dy = sc.y - h / 2
+        const angle = Math.atan2(dy, dx)
+        // Clamp onto screen edge
+        const absDx = Math.abs(dx), absDy = Math.abs(dy)
+        let ex, ey
+        if (absDx / (w / 2) > absDy / (h / 2)) {
+          ex = dx > 0 ? w - MARGIN : MARGIN
+          ey = h / 2 + dy * ((w / 2 - MARGIN) / absDx)
+        } else {
+          ey = dy > 0 ? h - MARGIN : MARGIN
+          ex = w / 2 + dx * ((h / 2 - MARGIN) / absDy)
+        }
+        ex = Math.max(MARGIN, Math.min(w - MARGIN, ex))
+        ey = Math.max(MARGIN, Math.min(h - MARGIN, ey))
+
+        const arrowDeg = (angle * 180) / Math.PI
         return (
           <div key={uid} style={{
             position: 'absolute',
-            left: cx, top: cy,
+            left: ex, top: ey,
             transform: 'translate(-50%, -50%)',
-            background: bg,
-            color: '#fff',
-            borderRadius: 20,
-            padding: '2px 8px',
-            fontSize: 10,
-            fontWeight: 700,
-            pointerEvents: 'none',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-            zIndex: 20,
-            whiteSpace: 'nowrap',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            pointerEvents: 'none', zIndex: 20,
           }}>
-            {isAdminCursor ? '👩‍🏫 Prof' : '📍 Stud'}
+            {/* Arrow */}
+            <div style={{
+              width: 0, height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderBottom: `10px solid ${bg}`,
+              transform: `rotate(${arrowDeg + 90}deg)`,
+              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+            }} />
+            {/* Label badge */}
+            <div style={{
+              background: bg, color: '#fff',
+              borderRadius: 8, padding: '1px 6px',
+              fontSize: 10, fontWeight: 700,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+              whiteSpace: 'nowrap',
+            }}>{label}</div>
           </div>
         )
       })}

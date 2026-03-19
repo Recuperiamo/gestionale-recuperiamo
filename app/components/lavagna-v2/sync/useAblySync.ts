@@ -73,7 +73,18 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         publish('stroke:points', { streamId: event.streamId, points: event.points, lavagnaId })
         break
       case 'commit':
-        publish('stroke:done', { streamId: event.stroke.id, lavagnaId })
+        // Include full stroke data as fallback in case stroke:start was missed
+        publish('stroke:done', {
+          streamId: event.stroke.id,
+          lavagnaId,
+          fallback: {
+            tool: event.stroke.tool,
+            color: event.stroke.color,
+            width: event.stroke.width,
+            opacity: event.stroke.opacity,
+            points: event.stroke.points,
+          },
+        })
         break
       case 'delete-stroke':
         if (event.stroke) publish('stroke:delete', { strokeId: event.stroke.id, lavagnaId })
@@ -152,14 +163,16 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           const stream = remoteStreams.current.get(d.streamId)
           remoteStreams.current.delete(d.streamId)
           engineRef.current?.endLiveStroke()
-          if (!stream || stream.points.length < 1) return
+          // Use accumulated stream if available; otherwise use fallback data sent with stroke:done
+          const src = (stream && stream.points.length >= 1) ? stream : (d.fallback ? { id: d.streamId, ...d.fallback } : null)
+          if (!src || !src.points?.length) return
           const stroke = prepareStroke({
-            id: stream.id,
-            tool: stream.tool,
-            color: stream.color,
-            width: stream.width,
-            opacity: stream.opacity,
-            points: stream.points,
+            id: src.id ?? d.streamId,
+            tool: src.tool || 'pen',
+            color: src.color || '#1a1a1a',
+            width: src.width || 3,
+            opacity: src.opacity ?? 1,
+            points: src.points,
           })
           store.addStroke(stroke)
         }

@@ -29,6 +29,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
   const isLaser = useRef(false)
   const streamId = useRef<string | null>(null)
   const allPoints = useRef([])            // all collected points (never trimmed)
+  const lastSentIdx = useRef(0)           // index of last point sent via Ably (avoids duplicates)
   const activePointerId = useRef<number | null>(null)
 
   // Panning state
@@ -91,6 +92,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     isLaser.current = tool === 'laser'
     streamId.current = `${store.tool === 'eraser' ? 'eraser' : ''}-${generateId()}`
     allPoints.current = [pt]
+    lastSentIdx.current = 0
 
     eng.startLiveStroke({
       id: streamId.current,
@@ -216,10 +218,13 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     // Update live display (unsimplified = responsive feel)
     eng.updateLiveStroke([...allPoints.current])
 
-    // Stream points to Ably (last batch) — skip for laser
+    // Stream only NEW points to Ably — no overlap with previous batch
     if (!isLaser.current) {
-      const latest = allPoints.current.slice(-8)
-      onStrokeCommit?.({ type: 'points', streamId: streamId.current, points: latest })
+      const newPts = allPoints.current.slice(lastSentIdx.current)
+      if (newPts.length > 0) {
+        onStrokeCommit?.({ type: 'points', streamId: streamId.current, points: newPts })
+        lastSentIdx.current = allPoints.current.length
+      }
     }
   }, [getPoint, onStrokeCommit])
 
@@ -292,6 +297,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
 
     const raw = allPoints.current
     allPoints.current = []
+    lastSentIdx.current = 0
 
     if (raw.length === 0) return
 
