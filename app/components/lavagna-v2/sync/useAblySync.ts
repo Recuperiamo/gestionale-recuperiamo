@@ -75,6 +75,12 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
       case 'commit':
         publish('stroke:done', { streamId: event.stroke.id, lavagnaId })
         break
+      case 'delete-stroke':
+        if (event.stroke) publish('stroke:delete', { strokeId: event.stroke.id, lavagnaId })
+        break
+      case 'commit-shape':
+        if (event.shape) publish('shape:add', { shape: event.shape, lavagnaId })
+        break
       case 'cursor':
         publish('cursor:move', { x: event.x, y: event.y, role, lavagnaId })
         break
@@ -186,6 +192,18 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           store.clearAll()
         }
 
+        const onStrokeDelete = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (d.strokeId) store.deleteStroke(d.strokeId)
+        }
+
+        const onShapeAdd = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (d.shape) store.addShape(d.shape)
+        }
+
         const onPermissionsUpdateMsg = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
@@ -207,6 +225,8 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         ch.subscribe('cursor:move', onCursorMove)
         ch.subscribe('viewport:force-sync', onForceSyncViewport)
         ch.subscribe('clear', onClear)
+        ch.subscribe('stroke:delete', onStrokeDelete)
+        ch.subscribe('shape:add', onShapeAdd)
         ch.subscribe('permissions:update', onPermissionsUpdateMsg)
         ch.subscribe('draw:request', onDrawRequestMsg)
 
