@@ -107,15 +107,10 @@ export default function LavagnaV2Page() {
     const isAdmin = session.user?.role === "admin" || session.user?.role === "operatore";
     if (isAdmin) return; // admin: sempre accesso
 
-    // Studente: verifica accesso lavagna v2
-    const clienteId = session.user?.clienteId;
-    if (!clienteId) { setError("Accesso non autorizzato"); return; }
-    fetch(`/api/clienti/${clienteId}/lavagnav2`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d?.lavagnaV2Abilitata) setError("La lavagna v2 non è ancora disponibile per te. Chiedi al tuo insegnante di abilitarla.");
-      })
-      .catch(() => setError("Errore verifica accesso"));
+    // Studente: verifica accesso lavagna v2 dal token (aggiornato al login)
+    if (!session.user?.lavagnaV2Abilitata) {
+      setError("La lavagna v2 non è ancora disponibile per te. Chiedi al tuo insegnante di abilitarla.");
+    }
   }, [status, session]);
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
