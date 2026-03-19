@@ -12,7 +12,7 @@
  * then committed to the store when stroke:done arrives.
  */
 import { useEffect, useRef, useCallback } from 'react'
-import { getAblyChannel } from '../../../lib/realtime/ablyClient'
+import { getAblyChannelAsync } from '../../../lib/realtime/ablyClient'
 import { useWhiteboardStore } from '../store/whiteboardStore'
 import { CanvasEngine } from '../engine/CanvasEngine'
 import { prepareStroke } from '../engine/strokeUtils'
@@ -111,7 +111,7 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
 
     ;(async () => {
       try {
-        ch = getAblyChannel(channelName)
+        ch = await getAblyChannelAsync(channelName)
         if (!alive) return
         channelRef.current = ch
 

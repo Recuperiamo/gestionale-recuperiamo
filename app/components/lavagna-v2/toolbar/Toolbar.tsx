@@ -295,13 +295,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
         <button style={S.btn(false)} onClick={fitView} title="Adatta contenuto"><Icon.FitView /></button>
         <div style={S.divider} />
         {/* Richiedi permesso disegno */}
-        <button
-          onClick={onRequestDraw}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, background: '#fef9c3', border: '1.5px solid #fbbf24', color: '#92400e', fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
-          title="Chiedi all'insegnante di abilitare il disegno"
-        >
-          ✏️ Richiedi disegno
-        </button>
+        <RequestDrawButton onRequestDraw={onRequestDraw} />
       </div>
     )
   }
@@ -551,6 +545,28 @@ function ShapesPopover({ rect, vertical, onClose }) {
         </button>
       ))}
     </div>
+  )
+}
+
+function RequestDrawButton({ onRequestDraw }) {
+  const [sent, setSent] = React.useState(false)
+  const handleClick = () => {
+    onRequestDraw?.()
+    setSent(true)
+    setTimeout(() => setSent(false), 5000)
+  }
+  return (
+    <button
+      onClick={handleClick}
+      disabled={sent}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, background: sent ? '#f3f4f6' : '#fef9c3', border: `1.5px solid ${sent ? '#e5e7eb' : '#fbbf24'}`, color: sent ? '#9ca3af' : '#92400e', fontWeight: 700, fontSize: 12, cursor: sent ? 'default' : 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+      title="Chiedi all'insegnante di abilitare il disegno"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+      </svg>
+      {sent ? 'Richiesta inviata' : 'Richiedi disegno'}
+    </button>
   )
 }
 

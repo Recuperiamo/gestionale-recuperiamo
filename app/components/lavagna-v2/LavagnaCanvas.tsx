@@ -157,6 +157,28 @@ export default function LavagnaCanvas({
     return () => window.removeEventListener('keydown', handler)
   }, [store, saveStroke, deleteStroke])
 
+  // Callbacks per useAblySync — devono stare al top-level del componente (regole hooks)
+  const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
+
+  const handlePermissionsUpdate = useCallback(({ canStudentDraw }: { canStudentDraw: boolean }) => {
+    setCanDraw(canStudentDraw)
+  }, [])
+
+  const handleDrawRequest = useCallback(() => {
+    setDrawRequestPending(true)
+  }, [])
+
+  // ── Ably sync ────────────────────────────────────────────────────────────────
+  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest } = useAblySync({
+    channelName, engineRef, userId: utenteId, role: ruolo,
+    lavagnaId, attivitaId, isAdmin,
+    onPermissionsUpdate: handlePermissionsUpdate,
+    onDrawRequest: handleDrawRequest,
+  })
+
+  // Keep ref in sync so toggleStudentDraw can use emitPermissionsUpdate
+  useEffect(() => { emitPermissionsUpdateRef.current = emitPermissionsUpdate }, [emitPermissionsUpdate])
+
   // ── Toggle student draw (admin action) ──────────────────────────────────────
   const toggleStudentDraw = useCallback(async (enable: boolean) => {
     try {
@@ -169,24 +191,6 @@ export default function LavagnaCanvas({
     emitPermissionsUpdateRef.current?.({ canStudentDraw: enable })
     setDrawRequestPending(false)
   }, [lavagnaId])
-
-  // Ref so toggleStudentDraw can call emitPermissionsUpdate after it's defined
-  const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
-
-  // ── Ably sync ────────────────────────────────────────────────────────────────
-  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest } = useAblySync({
-    channelName, engineRef, userId: utenteId, role: ruolo,
-    lavagnaId, attivitaId, isAdmin,
-    onPermissionsUpdate: useCallback(({ canStudentDraw }) => {
-      setCanDraw(canStudentDraw)
-    }, []),
-    onDrawRequest: useCallback(() => {
-      setDrawRequestPending(true)
-    }, []),
-  })
-
-  // Keep ref in sync so toggleStudentDraw can use it
-  useEffect(() => { emitPermissionsUpdateRef.current = emitPermissionsUpdate }, [emitPermissionsUpdate])
 
   // ── Pointer handlers ─────────────────────────────────────────────────────────
   const onStrokeCommit = useCallback(async (event: any) => {
@@ -367,7 +371,7 @@ export default function LavagnaCanvas({
       {/* Admin: banner richiesta disegno studente */}
       {drawRequestPending && isAdmin && (
         <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', whiteSpace: 'nowrap' }}>
-          <span style={{ fontSize: 16 }}>✏️</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Uno studente chiede il permesso di disegnare</span>
           <button
             onClick={() => toggleStudentDraw(true)}
