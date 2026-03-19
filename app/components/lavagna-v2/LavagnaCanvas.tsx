@@ -229,6 +229,7 @@ export default function LavagnaCanvas({
         style={{ ...canvasStyle, zIndex: 2 }}
         onPointerDown={(e) => {
           if (store.tool === 'text') {
+            e.preventDefault()
             const rect = liveRef.current?.getBoundingClientRect()
             if (rect) startText(e.clientX - rect.left, e.clientY - rect.top)
             return
@@ -334,12 +335,15 @@ function TextOverlay({ screenX, screenY, value, onChange, onCommit, onCancel, co
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onCommit() }
         if (e.key === 'Escape') onCancel()
       }}
-      onBlur={onCommit}
+      onBlur={e => {
+        // Small delay to allow Enter key to fire first
+        setTimeout(() => onCommit(), 150)
+      }}
       style={{
         position: 'absolute',
         left: screenX,
         top: screenY,
-        zIndex: 30,
+        zIndex: 50,
         minWidth: 120,
         minHeight: 36,
         background: 'rgba(255,255,255,0.92)',

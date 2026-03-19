@@ -6,7 +6,7 @@
  * Layout: centered horizontal pill at bottom of screen.
  * Groups: Inking tools | Shapes | Eraser/Select | Actions
  */
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useWhiteboardStore, Tool, Background } from '../store/whiteboardStore'
 import { CanvasEngine } from '../engine/CanvasEngine'
 
@@ -57,6 +57,7 @@ const S = {
     userSelect: 'none' as const,
     maxWidth: 'calc(100vw - 32px)',
     overflowX: 'auto' as const,
+    overflowY: 'visible' as const,
   },
   divider: {
     width: 1,
@@ -92,10 +93,10 @@ const S = {
     boxShadow: active ? '0 0 0 2px rgba(0,120,212,0.3)' : 'none',
     transition: 'transform 0.1s',
   }),
-  popover: {
-    position: 'absolute' as const,
-    bottom: 52,
-    left: '50%',
+  popover: (rect: DOMRect) => ({
+    position: 'fixed' as const,
+    bottom: window.innerHeight - rect.top + 8,
+    left: rect.left + rect.width / 2,
     transform: 'translateX(-50%)',
     background: 'rgba(255,255,255,0.98)',
     backdropFilter: 'blur(16px)',
@@ -105,7 +106,7 @@ const S = {
     border: '1px solid rgba(0,0,0,0.08)',
     zIndex: 1200,
     minWidth: 200,
-  },
+  }),
   widthBtn: (active: boolean) => ({
     border: active ? '2px solid #0078d4' : '2px solid transparent',
     borderRadius: 8,
@@ -212,10 +213,27 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
     setTool, setColor, setStrokeWidth, setBackground } = useWhiteboardStore()
 
   const [openPopover, setOpenPopover] = useState<string | null>(null)
+  const [popoverRect, setPopoverRect] = useState<DOMRect | null>(null)
   const [zoomPct, setZoomPct] = useState(100)
 
-  const togglePop = (name: string) => setOpenPopover(v => v === name ? null : name)
-  const closePop = () => setOpenPopover(null)
+  const penBtnRef = useRef<HTMLButtonElement>(null)
+  const hlBtnRef = useRef<HTMLButtonElement>(null)
+  const eraserBtnRef = useRef<HTMLButtonElement>(null)
+  const shapesBtnRef = useRef<HTMLButtonElement>(null)
+  const colorBtnRef = useRef<HTMLButtonElement>(null)
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
+
+  const togglePop = (name: string, btnRef: React.RefObject<HTMLButtonElement>) => {
+    if (openPopover === name) {
+      setOpenPopover(null)
+      setPopoverRect(null)
+    } else {
+      const rect = btnRef.current?.getBoundingClientRect() ?? null
+      setOpenPopover(name)
+      setPopoverRect(rect)
+    }
+  }
+  const closePop = () => { setOpenPopover(null); setPopoverRect(null) }
 
   // Sync zoom display from engine
   const syncZoom = useCallback(() => {
@@ -265,43 +283,40 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
         <div style={S.divider} />
 
         {/* ── Pen ── */}
-        <div style={{ position: 'relative' }}>
-          <button
-            style={{ ...S.btn(tool === 'pen'), ...(tool === 'pen' ? { background: color, color: '#fff' } : {}) }}
-            onClick={() => { setTool('pen'); togglePop('pen') }}
-            title="Penna (P)"
-          >
-            <Icon.Pen />
-          </button>
-          {openPopover === 'pen' && <InkPopover type="pen" onClose={closePop} />}
-        </div>
+        <button
+          ref={penBtnRef}
+          style={{ ...S.btn(tool === 'pen'), ...(tool === 'pen' ? { background: color, color: '#fff' } : {}) }}
+          onClick={() => { setTool('pen'); togglePop('pen', penBtnRef) }}
+          title="Penna (P)"
+        >
+          <Icon.Pen />
+        </button>
+        {openPopover === 'pen' && popoverRect && <InkPopover type="pen" rect={popoverRect} onClose={closePop} />}
 
         {/* ── Highlighter ── */}
-        <div style={{ position: 'relative' }}>
-          <button
-            style={{ ...S.btn(tool === 'highlighter'), ...(tool === 'highlighter' ? { background: color + '99', color: '#1a1a1a' } : {}) }}
-            onClick={() => { setTool('highlighter'); togglePop('hl') }}
-            title="Evidenziatore (H)"
-          >
-            <Icon.Highlighter />
-          </button>
-          {openPopover === 'hl' && <InkPopover type="highlighter" onClose={closePop} />}
-        </div>
+        <button
+          ref={hlBtnRef}
+          style={{ ...S.btn(tool === 'highlighter'), ...(tool === 'highlighter' ? { background: color + '99', color: '#1a1a1a' } : {}) }}
+          onClick={() => { setTool('highlighter'); togglePop('hl', hlBtnRef) }}
+          title="Evidenziatore (H)"
+        >
+          <Icon.Highlighter />
+        </button>
+        {openPopover === 'hl' && popoverRect && <InkPopover type="highlighter" rect={popoverRect} onClose={closePop} />}
 
         {/* ── Eraser ── */}
-        <button style={S.btn(tool === 'eraser')} onClick={() => { setTool('eraser'); closePop() }} title="Gomma (E)">
+        <button ref={eraserBtnRef} style={S.btn(tool === 'eraser')} onClick={() => { setTool('eraser'); togglePop('eraser', eraserBtnRef) }} title="Gomma (E)">
           <Icon.Eraser />
         </button>
+        {openPopover === 'eraser' && popoverRect && <EraserPopover rect={popoverRect} onClose={closePop} />}
 
         <div style={S.divider} />
 
         {/* ── Shapes ── */}
-        <div style={{ position: 'relative' }}>
-          <button style={S.btn(['rect','ellipse','line','arrow','diamond','triangle'].includes(tool))} onClick={() => togglePop('shapes')} title="Forme">
-            <Icon.Shapes />
-          </button>
-          {openPopover === 'shapes' && <ShapesPopover onClose={closePop} />}
-        </div>
+        <button ref={shapesBtnRef} style={S.btn(['rect','ellipse','line','arrow','diamond','triangle'].includes(tool))} onClick={() => togglePop('shapes', shapesBtnRef)} title="Forme">
+          <Icon.Shapes />
+        </button>
+        {openPopover === 'shapes' && popoverRect && <ShapesPopover rect={popoverRect} onClose={closePop} />}
 
         <div style={S.divider} />
 
@@ -323,12 +338,12 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
 
         {/* ── Color swatch (quick picker) ── */}
         {isInkTool && (
-          <div style={{ position: 'relative' }}>
-            <button style={{ ...S.btn(false), gap: 0 }} onClick={() => togglePop('color')} title="Colore">
+          <>
+            <button ref={colorBtnRef} style={{ ...S.btn(false), gap: 0 }} onClick={() => togglePop('color', colorBtnRef)} title="Colore">
               <span style={{ width: 18, height: 18, borderRadius: '50%', background: color, border: color === '#ffffff' ? '1.5px solid #e5e7eb' : 'none', display: 'block' }} />
             </button>
-            {openPopover === 'color' && <ColorPopover onClose={closePop} />}
-          </div>
+            {openPopover === 'color' && popoverRect && <ColorPopover rect={popoverRect} onClose={closePop} />}
+          </>
         )}
 
         <div style={S.divider} />
@@ -344,20 +359,19 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
         <div style={S.divider} />
 
         {/* ── More menu ── */}
-        <div style={{ position: 'relative' }}>
-          <button style={S.btn(openPopover === 'more')} onClick={() => togglePop('more')} title="Altro">
-            <Icon.More />
-          </button>
-          {openPopover === 'more' && (
-            <MorePopover
-              isAdmin={isAdmin}
-              onClear={onClear}
-              onForceSyncViewport={onForceSyncViewport}
-              onExportPNG={onExportPNG}
-              onClose={closePop}
-            />
-          )}
-        </div>
+        <button ref={moreBtnRef} style={S.btn(openPopover === 'more')} onClick={() => togglePop('more', moreBtnRef)} title="Altro">
+          <Icon.More />
+        </button>
+        {openPopover === 'more' && popoverRect && (
+          <MorePopover
+            rect={popoverRect}
+            isAdmin={isAdmin}
+            onClear={onClear}
+            onForceSyncViewport={onForceSyncViewport}
+            onExportPNG={onExportPNG}
+            onClose={closePop}
+          />
+        )}
 
       </div>
     </>
@@ -366,10 +380,10 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
 
 // ─── Sub-popovers ─────────────────────────────────────────────────────────────
 
-function InkPopover({ type, onClose }) {
+function InkPopover({ type, rect, onClose }) {
   const { color, setColor, strokeWidth, setStrokeWidth } = useWhiteboardStore()
   return (
-    <div style={S.popover}>
+    <div style={S.popover(rect)}>
       <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>
         {type === 'pen' ? 'PENNA' : 'EVIDENZIATORE'}
       </div>
@@ -399,10 +413,27 @@ function InkPopover({ type, onClose }) {
   )
 }
 
-function ColorPopover({ onClose }) {
+function EraserPopover({ rect, onClose }) {
+  const { strokeWidth, setStrokeWidth } = useWhiteboardStore()
+  const ERASER_SIZES = [4, 8, 16, 32]
+  return (
+    <div style={S.popover(rect)}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>DIMENSIONE GOMMA</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {ERASER_SIZES.map(w => (
+          <button key={w} style={S.widthBtn(w === strokeWidth)} onClick={() => { setStrokeWidth(w); onClose() }}>
+            <div style={{ width: w > 24 ? 24 : w, height: w > 24 ? 24 : w, borderRadius: '50%', background: '#d1d5db', border: '1.5px solid #9ca3af' }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ColorPopover({ rect, onClose }) {
   const { color, setColor } = useWhiteboardStore()
   return (
-    <div style={S.popover}>
+    <div style={S.popover(rect)}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {COLORS.map(c => (
           <button key={c} style={S.colorDot(c, c === color)} onClick={() => { setColor(c); onClose() }} />
@@ -415,7 +446,7 @@ function ColorPopover({ onClose }) {
   )
 }
 
-function ShapesPopover({ onClose }) {
+function ShapesPopover({ rect, onClose }) {
   const { tool, setTool } = useWhiteboardStore()
 
   const shapes = [
@@ -428,7 +459,7 @@ function ShapesPopover({ onClose }) {
   ]
 
   return (
-    <div style={{ ...S.popover, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, minWidth: 160 }}>
+    <div style={{ ...S.popover(rect), display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, minWidth: 160 }}>
       {shapes.map(s => (
         <button
           key={s.id}
@@ -444,11 +475,11 @@ function ShapesPopover({ onClose }) {
   )
 }
 
-function MorePopover({ isAdmin, onClear, onForceSyncViewport, onExportPNG, onClose }) {
+function MorePopover({ rect, isAdmin, onClear, onForceSyncViewport, onExportPNG, onClose }) {
   const { background, setBackground } = useWhiteboardStore()
 
   return (
-    <div style={{ ...S.popover, bottom: 52, right: 0, left: 'auto', transform: 'none', minWidth: 220 }}>
+    <div style={{ ...S.popover(rect), minWidth: 220 }}>
       {/* Background */}
       <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>SFONDO</div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>

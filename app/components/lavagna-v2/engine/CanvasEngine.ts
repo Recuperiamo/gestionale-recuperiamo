@@ -192,6 +192,8 @@ export class CanvasEngine {
   private liveCanvas: HTMLCanvasElement
   private baseCtx: CanvasRenderingContext2D
   private liveCtx: CanvasRenderingContext2D
+  private contentCanvas: HTMLCanvasElement
+  private contentCtx: CanvasRenderingContext2D
   private dpr: number
 
   // Viewport — pure refs, never React state
@@ -222,6 +224,8 @@ export class CanvasEngine {
     this.dpr = window.devicePixelRatio || 1
     this.baseCtx = base.getContext('2d')!
     this.liveCtx = live.getContext('2d')!
+    this.contentCanvas = document.createElement('canvas')
+    this.contentCtx = this.contentCanvas.getContext('2d')!
     this.startLiveLoop()
   }
 
@@ -236,6 +240,8 @@ export class CanvasEngine {
       c.style.width = `${cssW}px`
       c.style.height = `${cssH}px`
     }
+    this.contentCanvas.width = cssW * dpr
+    this.contentCanvas.height = cssH * dpr
     this.markBaseDirty()
   }
 
@@ -346,27 +352,33 @@ export class CanvasEngine {
     const cssW = this.baseCanvas.width / dpr
     const cssH = this.baseCanvas.height / dpr
 
+    // 1. Draw background on baseCtx
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, cssW, cssH)
-
-    // Background in screen space (before transform)
     drawBackground(ctx, this.background, this.pan, this.zoom, cssW, cssH)
 
-    // World transform
-    applyTransform(ctx, this.pan, this.zoom, dpr)
+    // 2. Draw all strokes and shapes on offscreen contentCanvas
+    const cc = this.contentCtx
+    cc.setTransform(dpr, 0, 0, dpr, 0, 0)
+    cc.clearRect(0, 0, cssW, cssH)
 
-    // Strokes
+    applyTransform(cc, this.pan, this.zoom, dpr)
+
     for (const s of this.strokes) {
-      drawSingleStroke(ctx, s, this.background)
+      drawSingleStroke(cc, s, this.background)
     }
-
-    // Shapes
     for (const s of this.shapes) {
-      drawShape(ctx, s)
+      drawShape(cc, s)
     }
 
-    // Selection highlight
+    // 3. Composite contentCanvas onto baseCtx
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(this.contentCanvas, 0, 0)
+
+    // 4. Selection highlight on baseCtx (in world coords)
     if (this.selectedStrokeIds.length || this.selectedShapeIds.length) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      applyTransform(ctx, this.pan, this.zoom, dpr)
       ctx.save()
       ctx.strokeStyle = '#0078d4'
       ctx.lineWidth = 1.5 / this.zoom
@@ -411,16 +423,31 @@ export class CanvasEngine {
       const ls = this.liveStroke
       ctx.save()
       if (ls.tool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out'
-        ctx.strokeStyle = 'rgba(0,0,0,1)'
-        ctx.fillStyle = 'rgba(0,0,0,1)'
+        // Draw eraser cursor circle instead of destination-out on live layer
+        const lastPt = ls.points[ls.points.length - 1]
+        if (lastPt) {
+          ctx.setLineDash([3 / this.zoom, 3 / this.zoom])
+          ctx.strokeStyle = '#666'
+          ctx.lineWidth = 1.5 / this.zoom
+          ctx.globalAlpha = 0.7
+          ctx.globalCompositeOperation = 'source-over'
+          ctx.beginPath()
+          ctx.arc(lastPt.x, lastPt.y, ls.width / 2, 0, Math.PI * 2)
+          ctx.stroke()
+        }
+      } else if (ls.tool === 'laser') {
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.globalAlpha = 0.7
+        ctx.strokeStyle = '#ef4444'
+        ctx.fillStyle = '#ef4444'
+        drawStrokePath(ctx, ls.points, Math.max(ls.width, 3))
       } else {
         ctx.globalCompositeOperation = 'source-over'
         ctx.globalAlpha = ls.opacity ?? 1
         ctx.strokeStyle = ls.color
         ctx.fillStyle = ls.color
+        drawStrokePath(ctx, ls.points, ls.width)
       }
-      drawStrokePath(ctx, ls.points, ls.width)
       ctx.restore()
     }
 

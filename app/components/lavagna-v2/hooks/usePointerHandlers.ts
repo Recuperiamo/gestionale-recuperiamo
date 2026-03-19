@@ -22,6 +22,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
 
   // Current drawing state — all refs, no React state
   const drawing = useRef(false)
+  const isLaser = useRef(false)
   const streamId = useRef<string | null>(null)
   const allPoints = useRef([])            // all collected points (never trimmed)
   const activePointerId = useRef<number | null>(null)
@@ -71,6 +72,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     try { (e.target as HTMLElement).setPointerCapture?.(native.pointerId) } catch (_) {}
     activePointerId.current = native.pointerId
     drawing.current = true
+    isLaser.current = tool === 'laser'
     streamId.current = `${store.tool === 'eraser' ? 'eraser' : ''}-${generateId()}`
     allPoints.current = [pt]
 
@@ -83,8 +85,10 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       points: [pt],
     })
 
-    // Notify Ably immediately (stroke:start)
-    onStrokeCommit?.({ type: 'start', streamId: streamId.current, tool, color, strokeWidth, opacity, start: pt })
+    // Notify Ably immediately (stroke:start) — skip for laser
+    if (!isLaser.current) {
+      onStrokeCommit?.({ type: 'start', streamId: streamId.current, tool, color, strokeWidth, opacity, start: pt })
+    }
   }, [store, readOnly, getPoint, onStrokeCommit])
 
   const onPointerMove = useCallback((e) => {
@@ -126,9 +130,11 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     // Update live display (unsimplified = responsive feel)
     eng.updateLiveStroke([...allPoints.current])
 
-    // Stream points to Ably (last batch)
-    const latest = allPoints.current.slice(-8)
-    onStrokeCommit?.({ type: 'points', streamId: streamId.current, points: latest })
+    // Stream points to Ably (last batch) — skip for laser
+    if (!isLaser.current) {
+      const latest = allPoints.current.slice(-8)
+      onStrokeCommit?.({ type: 'points', streamId: streamId.current, points: latest })
+    }
   }, [getPoint, onStrokeCommit])
 
   const onPointerUp = useCallback((e) => {
@@ -148,6 +154,15 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
 
     try { (e.target as HTMLElement).releasePointerCapture?.(native.pointerId) } catch (_) {}
     activePointerId.current = null
+
+    // Laser: visual only, do not commit to store
+    if (isLaser.current) {
+      isLaser.current = false
+      allPoints.current = []
+      streamId.current = null
+      return
+    }
+    isLaser.current = false
 
     const raw = allPoints.current
     allPoints.current = []
@@ -183,6 +198,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     const eng = getEngine()
     if (eng) eng.endLiveStroke()
     drawing.current = false
+    isLaser.current = false
     panning.current.active = false
     if (streamId.current) {
       onStrokeCancel?.(streamId.current)
