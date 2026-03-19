@@ -103,7 +103,7 @@ export default function Navbar() {
   return (
     <>
       <style>{`
-        .nb-links { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; }
+        .nb-links { display: flex; flex: 1; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; }
         .nb-links::-webkit-scrollbar { display: none; }
         .nb-hamburger { display: none !important; }
         @media (max-width: 767px) {
