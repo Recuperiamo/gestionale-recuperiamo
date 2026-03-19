@@ -236,12 +236,12 @@ model MaterialeDidattico {
 
 model Lavagna {
   id         Int             @id @default(autoincrement())
-  attivitaId Int             @unique
+  attivitaId Int?            @unique
   titolo     String?         @default("Lavagna")
   snapshot   Json?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
-  attivita   Attivita        @relation(fields: [attivitaId], references: [id])
+  attivita   Attivita?       @relation(fields: [attivitaId], references: [id])
   shapes     LavagnaShape[]
   tratti     LavagnaTratto[]
 

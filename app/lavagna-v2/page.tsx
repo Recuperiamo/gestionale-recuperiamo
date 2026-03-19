@@ -66,16 +66,40 @@ export default function LavagnaV2Page() {
   }, []);
 
   // ── Load lavagna ──────────────────────────────────────────────────────────
-  const load = useCallback(async (id: string) => {
-    if (!id) return;
+  const load = useCallback(async (attId?: string, lavId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`/api/lavagna?attivitaId=${id}`, { cache: "no-store" });
+      let url: string;
+      if (attId) {
+        // Modalità calendario: lavagna legata all'attività (auto-create se non esiste)
+        url = `/api/lavagna-v2?attivitaId=${attId}`;
+      } else if (lavId) {
+        // Modalità per ID diretto
+        url = `/api/lavagna-v2?lavagnaId=${lavId}`;
+      } else {
+        // Modalità libera: crea nuova lavagna al volo
+        const res = await fetch("/api/lavagna-v2", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const js = await res.json();
+        if (res.ok) {
+          setLavagna(js.lavagna);
+          // Aggiorna URL con il lavagnaId per poter ricaricare la pagina
+          window.history.replaceState({}, "", `/lavagna-v2?lavagnaId=${js.lavagna.id}`);
+        } else {
+          setError(js.error || "Errore creazione lavagna");
+        }
+        setLoading(false);
+        return;
+      }
+      const r = await fetch(url, { cache: "no-store" });
       const js = await r.json();
       if (r.ok) setLavagna(js.lavagna);
       else setError(js.error || "Errore caricamento lavagna");
-    } catch (e) {
+    } catch {
       setError("Errore di rete");
     } finally {
       setLoading(false);
@@ -84,10 +108,22 @@ export default function LavagnaV2Page() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
+    const role = session?.user?.role;
     const qp = new URLSearchParams(window.location.search);
-    const id = qp.get("attivitaId");
-    if (id) { setAttivitaId(id); load(id); }
-  }, [status, load]);
+    const attId = qp.get("attivitaId");
+    const lavId = qp.get("lavagnaId");
+
+    if (attId) {
+      setAttivitaId(attId);
+      load(attId);
+    } else if (lavId) {
+      load(undefined, lavId);
+    } else if (role === "admin" || role === "operatore") {
+      // Nessun parametro: crea lavagna libera per test/uso diretto
+      load();
+    }
+    // Per gli studenti senza parametri: auth check mostrerà l'errore se non abilitati
+  }, [status, session, load]);
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -122,7 +158,7 @@ export default function LavagnaV2Page() {
   if (status === "loading") return <FullPage><Spinner text="Caricamento sessione…" /></FullPage>;
   if (!session) return <FullPage><div style={{ color: "#ef4444", fontWeight: 600 }}>Non autenticato</div></FullPage>;
   if (error) return <FullPage><ErrorBox msg={error} /></FullPage>;
-  if (loading || !lavagna) return <FullPage><Spinner text={loading ? "Caricamento lavagna…" : "In attesa del parametro attivitaId"} /></FullPage>;
+  if (loading || !lavagna) return <FullPage><Spinner text="Caricamento lavagna…" /></FullPage>;
 
   const isAdmin = session.user?.role === "admin" || session.user?.role === "operatore";
   const titolo = isAdmin
