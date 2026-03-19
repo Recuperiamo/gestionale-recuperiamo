@@ -207,6 +207,7 @@ export class CanvasEngine {
 
   // Live state
   liveStroke: LiveStroke | null = null
+  liveShape: { type: string; x: number; y: number; x2: number; y2: number; color: string; strokeWidth: number } | null = null
   remoteCursors: RemoteCursorRender[] = []
 
   // Internal
@@ -314,6 +315,10 @@ export class CanvasEngine {
   updateLiveStroke(pts: Point[]) { if (this.liveStroke) this.liveStroke.points = pts }
   endLiveStroke() { this.liveStroke = null }
 
+  startLiveShape(s: { type: string; x: number; y: number; x2: number; y2: number; color: string; strokeWidth: number }) { this.liveShape = s }
+  updateLiveShape(x2: number, y2: number) { if (this.liveShape) { this.liveShape.x2 = x2; this.liveShape.y2 = y2 } }
+  endLiveShape() { this.liveShape = null }
+
   setRemoteCursors(cursors: RemoteCursorRender[]) { this.remoteCursors = cursors }
 
   getViewport(): Viewport { return { pan: { ...this.pan }, zoom: this.zoom } }
@@ -414,7 +419,7 @@ export class CanvasEngine {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, cssW, cssH)
 
-    if (!this.liveStroke && !this.remoteCursors.length) return
+    if (!this.liveStroke && !this.liveShape && !this.remoteCursors.length) return
 
     applyTransform(ctx, this.pan, this.zoom, dpr)
 
@@ -461,6 +466,29 @@ export class CanvasEngine {
         ctx.fillStyle = ls.color
         drawStrokePath(ctx, ls.points, ls.width)
       }
+      ctx.restore()
+    }
+
+    // Live shape preview (rubber-band)
+    if (this.liveShape) {
+      const ls = this.liveShape
+      const isLine = ls.type === 'line' || ls.type === 'arrow'
+      const tempShape = {
+        id: 'live', type: ls.type,
+        x: isLine ? ls.x : Math.min(ls.x, ls.x2),
+        y: isLine ? ls.y : Math.min(ls.y, ls.y2),
+        x2: isLine ? ls.x2 : undefined,
+        y2: isLine ? ls.y2 : undefined,
+        width: isLine ? undefined : Math.abs(ls.x2 - ls.x),
+        height: isLine ? undefined : Math.abs(ls.y2 - ls.y),
+        color: ls.color,
+        strokeWidth: ls.strokeWidth,
+        fillColor: 'transparent',
+        rotation: 0,
+      }
+      ctx.save()
+      ctx.globalAlpha = 0.75
+      drawShape(ctx, tempShape as any)
       ctx.restore()
     }
 

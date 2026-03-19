@@ -10,6 +10,8 @@ import { CanvasEngine } from '../engine/CanvasEngine'
 import { simplifyPoints, generateId, hitTestStroke } from '../engine/strokeUtils'
 import { useWhiteboardStore } from '../store/whiteboardStore'
 
+const SHAPE_TOOLS = new Set(['rect', 'ellipse', 'line', 'arrow', 'diamond', 'triangle'])
+
 interface Options {
   engineRef: React.RefObject<CanvasEngine>
   onStrokeCommit?: (stroke: any) => void   // called with final stroke to save to DB + Ably
@@ -35,6 +37,10 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
 
   // Cursor emit throttle
   const cursorThrottle = useRef(0)
+
+  const isShape = useRef(false)
+  const shapeStart = useRef<{ x: number; y: number } | null>(null)
+  const lastShiftKey = useRef(false)
 
   // ── helpers ──
 
@@ -72,6 +78,14 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     try { (e.target as HTMLElement).setPointerCapture?.(native.pointerId) } catch (_) {}
     activePointerId.current = native.pointerId
     drawing.current = true
+
+    if (SHAPE_TOOLS.has(tool)) {
+      isShape.current = true
+      shapeStart.current = pt
+      eng.startLiveShape({ type: tool, x: pt.x, y: pt.y, x2: pt.x, y2: pt.y, color, strokeWidth })
+      return
+    }
+
     isLaser.current = tool === 'laser'
     streamId.current = `${store.tool === 'eraser' ? 'eraser' : ''}-${generateId()}`
     allPoints.current = [pt]
@@ -135,6 +149,44 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       return
     }
 
+    // Shape drawing live preview
+    if (isShape.current && shapeStart.current) {
+      const pt = getPoint(e)
+      if (pt) {
+        let ex = pt.x, ey = pt.y
+        if (native.shiftKey) {
+          const dx = pt.x - shapeStart.current.x
+          const dy = pt.y - shapeStart.current.y
+          const shapeTl = useWhiteboardStore.getState().tool
+          if (shapeTl === 'line' || shapeTl === 'arrow') {
+            const angle = Math.atan2(dy, dx)
+            const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4)
+            const dist = Math.hypot(dx, dy)
+            ex = shapeStart.current.x + dist * Math.cos(snapped)
+            ey = shapeStart.current.y + dist * Math.sin(snapped)
+          } else {
+            const size = Math.min(Math.abs(dx), Math.abs(dy))
+            ex = shapeStart.current.x + Math.sign(dx) * size
+            ey = shapeStart.current.y + Math.sign(dy) * size
+          }
+        }
+        eng.updateLiveShape(ex, ey)
+        lastShiftKey.current = native.shiftKey
+      }
+      return
+    }
+
+    // Track shift key for straight-line snap
+    lastShiftKey.current = native.shiftKey
+
+    // Shift+straight line live preview for ink tools
+    if (native.shiftKey && (useWhiteboardStore.getState().tool === 'pen' || useWhiteboardStore.getState().tool === 'highlighter')) {
+      const startPt = allPoints.current[0]
+      const pt = getPoint(e)
+      if (startPt && pt) eng.updateLiveStroke([startPt, pt])
+      return
+    }
+
     // Coalesced events for smoother strokes
     const evts = native.getCoalescedEvents ? native.getCoalescedEvents() : [native]
     for (const ev of evts) {
@@ -173,6 +225,37 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     try { (e.target as HTMLElement).releasePointerCapture?.(native.pointerId) } catch (_) {}
     activePointerId.current = null
 
+    // Shape commit
+    if (isShape.current) {
+      isShape.current = false
+      const start = shapeStart.current
+      shapeStart.current = null
+      eng.endLiveShape()
+      if (!start) return
+      const pt = getPoint(e)
+      if (!pt || (Math.abs(pt.x - start.x) < 3 && Math.abs(pt.y - start.y) < 3)) return
+      const { tool: shapeTool, color: shapeColor, strokeWidth: shapeWidth } = useWhiteboardStore.getState()
+      const isLine = shapeTool === 'line' || shapeTool === 'arrow'
+      const shape = {
+        id: generateId(),
+        type: shapeTool,
+        x: isLine ? start.x : Math.min(start.x, pt.x),
+        y: isLine ? start.y : Math.min(start.y, pt.y),
+        x2: isLine ? pt.x : undefined,
+        y2: isLine ? pt.y : undefined,
+        width: isLine ? undefined : Math.abs(pt.x - start.x),
+        height: isLine ? undefined : Math.abs(pt.y - start.y),
+        color: shapeColor,
+        strokeWidth: shapeWidth,
+        fillColor: 'transparent',
+        rotation: 0,
+      }
+      useWhiteboardStore.getState().addShape(shape)
+      useWhiteboardStore.getState().pushUndo({ type: 'add-shape', shape })
+      onStrokeCommit?.({ type: 'commit-shape', shape })
+      return
+    }
+
     // Laser: visual only, do not commit to store
     if (isLaser.current) {
       isLaser.current = false
@@ -196,8 +279,15 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     if (raw.length === 0) return
 
     // Simplify only at commit time
-    let finalPts = simplifyPoints(raw, eng.zoom)
-    if (finalPts.length === 0) return
+    // Shift: straight line from first to last collected point
+    const isShiftUp = (e.nativeEvent || e).shiftKey || lastShiftKey.current
+    let finalPts
+    if (isShiftUp && (tool === 'pen' || tool === 'highlighter') && raw.length >= 2) {
+      finalPts = [raw[0], raw[raw.length - 1]]
+    } else {
+      finalPts = simplifyPoints(raw, eng.zoom)
+    }
+    if (!finalPts || finalPts.length === 0) return
     if (finalPts.length === 1) finalPts = [finalPts[0], { x: finalPts[0].x + 0.1, y: finalPts[0].y + 0.1 }]
 
     const { tool, color, strokeWidth, opacity } = store

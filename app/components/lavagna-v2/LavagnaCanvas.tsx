@@ -165,6 +165,19 @@ export default function LavagnaCanvas({
     if (event.type === 'delete-stroke' && event.stroke?.dbId) {
       await deleteStroke(event.stroke.dbId)
     }
+    if (event.type === 'commit-shape' && event.shape) {
+      try {
+        const res = await fetch('/api/lavagna-v2/shape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...event.shape, lavagnaId }),
+        })
+        if (res.ok) {
+          const js = await res.json()
+          if (js.shape?.dbId) store.updateShape(event.shape.id, { dbId: js.shape.dbId })
+        }
+      } catch (_) {}
+    }
   }, [emitStrokeEvent, saveStroke, deleteStroke, utenteId])
 
   const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel,

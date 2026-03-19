@@ -208,9 +208,22 @@ export const useWhiteboardStore = create<WBState>((set, get) => ({
       points: s.punti || [],
     }))
     const shapes = (rawShapes || []).map(s => ({
-      ...s,
       id: `shape-${s.id}`,
       dbId: s.id,
+      type: s.kind || s.type || 'rect',
+      x: s.x ?? 0,
+      y: s.y ?? 0,
+      width: s.w ?? s.width ?? 0,
+      height: s.h ?? s.height ?? 0,
+      x2: s.x2 ?? undefined,
+      y2: s.y2 ?? undefined,
+      color: s.colore || s.color || '#1a1a1a',
+      strokeWidth: s.spessore || s.strokeWidth || 2,
+      fillColor: s.fillColor || 'transparent',
+      text: s.titolo || s.text || undefined,
+      fontSize: s.fontSize ?? undefined,
+      fontFamily: s.fontFamily ?? undefined,
+      rotation: s.rotation ?? 0,
     }))
     set({ strokes, shapes })
   },
