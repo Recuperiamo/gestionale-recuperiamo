@@ -1,269 +1,221 @@
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import dynamic from "next/dynamic";
+import Navbar from "../components/Navbar";
+import AuthGuard from "../components/AuthGuard";
 
-// Carica il canvas solo client-side (usa canvas API)
-const LavagnaCanvasV2 = dynamic(
-  () => import("../components/lavagna-v2/LavagnaCanvas"),
-  { ssr: false, loading: () => <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280" }}>Caricamento lavagna…</div> }
-);
-
-function isIOS() {
-  if (typeof navigator === "undefined") return false;
-  return /iP(ad|hone|od)/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
-export default function LavagnaV2Page() {
+export default function LavagnaV2ListPage() {
   const { data: session, status } = useSession();
-  const [lavagna, setLavagna] = useState(null);
+  const [lavagne, setLavagne] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [attivitaId, setAttivitaId] = useState("");
-  const [canvasH, setCanvasH] = useState(
-    typeof window !== "undefined"
-      ? (window.visualViewport?.height ?? window.innerHeight) - 52
-      : 700
-  );
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [iosFull, setIosFull] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [hoveredId, setHoveredId] = useState(null);
 
-  // ── Resize ────────────────────────────────────────────────────────────────
-  const updateSize = useCallback(() => {
-    const vvh = window.visualViewport?.height ?? window.innerHeight;
-    setCanvasH(vvh - (iosFull ? 0 : 52));
-  }, [iosFull]);
+  const isAdmin = /^(admin|operatore)$/i.test(session?.user?.role || "");
 
-  useEffect(() => {
-    updateSize();
-    window.addEventListener("resize", updateSize);
-    window.visualViewport?.addEventListener("resize", updateSize);
-    return () => {
-      window.removeEventListener("resize", updateSize);
-      window.visualViewport?.removeEventListener("resize", updateSize);
-    };
-  }, [updateSize]);
-
-  useEffect(() => {
-    const onFsChange = () => {
-      setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement));
-      setTimeout(updateSize, 100);
-    };
-    document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("webkitfullscreenchange", onFsChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("webkitfullscreenchange", onFsChange);
-    };
-  }, [updateSize]);
-
-  useEffect(() => {
-    function onPageShow(e) { if (e.persisted) window.location.reload(); }
-    window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
-  }, []);
-
-  // ── Load lavagna ──────────────────────────────────────────────────────────
-  const load = useCallback(async (attId?: string, lavId?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      let url: string;
-      if (attId) {
-        // Modalità calendario: lavagna legata all'attività (auto-create se non esiste)
-        url = `/api/lavagna-v2?attivitaId=${attId}`;
-      } else if (lavId) {
-        // Modalità per ID diretto
-        url = `/api/lavagna-v2?lavagnaId=${lavId}`;
-      } else {
-        // Modalità libera: crea nuova lavagna al volo
-        const res = await fetch("/api/lavagna-v2", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const js = await res.json();
-        if (res.ok) {
-          setLavagna(js.lavagna);
-          // Aggiorna URL con il lavagnaId per poter ricaricare la pagina
-          window.history.replaceState({}, "", `/lavagna-v2?lavagnaId=${js.lavagna.id}`);
-        } else {
-          setError(js.error || "Errore creazione lavagna");
-        }
-        setLoading(false);
-        return;
-      }
-      const r = await fetch(url, { cache: "no-store" });
-      const js = await r.json();
-      if (r.ok) setLavagna(js.lavagna);
-      else setError(js.error || "Errore caricamento lavagna");
-    } catch {
-      setError("Errore di rete");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // ── Carica lista ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (status !== "authenticated") return;
-    const role = session?.user?.role;
-    const qp = new URLSearchParams(window.location.search);
-    const attId = qp.get("attivitaId");
-    const lavId = qp.get("lavagnaId");
+    setLoading(true);
+    fetch("/api/lavagna-v2/list")
+      .then(r => r.ok ? r.json() : { lavagne: [] })
+      .then(d => setLavagne(Array.isArray(d.lavagne) ? d.lavagne : []))
+      .catch(() => setLavagne([]))
+      .finally(() => setLoading(false));
+  }, [status]);
 
-    if (attId) {
-      setAttivitaId(attId);
-      load(attId);
-    } else if (lavId) {
-      load(undefined, lavId);
-    } else if (role === "admin" || role === "operatore") {
-      // Nessun parametro: crea lavagna libera per test/uso diretto
-      load();
-    }
-    // Per gli studenti senza parametri: auth check mostrerà l'errore se non abilitati
-  }, [status, session, load]);
-
-  // ── Auth check ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (status !== "authenticated" || !session) return;
-    const isAdmin = session.user?.role === "admin" || session.user?.role === "operatore";
-    if (isAdmin) return; // admin: sempre accesso
-
-    // Studente: verifica accesso lavagna v2
-    const clienteId = session.user?.clienteId;
-    if (!clienteId) { setError("Accesso non autorizzato"); return; }
-    fetch(`/api/clienti/${clienteId}/lavagnav2`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d?.lavagnaV2Abilitata) setError("La lavagna v2 non è ancora disponibile per te. Chiedi al tuo insegnante di abilitarla.");
-      })
-      .catch(() => setError("Errore verifica accesso"));
-  }, [status, session]);
-
-  // ── Fullscreen ─────────────────────────────────────────────────────────────
-  function toggleFullscreen() {
-    if (isIOS()) { setIosFull(v => !v); setTimeout(updateSize, 50); return; }
-    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-    if (fsEl) {
-      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document).catch(() => {});
-    } else {
-      const el = document.documentElement;
-      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el).catch(() => {});
+  // ── Crea nuova lavagna ────────────────────────────────────────────────────
+  async function handleCreate(e) {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      const res = await fetch("/api/lavagna-v2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titolo: newTitle.trim() || undefined }),
+      });
+      const js = await res.json();
+      if (res.ok) {
+        setLavagne(prev => [js.lavagna, ...prev]);
+        setShowCreate(false);
+        setNewTitle("");
+        // Apri subito in nuova scheda
+        window.open(`/lavagna-v2/canvas?lavagnaId=${js.lavagna.id}`, "_blank");
+      } else {
+        alert(js.error || "Errore nella creazione");
+      }
+    } catch {
+      alert("Errore di rete");
+    } finally {
+      setCreating(false);
     }
   }
 
-  // ── States ────────────────────────────────────────────────────────────────
-  if (status === "loading") return <FullPage><Spinner text="Caricamento sessione…" /></FullPage>;
-  if (!session) return <FullPage><div style={{ color: "#ef4444", fontWeight: 600 }}>Non autenticato</div></FullPage>;
-  if (error) return <FullPage><ErrorBox msg={error} /></FullPage>;
-  if (loading || !lavagna) return <FullPage><Spinner text="Caricamento lavagna…" /></FullPage>;
+  // ── Elimina lavagna ───────────────────────────────────────────────────────
+  async function handleDelete(id) {
+    if (!window.confirm("Eliminare questa lavagna? L'azione è irreversibile.")) return;
+    try {
+      const res = await fetch(`/api/lavagna-v2?id=${id}`, { method: "DELETE" });
+      if (res.ok) setLavagne(prev => prev.filter(l => l.id !== id));
+      else alert("Errore nell'eliminazione");
+    } catch {
+      alert("Errore di rete");
+    }
+  }
 
-  const isAdmin = session.user?.role === "admin" || session.user?.role === "operatore";
-  const titolo = isAdmin
-    ? (lavagna.titoloVisuale || lavagna.titolo || "Lavagna")
-    : (lavagna.titolo || "Lavagna");
-  const canvasHFinal = iosFull
-    ? (typeof window !== "undefined" ? (window.visualViewport?.height ?? window.innerHeight) : 700)
-    : canvasH;
+  // ── Filtra ────────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    if (!search.trim()) return lavagne;
+    const q = search.toLowerCase();
+    return lavagne.filter(l => (l.titolo || "").toLowerCase().includes(q));
+  }, [lavagne, search]);
+
+  if (status === "loading") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
+        <Navbar />
+        <div style={{ padding: 50, color: "#6b7280" }}>Caricamento…</div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh", overflow: "hidden", background: "#f9fafb" }}>
+    <AuthGuard>
+      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
+        <Navbar />
+        <main style={{ maxWidth: 900, margin: "40px auto 60px", background: "#fff", borderRadius: 24, padding: "36px 40px 48px", boxShadow: "0 6px 34px rgba(32,72,154,0.13)", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}>
 
-      {/* ── Top bar ── */}
-      {!iosFull && (
-        <div style={{
-          height: 52, background: "#fff", borderBottom: "1px solid #e5e7eb",
-          display: "flex", alignItems: "center", padding: "0 16px", gap: 12,
-          flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        }}>
-          {/* Back */}
-          <button
-            onClick={() => window.history.back()}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "6px 8px", borderRadius: 8 }}
-            title="Torna indietro"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            Indietro
-          </button>
-
-          {/* Title */}
-          <div style={{ flex: 1, fontWeight: 600, fontSize: 14, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {titolo}
-            <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, background: "#dbeafe", color: "#1d4ed8", borderRadius: 6, padding: "2px 6px", verticalAlign: "middle" }}>v2 beta</span>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#20489a" }}>
+                Lavagna
+                <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: 6, padding: "3px 8px", verticalAlign: "middle" }}>v2 beta</span>
+              </h1>
+              <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+                {lavagne.length} lavagn{lavagne.length === 1 ? "a" : "e"}
+              </div>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => setShowCreate(v => !v)}
+                style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(28,176,246,0.3)" }}
+              >
+                + Nuova lavagna
+              </button>
+            )}
           </div>
 
-          {/* Fullscreen */}
-          <button
-            onClick={toggleFullscreen}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 6, borderRadius: 8, display: "flex", alignItems: "center" }}
-            title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
-          >
-            {isFullscreen ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-              </svg>
-            )}
-          </button>
-        </div>
-      )}
+          {/* Form crea */}
+          {showCreate && (
+            <form onSubmit={handleCreate} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "16px 20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                type="text"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder={`Lavagna ${new Date().toLocaleDateString("it-IT")}`}
+                autoFocus
+                style={{ flex: 1, minWidth: 220, padding: "8px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none" }}
+              />
+              <button type="submit" disabled={creating} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                {creating ? "Creazione…" : "Crea e apri"}
+              </button>
+              <button type="button" onClick={() => setShowCreate(false)} style={{ background: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                Annulla
+              </button>
+            </form>
+          )}
 
-      {/* ── Canvas ── */}
-      <div style={{ flex: 1, overflow: "hidden" }}>
-        <LavagnaCanvasV2
-          lavagnaId={lavagna.id}
-          attivitaId={attivitaId}
-          trattiIniziali={lavagna.tratti || []}
-          formeIniziali={lavagna.forme || []}
-          utenteId={session.user?.id}
-          clienteId={session.user?.clienteId}
-          ruolo={session.user?.role || "cliente"}
-          altezza={canvasHFinal}
-        />
+          {/* Ricerca */}
+          {lavagne.length > 4 && (
+            <div style={{ position: "relative", marginBottom: 16 }}>
+              <input
+                type="text"
+                placeholder="Cerca lavagna…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px 8px 34px", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 14, outline: "none", background: "#f8fbff" }}
+              />
+              <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
+                <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+          )}
+
+          {/* Lista */}
+          {loading ? (
+            <div style={{ color: "#9ab0d4", fontSize: 14, padding: "20px 0" }}>Caricamento lavagne…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ background: "#f0f5ff", border: "1px solid #d4dff6", color: "#20489a", padding: "16px 20px", borderRadius: 12, fontSize: 14, fontWeight: 500 }}>
+              {lavagne.length === 0
+                ? (isAdmin ? "Nessuna lavagna. Creane una nuova." : "Nessuna lavagna disponibile.")
+                : `Nessun risultato per "${search}".`}
+            </div>
+          ) : (
+            <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+              {filtered.map(l => (
+                <li
+                  key={l.id}
+                  onMouseEnter={() => setHoveredId(l.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  style={{
+                    background: hoveredId === l.id ? "#eef4ff" : "#f8fbff",
+                    border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5",
+                    borderRadius: 12, padding: "12px 16px",
+                    display: "flex", alignItems: "center", gap: 12,
+                    transition: "background 0.15s, border-color 0.15s",
+                    boxShadow: hoveredId === l.id ? "0 2px 8px rgba(20,53,120,0.09)" : "none",
+                  }}
+                >
+                  {/* Icona lavagna */}
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2"/>
+                      <path d="M8 21h8M12 17v4"/>
+                    </svg>
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {l.titolo || "Lavagna"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      {l.updatedAt && l.updatedAt !== l.createdAt && (
+                        <span style={{ marginLeft: 8 }}>· Modificata {new Date(l.updatedAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Azioni */}
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={() => window.open(`/lavagna-v2/canvas?lavagnaId=${l.id}`, "_blank")}
+                      style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                    >
+                      Apri
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDelete(l.id)}
+                        style={{ background: "transparent", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 8, padding: "6px 10px", fontWeight: 600, fontSize: 12, cursor: "pointer", opacity: hoveredId === l.id ? 1 : 0, transition: "opacity 0.15s" }}
+                      >
+                        Elimina
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </main>
       </div>
-    </div>
-  );
-}
-
-// ── Helpers UI ────────────────────────────────────────────────────────────────
-
-function FullPage({ children }) {
-  return (
-    <div style={{ width: "100vw", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb" }}>
-      {children}
-    </div>
-  );
-}
-
-function Spinner({ text }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, color: "#6b7280" }}>
-      <div style={{ width: 32, height: 32, border: "3px solid #e5e7eb", borderTopColor: "#0078d4", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <div style={{ fontSize: 14 }}>{text}</div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  );
-}
-
-function ErrorBox({ msg }) {
-  return (
-    <div style={{ maxWidth: 420, background: "#fff", borderRadius: 12, padding: "28px 24px", boxShadow: "0 4px 24px rgba(0,0,0,0.10)", textAlign: "center", border: "1px solid #fee2e2" }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
-      <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", marginBottom: 8 }}>Accesso non disponibile</div>
-      <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>{msg}</div>
-      <button
-        onClick={() => window.history.back()}
-        style={{ marginTop: 20, padding: "8px 20px", borderRadius: 8, background: "#0078d4", color: "#fff", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }}
-      >
-        Torna indietro
-      </button>
-    </div>
+    </AuthGuard>
   );
 }

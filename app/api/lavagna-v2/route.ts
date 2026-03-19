@@ -111,3 +111,22 @@ export async function POST(req) {
 
   return NextResponse.json({ lavagna: { ...lavagna, tratti: [], forme: [] } })
 }
+
+// ── Elimina lavagna libera ─────────────────────────────────────────────────────
+export async function DELETE(req) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  }
+
+  const url = new URL(req.url)
+  const id = Number(url.searchParams.get('id'))
+  if (!id) return NextResponse.json({ error: 'id mancante' }, { status: 400 })
+
+  // Elimina tratti, forme e la lavagna
+  await prisma.lavagnaTratto.deleteMany({ where: { lavagnaId: id } })
+  await prisma.lavagnaShape.deleteMany({ where: { lavagnaId: id } })
+  await prisma.lavagna.delete({ where: { id } })
+
+  return NextResponse.json({ ok: true })
+}
