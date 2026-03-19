@@ -13,10 +13,14 @@ import { CanvasEngine } from '../engine/CanvasEngine'
 interface Props {
   engineRef: React.RefObject<CanvasEngine>
   isAdmin: boolean
+  readOnly?: boolean
+  canStudentDraw?: boolean
   onClear?: () => void
   onForceSyncViewport?: () => void
   onExportPNG?: () => void
   onExportPDF?: () => void
+  onRequestDraw?: () => void
+  onToggleStudentDraw?: (enable: boolean) => void
   lavagnaId?: string
   attivitaId?: string
 }
@@ -213,7 +217,7 @@ const Icon = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewport, onExportPNG, onExportPDF }: Props) {
+export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onRequestDraw, onToggleStudentDraw }: Props) {
   const { tool, color, strokeWidth, opacity, background, undoStack, redoStack,
     setTool, setColor, setStrokeWidth, setBackground, setEraserMode } = useWhiteboardStore()
 
@@ -271,6 +275,37 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
   const isInkTool = tool === 'pen' || tool === 'highlighter'
   const isDrawTool = isInkTool || tool === 'eraser'
 
+  // ── Toolbar ridotta per studente in sola lettura ──────────────────────────
+  if (!isAdmin && readOnly) {
+    return (
+      <div
+        style={{ ...S.toolbar, gap: 6 }}
+        onPointerDown={e => e.stopPropagation()}
+      >
+        {/* Hand tool always active */}
+        <button style={S.btn(true)} onClick={() => {}} title="Solo visualizzazione">
+          <Icon.Hand />
+        </button>
+        <div style={S.divider} />
+        <button style={S.btn(false)} onClick={zoomOut} title="Zoom -"><Icon.ZoomOut /></button>
+        <button style={{ ...S.btn(false), width: 48, fontSize: 11, fontWeight: 600, color: '#374151' }} onClick={resetZoom} title="Reset zoom">
+          {zoomPct}%
+        </button>
+        <button style={S.btn(false)} onClick={zoomIn} title="Zoom +"><Icon.ZoomIn /></button>
+        <button style={S.btn(false)} onClick={fitView} title="Adatta contenuto"><Icon.FitView /></button>
+        <div style={S.divider} />
+        {/* Richiedi permesso disegno */}
+        <button
+          onClick={onRequestDraw}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, background: '#fef9c3', border: '1.5px solid #fbbf24', color: '#92400e', fontWeight: 700, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          title="Chiedi all'insegnante di abilitare il disegno"
+        >
+          ✏️ Richiedi disegno
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Click outside to close popovers */}
@@ -287,10 +322,12 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
           rect={popoverRect}
           vertical={toolbarVertical}
           isAdmin={isAdmin}
+          canStudentDraw={canStudentDraw}
           onClear={onClear}
           onForceSyncViewport={onForceSyncViewport}
           onExportPNG={onExportPNG}
           onExportPDF={onExportPDF}
+          onToggleStudentDraw={onToggleStudentDraw}
           onClose={closePop}
           toolbarVertical={toolbarVertical}
           onToggleVertical={() => setToolbarVertical(v => !v)}
@@ -517,7 +554,7 @@ function ShapesPopover({ rect, vertical, onClose }) {
   )
 }
 
-function MorePopover({ rect, vertical, isAdmin, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onClose, toolbarVertical, onToggleVertical }) {
+function MorePopover({ rect, vertical, isAdmin, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onToggleStudentDraw, onClose, toolbarVertical, onToggleVertical }) {
   const { background, setBackground } = useWhiteboardStore()
 
   return (
@@ -563,6 +600,14 @@ function MorePopover({ rect, vertical, isAdmin, onClear, onForceSyncViewport, on
 
       {isAdmin && (
         <>
+          {/* Toggle disegno studente */}
+          <button
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: canStudentDraw ? '#f0fdf4' : '#f3f4f6', border: canStudentDraw ? '1px solid #86efac' : '1px solid #e5e7eb', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', color: canStudentDraw ? '#15803d' : '#374151' }}
+            onClick={() => { onToggleStudentDraw?.(!canStudentDraw); onClose() }}
+          >
+            <span>{canStudentDraw ? '✏️' : '🔒'}</span>
+            {canStudentDraw ? 'Disabilita disegno studente' : 'Abilita disegno studente'}
+          </button>
           <button
             style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', color: '#1d4ed8' }}
             onClick={() => { onForceSyncViewport?.(); onClose() }}

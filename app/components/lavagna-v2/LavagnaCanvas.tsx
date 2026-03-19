@@ -30,13 +30,22 @@ interface Props {
   clienteId?: string | number
   ruolo: string
   altezza?: number
+  canStudentDraw?: boolean
 }
 
 export default function LavagnaCanvas({
   lavagnaId, attivitaId, trattiIniziali, formeIniziali,
-  utenteId, ruolo, altezza = 600,
+  utenteId, ruolo, altezza = 600, canStudentDraw: canStudentDrawInitial = false,
 }: Props) {
   const isAdmin = ruolo === 'admin' || ruolo === 'operatore'
+
+  // ── Draw permissions ─────────────────────────────────────────────────────────
+  // Admin can always draw; students need canStudentDraw toggle
+  const [canDraw, setCanDraw] = useState(isAdmin || canStudentDrawInitial)
+  const readOnly = !isAdmin && !canDraw
+
+  // Admin: incoming draw requests from students
+  const [drawRequestPending, setDrawRequestPending] = useState(false)
 
   // ── Canvas refs ──────────────────────────────────────────────────────────────
   const baseRef = useRef<HTMLCanvasElement>(null)
@@ -49,7 +58,7 @@ export default function LavagnaCanvas({
 
   // ── Channel name (same as v1) ────────────────────────────────────────────────
   const channelName = useMemo(() => {
-    const base = attivitaId ?? lavagnaId
+    const base = attivitaId || lavagnaId   // || not ?? : empty string must fall back to lavagnaId
     return base ? `lavagna:${base}` : null
   }, [lavagnaId, attivitaId])
 
@@ -148,11 +157,36 @@ export default function LavagnaCanvas({
     return () => window.removeEventListener('keydown', handler)
   }, [store, saveStroke, deleteStroke])
 
+  // ── Toggle student draw (admin action) ──────────────────────────────────────
+  const toggleStudentDraw = useCallback(async (enable: boolean) => {
+    try {
+      await fetch('/api/lavagna-v2', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: Number(lavagnaId), canStudentDraw: enable }),
+      })
+    } catch (_) {}
+    emitPermissionsUpdateRef.current?.({ canStudentDraw: enable })
+    setDrawRequestPending(false)
+  }, [lavagnaId])
+
+  // Ref so toggleStudentDraw can call emitPermissionsUpdate after it's defined
+  const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
+
   // ── Ably sync ────────────────────────────────────────────────────────────────
-  const { emitStrokeEvent, emitForceSyncViewport } = useAblySync({
+  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest } = useAblySync({
     channelName, engineRef, userId: utenteId, role: ruolo,
     lavagnaId, attivitaId, isAdmin,
+    onPermissionsUpdate: useCallback(({ canStudentDraw }) => {
+      setCanDraw(canStudentDraw)
+    }, []),
+    onDrawRequest: useCallback(() => {
+      setDrawRequestPending(true)
+    }, []),
   })
+
+  // Keep ref in sync so toggleStudentDraw can use it
+  useEffect(() => { emitPermissionsUpdateRef.current = emitPermissionsUpdate }, [emitPermissionsUpdate])
 
   // ── Pointer handlers ─────────────────────────────────────────────────────────
   const onStrokeCommit = useCallback(async (event: any) => {
@@ -184,7 +218,7 @@ export default function LavagnaCanvas({
     onWheel, onTouchStart, onTouchMove, onTouchEnd } = usePointerHandlers({
     engineRef,
     onStrokeCommit,
-    readOnly: false,
+    readOnly,
   })
 
   // ── Selection tool ───────────────────────────────────────────────────────────
@@ -330,14 +364,34 @@ export default function LavagnaCanvas({
         </div>
       )}
 
+      {/* Admin: banner richiesta disegno studente */}
+      {drawRequestPending && isAdmin && (
+        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 40, background: '#fffbeb', border: '1.5px solid #fbbf24', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 16 }}>✏️</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Uno studente chiede il permesso di disegnare</span>
+          <button
+            onClick={() => toggleStudentDraw(true)}
+            style={{ padding: '4px 12px', borderRadius: 8, background: '#22c55e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+          >Abilita</button>
+          <button
+            onClick={() => setDrawRequestPending(false)}
+            style={{ padding: '4px 10px', borderRadius: 8, background: '#f3f4f6', color: '#6b7280', border: 'none', cursor: 'pointer', fontSize: 12 }}
+          >Ignora</button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <Toolbar
         engineRef={engineRef}
         isAdmin={isAdmin}
+        readOnly={readOnly}
+        canStudentDraw={canDraw}
         onClear={clearBoard}
         onForceSyncViewport={isAdmin ? emitForceSyncViewport : undefined}
         onExportPNG={exportPNG}
         onExportPDF={exportPDF}
+        onRequestDraw={emitDrawRequest}
+        onToggleStudentDraw={isAdmin ? toggleStudentDraw : undefined}
       />
 
       {/* Off-screen cursor indicators */}

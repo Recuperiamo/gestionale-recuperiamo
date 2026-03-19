@@ -197,6 +197,7 @@ export default function LavagnaV2Page() {
           clienteId={session.user?.clienteId}
           ruolo={session.user?.role || "cliente"}
           altezza={canvasHFinal}
+          canStudentDraw={lavagna.canStudentDraw ?? false}
         />
       </div>
     </div>

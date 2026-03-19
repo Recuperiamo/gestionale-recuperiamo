@@ -25,6 +25,8 @@ interface Options {
   lavagnaId: string
   attivitaId?: string
   isAdmin: boolean
+  onPermissionsUpdate?: (data: { canStudentDraw: boolean }) => void
+  onDrawRequest?: () => void
 }
 
 // Remote streams accumulate points until stroke:done
@@ -37,7 +39,7 @@ type RemoteStream = {
   points: any[]
 }
 
-export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, attivitaId, isAdmin }: Options) {
+export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, attivitaId, isAdmin, onPermissionsUpdate, onDrawRequest }: Options) {
   const store = useWhiteboardStore()
   const channelRef = useRef<any>(null)
   const remoteStreams = useRef<Map<string, RemoteStream>>(new Map())
@@ -78,6 +80,14 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         break
     }
   }, [publish, lavagnaId, attivitaId, role])
+
+  const emitPermissionsUpdate = useCallback((data: { canStudentDraw: boolean }) => {
+    publish('permissions:update', { ...data, lavagnaId })
+  }, [publish, lavagnaId])
+
+  const emitDrawRequest = useCallback(() => {
+    publish('draw:request', { lavagnaId })
+  }, [publish, lavagnaId])
 
   const emitForceSyncViewport = useCallback(() => {
     const eng = engineRef.current
@@ -176,6 +186,20 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           store.clearAll()
         }
 
+        const onPermissionsUpdateMsg = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (!isAdmin && typeof d.canStudentDraw === 'boolean') {
+            onPermissionsUpdate?.({ canStudentDraw: d.canStudentDraw })
+          }
+        }
+
+        const onDrawRequestMsg = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (isAdmin) onDrawRequest?.()
+        }
+
         ch.subscribe('stroke:start', onStrokeStart)
         ch.subscribe('stroke:points', onStrokePoints)
         ch.subscribe('stroke:done', onStrokeDone)
@@ -183,6 +207,8 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         ch.subscribe('cursor:move', onCursorMove)
         ch.subscribe('viewport:force-sync', onForceSyncViewport)
         ch.subscribe('clear', onClear)
+        ch.subscribe('permissions:update', onPermissionsUpdateMsg)
+        ch.subscribe('draw:request', onDrawRequestMsg)
 
         // Flush pending messages
         for (const m of pendingMessages.current) {
@@ -205,5 +231,5 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
     }
   }, [channelName, userId, isAdmin])
 
-  return { emitStrokeEvent, emitForceSyncViewport, publish }
+  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, publish }
 }

@@ -141,6 +141,24 @@ export async function POST(req) {
   return NextResponse.json({ lavagna: { ...lavagna, tratti: [], forme: [] } })
 }
 
+// ── Aggiorna permessi lavagna (es. canStudentDraw) ────────────────────────────
+export async function PATCH(req) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  }
+
+  const body = await req.json().catch(() => ({}))
+  const id = Number(body.id)
+  if (!id) return NextResponse.json({ error: 'id mancante' }, { status: 400 })
+
+  const data: any = {}
+  if (typeof body.canStudentDraw === 'boolean') data.canStudentDraw = body.canStudentDraw
+
+  const lavagna = await prisma.lavagna.update({ where: { id }, data })
+  return NextResponse.json({ lavagna })
+}
+
 // ── Elimina lavagna libera ─────────────────────────────────────────────────────
 export async function DELETE(req) {
   const session = await getServerSession(authOptions)
