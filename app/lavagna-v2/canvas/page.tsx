@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 
 // Carica il canvas solo client-side (usa canvas API)
 const LavagnaCanvasV2 = dynamic(
-  () => import("../components/lavagna-v2/LavagnaCanvas"),
+  () => import("../../components/lavagna-v2/LavagnaCanvas"),
   { ssr: false, loading: () => <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280" }}>Caricamento lavagna…</div> }
 );
 
