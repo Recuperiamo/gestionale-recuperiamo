@@ -219,6 +219,17 @@ export default function LavagnaCanvas({
     a.click()
   }, [lavagnaId])
 
+  // ── Export PDF (open print dialog with canvas image) ─────────────────────────
+  const exportPDF = useCallback(() => {
+    const base = baseRef.current
+    if (!base) return
+    const dataUrl = base.toDataURL('image/png')
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head><title>Lavagna ${lavagnaId}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#fff;}img{width:100%;height:auto;display:block;}@page{size:auto;margin:10mm;}@media print{img{max-width:100%;page-break-inside:avoid;}}</style></head><body><img src="${dataUrl}" onload="setTimeout(function(){window.print();},300)"/></body></html>`)
+    win.document.close()
+  }, [lavagnaId])
+
   // ── Background change broadcast (admin only) ─────────────────────────────────
   useEffect(() => {
     if (!isAdmin) return
@@ -326,6 +337,7 @@ export default function LavagnaCanvas({
         onClear={clearBoard}
         onForceSyncViewport={isAdmin ? emitForceSyncViewport : undefined}
         onExportPNG={exportPNG}
+        onExportPDF={exportPDF}
       />
 
       {/* Off-screen cursor indicators */}

@@ -120,6 +120,24 @@ function drawSingleStroke(ctx: CanvasRenderingContext2D, s: Stroke, bg: Backgrou
   ctx.restore()
 }
 
+function _drawAxisArrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, sw: number, color: string) {
+  const angle = Math.atan2(y2 - y1, x2 - x1)
+  const hl = Math.max(10, (sw ?? 2) * 4)
+  ctx.strokeStyle = color
+  ctx.fillStyle = color
+  ctx.lineWidth = sw ?? 2
+  ctx.beginPath()
+  ctx.moveTo(x1, y1)
+  ctx.lineTo(x2 - hl * 0.85 * Math.cos(angle), y2 - hl * 0.85 * Math.sin(angle))
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(x2, y2)
+  ctx.lineTo(x2 - hl * Math.cos(angle - 0.42), y2 - hl * Math.sin(angle - 0.42))
+  ctx.lineTo(x2 - hl * Math.cos(angle + 0.42), y2 - hl * Math.sin(angle + 0.42))
+  ctx.closePath()
+  ctx.fill()
+}
+
 function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
   ctx.save()
   ctx.strokeStyle = s.color
@@ -149,13 +167,17 @@ function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
     ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x2 ?? s.x, s.y2 ?? s.y); ctx.stroke()
   } else if (s.type === 'arrow') {
     const tx = s.x2 ?? s.x, ty = s.y2 ?? s.y
-    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke()
     const angle = Math.atan2(ty - s.y, tx - s.x)
     const hl = Math.max(12, s.strokeWidth * 4)
+    // Stop shaft before tip so it doesn't poke through the filled head
+    ctx.beginPath()
+    ctx.moveTo(s.x, s.y)
+    ctx.lineTo(tx - hl * 0.85 * Math.cos(angle), ty - hl * 0.85 * Math.sin(angle))
+    ctx.stroke()
     ctx.beginPath()
     ctx.moveTo(tx, ty)
-    ctx.lineTo(tx - hl * Math.cos(angle - 0.45), ty - hl * Math.sin(angle - 0.45))
-    ctx.lineTo(tx - hl * Math.cos(angle + 0.45), ty - hl * Math.sin(angle + 0.45))
+    ctx.lineTo(tx - hl * Math.cos(angle - 0.42), ty - hl * Math.sin(angle - 0.42))
+    ctx.lineTo(tx - hl * Math.cos(angle + 0.42), ty - hl * Math.sin(angle + 0.42))
     ctx.closePath()
     ctx.fillStyle = s.color; ctx.fill()
   } else if (s.type === 'diamond') {
@@ -173,6 +195,35 @@ function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
     ctx.closePath()
     if (s.fillColor && s.fillColor !== 'transparent') ctx.fill()
     ctx.stroke()
+  } else if (s.type === 'axis2') {
+    const ox = s.x, oy = s.y + (s.height ?? 80)  // origin: bottom-left
+    const ex = s.x + (s.width ?? 80), ey = oy     // X endpoint
+    const ux = ox, uy = s.y                        // Y endpoint (up)
+    _drawAxisArrow(ctx, ox, oy, ex, ey, s.strokeWidth, s.color)
+    _drawAxisArrow(ctx, ox, oy, ux, uy, s.strokeWidth, s.color)
+    const ls = Math.max(10, (s.strokeWidth ?? 2) * 3)
+    ctx.font = `italic bold ${ls}px serif`
+    ctx.fillStyle = s.color; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+    ctx.fillText('x', ex + ls * 0.3, ey)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+    ctx.fillText('y', ux, uy - ls * 0.2)
+  } else if (s.type === 'axis3') {
+    const w = s.width ?? 80, h = s.height ?? 80
+    const ox = s.x + w * 0.38, oy = s.y + h * 0.72  // origin
+    const ex = s.x + w, ey = oy                       // X → right
+    const ux = ox, uy = s.y                            // Y → up
+    const zx = s.x, zy = s.y + h                      // Z → lower-left
+    _drawAxisArrow(ctx, ox, oy, ex, ey, s.strokeWidth, s.color)
+    _drawAxisArrow(ctx, ox, oy, ux, uy, s.strokeWidth, s.color)
+    _drawAxisArrow(ctx, ox, oy, zx, zy, s.strokeWidth, s.color)
+    const ls = Math.max(10, (s.strokeWidth ?? 2) * 3)
+    ctx.font = `italic bold ${ls}px serif`
+    ctx.fillStyle = s.color; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+    ctx.fillText('x', ex + ls * 0.3, ey)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+    ctx.fillText('y', ux, uy - ls * 0.2)
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top'
+    ctx.fillText('z', zx - ls * 0.2, zy + ls * 0.2)
   } else if (s.type === 'text' && s.text) {
     ctx.font = `${s.fontSize || 18}px ${s.fontFamily || 'Inter, sans-serif'}`
     ctx.fillStyle = s.color

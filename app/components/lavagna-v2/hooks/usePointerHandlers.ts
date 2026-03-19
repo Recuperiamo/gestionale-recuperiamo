@@ -10,7 +10,7 @@ import { CanvasEngine } from '../engine/CanvasEngine'
 import { simplifyPoints, generateId, hitTestStroke } from '../engine/strokeUtils'
 import { useWhiteboardStore } from '../store/whiteboardStore'
 
-const SHAPE_TOOLS = new Set(['rect', 'ellipse', 'line', 'arrow', 'diamond', 'triangle'])
+const SHAPE_TOOLS = new Set(['rect', 'ellipse', 'line', 'arrow', 'diamond', 'triangle', 'axis2', 'axis3'])
 
 interface Options {
   engineRef: React.RefObject<CanvasEngine>

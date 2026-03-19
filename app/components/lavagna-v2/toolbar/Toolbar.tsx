@@ -16,6 +16,7 @@ interface Props {
   onClear?: () => void
   onForceSyncViewport?: () => void
   onExportPNG?: () => void
+  onExportPDF?: () => void
   lavagnaId?: string
   attivitaId?: string
 }
@@ -56,8 +57,6 @@ const S = {
     zIndex: 1100,
     userSelect: 'none' as const,
     maxWidth: 'calc(100vw - 32px)',
-    overflowX: 'auto' as const,
-    overflowY: 'visible' as const,
   },
   divider: {
     width: 1,
@@ -214,7 +213,7 @@ const Icon = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewport, onExportPNG }: Props) {
+export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewport, onExportPNG, onExportPDF }: Props) {
   const { tool, color, strokeWidth, opacity, background, undoStack, redoStack,
     setTool, setColor, setStrokeWidth, setBackground, setEraserMode } = useWhiteboardStore()
 
@@ -291,6 +290,7 @@ export default function Toolbar({ engineRef, isAdmin, onClear, onForceSyncViewpo
           onClear={onClear}
           onForceSyncViewport={onForceSyncViewport}
           onExportPNG={onExportPNG}
+          onExportPDF={onExportPDF}
           onClose={closePop}
           toolbarVertical={toolbarVertical}
           onToggleVertical={() => setToolbarVertical(v => !v)}
@@ -493,13 +493,15 @@ function ShapesPopover({ rect, vertical, onClose }) {
     { id: 'rect', label: 'Rettangolo', icon: <rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/> },
     { id: 'ellipse', label: 'Ellisse', icon: <ellipse cx="12" cy="12" rx="9" ry="7" stroke="currentColor" strokeWidth="2" fill="none"/> },
     { id: 'line', label: 'Linea', icon: <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/> },
-    { id: 'arrow', label: 'Freccia', icon: <><line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polyline points="12,4 20,4 20,12" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></> },
+    { id: 'arrow', label: 'Freccia', icon: <><line x1="4" y1="20" x2="19" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="19,5 14,5 19,10" stroke="currentColor" strokeWidth="1.5" fill="currentColor"/></> },
     { id: 'diamond', label: 'Rombo', icon: <polygon points="12,3 21,12 12,21 3,12" stroke="currentColor" strokeWidth="2" fill="none"/> },
     { id: 'triangle', label: 'Triangolo', icon: <polygon points="12,4 22,20 2,20" stroke="currentColor" strokeWidth="2" fill="none"/> },
+    { id: 'axis2', label: 'Assi 2D', icon: <><line x1="4" y1="20" x2="4" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="4,4 2,8 6,8" fill="currentColor"/><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="21,20 17,18 17,22" fill="currentColor"/></> },
+    { id: 'axis3', label: 'Assi 3D', icon: <><line x1="10" y1="14" x2="10" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="10,2 8,6 12,6" fill="currentColor"/><line x1="10" y1="14" x2="21" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="22,14 18,12 18,16" fill="currentColor"/><line x1="10" y1="14" x2="3" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="2,22 6,21 3,18" fill="currentColor"/></> },
   ]
 
   return (
-    <div style={{ ...S.popover(rect, vertical), display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, minWidth: 160 }}>
+    <div style={{ ...S.popover(rect, vertical), display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, minWidth: 200 }}>
       {shapes.map(s => (
         <button
           key={s.id}
@@ -515,7 +517,7 @@ function ShapesPopover({ rect, vertical, onClose }) {
   )
 }
 
-function MorePopover({ rect, vertical, isAdmin, onClear, onForceSyncViewport, onExportPNG, onClose, toolbarVertical, onToggleVertical }) {
+function MorePopover({ rect, vertical, isAdmin, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onClose, toolbarVertical, onToggleVertical }) {
   const { background, setBackground } = useWhiteboardStore()
 
   return (
@@ -545,11 +547,18 @@ function MorePopover({ rect, vertical, isAdmin, onClear, onForceSyncViewport, on
 
       {/* Export */}
       <button
-        style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#f3f4f6', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 500, marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', color: '#374151' }}
+        style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#f3f4f6', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 500, marginBottom: 4, display: 'flex', gap: 8, alignItems: 'center', color: '#374151' }}
         onClick={() => { onExportPNG?.(); onClose() }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Esporta PNG
+      </button>
+      <button
+        style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#f3f4f6', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 500, marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', color: '#374151' }}
+        onClick={() => { onExportPDF?.(); onClose() }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        Esporta PDF
       </button>
 
       {isAdmin && (
