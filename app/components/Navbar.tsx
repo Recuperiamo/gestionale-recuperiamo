@@ -38,10 +38,13 @@ export default function Navbar() {
     { href: "/admin/password-resets", label: "Reset Password" }
   ];
 
+  const lavagnaV2Abilitata = session?.user?.lavagnaV2Abilitata;
+
   const navLinksCliente = [
     { href: "/profilo", label: "Profilo" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/lavagna", label: "Lavagna" },
+    ...(lavagnaV2Abilitata ? [{ href: "/lavagna-v2", label: "Lavagna v2", beta: true }] : []),
     { href: "/aula", label: "Aula" },
     { href: "/lezioni", label: "Lezioni" },
     { href: "/richieste", label: "Richieste" }
