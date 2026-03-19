@@ -11,39 +11,63 @@ export default function LavagnaV2ListPage() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [selectedClienteId, setSelectedClienteId] = useState("");
+  const [clienteFiltro, setClienteFiltro] = useState("");
+  const [clienti, setClienti] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
   const [hoveredId, setHoveredId] = useState(null);
 
   const isAdmin = /^(admin|operatore)$/i.test(session?.user?.role || "");
 
-  // ── Carica lista ──────────────────────────────────────────────────────────
+  // ── Carica studenti (solo admin) ──────────────────────────────────────────
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !isAdmin) return;
+    fetch("/api/clienti?tipo=STUDENTE")
+      .then(r => r.json())
+      .then(d => setClienti(Array.isArray(d) ? d : Array.isArray(d.clienti) ? d.clienti : []))
+      .catch(() => setClienti([]));
+  }, [status, isAdmin]);
+
+  // ── Carica lista lavagne ───────────────────────────────────────────────────
+  const fetchLavagne = (filtroClienteId = "") => {
     setLoading(true);
-    fetch("/api/lavagna-v2/list")
+    const qs = filtroClienteId ? `?clienteId=${filtroClienteId}` : "";
+    fetch(`/api/lavagna-v2/list${qs}`)
       .then(r => r.ok ? r.json() : { lavagne: [] })
       .then(d => setLavagne(Array.isArray(d.lavagne) ? d.lavagne : []))
       .catch(() => setLavagne([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetchLavagne();
   }, [status]);
 
-  // ── Crea nuova lavagna ────────────────────────────────────────────────────
+  // ── Crea nuova lavagna ─────────────────────────────────────────────────────
   async function handleCreate(e) {
     e.preventDefault();
+    if (isAdmin && !selectedClienteId) {
+      alert("Seleziona uno studente.");
+      return;
+    }
     setCreating(true);
     try {
       const res = await fetch("/api/lavagna-v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titolo: newTitle.trim() || undefined }),
+        body: JSON.stringify({
+          titolo: newTitle.trim() || undefined,
+          clienteId: selectedClienteId ? Number(selectedClienteId) : undefined,
+        }),
       });
       const js = await res.json();
       if (res.ok) {
         setLavagne(prev => [js.lavagna, ...prev]);
         setShowCreate(false);
         setNewTitle("");
-        // Apri subito in nuova scheda
+        setSelectedClienteId("");
         window.open(`/lavagna-v2/canvas?lavagnaId=${js.lavagna.id}`, "_blank");
       } else {
         alert(js.error || "Errore nella creazione");
@@ -55,7 +79,7 @@ export default function LavagnaV2ListPage() {
     }
   }
 
-  // ── Elimina lavagna ───────────────────────────────────────────────────────
+  // ── Elimina lavagna ────────────────────────────────────────────────────────
   async function handleDelete(id) {
     if (!window.confirm("Eliminare questa lavagna? L'azione è irreversibile.")) return;
     try {
@@ -67,11 +91,14 @@ export default function LavagnaV2ListPage() {
     }
   }
 
-  // ── Filtra ────────────────────────────────────────────────────────────────
+  // ── Filtra per ricerca ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!search.trim()) return lavagne;
     const q = search.toLowerCase();
-    return lavagne.filter(l => (l.titolo || "").toLowerCase().includes(q));
+    return lavagne.filter(l =>
+      (l.titolo || "").toLowerCase().includes(q) ||
+      (l.cliente?.nomeReferente || l.cliente?.email || "").toLowerCase().includes(q)
+    );
   }, [lavagne, search]);
 
   if (status === "loading") {
@@ -90,7 +117,7 @@ export default function LavagnaV2ListPage() {
         <main style={{ maxWidth: 900, margin: "40px auto 60px", background: "#fff", borderRadius: 24, padding: "36px 40px 48px", boxShadow: "0 6px 34px rgba(32,72,154,0.13)", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}>
 
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#20489a" }}>
                 Lavagna
@@ -112,22 +139,67 @@ export default function LavagnaV2ListPage() {
 
           {/* Form crea */}
           {showCreate && (
-            <form onSubmit={handleCreate} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "16px 20px", marginBottom: 24, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <input
-                type="text"
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                placeholder={`Lavagna ${new Date().toLocaleDateString("it-IT")}`}
-                autoFocus
-                style={{ flex: 1, minWidth: 220, padding: "8px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none" }}
-              />
-              <button type="submit" disabled={creating} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                {creating ? "Creazione…" : "Crea e apri"}
-              </button>
-              <button type="button" onClick={() => setShowCreate(false)} style={{ background: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                Annulla
-              </button>
+            <form onSubmit={handleCreate} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "18px 20px", marginBottom: 24 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+                {/* Selezione studente */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 200px" }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#1e40af" }}>Studente *</label>
+                  <select
+                    value={selectedClienteId}
+                    onChange={e => setSelectedClienteId(e.target.value)}
+                    required
+                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none", background: "#fff" }}
+                  >
+                    <option value="">Seleziona studente…</option>
+                    {clienti.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nomeReferente || c.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Titolo */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "2 1 260px" }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#1e40af" }}>Titolo (opzionale)</label>
+                  <input
+                    type="text"
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    placeholder={`Lavagna ${new Date().toLocaleDateString("it-IT")}`}
+                    autoFocus
+                    style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none" }}
+                  />
+                </div>
+
+                {/* Azioni */}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="submit" disabled={creating} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                    {creating ? "Creazione…" : "Crea e apri"}
+                  </button>
+                  <button type="button" onClick={() => { setShowCreate(false); setNewTitle(""); setSelectedClienteId(""); }} style={{ background: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                    Annulla
+                  </button>
+                </div>
+              </div>
             </form>
+          )}
+
+          {/* Filtro per studente (admin) */}
+          {isAdmin && clienti.length > 0 && (
+            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Filtra:</span>
+              <select
+                value={clienteFiltro}
+                onChange={e => { setClienteFiltro(e.target.value); fetchLavagne(e.target.value); }}
+                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none" }}
+              >
+                <option value="">Tutti gli studenti</option>
+                {clienti.map(c => (
+                  <option key={c.id} value={c.id}>{c.nomeReferente || c.email}</option>
+                ))}
+              </select>
+            </div>
           )}
 
           {/* Ricerca */}
@@ -135,7 +207,7 @@ export default function LavagnaV2ListPage() {
             <div style={{ position: "relative", marginBottom: 16 }}>
               <input
                 type="text"
-                placeholder="Cerca lavagna…"
+                placeholder="Cerca per titolo o studente…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px 8px 34px", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 14, outline: "none", background: "#f8fbff" }}
@@ -158,60 +230,65 @@ export default function LavagnaV2ListPage() {
             </div>
           ) : (
             <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
-              {filtered.map(l => (
-                <li
-                  key={l.id}
-                  onMouseEnter={() => setHoveredId(l.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  style={{
-                    background: hoveredId === l.id ? "#eef4ff" : "#f8fbff",
-                    border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5",
-                    borderRadius: 12, padding: "12px 16px",
-                    display: "flex", alignItems: "center", gap: 12,
-                    transition: "background 0.15s, border-color 0.15s",
-                    boxShadow: hoveredId === l.id ? "0 2px 8px rgba(20,53,120,0.09)" : "none",
-                  }}
-                >
-                  {/* Icona lavagna */}
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="3" width="20" height="14" rx="2"/>
-                      <path d="M8 21h8M12 17v4"/>
-                    </svg>
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {l.titolo || "Lavagna"}
+              {filtered.map(l => {
+                const nomeStudente = l.cliente?.nomeReferente || l.cliente?.email || null;
+                return (
+                  <li
+                    key={l.id}
+                    onMouseEnter={() => setHoveredId(l.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{
+                      background: hoveredId === l.id ? "#eef4ff" : "#f8fbff",
+                      border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5",
+                      borderRadius: 12, padding: "12px 16px",
+                      display: "flex", alignItems: "center", gap: 12,
+                      transition: "background 0.15s, border-color 0.15s",
+                      boxShadow: hoveredId === l.id ? "0 2px 8px rgba(20,53,120,0.09)" : "none",
+                    }}
+                  >
+                    {/* Icona */}
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <path d="M8 21h8M12 17v4"/>
+                      </svg>
                     </div>
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                      Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                      {l.updatedAt && l.updatedAt !== l.createdAt && (
-                        <span style={{ marginLeft: 8 }}>· Modificata {new Date(l.updatedAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {l.titolo || "Lavagna"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {nomeStudente && isAdmin && (
+                          <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>
+                            {nomeStudente}
+                          </span>
+                        )}
+                        <span>Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                    </div>
+
+                    {/* Azioni */}
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => window.open(`/lavagna-v2/canvas?lavagnaId=${l.id}`, "_blank")}
+                        style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                      >
+                        Apri
+                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(l.id)}
+                          style={{ background: "transparent", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 8, padding: "6px 10px", fontWeight: 600, fontSize: 12, cursor: "pointer", opacity: hoveredId === l.id ? 1 : 0, transition: "opacity 0.15s" }}
+                        >
+                          Elimina
+                        </button>
                       )}
                     </div>
-                  </div>
-
-                  {/* Azioni */}
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={() => window.open(`/lavagna-v2/canvas?lavagnaId=${l.id}`, "_blank")}
-                      style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                    >
-                      Apri
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => handleDelete(l.id)}
-                        style={{ background: "transparent", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 8, padding: "6px 10px", fontWeight: 600, fontSize: 12, cursor: "pointer", opacity: hoveredId === l.id ? 1 : 0, transition: "opacity 0.15s" }}
-                      >
-                        Elimina
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </main>

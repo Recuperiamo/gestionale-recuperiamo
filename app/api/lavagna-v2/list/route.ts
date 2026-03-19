@@ -1,9 +1,8 @@
 // @ts-nocheck
 /**
- * GET /api/lavagna-v2/list
- * Restituisce tutte le lavagne v2 (attivitaId = null), ordinate per data decrescente.
- * In futuro, con il merge col calendario, includerà anche quelle con attivitaId
- * filtrate per clienteId.
+ * GET /api/lavagna-v2/list?clienteId=X
+ * - admin/operatore: lista tutte le lavagne v2 libere, o filtrate per clienteId
+ * - cliente: lista solo le lavagne assegnate a sé stesso
  */
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -18,12 +17,20 @@ export async function GET(req) {
   if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const isStaff = session.user?.role === 'admin' || session.user?.role === 'operatore'
+  const url = new URL(req.url)
+  const clienteIdParam = url.searchParams.get('clienteId')
 
-  // Per ora: lista tutte le lavagne libere (attivitaId null)
-  // Futuro: filtra per clienteId quando integrato col calendario
-  const where = isStaff
-    ? { attivitaId: null }
-    : { attivitaId: null } // studenti vedranno solo le proprie (TODO: aggiungere campo clienteId su Lavagna al merge)
+  let where: any = { attivitaId: null }
+
+  if (isStaff) {
+    // Admin: filtra per clienteId se passato, altrimenti mostra tutte
+    if (clienteIdParam) where.clienteId = Number(clienteIdParam)
+  } else {
+    // Studente: vede solo le proprie lavagne
+    const clienteId = session.user?.clienteId
+    if (!clienteId) return NextResponse.json({ lavagne: [] })
+    where.clienteId = clienteId
+  }
 
   const lavagne = await prisma.lavagna.findMany({
     where,
@@ -33,7 +40,8 @@ export async function GET(req) {
       titolo: true,
       createdAt: true,
       updatedAt: true,
-      attivitaId: true,
+      clienteId: true,
+      cliente: { select: { id: true, nomeReferente: true, email: true } },
     },
   })
 

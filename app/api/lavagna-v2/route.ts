@@ -104,9 +104,14 @@ export async function POST(req) {
 
   const body = await req.json().catch(() => ({}))
   const titolo = body.titolo || formatDataOra(new Date())
+  const clienteId = body.clienteId ? Number(body.clienteId) : null
+
+  const data: any = { titolo }
+  if (clienteId) data.clienteId = clienteId
 
   const lavagna = await prisma.lavagna.create({
-    data: { titolo },
+    data,
+    include: { cliente: { select: { id: true, nomeReferente: true, email: true } } },
   })
 
   return NextResponse.json({ lavagna: { ...lavagna, tratti: [], forme: [] } })

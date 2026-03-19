@@ -92,6 +92,7 @@ model Client {
   promemoria        Nota[]   @relation("ClienteNote")
   lezioniAssegnate   AssegnazioneLezione[]
   lavagnaV2Abilitata Boolean              @default(false)
+  lavagneV2          Lavagna[]
 
   @@index([email])
   @@index([referenteId])
@@ -237,15 +238,18 @@ model MaterialeDidattico {
 model Lavagna {
   id         Int             @id @default(autoincrement())
   attivitaId Int?            @unique
+  clienteId  Int?
   titolo     String?         @default("Lavagna")
   snapshot   Json?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
   attivita   Attivita?       @relation(fields: [attivitaId], references: [id])
+  cliente    Client?         @relation(fields: [clienteId], references: [id])
   shapes     LavagnaShape[]
   tratti     LavagnaTratto[]
 
   @@index([createdAt])
+  @@index([clienteId])
 }
 
 model LavagnaTratto {
