@@ -54,6 +54,13 @@ export function usePersistence({ lavagnaId, userId }: Options) {
     } catch (_) {}
   }, [])
 
+  const deleteShape = useCallback(async (dbId: string | number) => {
+    if (!dbId) return
+    try {
+      await fetch(`/api/lavagna-v2/shape?id=${dbId}`, { method: 'DELETE' })
+    } catch (_) {}
+  }, [])
+
   const clearBoard = useCallback(async () => {
     if (!lavagnaId) return
     try {
@@ -62,5 +69,5 @@ export function usePersistence({ lavagnaId, userId }: Options) {
     } catch (_) {}
   }, [lavagnaId, store])
 
-  return { saveStroke, deleteStroke, clearBoard }
+  return { saveStroke, deleteStroke, deleteShape, clearBoard }
 }

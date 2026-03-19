@@ -81,6 +81,9 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
       case 'commit-shape':
         if (event.shape) publish('shape:add', { shape: event.shape, lavagnaId })
         break
+      case 'delete-shape':
+        if (event.shape) publish('shape:delete', { shapeId: event.shape.id, lavagnaId })
+        break
       case 'cursor':
         publish('cursor:move', { x: event.x, y: event.y, role, lavagnaId })
         break
@@ -204,6 +207,12 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           if (d.shape) store.addShape(d.shape)
         }
 
+        const onShapeDelete = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (d.shapeId) store.deleteShape(d.shapeId)
+        }
+
         const onPermissionsUpdateMsg = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
@@ -227,6 +236,7 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         ch.subscribe('clear', onClear)
         ch.subscribe('stroke:delete', onStrokeDelete)
         ch.subscribe('shape:add', onShapeAdd)
+        ch.subscribe('shape:delete', onShapeDelete)
         ch.subscribe('permissions:update', onPermissionsUpdateMsg)
         ch.subscribe('draw:request', onDrawRequestMsg)
 

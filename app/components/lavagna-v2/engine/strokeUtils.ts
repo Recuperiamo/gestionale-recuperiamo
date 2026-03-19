@@ -90,6 +90,17 @@ export function hitTestStroke(stroke: Stroke, wx: number, wy: number, zoom: numb
   return false
 }
 
+/** Hit-test a shape at world-space point (wx, wy).
+ *  Uses an expanded bbox with a radius proportional to zoom. */
+export function hitTestShape(shape: Shape, wx: number, wy: number, zoom: number): boolean {
+  const pad = Math.max(8, (shape.strokeWidth || 2) * 1.5) / zoom
+  const bb = shapeBBox(shape)
+  return (
+    wx >= bb.minX - pad && wx <= bb.maxX + pad &&
+    wy >= bb.minY - pad && wy <= bb.maxY + pad
+  )
+}
+
 export function shapeBBox(s: Shape): BBox {
   const hw = (s.strokeWidth || 1) / 2
   if (s.type === 'line' || s.type === 'arrow') {

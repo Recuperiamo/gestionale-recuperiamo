@@ -207,6 +207,7 @@ export const useWhiteboardStore = create<WBState>((set, get) => ({
       width: s.spessore || 3,
       opacity: 1,
       points: s.punti || [],
+      authorId: s.autoreUserId ?? undefined,
     }))
     const shapes = (rawShapes || []).map(s => ({
       id: `shape-${s.id}`,
@@ -225,6 +226,7 @@ export const useWhiteboardStore = create<WBState>((set, get) => ({
       fontSize: s.fontSize ?? undefined,
       fontFamily: s.fontFamily ?? undefined,
       rotation: s.rotation ?? 0,
+      authorId: s.autoreUserId ?? undefined,
     }))
     set({ strokes, shapes })
   },

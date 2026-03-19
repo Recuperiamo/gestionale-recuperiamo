@@ -7,7 +7,7 @@
  */
 import { useRef, useCallback } from 'react'
 import { CanvasEngine } from '../engine/CanvasEngine'
-import { simplifyPoints, generateId, hitTestStroke } from '../engine/strokeUtils'
+import { simplifyPoints, generateId, hitTestStroke, hitTestShape } from '../engine/strokeUtils'
 import { useWhiteboardStore } from '../store/whiteboardStore'
 
 const SHAPE_TOOLS = new Set(['rect', 'ellipse', 'line', 'arrow', 'diamond', 'triangle', 'axis2', 'axis3'])
@@ -17,9 +17,11 @@ interface Options {
   onStrokeCommit?: (stroke: any) => void   // called with final stroke to save to DB + Ably
   onStrokeCancel?: (streamId: string) => void
   readOnly?: boolean
+  userId?: string | number   // for eraser permission check
+  isAdmin?: boolean          // admin can erase everything, student only own
 }
 
-export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, readOnly }: Options) {
+export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, readOnly, userId, isAdmin }: Options) {
   const store = useWhiteboardStore()
 
   // Current drawing state — all refs, no React state
@@ -131,18 +133,32 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     if (!drawing.current) return
     if (native.pointerId !== activePointerId.current) return
 
-    // Stroke-erase mode: delete entire strokes under cursor
+    // Stroke-erase mode: delete entire strokes AND shapes under cursor
     const { tool, eraserMode } = useWhiteboardStore.getState()
     if (tool === 'eraser' && eraserMode === 'stroke') {
       const pt = getPoint(e)
       if (pt) {
         eng.updateLiveStroke([pt]) // cursor circle only
-        const currentStrokes = useWhiteboardStore.getState().strokes
-        for (const s of currentStrokes) {
-          if (hitTestStroke(s, pt.x, pt.y, eng.zoom)) {
-            useWhiteboardStore.getState().deleteStroke(s.id)
-            useWhiteboardStore.getState().pushUndo({ type: 'delete-stroke', stroke: s })
+
+        const canEraseItem = (authorId: any) => {
+          if (isAdmin) return true
+          // Studente: solo i propri (confronto come stringa per evitare type mismatch)
+          return String(authorId) === String(userId)
+        }
+
+        const st = useWhiteboardStore.getState()
+        for (const s of st.strokes) {
+          if (canEraseItem(s.authorId) && hitTestStroke(s, pt.x, pt.y, eng.zoom)) {
+            st.deleteStroke(s.id)
+            st.pushUndo({ type: 'delete-stroke', stroke: s })
             onStrokeCommit?.({ type: 'delete-stroke', stroke: s })
+          }
+        }
+        for (const sh of st.shapes) {
+          if (canEraseItem(sh.authorId) && hitTestShape(sh, pt.x, pt.y, eng.zoom)) {
+            st.deleteShape(sh.id)
+            st.pushUndo({ type: 'delete-shape', shape: sh })
+            onStrokeCommit?.({ type: 'delete-shape', shape: sh })
           }
         }
       }
@@ -249,6 +265,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
         strokeWidth: shapeWidth,
         fillColor: 'transparent',
         rotation: 0,
+        authorId: userId,
       }
       useWhiteboardStore.getState().addShape(shape)
       useWhiteboardStore.getState().pushUndo({ type: 'add-shape', shape })

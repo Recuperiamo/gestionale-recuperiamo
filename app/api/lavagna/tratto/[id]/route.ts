@@ -30,9 +30,8 @@ export async function PUT(req, { params }) {
     
     const isAdmin = ["admin", "operatore"].includes(session.user.role);
     const isAutore = String(session.user.id) === String(tratto.autoreUserId);
-    const sameCliente = String(session.user.clienteId) === String(tratto.lavagna.attivita.clienteId);
-    
-    if (session.user.role === "cliente" && (!sameCliente || !isAutore)) {
+
+    if (session.user.role === "cliente" && !isAutore) {
       return NextResponse.json({ error: "Puoi modificare solo i tuoi tratti" }, { status: 403 });
     }
     
@@ -79,9 +78,10 @@ export async function DELETE(_req, { params }) {
 
     const isAdmin = ["admin", "operatore"].includes(session.user.role);
     const isAutore = String(session.user.id) === String(tratto.autoreUserId);
-    const sameCliente = String(session.user.clienteId) === String(tratto.lavagna.attivita.clienteId);
 
-    if (session.user.role === "cliente" && (!sameCliente || !isAutore)) {
+    // Studente: può cancellare solo i propri tratti (isAutore è sufficiente,
+    // il controllo attivita?.clienteId crashava per lavagne libere senza attività)
+    if (session.user.role === "cliente" && !isAutore) {
       return NextResponse.json({ error: "Puoi cancellare solo i tuoi tratti" }, { status: 403 });
     }
 

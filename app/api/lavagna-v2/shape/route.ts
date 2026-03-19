@@ -16,6 +16,10 @@ export async function POST(req) {
 
   if (!lavagnaId || !type) return NextResponse.json({ error: 'Dati mancanti' }, { status: 400 })
 
+  // Ricava autoreUserId dall'id utente in sessione
+  const rawId = session.user?.id
+  const autoreUserId = rawId ? (isNaN(Number(rawId)) ? null : Number(rawId)) : null
+
   const shape = await prisma.lavagnaShape.create({
     data: {
       lavagnaId: Number(lavagnaId),
@@ -30,6 +34,7 @@ export async function POST(req) {
       spessore: strokeWidth ?? null,
       rotation: rotation ?? null,
       titolo: text ?? null,
+      ...(autoreUserId ? { autoreUserId } : {}),
     },
   })
 
@@ -38,13 +43,24 @@ export async function POST(req) {
 
 export async function DELETE(req) {
   const session = await getServerSession(authOptions)
-  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
-    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
-  }
+  if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const url = new URL(req.url)
   const id = Number(url.searchParams.get('id'))
   if (!id) return NextResponse.json({ error: 'id mancante' }, { status: 400 })
+
+  const isAdmin = session.user?.role === 'admin' || session.user?.role === 'operatore'
+
+  if (!isAdmin) {
+    // Studente: può cancellare solo le proprie forme
+    const shape = await prisma.lavagnaShape.findUnique({ where: { id }, select: { autoreUserId: true } })
+    if (!shape) return NextResponse.json({ error: 'Forma non trovata' }, { status: 404 })
+    const rawId = session.user?.id
+    const userId = rawId ? (isNaN(Number(rawId)) ? rawId : Number(rawId)) : null
+    if (String(shape.autoreUserId) !== String(userId)) {
+      return NextResponse.json({ error: 'Puoi cancellare solo le tue forme' }, { status: 403 })
+    }
+  }
 
   await prisma.lavagnaShape.deleteMany({ where: { id } })
   return NextResponse.json({ ok: true })

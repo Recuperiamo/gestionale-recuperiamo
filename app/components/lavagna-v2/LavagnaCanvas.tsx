@@ -129,7 +129,7 @@ export default function LavagnaCanvas({
   }, [])
 
   // ── Persistence ──────────────────────────────────────────────────────────────
-  const { saveStroke, deleteStroke, clearBoard } = usePersistence({ lavagnaId, userId: utenteId })
+  const { saveStroke, deleteStroke, deleteShape, clearBoard } = usePersistence({ lavagnaId, userId: utenteId })
 
   // ── Undo / Redo keyboard ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -203,6 +203,9 @@ export default function LavagnaCanvas({
     if (event.type === 'delete-stroke' && event.stroke?.dbId) {
       await deleteStroke(event.stroke.dbId)
     }
+    if (event.type === 'delete-shape' && event.shape?.dbId) {
+      await deleteShape(event.shape.dbId)
+    }
     if (event.type === 'commit-shape' && event.shape) {
       try {
         const res = await fetch('/api/lavagna-v2/shape', {
@@ -223,6 +226,8 @@ export default function LavagnaCanvas({
     engineRef,
     onStrokeCommit,
     readOnly,
+    userId: utenteId,
+    isAdmin,
   })
 
   // ── Selection tool ───────────────────────────────────────────────────────────
