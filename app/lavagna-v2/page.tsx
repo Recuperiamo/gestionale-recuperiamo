@@ -5,18 +5,32 @@ import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
 import AuthGuard from "../components/AuthGuard";
 
+function formatDataOra(d) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
 export default function LavagnaV2ListPage() {
   const { data: session, status } = useSession();
   const [lavagne, setLavagne] = useState([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [selectedClienteId, setSelectedClienteId] = useState("");
-  const [clienteFiltro, setClienteFiltro] = useState("");
   const [clienti, setClienti] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
   const [hoveredId, setHoveredId] = useState(null);
+  const [clienteFiltro, setClienteFiltro] = useState("");
+
+  // Form crea
+  const [selectedClienteId, setSelectedClienteId] = useState("");
+  const [attivitaList, setAttivitaList] = useState([]);
+  const [attivitaLoading, setAttivitaLoading] = useState(false);
+  const [selectedAttivitaId, setSelectedAttivitaId] = useState(""); // "" | "ad-hoc" | "123"
+  const [newTitle, setNewTitle] = useState("");
 
   const isAdmin = /^(admin|operatore)$/i.test(session?.user?.role || "");
 
@@ -29,10 +43,37 @@ export default function LavagnaV2ListPage() {
       .catch(() => setClienti([]));
   }, [status, isAdmin]);
 
+  // ── Carica attività quando cambia lo studente ─────────────────────────────
+  useEffect(() => {
+    if (!selectedClienteId) { setAttivitaList([]); setSelectedAttivitaId(""); return; }
+    setAttivitaLoading(true);
+    setSelectedAttivitaId("");
+    setNewTitle("");
+    fetch(`/api/attivita/list?clienteId=${selectedClienteId}`)
+      .then(r => r.json())
+      .then(d => setAttivitaList(Array.isArray(d.attivita) ? d.attivita : []))
+      .catch(() => setAttivitaList([]))
+      .finally(() => setAttivitaLoading(false));
+  }, [selectedClienteId]);
+
+  // ── Pre-compila titolo quando si seleziona un'attività ────────────────────
+  useEffect(() => {
+    if (!selectedAttivitaId || selectedAttivitaId === "ad-hoc") {
+      setNewTitle("");
+      return;
+    }
+    const att = attivitaList.find(a => String(a.id) === selectedAttivitaId);
+    if (att?.orario) {
+      const nomeStudente = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
+      const base = formatDataOra(new Date(att.orario));
+      setNewTitle(nomeStudente ? `${base} – ${nomeStudente}` : base);
+    }
+  }, [selectedAttivitaId, attivitaList, clienti, selectedClienteId]);
+
   // ── Carica lista lavagne ───────────────────────────────────────────────────
-  const fetchLavagne = (filtroClienteId = "") => {
+  const fetchLavagne = (filtroId = "") => {
     setLoading(true);
-    const qs = filtroClienteId ? `?clienteId=${filtroClienteId}` : "";
+    const qs = filtroId ? `?clienteId=${filtroId}` : "";
     fetch(`/api/lavagna-v2/list${qs}`)
       .then(r => r.ok ? r.json() : { lavagne: [] })
       .then(d => setLavagne(Array.isArray(d.lavagne) ? d.lavagne : []))
@@ -45,29 +86,32 @@ export default function LavagnaV2ListPage() {
     fetchLavagne();
   }, [status]);
 
-  // ── Crea nuova lavagna ─────────────────────────────────────────────────────
+  // ── Crea lavagna ───────────────────────────────────────────────────────────
   async function handleCreate(e) {
     e.preventDefault();
-    if (isAdmin && !selectedClienteId) {
-      alert("Seleziona uno studente.");
-      return;
-    }
+    if (!selectedClienteId) { alert("Seleziona uno studente."); return; }
+    if (!selectedAttivitaId) { alert("Seleziona un'attività o scegli 'Crea ad-hoc'."); return; }
+
+    const nomeStudente = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
+    const titoloAuto = `${formatDataOra(new Date())}${nomeStudente ? ` – ${nomeStudente}` : ""}`;
+
+    // Titolo: se è stata selezionata un'attività, già pre-compilato; altrimenti auto
+    const titoloFinale = newTitle.trim() || titoloAuto;
+
     setCreating(true);
     try {
       const res = await fetch("/api/lavagna-v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          titolo: newTitle.trim() || undefined,
-          clienteId: selectedClienteId ? Number(selectedClienteId) : undefined,
+          titolo: titoloFinale,
+          clienteId: Number(selectedClienteId),
         }),
       });
       const js = await res.json();
       if (res.ok) {
         setLavagne(prev => [js.lavagna, ...prev]);
-        setShowCreate(false);
-        setNewTitle("");
-        setSelectedClienteId("");
+        closeCreate();
         window.open(`/lavagna-v2/canvas?lavagnaId=${js.lavagna.id}`, "_blank");
       } else {
         alert(js.error || "Errore nella creazione");
@@ -77,6 +121,14 @@ export default function LavagnaV2ListPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  function closeCreate() {
+    setShowCreate(false);
+    setSelectedClienteId("");
+    setSelectedAttivitaId("");
+    setNewTitle("");
+    setAttivitaList([]);
   }
 
   // ── Elimina lavagna ────────────────────────────────────────────────────────
@@ -110,6 +162,8 @@ export default function LavagnaV2ListPage() {
     );
   }
 
+  const nomeStudenteSelezionato = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
+
   return (
     <AuthGuard>
       <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
@@ -129,95 +183,128 @@ export default function LavagnaV2ListPage() {
             </div>
             {isAdmin && (
               <button
-                onClick={() => setShowCreate(v => !v)}
+                onClick={() => showCreate ? closeCreate() : setShowCreate(true)}
                 style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(28,176,246,0.3)" }}
               >
-                + Nuova lavagna
+                {showCreate ? "Annulla" : "+ Nuova lavagna"}
               </button>
             )}
           </div>
 
-          {/* Form crea */}
+          {/* ── Form crea ─────────────────────────────────────────────────── */}
           {showCreate && (
-            <form onSubmit={handleCreate} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "18px 20px", marginBottom: 24 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
-                {/* Selezione studente */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 200px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#1e40af" }}>Studente *</label>
-                  <select
-                    value={selectedClienteId}
-                    onChange={e => setSelectedClienteId(e.target.value)}
-                    required
-                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none", background: "#fff" }}
-                  >
-                    <option value="">Seleziona studente…</option>
-                    {clienti.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.nomeReferente || c.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <form onSubmit={handleCreate} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 14, padding: "20px 22px", marginBottom: 28 }}>
 
-                {/* Titolo */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "2 1 260px" }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#1e40af" }}>Titolo (opzionale)</label>
+              {/* 1. Seleziona studente */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  1. Studente *
+                </label>
+                <select
+                  value={selectedClienteId}
+                  onChange={e => setSelectedClienteId(e.target.value)}
+                  required
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none", background: "#fff" }}
+                >
+                  <option value="">Seleziona studente…</option>
+                  {clienti.map(c => (
+                    <option key={c.id} value={c.id}>{c.nomeReferente || c.email}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Seleziona attività */}
+              {selectedClienteId && (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    2. Associa a lezione
+                  </label>
+                  {attivitaLoading ? (
+                    <div style={{ fontSize: 13, color: "#6b7280" }}>Caricamento lezioni…</div>
+                  ) : (
+                    <select
+                      value={selectedAttivitaId}
+                      onChange={e => setSelectedAttivitaId(e.target.value)}
+                      required
+                      style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none", background: "#fff" }}
+                    >
+                      <option value="">Seleziona lezione…</option>
+                      {attivitaList.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.orario ? formatDataOra(new Date(a.orario)) : "—"}{a.descrizione ? ` · ${a.descrizione}` : ""}
+                        </option>
+                      ))}
+                      <option value="ad-hoc">── Crea lavagna ad-hoc (senza lezione)</option>
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Titolo personalizzato */}
+              {selectedAttivitaId && (
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    3. Titolo (opzionale)
+                  </label>
                   <input
                     type="text"
                     value={newTitle}
                     onChange={e => setNewTitle(e.target.value)}
-                    placeholder={`Lavagna ${new Date().toLocaleDateString("it-IT")}`}
-                    autoFocus
-                    style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none" }}
+                    placeholder={
+                      selectedAttivitaId === "ad-hoc"
+                        ? `${formatDataOra(new Date())}${nomeStudenteSelezionato ? ` – ${nomeStudenteSelezionato}` : ""}`
+                        : newTitle || `${formatDataOra(new Date())}${nomeStudenteSelezionato ? ` – ${nomeStudenteSelezionato}` : ""}`
+                    }
+                    style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none" }}
                   />
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    Se vuoto verrà usato: <em>{newTitle || (selectedAttivitaId !== "ad-hoc" ? (attivitaList.find(a => String(a.id) === selectedAttivitaId)?.orario ? `${formatDataOra(new Date(attivitaList.find(a => String(a.id) === selectedAttivitaId).orario))} – ${nomeStudenteSelezionato}` : "") : `${formatDataOra(new Date())}${nomeStudenteSelezionato ? ` – ${nomeStudenteSelezionato}` : ""}`)}</em>
+                  </div>
                 </div>
+              )}
 
-                {/* Azioni */}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button type="submit" disabled={creating} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                    {creating ? "Creazione…" : "Crea e apri"}
-                  </button>
-                  <button type="button" onClick={() => { setShowCreate(false); setNewTitle(""); setSelectedClienteId(""); }} style={{ background: "#e5e7eb", color: "#374151", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                    Annulla
-                  </button>
-                </div>
-              </div>
+              {selectedAttivitaId && (
+                <button
+                  type="submit"
+                  disabled={creating}
+                  style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 22px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                >
+                  {creating ? "Creazione…" : "Crea e apri"}
+                </button>
+              )}
             </form>
           )}
 
-          {/* Filtro per studente (admin) */}
-          {isAdmin && clienti.length > 0 && (
-            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Filtra:</span>
+          {/* Filtro + Ricerca */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+            {isAdmin && clienti.length > 0 && (
               <select
                 value={clienteFiltro}
                 onChange={e => { setClienteFiltro(e.target.value); fetchLavagne(e.target.value); }}
-                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none" }}
+                style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none" }}
               >
                 <option value="">Tutti gli studenti</option>
                 {clienti.map(c => (
                   <option key={c.id} value={c.id}>{c.nomeReferente || c.email}</option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {/* Ricerca */}
-          {lavagne.length > 4 && (
-            <div style={{ position: "relative", marginBottom: 16 }}>
-              <input
-                type="text"
-                placeholder="Cerca per titolo o studente…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px 8px 34px", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 14, outline: "none", background: "#f8fbff" }}
-              />
-              <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
-                <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </div>
-          )}
+            )}
+            {lavagne.length > 4 && (
+              <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+                <input
+                  type="text"
+                  placeholder="Cerca…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "7px 12px 7px 32px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none", background: "#f8fbff" }}
+                />
+                <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
+                  <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+            )}
+          </div>
 
           {/* Lista */}
           {loading ? (
@@ -246,15 +333,12 @@ export default function LavagnaV2ListPage() {
                       boxShadow: hoveredId === l.id ? "0 2px 8px rgba(20,53,120,0.09)" : "none",
                     }}
                   >
-                    {/* Icona */}
                     <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="2" y="3" width="20" height="14" rx="2"/>
                         <path d="M8 21h8M12 17v4"/>
                       </svg>
                     </div>
-
-                    {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {l.titolo || "Lavagna"}
@@ -268,8 +352,6 @@ export default function LavagnaV2ListPage() {
                         <span>Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                     </div>
-
-                    {/* Azioni */}
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                       <button
                         onClick={() => window.open(`/lavagna-v2/canvas?lavagnaId=${l.id}`, "_blank")}

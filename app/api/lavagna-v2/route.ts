@@ -95,7 +95,7 @@ export async function GET(req) {
   return NextResponse.json({ error: 'Parametro mancante (lavagnaId o attivitaId)' }, { status: 400 })
 }
 
-// ── Crea lavagna libera (senza attività) ──────────────────────────────────────
+// ── Crea lavagna v2 (libera, senza attivitaId per evitare conflitti con v1) ────
 export async function POST(req) {
   const session = await getServerSession(authOptions)
   if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
@@ -103,8 +103,22 @@ export async function POST(req) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const titolo = body.titolo || formatDataOra(new Date())
   const clienteId = body.clienteId ? Number(body.clienteId) : null
+
+  // Recupera nome studente per il titolo automatico
+  let nomeStudente = ''
+  if (clienteId) {
+    const cliente = await prisma.client.findUnique({
+      where: { id: clienteId },
+      select: { nomeReferente: true, email: true },
+    })
+    nomeStudente = cliente?.nomeReferente || cliente?.email || ''
+  }
+
+  // Titolo: personalizzato, oppure "DD/MM/YYYY HH:MM – Nome Studente"
+  const dataOra = formatDataOra(new Date())
+  const titoloAuto = nomeStudente ? `${dataOra} – ${nomeStudente}` : dataOra
+  const titolo = body.titolo?.trim() || titoloAuto
 
   const data: any = { titolo }
   if (clienteId) data.clienteId = clienteId
