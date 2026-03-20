@@ -267,7 +267,11 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640)
+    const check = () => {
+      const byWidth = window.innerWidth < 768
+      const byTouch = window.matchMedia('(pointer: coarse)').matches
+      setIsMobile(byWidth || byTouch)
+    }
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
