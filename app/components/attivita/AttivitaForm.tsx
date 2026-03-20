@@ -670,6 +670,33 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
                 <span>✏️</span>
                 <span>Lavagna</span>
               </button>
+              <button
+                type="button"
+                onClick={() => window.open(`/lavagna-v2/canvas?attivitaId=${initialData.id}`, '_blank')}
+                style={{
+                  flex: "1 1 calc(33.333% - 7px)",
+                  minWidth: 100,
+                  background: "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  transition: "all 0.2s",
+                  boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)"
+                }}
+                onMouseOver={e => e.currentTarget.style.background = "#1d4ed8"}
+                onMouseOut={e => e.currentTarget.style.background = "#2563eb"}
+              >
+                <span>🖊️</span>
+                <span>Lavagna V2</span>
+              </button>
             </div>
           </div>
         )}
