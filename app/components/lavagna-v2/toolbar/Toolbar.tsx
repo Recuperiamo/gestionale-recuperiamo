@@ -41,6 +41,17 @@ const BG_OPTIONS: { value: Background; label: string }[] = [
 
 const WIDTHS = [2, 4, 8, 14, 22]
 
+const SHAPES = [
+  { id: 'rect', label: 'Rettangolo', icon: <rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/> },
+  { id: 'ellipse', label: 'Ellisse', icon: <ellipse cx="12" cy="12" rx="9" ry="7" stroke="currentColor" strokeWidth="2" fill="none"/> },
+  { id: 'line', label: 'Linea', icon: <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/> },
+  { id: 'arrow', label: 'Freccia', icon: <><line x1="4" y1="20" x2="19" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="19,5 14,5 19,10" stroke="currentColor" strokeWidth="1.5" fill="currentColor"/></> },
+  { id: 'diamond', label: 'Rombo', icon: <polygon points="12,3 21,12 12,21 3,12" stroke="currentColor" strokeWidth="2" fill="none"/> },
+  { id: 'triangle', label: 'Triangolo', icon: <polygon points="12,4 22,20 2,20" stroke="currentColor" strokeWidth="2" fill="none"/> },
+  { id: 'axis2', label: 'Assi 2D', icon: <><line x1="4" y1="20" x2="4" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="4,4 2,8 6,8" fill="currentColor"/><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="21,20 17,18 17,22" fill="currentColor"/></> },
+  { id: 'axis3', label: 'Assi 3D', icon: <><line x1="10" y1="14" x2="10" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="10,2 8,6 12,6" fill="currentColor"/><line x1="10" y1="14" x2="21" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="22,14 18,12 18,16" fill="currentColor"/><line x1="10" y1="14" x2="3" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="2,22 6,21 3,18" fill="currentColor"/></> },
+]
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const S = {
@@ -125,6 +136,34 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+  }),
+}
+
+// ─── Mobile styles ────────────────────────────────────────────────────────────
+
+const Sm = {
+  toolbar: {
+    position: 'fixed' as const,
+    bottom: 16,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    background: 'rgba(255,255,255,0.97)',
+    backdropFilter: 'blur(16px)',
+    borderRadius: 22,
+    padding: '8px 14px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.8) inset',
+    border: '1px solid rgba(0,0,0,0.08)',
+    zIndex: 1100,
+    userSelect: 'none' as const,
+  },
+  btn: (active: boolean) => ({
+    ...S.btn(active),
+    width: 48,
+    height: 48,
+    borderRadius: 12,
   }),
 }
 
@@ -225,6 +264,14 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
   const [popoverRect, setPopoverRect] = useState<DOMRect | null>(null)
   const [zoomPct, setZoomPct] = useState(100)
   const [toolbarVertical, setToolbarVertical] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const penBtnRef = useRef<HTMLButtonElement>(null)
   const hlBtnRef = useRef<HTMLButtonElement>(null)
@@ -304,6 +351,77 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
     )
   }
 
+  // ── Toolbar mobile ──────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        {openPopover && <div style={{ position: 'fixed', inset: 0, zIndex: 1099 }} onClick={closePop} />}
+        {openPopover === 'pen' && popoverRect && <InkPopover type="pen" rect={popoverRect} vertical={false} onClose={closePop} />}
+        {openPopover === 'eraser' && popoverRect && <EraserPopover rect={popoverRect} vertical={false} onClose={closePop} />}
+        {openPopover === 'color' && popoverRect && <ColorPopover rect={popoverRect} vertical={false} onClose={closePop} />}
+        {openPopover === 'more' && popoverRect && (
+          <MorePopover
+            rect={popoverRect} vertical={false} isMobile={true}
+            isAdmin={isAdmin} canStudentDraw={canStudentDraw}
+            onClear={onClear} onForceSyncViewport={onForceSyncViewport}
+            onExportPNG={onExportPNG} onExportPDF={onExportPDF}
+            onToggleStudentDraw={onToggleStudentDraw} onClose={closePop}
+            toolbarVertical={false} onToggleVertical={() => {}}
+            zoomIn={zoomIn} zoomOut={zoomOut} fitView={fitView} resetZoom={resetZoom} zoomPct={zoomPct}
+          />
+        )}
+
+        <div style={Sm.toolbar} onPointerDown={e => e.stopPropagation()}>
+          {/* Undo / Redo */}
+          <button style={{ ...Sm.btn(false), opacity: undoStack.length ? 1 : 0.35 }} onClick={handleUndo} disabled={!undoStack.length}><Icon.Undo /></button>
+          <button style={{ ...Sm.btn(false), opacity: redoStack.length ? 1 : 0.35 }} onClick={handleRedo} disabled={!redoStack.length}><Icon.Redo /></button>
+
+          <div style={S.divider} />
+
+          {/* Mano */}
+          <button style={Sm.btn(tool === 'hand')} onClick={() => { setTool('hand'); closePop() }}>
+            <Icon.Hand />
+          </button>
+
+          {/* Penna — tap quando già attiva apre opzioni */}
+          <button
+            ref={penBtnRef}
+            style={{ ...Sm.btn(tool === 'pen'), ...(tool === 'pen' ? { background: color, color: '#fff' } : {}) }}
+            onClick={() => tool === 'pen' ? togglePop('pen', penBtnRef) : (setTool('pen'), closePop())}
+          >
+            <Icon.Pen />
+          </button>
+
+          {/* Gomma — tap quando già attiva apre opzioni */}
+          <button
+            ref={eraserBtnRef}
+            style={Sm.btn(tool === 'eraser')}
+            onClick={() => tool === 'eraser' ? togglePop('eraser', eraserBtnRef) : (setTool('eraser'), closePop())}
+          >
+            <Icon.Eraser />
+          </button>
+
+          {/* Colore rapido (solo con strumenti inchiostro) */}
+          {isInkTool && (
+            <>
+              <div style={S.divider} />
+              <button ref={colorBtnRef} style={Sm.btn(false)} onClick={() => togglePop('color', colorBtnRef)}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: color, border: color === '#ffffff' ? '1.5px solid #e5e7eb' : 'none', display: 'block', flexShrink: 0 }} />
+              </button>
+            </>
+          )}
+
+          <div style={S.divider} />
+
+          {/* Altro */}
+          <button ref={moreBtnRef} style={Sm.btn(openPopover === 'more')} onClick={() => togglePop('more', moreBtnRef)}>
+            <Icon.More />
+          </button>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       {/* Click outside to close popovers */}
@@ -319,6 +437,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
         <MorePopover
           rect={popoverRect}
           vertical={toolbarVertical}
+          isMobile={false}
           isAdmin={isAdmin}
           canStudentDraw={canStudentDraw}
           onClear={onClear}
@@ -329,6 +448,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
           onClose={closePop}
           toolbarVertical={toolbarVertical}
           onToggleVertical={() => setToolbarVertical(v => !v)}
+          zoomIn={zoomIn} zoomOut={zoomOut} fitView={fitView} resetZoom={resetZoom} zoomPct={zoomPct}
         />
       )}
 
@@ -524,20 +644,9 @@ function ColorPopover({ rect, vertical, onClose }) {
 function ShapesPopover({ rect, vertical, onClose }) {
   const { tool, setTool } = useWhiteboardStore()
 
-  const shapes = [
-    { id: 'rect', label: 'Rettangolo', icon: <rect x="3" y="5" width="18" height="14" rx="1" stroke="currentColor" strokeWidth="2" fill="none"/> },
-    { id: 'ellipse', label: 'Ellisse', icon: <ellipse cx="12" cy="12" rx="9" ry="7" stroke="currentColor" strokeWidth="2" fill="none"/> },
-    { id: 'line', label: 'Linea', icon: <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/> },
-    { id: 'arrow', label: 'Freccia', icon: <><line x1="4" y1="20" x2="19" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="19,5 14,5 19,10" stroke="currentColor" strokeWidth="1.5" fill="currentColor"/></> },
-    { id: 'diamond', label: 'Rombo', icon: <polygon points="12,3 21,12 12,21 3,12" stroke="currentColor" strokeWidth="2" fill="none"/> },
-    { id: 'triangle', label: 'Triangolo', icon: <polygon points="12,4 22,20 2,20" stroke="currentColor" strokeWidth="2" fill="none"/> },
-    { id: 'axis2', label: 'Assi 2D', icon: <><line x1="4" y1="20" x2="4" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="4,4 2,8 6,8" fill="currentColor"/><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="21,20 17,18 17,22" fill="currentColor"/></> },
-    { id: 'axis3', label: 'Assi 3D', icon: <><line x1="10" y1="14" x2="10" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="10,2 8,6 12,6" fill="currentColor"/><line x1="10" y1="14" x2="21" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="22,14 18,12 18,16" fill="currentColor"/><line x1="10" y1="14" x2="3" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="2,22 6,21 3,18" fill="currentColor"/></> },
-  ]
-
   return (
     <div style={{ ...S.popover(rect, vertical), display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, minWidth: 200 }}>
-      {shapes.map(s => (
+      {SHAPES.map(s => (
         <button
           key={s.id}
           title={s.label}
@@ -574,11 +683,66 @@ function RequestDrawButton({ onRequestDraw }) {
   )
 }
 
-function MorePopover({ rect, vertical, isAdmin, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onToggleStudentDraw, onClose, toolbarVertical, onToggleVertical }) {
-  const { background, setBackground } = useWhiteboardStore()
+function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onToggleStudentDraw, onClose, toolbarVertical, onToggleVertical, zoomIn, zoomOut, fitView, resetZoom, zoomPct }) {
+  const { background, setBackground, tool, setTool } = useWhiteboardStore()
+
+  const mobilePopoverStyle = {
+    position: 'fixed' as const,
+    bottom: window.innerHeight - rect.top + 8,
+    right: 8,
+    background: 'rgba(255,255,255,0.98)',
+    backdropFilter: 'blur(16px)',
+    borderRadius: 14,
+    padding: 12,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+    border: '1px solid rgba(0,0,0,0.08)',
+    zIndex: 1200,
+    minWidth: 240,
+    maxWidth: 'calc(100vw - 16px)',
+    maxHeight: 'calc(100vh - 120px)',
+    overflowY: 'auto' as const,
+  }
 
   return (
-    <div style={{ ...S.popover(rect, vertical), minWidth: 220 }}>
+    <div style={isMobile ? mobilePopoverStyle : { ...S.popover(rect, vertical), minWidth: 220 }}>
+
+      {/* ── Sezione mobile: strumenti extra ── */}
+      {isMobile && (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>STRUMENTI</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <button style={{ ...S.btn(tool === 'highlighter'), ...(tool === 'highlighter' ? { background: (useWhiteboardStore.getState().color) + '99', color: '#1a1a1a' } : {}) }} onClick={() => { setTool('highlighter'); onClose() }} title="Evidenziatore"><Icon.Highlighter /></button>
+            <button style={S.btn(tool === 'select')} onClick={() => { setTool('select'); onClose() }} title="Selezione"><Icon.Select /></button>
+            <button style={S.btn(tool === 'text')} onClick={() => { setTool('text'); onClose() }} title="Testo"><Icon.Text /></button>
+            <button style={S.btn(tool === 'laser')} onClick={() => { setTool('laser'); onClose() }} title="Laser"><Icon.Laser /></button>
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>FORME</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
+            {SHAPES.map(s => (
+              <button
+                key={s.id}
+                title={s.label}
+                style={{ ...S.btn(['rect','ellipse','line','arrow','diamond','triangle','axis2','axis3'].includes(tool) && tool === s.id), flexDirection: 'column', gap: 2, height: 48, fontSize: 9, fontWeight: 600 }}
+                onClick={() => { setTool(s.id as Tool); onClose() }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24">{s.icon}</svg>
+                <span>{s.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>ZOOM</div>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 12 }}>
+            <button style={S.btn(false)} onClick={() => { zoomOut?.(); }} title="Zoom -"><Icon.ZoomOut /></button>
+            <button style={{ ...S.btn(false), width: 52, fontSize: 11, fontWeight: 600, color: '#374151' }} onClick={() => { resetZoom?.(); }} title="Reset zoom">{zoomPct}%</button>
+            <button style={S.btn(false)} onClick={() => { zoomIn?.(); }} title="Zoom +"><Icon.ZoomIn /></button>
+            <button style={S.btn(false)} onClick={() => { fitView?.(); onClose() }} title="Adatta"><Icon.FitView /></button>
+          </div>
+
+          <div style={{ width: 'auto', height: 1, background: 'rgba(0,0,0,0.08)', margin: '0 0 10px' }} />
+        </>
+      )}
       {/* Background */}
       <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>SFONDO</div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>

@@ -1,5 +1,34 @@
 # LOG OPERATIVO – GESTIONALE PACCHETTI ORE
 # LOG OPERATIVO
+
+## [2026-03-20] - Lavagna V2: mobile, touch e workflow CI
+
+**Autore**: Recuperiamo
+**Operazione**: Miglioramenti UX mobile per la lavagna V2 e fix workflow CI.
+
+**Motivo/contesto**:
+- Su mobile il tool predefinito era la penna, rendendo impossibile navigare senza cambiare strumento.
+- Il gesto con due dita (pan + zoom) non funzionava quando era attivo uno strumento diverso dalla mano.
+- La toolbar orizzontale era troppo larga per gli schermi mobile (overflow).
+- Il workflow CI falliva perché `npm run build` include `prisma migrate deploy` che richiede DATABASE_URL.
+
+**File coinvolti**:
+- `app/components/lavagna-v2/store/whiteboardStore.ts` — tool predefinito cambiato da `pen` a `hand`
+- `app/components/lavagna-v2/hooks/usePointerHandlers.ts` — pan + zoom con due dita simultanei, indipendente dallo strumento
+- `app/components/lavagna-v2/toolbar/Toolbar.tsx` — toolbar responsive: layout compatto su mobile (< 640px), pulsanti 48px, strumenti extra nel menu "Altro"
+- `.github/workflows/build.yml` — CI usa `npx next build` invece di `npm run build` per evitare il fallimento di prisma migrate
+
+**Scenario Test**:
+1. Aprire la lavagna su dispositivo mobile (o DevTools con viewport < 640px): verificare toolbar compatta con 6 pulsanti grandi.
+2. Selezionare la penna e usare due dita: deve fare pan/zoom senza disegnare.
+3. Toccare la penna quando già attiva: deve aprire il pannello colori/spessore.
+4. Aprire il menu "Altro": deve contenere evidenziatore, selezione, testo, laser, forme e zoom.
+5. Verificare che il workflow CI `Build / build` passi senza DATABASE_URL.
+
+**Problemi riscontrati**: nessuno.
+
+---
+
 ## [2026-01-27 18:14] - Correzione LavagnaCanvas input
 
 **Autore**: Copilot/Recuperiamo

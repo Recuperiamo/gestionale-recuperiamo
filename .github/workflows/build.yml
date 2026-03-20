@@ -15,4 +15,8 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: npm run build
+      - run: npx next build
+        env:
+          DATABASE_URL: "postgresql://localhost/ci_dummy"
+          NEXTAUTH_SECRET: "ci_dummy_secret"
+          NEXTAUTH_URL: "http://localhost:3000"
