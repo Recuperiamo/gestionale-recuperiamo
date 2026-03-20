@@ -12,7 +12,7 @@ export async function POST(req) {
   if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  const { lavagnaId, type, x, y, width, height, x2, y2, color, strokeWidth, fillColor, text, fontSize, rotation } = body
+  const { lavagnaId, type, x, y, width, height, x2, y2, color, strokeWidth, fillColor, text, fontSize, rotation, imageUrl } = body
 
   if (!lavagnaId || !type) return NextResponse.json({ error: 'Dati mancanti' }, { status: 400 })
 
@@ -34,6 +34,7 @@ export async function POST(req) {
       spessore: strokeWidth ?? null,
       rotation: rotation ?? null,
       titolo: text ?? null,
+      src: imageUrl ?? null,
       ...(autoreUserId ? { autoreUserId } : {}),
     },
   })

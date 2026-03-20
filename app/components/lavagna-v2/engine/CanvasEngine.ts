@@ -138,7 +138,7 @@ function _drawAxisArrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x
   ctx.fill()
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
+function drawShape(ctx: CanvasRenderingContext2D, s: Shape, imageCache?: Map<string, HTMLImageElement>, onImageLoad?: () => void) {
   ctx.save()
   ctx.strokeStyle = s.color
   ctx.fillStyle = s.fillColor || 'transparent'
@@ -232,6 +232,27 @@ function drawShape(ctx: CanvasRenderingContext2D, s: Shape) {
     const lines = s.text.split('\n')
     const lineH = (s.fontSize || 18) * 1.4
     lines.forEach((line, i) => ctx.fillText(line, s.x, s.y + i * lineH))
+  } else if (s.type === 'image' && s.imageUrl) {
+    const url = s.imageUrl
+    let img = imageCache?.get(url)
+    if (!img) {
+      img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => onImageLoad?.()
+      img.src = url
+      imageCache?.set(url, img)
+    }
+    const w = s.width ?? 200, h = s.height ?? 150
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, s.x, s.y, w, h)
+    } else {
+      // Placeholder while loading
+      ctx.fillStyle = '#e5e7eb'
+      ctx.fillRect(s.x, s.y, w, h)
+      ctx.strokeStyle = '#9ca3af'
+      ctx.lineWidth = 1
+      ctx.strokeRect(s.x, s.y, w, h)
+    }
   }
   ctx.restore()
 }
@@ -265,6 +286,7 @@ export class CanvasEngine {
   private baseDirty = true
   private liveRafId: number | null = null
   private listeners: EngineListener[] = []
+  private imageCache: Map<string, HTMLImageElement> = new Map()
 
   // Selection highlight
   selectedStrokeIds: string[] = []
@@ -424,7 +446,7 @@ export class CanvasEngine {
       drawSingleStroke(cc, s, this.background)
     }
     for (const s of this.shapes) {
-      drawShape(cc, s)
+      drawShape(cc, s, this.imageCache, () => this.markBaseDirty())
     }
 
     // 3. Composite contentCanvas onto baseCtx

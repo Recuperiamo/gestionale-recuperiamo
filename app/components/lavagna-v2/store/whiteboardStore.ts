@@ -227,6 +227,7 @@ export const useWhiteboardStore = create<WBState>((set, get) => ({
       fontFamily: s.fontFamily ?? undefined,
       rotation: s.rotation ?? 0,
       authorId: s.autoreUserId ?? undefined,
+      imageUrl: s.src || s.imageUrl || undefined,
     }))
     set({ strokes, shapes })
   },

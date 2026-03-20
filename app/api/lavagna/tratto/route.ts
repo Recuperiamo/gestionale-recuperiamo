@@ -52,7 +52,7 @@ export async function POST(req) {
     });
     if (!lavagna) return NextResponse.json({ error: "Lavagna non trovata" }, { status: 404 });
 
-    if (session.user.role === "cliente" && session.user.clienteId !== lavagna.attivita.clienteId) {
+    if (session.user.role === "cliente" && lavagna.attivita && session.user.clienteId !== lavagna.attivita.clienteId) {
       return NextResponse.json({ error: "Accesso negato" }, { status: 403 });
     }
 

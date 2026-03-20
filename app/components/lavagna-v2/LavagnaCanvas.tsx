@@ -20,6 +20,7 @@ import { usePersistence } from './sync/usePersistence'
 import Toolbar from './toolbar/Toolbar'
 import { useTextTool } from './hooks/useTextTool'
 import { useSelectionTool } from './hooks/useSelectionTool'
+import { generateId, prepareStroke } from './engine/strokeUtils'
 
 interface Props {
   lavagnaId: string
@@ -273,6 +274,157 @@ export default function LavagnaCanvas({
     win.document.close()
   }, [lavagnaId])
 
+  // ── Image paste ──────────────────────────────────────────────────────────────
+  // Nessun servizio esterno: l'immagine viene compressa in base64 e salvata nel DB
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of Array.from(items)) {
+        if (!item.type.startsWith('image/')) continue
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (!file) continue
+
+        // Comprimi a max 600px, JPEG 65% → base64 tipicamente 15-45KB (sotto limite Ably 64KB)
+        const imageUrl = await imageToDataUrl(file, 600, 600, 0.65)
+        if (!imageUrl) return
+
+        const dims = await getImageDimensions(imageUrl)
+        const eng = engineRef.current
+        if (!eng) return
+        const cssW = eng['baseCanvas'].width / eng['dpr']
+        const cssH = eng['baseCanvas'].height / eng['dpr']
+        const center = eng.screenToWorld(cssW / 2, cssH / 2)
+        const maxW = (cssW / eng.zoom) * 0.6
+        const scale = Math.min(1, maxW / (dims.w || 400))
+        const w = (dims.w || 400) * scale
+        const h = (dims.h || 300) * scale
+
+        const shape = {
+          id: generateId(),
+          type: 'image' as const,
+          x: center.x - w / 2,
+          y: center.y - h / 2,
+          width: w,
+          height: h,
+          imageUrl,
+          color: 'transparent',
+          strokeWidth: 0,
+          fillColor: 'transparent',
+          rotation: 0,
+          authorId: utenteId,
+        }
+
+        store.addShape(shape)
+        store.pushUndo({ type: 'add-shape', shape })
+        // Sync via Ably (l'immagine è già piccola, stare dentro i 64KB Ably)
+        emitStrokeEvent({ type: 'commit-shape', shape })
+
+        // Persist to DB (src = base64 data URL)
+        try {
+          const res = await fetch('/api/lavagna-v2/shape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...shape, lavagnaId }),
+          })
+          if (res.ok) {
+            const js = await res.json()
+            if (js.shape?.dbId) store.updateShape(shape.id, { dbId: js.shape.dbId })
+          }
+        } catch (_) {}
+
+        break
+      }
+    }
+
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  }, [engineRef, store, utenteId, lavagnaId, emitStrokeEvent])
+
+  // ── Catch-up poll: recupera tratti persi da Ably ogni 4 secondi ──────────────
+  // Se Ably droppa un messaggio stroke:done, il tratto appare nel DB ma non nello store.
+  // Questo poll confronta il DB (solo nuovi tratti dall'ultima sync) con lo store
+  // e aggiunge quelli mancanti — senza toccare quelli già presenti.
+  useEffect(() => {
+    const syncedDbIds = new Set<number>()
+    // Inizializza con i tratti già caricati dall'initial load (hanno dbId)
+    for (const s of useWhiteboardStore.getState().strokes) {
+      if (s.dbId) syncedDbIds.add(Number(s.dbId))
+    }
+
+    // Timestamp dell'ultima sync: inizia a ora - 2s per coprire possibili race conditions
+    let lastSync = new Date(Date.now() - 2000)
+
+    const poll = async () => {
+      const since = lastSync.toISOString()
+      lastSync = new Date() // aggiorna subito prima della fetch
+
+      const params = attivitaId
+        ? `attivitaId=${attivitaId}&since=${since}`
+        : `lavagnaId=${lavagnaId}&since=${since}`
+
+      try {
+        const res = await fetch(`/api/lavagna-v2?${params}`)
+        if (!res.ok) return
+        const js = await res.json()
+        const tratti: any[] = js.lavagna?.tratti || []
+        const forme: any[] = js.lavagna?.forme || []
+        if (!tratti.length && !forme.length) return
+
+        const st = useWhiteboardStore.getState()
+        const knownStreamIds = new Set(st.strokes.map(s => s.id))
+        const knownShapeDbIds = new Set(st.shapes.map(s => s.dbId).filter(Boolean).map(Number))
+
+        // Tratti mancanti
+        for (const t of tratti) {
+          if (syncedDbIds.has(t.id)) continue
+          if (t.streamId && knownStreamIds.has(t.streamId)) { syncedDbIds.add(t.id); continue }
+          const punti = Array.isArray(t.punti) ? t.punti : []
+          if (punti.length === 0) continue
+          const stroke = prepareStroke({
+            id: t.streamId || `db-${t.id}`,
+            tool: t.strumento || 'pen',
+            color: t.colore || '#1a1a1a',
+            width: t.spessore || 3,
+            opacity: 1,
+            points: punti,
+          })
+          if (stroke) {
+            st.addStroke({ ...stroke, dbId: t.id, authorId: t.autoreUserId ?? undefined })
+            syncedDbIds.add(t.id)
+          }
+        }
+
+        // Forme mancanti (incluse immagini)
+        for (const f of forme) {
+          if (knownShapeDbIds.has(f.id)) continue
+          const shape = {
+            id: `shape-${f.id}`,
+            dbId: f.id,
+            type: f.kind || 'rect',
+            x: f.x ?? 0, y: f.y ?? 0,
+            width: f.w ?? f.width ?? 0,
+            height: f.h ?? f.height ?? 0,
+            x2: f.x2 ?? undefined, y2: f.y2 ?? undefined,
+            color: f.colore || f.color || '#1a1a1a',
+            strokeWidth: f.spessore || f.strokeWidth || 2,
+            fillColor: f.fillColor || 'transparent',
+            text: f.titolo || undefined,
+            fontSize: f.fontSize ?? undefined,
+            rotation: f.rotation ?? 0,
+            imageUrl: f.src || f.imageUrl || undefined,
+            authorId: f.autoreUserId ?? undefined,
+          }
+          st.addShape(shape)
+        }
+      } catch (_) {}
+    }
+
+    const interval = setInterval(poll, 500)
+    return () => clearInterval(interval)
+  }, [lavagnaId, attivitaId])
+
   // ── Background change broadcast (admin only) ─────────────────────────────────
   useEffect(() => {
     if (!isAdmin) return
@@ -412,6 +564,38 @@ export default function LavagnaCanvas({
       `}</style>
     </div>
   )
+}
+
+// ─── Image helpers ─────────────────────────────────────────────────────────────
+
+// Converte File immagine in base64 data URL compressa (nessun servizio esterno)
+function imageToDataUrl(file: File, maxW: number, maxH: number, quality: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxW / img.width, maxH / img.height)
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+function getImageDimensions(url: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 600, h: 400 })
+    img.src = url
+  })
 }
 
 // ─── Text input overlay ───────────────────────────────────────────────────────

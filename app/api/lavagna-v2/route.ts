@@ -24,13 +24,14 @@ function formatDataOra(d: Date) {
 }
 
 // ── Leggi lavagna (tratti + forme) ────────────────────────────────────────────
-async function getLavagnaData(lavagnaId: number) {
+async function getLavagnaData(lavagnaId: number, since?: Date) {
+  const sinceFilter = since ? { createdAt: { gt: since } } : {}
   const tratti = await prisma.lavagnaTratto.findMany({
-    where: { lavagnaId, deletedAt: null },
+    where: { lavagnaId, deletedAt: null, ...sinceFilter },
     orderBy: { createdAt: 'asc' },
   })
   const forme = await prisma.lavagnaShape.findMany({
-    where: { lavagnaId, deletedAt: null },
+    where: { lavagnaId, deletedAt: null, ...sinceFilter },
     orderBy: { createdAt: 'asc' },
   })
   return { tratti, forme }
@@ -45,6 +46,9 @@ export async function GET(req) {
   const attivitaIdParam = url.searchParams.get('attivitaId')
 
   // ── Modalità: per ID lavagna diretta ────────────────────────────────────────
+  const sinceParam = url.searchParams.get('since')
+  const sinceDate = sinceParam ? new Date(sinceParam) : undefined
+
   if (lavagnaIdParam) {
     const lavagnaId = Number(lavagnaIdParam)
     if (isNaN(lavagnaId)) return NextResponse.json({ error: 'lavagnaId non valido' }, { status: 400 })
@@ -52,7 +56,7 @@ export async function GET(req) {
     const lavagna = await prisma.lavagna.findUnique({ where: { id: lavagnaId } })
     if (!lavagna) return NextResponse.json({ error: 'Lavagna non trovata' }, { status: 404 })
 
-    const { tratti, forme } = await getLavagnaData(lavagnaId)
+    const { tratti, forme } = await getLavagnaData(lavagnaId, sinceDate)
     return NextResponse.json({ lavagna: { ...lavagna, tratti, forme } })
   }
 
@@ -98,7 +102,7 @@ export async function GET(req) {
     const nomeStudente = att.cliente?.nomeReferente || att.cliente?.email || ''
     const titoloVisuale = nomeStudente ? `${lavagna.titolo} – ${nomeStudente}` : lavagna.titolo
 
-    const { tratti, forme } = await getLavagnaData(lavagna.id)
+    const { tratti, forme } = await getLavagnaData(lavagna.id, sinceDate)
     return NextResponse.json({ lavagna: { ...lavagna, titoloVisuale, nomeStudente, tratti, forme } })
   }
 

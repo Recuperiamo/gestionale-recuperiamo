@@ -305,7 +305,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     // Shift: straight line from first to last collected point
     const isShiftUp = (e.nativeEvent || e).shiftKey || lastShiftKey.current
     let finalPts
-    if (isShiftUp && (tool === 'pen' || tool === 'highlighter') && raw.length >= 2) {
+    if (isShiftUp && (currentTool === 'pen' || currentTool === 'highlighter') && raw.length >= 2) {
       finalPts = [raw[0], raw[raw.length - 1]]
     } else {
       finalPts = simplifyPoints(raw, eng.zoom)
@@ -356,8 +356,15 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     const rect = (e.target as HTMLElement).getBoundingClientRect?.() || { left: 0, top: 0 }
     const sx = e.clientX - rect.left
     const sy = e.clientY - rect.top
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
-    eng.zoomAt(factor, sx, sy)
+
+    if (e.ctrlKey) {
+      // Pinch gesture su Mac trackpad (ctrlKey=true) oppure Ctrl+scroll → zoom
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
+      eng.zoomAt(factor, sx, sy)
+    } else {
+      // Due dita swipe su Mac trackpad → pan (deltaX orizzontale, deltaY verticale)
+      eng.setPan(eng.pan.x + e.deltaX / eng.zoom, eng.pan.y + e.deltaY / eng.zoom)
+    }
   }, [])
 
   // ── Touch pinch ─────────────────────────────────────────────────────────────
