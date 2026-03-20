@@ -21,6 +21,8 @@ interface Props {
   onExportPDF?: () => void
   onRequestDraw?: () => void
   onToggleStudentDraw?: (enable: boolean) => void
+  onUndo?: () => void
+  onRedo?: () => void
   lavagnaId?: string
   attivitaId?: string
 }
@@ -256,7 +258,7 @@ const Icon = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onRequestDraw, onToggleStudentDraw }: Props) {
+export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onRequestDraw, onToggleStudentDraw, onUndo, onRedo }: Props) {
   const { tool, color, strokeWidth, opacity, background, undoStack, redoStack,
     setTool, setColor, setStrokeWidth, setBackground, setEraserMode } = useWhiteboardStore()
 
@@ -308,24 +310,8 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
   const fitView = () => { engineRef.current?.fitToContent(); syncZoom() }
   const resetZoom = () => { engineRef.current?.resetView(); syncZoom() }
 
-  const handleUndo = () => {
-    const store = useWhiteboardStore.getState()
-    const entry = store.undo()
-    if (!entry) return
-    if (entry.type === 'add-stroke' && entry.stroke) store.deleteStroke(entry.stroke.id)
-    if (entry.type === 'delete-stroke' && entry.stroke) store.addStroke(entry.stroke)
-    if (entry.type === 'add-shape' && entry.shape) store.deleteShape(entry.shape.id)
-    if (entry.type === 'delete-shape' && entry.shape) store.addShape(entry.shape)
-  }
-  const handleRedo = () => {
-    const store = useWhiteboardStore.getState()
-    const entry = store.redo()
-    if (!entry) return
-    if (entry.type === 'add-stroke' && entry.stroke) store.addStroke(entry.stroke)
-    if (entry.type === 'delete-stroke' && entry.stroke) store.deleteStroke(entry.stroke.id)
-    if (entry.type === 'add-shape' && entry.shape) store.addShape(entry.shape)
-    if (entry.type === 'delete-shape' && entry.shape) store.deleteShape(entry.shape.id)
-  }
+  const handleUndo = () => onUndo?.()
+  const handleRedo = () => onRedo?.()
 
   const isInkTool = tool === 'pen' || tool === 'highlighter'
   const isDrawTool = isInkTool || tool === 'eraser'
