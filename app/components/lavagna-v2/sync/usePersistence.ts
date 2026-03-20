@@ -61,6 +61,24 @@ export function usePersistence({ lavagnaId, userId }: Options) {
     } catch (_) {}
   }, [])
 
+  const saveShape = useCallback(async (shape: any): Promise<string | number | null> => {
+    if (!lavagnaId) return null
+    try {
+      const res = await fetch('/api/lavagna-v2/shape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...shape, lavagnaId }),
+      })
+      if (!res.ok) return null
+      const js = await res.json()
+      const dbId = js.shape?.dbId
+      if (dbId) store.updateShape(shape.id, { dbId })
+      return dbId ?? null
+    } catch (_) {
+      return null
+    }
+  }, [lavagnaId, store])
+
   const clearBoard = useCallback(async () => {
     if (!lavagnaId) return
     try {
@@ -69,5 +87,5 @@ export function usePersistence({ lavagnaId, userId }: Options) {
     } catch (_) {}
   }, [lavagnaId, store])
 
-  return { saveStroke, deleteStroke, deleteShape, clearBoard }
+  return { saveStroke, deleteStroke, saveShape, deleteShape, clearBoard }
 }

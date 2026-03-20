@@ -130,55 +130,66 @@ export default function LavagnaCanvas({
   }, [])
 
   // ── Persistence ──────────────────────────────────────────────────────────────
-  const { saveStroke, deleteStroke, deleteShape, clearBoard } = usePersistence({ lavagnaId, userId: utenteId })
+  const { saveStroke, deleteStroke, saveShape, deleteShape, clearBoard } = usePersistence({ lavagnaId, userId: utenteId })
 
-  // ── Undo / Redo keyboard ─────────────────────────────────────────────────────
+  // ── Undo / Redo (usato sia da keyboard che dai pulsanti toolbar) ─────────────
+  const handleUndo = useCallback(() => {
+    const entry = store.undo()
+    if (!entry) return
+    if (entry.type === 'add-stroke' && entry.stroke) {
+      store.deleteStroke(entry.stroke.id)
+      if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
+    }
+    if (entry.type === 'delete-stroke' && entry.stroke) {
+      store.addStroke(entry.stroke)
+      saveStroke(entry.stroke)
+    }
+    if (entry.type === 'add-shape' && entry.shape) {
+      store.deleteShape(entry.shape.id)
+      if (entry.shape.dbId) deleteShape(entry.shape.dbId)
+    }
+    if (entry.type === 'delete-shape' && entry.shape) {
+      store.addShape(entry.shape)
+      saveShape(entry.shape)
+    }
+  }, [store, saveStroke, deleteStroke, saveShape, deleteShape])
+
+  const handleRedo = useCallback(() => {
+    const entry = store.redo()
+    if (!entry) return
+    if (entry.type === 'add-stroke' && entry.stroke) {
+      store.addStroke(entry.stroke)
+      saveStroke(entry.stroke)
+    }
+    if (entry.type === 'delete-stroke' && entry.stroke) {
+      store.deleteStroke(entry.stroke.id)
+      if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
+    }
+    if (entry.type === 'add-shape' && entry.shape) {
+      store.addShape(entry.shape)
+      saveShape(entry.shape)
+    }
+    if (entry.type === 'delete-shape' && entry.shape) {
+      store.deleteShape(entry.shape.id)
+      if (entry.shape.dbId) deleteShape(entry.shape.dbId)
+    }
+  }, [store, saveStroke, deleteStroke, saveShape, deleteShape])
+
+  // ── Keyboard shortcuts Ctrl+Z / Ctrl+Y ──────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
-        const entry = store.undo()
-        if (!entry) return
-        if (entry.type === 'add-stroke' && entry.stroke) {
-          store.deleteStroke(entry.stroke.id)
-          if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
-        }
-        if (entry.type === 'delete-stroke' && entry.stroke) {
-          store.addStroke(entry.stroke)
-          saveStroke(entry.stroke)
-        }
-        if (entry.type === 'add-shape' && entry.shape) {
-          store.deleteShape(entry.shape.id)
-          if (entry.shape.dbId) deleteShape(entry.shape.dbId)
-        }
-        if (entry.type === 'delete-shape' && entry.shape) {
-          store.addShape(entry.shape)
-        }
+        handleUndo()
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault()
-        const entry = store.redo()
-        if (!entry) return
-        if (entry.type === 'add-stroke' && entry.stroke) {
-          store.addStroke(entry.stroke)
-          saveStroke(entry.stroke)
-        }
-        if (entry.type === 'delete-stroke' && entry.stroke) {
-          store.deleteStroke(entry.stroke.id)
-          if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
-        }
-        if (entry.type === 'add-shape' && entry.shape) {
-          store.addShape(entry.shape)
-        }
-        if (entry.type === 'delete-shape' && entry.shape) {
-          store.deleteShape(entry.shape.id)
-          if (entry.shape.dbId) deleteShape(entry.shape.dbId)
-        }
+        handleRedo()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [store, saveStroke, deleteStroke, deleteShape])
+  }, [handleUndo, handleRedo])
 
   // Callbacks per useAblySync — devono stare al top-level del componente (regole hooks)
   const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
@@ -578,6 +589,8 @@ export default function LavagnaCanvas({
         onExportPDF={exportPDF}
         onRequestDraw={emitDrawRequest}
         onToggleStudentDraw={isAdmin ? toggleStudentDraw : undefined}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
 
       {/* Off-screen cursor indicators */}
