@@ -143,6 +143,17 @@ export default function LavagnaCanvas({
           store.deleteStroke(entry.stroke.id)
           if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
         }
+        if (entry.type === 'delete-stroke' && entry.stroke) {
+          store.addStroke(entry.stroke)
+          saveStroke(entry.stroke)
+        }
+        if (entry.type === 'add-shape' && entry.shape) {
+          store.deleteShape(entry.shape.id)
+          if (entry.shape.dbId) deleteShape(entry.shape.dbId)
+        }
+        if (entry.type === 'delete-shape' && entry.shape) {
+          store.addShape(entry.shape)
+        }
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault()
@@ -152,11 +163,22 @@ export default function LavagnaCanvas({
           store.addStroke(entry.stroke)
           saveStroke(entry.stroke)
         }
+        if (entry.type === 'delete-stroke' && entry.stroke) {
+          store.deleteStroke(entry.stroke.id)
+          if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
+        }
+        if (entry.type === 'add-shape' && entry.shape) {
+          store.addShape(entry.shape)
+        }
+        if (entry.type === 'delete-shape' && entry.shape) {
+          store.deleteShape(entry.shape.id)
+          if (entry.shape.dbId) deleteShape(entry.shape.dbId)
+        }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [store, saveStroke, deleteStroke])
+  }, [store, saveStroke, deleteStroke, deleteShape])
 
   // Callbacks per useAblySync — devono stare al top-level del componente (regole hooks)
   const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
@@ -240,15 +262,18 @@ export default function LavagnaCanvas({
   // ── Text tool ────────────────────────────────────────────────────────────────
   const { session: textSession, value: textValue, setValue: setTextValue,
     startText, commit: commitText, cancel: cancelText } = useTextTool(engineRef, async (shape) => {
+    // Sync via Ably
+    emitStrokeEvent({ type: 'commit-shape', shape })
+    // Persist su lavagna-v2
     try {
-      const res = await fetch('/api/lavagna/shape', {
+      const res = await fetch('/api/lavagna-v2/shape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...shape, lavagnaId }),
       })
       if (res.ok) {
         const js = await res.json()
-        if (js.shape?.id) store.updateShape(shape.id, { dbId: js.shape.id })
+        if (js.shape?.dbId) store.updateShape(shape.id, { dbId: js.shape.dbId })
       }
     } catch (_) {}
   })

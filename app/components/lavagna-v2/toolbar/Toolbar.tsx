@@ -263,6 +263,8 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
     if (!entry) return
     if (entry.type === 'add-stroke' && entry.stroke) store.deleteStroke(entry.stroke.id)
     if (entry.type === 'delete-stroke' && entry.stroke) store.addStroke(entry.stroke)
+    if (entry.type === 'add-shape' && entry.shape) store.deleteShape(entry.shape.id)
+    if (entry.type === 'delete-shape' && entry.shape) store.addShape(entry.shape)
   }
   const handleRedo = () => {
     const store = useWhiteboardStore.getState()
@@ -270,6 +272,8 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
     if (!entry) return
     if (entry.type === 'add-stroke' && entry.stroke) store.addStroke(entry.stroke)
     if (entry.type === 'delete-stroke' && entry.stroke) store.deleteStroke(entry.stroke.id)
+    if (entry.type === 'add-shape' && entry.shape) store.addShape(entry.shape)
+    if (entry.type === 'delete-shape' && entry.shape) store.deleteShape(entry.shape.id)
   }
 
   const isInkTool = tool === 'pen' || tool === 'highlighter'
