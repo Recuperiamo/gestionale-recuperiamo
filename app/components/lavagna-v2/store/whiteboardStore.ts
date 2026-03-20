@@ -94,7 +94,7 @@ interface WBState {
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useWhiteboardStore = create<WBState>((set, get) => ({
-  tool: 'pen',
+  tool: 'hand',
   color: '#1a1a1a',
   strokeWidth: 3,
   opacity: 1,

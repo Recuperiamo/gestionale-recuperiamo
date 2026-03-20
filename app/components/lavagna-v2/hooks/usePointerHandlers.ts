@@ -386,10 +386,19 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     if (prevDist < 1) return
 
     const factor = newDist / prevDist
-    const mx = (a.clientX + b.clientX) / 2
-    const my = (a.clientY + b.clientY) / 2
+    const prevMidX = (prev[0].x + prev[1].x) / 2
+    const prevMidY = (prev[0].y + prev[1].y) / 2
+    const newMidX = (a.clientX + b.clientX) / 2
+    const newMidY = (a.clientY + b.clientY) / 2
     const rect = (e.target as HTMLElement).getBoundingClientRect?.() || { left: 0, top: 0 }
-    getEngine()?.zoomAt(factor, mx - rect.left, my - rect.top)
+    const eng = getEngine()
+    if (!eng) return
+
+    // Zoom centrato sul midpoint precedente, poi pan per seguire lo spostamento delle dita
+    eng.zoomAt(factor, prevMidX - rect.left, prevMidY - rect.top)
+    const dmx = newMidX - prevMidX
+    const dmy = newMidY - prevMidY
+    eng.setPan(eng.pan.x - dmx / eng.zoom, eng.pan.y - dmy / eng.zoom)
 
     for (const t of e.changedTouches) touches.current.set(t.identifier, { x: t.clientX, y: t.clientY })
   }, [])
