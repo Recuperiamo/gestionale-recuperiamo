@@ -226,6 +226,12 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           if (d.shapeId) store.deleteShape(d.shapeId)
         }
 
+        const onShapeUpdate = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (d.shapeId && d.patch) store.updateShape(d.shapeId, d.patch)
+        }
+
         const onPermissionsUpdateMsg = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
@@ -250,6 +256,7 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         ch.subscribe('stroke:delete', onStrokeDelete)
         ch.subscribe('shape:add', onShapeAdd)
         ch.subscribe('shape:delete', onShapeDelete)
+        ch.subscribe('shape:update', onShapeUpdate)
         ch.subscribe('permissions:update', onPermissionsUpdateMsg)
         ch.subscribe('draw:request', onDrawRequestMsg)
 
@@ -274,5 +281,13 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
     }
   }, [channelName, userId, isAdmin])
 
-  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, publish }
+  const emitShapeUpdate = useCallback((shape: any) => {
+    publish('shape:update', {
+      shapeId: shape.id,
+      patch: { x: shape.x, y: shape.y, width: shape.width, height: shape.height, x2: shape.x2, y2: shape.y2, rotation: shape.rotation },
+      lavagnaId,
+    })
+  }, [publish, lavagnaId])
+
+  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, publish }
 }

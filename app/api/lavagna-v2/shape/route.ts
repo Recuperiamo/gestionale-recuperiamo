@@ -42,6 +42,30 @@ export async function POST(req) {
   return NextResponse.json({ shape: { dbId: shape.id } }, { status: 201 })
 }
 
+export async function PATCH(req) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+
+  const url = new URL(req.url)
+  const id = Number(url.searchParams.get('id'))
+  if (!id) return NextResponse.json({ error: 'id mancante' }, { status: 400 })
+
+  const body = await req.json().catch(() => ({}))
+  const data: any = {}
+  if (body.x !== undefined) data.x = Number(body.x)
+  if (body.y !== undefined) data.y = Number(body.y)
+  if (body.x2 !== undefined) data.x2 = Number(body.x2)
+  if (body.y2 !== undefined) data.y2 = Number(body.y2)
+  if (body.w !== undefined) data.w = Number(body.w)
+  if (body.h !== undefined) data.h = Number(body.h)
+  if (body.rotation !== undefined) data.rotation = Number(body.rotation)
+
+  if (!Object.keys(data).length) return NextResponse.json({ error: 'Nessun dato' }, { status: 400 })
+
+  await prisma.lavagnaShape.updateMany({ where: { id }, data })
+  return NextResponse.json({ ok: true })
+}
+
 export async function DELETE(req) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })

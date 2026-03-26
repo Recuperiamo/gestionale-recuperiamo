@@ -187,9 +187,22 @@ export default function LavagnaCanvas({
         handleRedo()
       }
     }
+      // [ / ] → ruota immagine selezionata di ±15°
+      if (e.key === '[' || e.key === ']') {
+        const { selectedShapeIds, shapes } = store
+        if (selectedShapeIds.length !== 1) return
+        const img = shapes.find(s => s.id === selectedShapeIds[0] && s.type === 'image')
+        if (!img) return
+        e.preventDefault()
+        const delta = e.key === '[' ? -Math.PI / 12 : Math.PI / 12
+        const newRotation = (img.rotation ?? 0) + delta
+        store.updateShape(img.id, { rotation: newRotation })
+        onSaveShape(img.id)
+      }
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [handleUndo, handleRedo])
+  }, [store, saveStroke, deleteStroke, onSaveShape])
 
   // Callbacks per useAblySync — devono stare al top-level del componente (regole hooks)
   const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
@@ -203,7 +216,7 @@ export default function LavagnaCanvas({
   }, [])
 
   // ── Ably sync ────────────────────────────────────────────────────────────────
-  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest } = useAblySync({
+  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate } = useAblySync({
     channelName, engineRef, userId: utenteId, role: ruolo,
     lavagnaId, attivitaId, isAdmin,
     onPermissionsUpdate: handlePermissionsUpdate,
@@ -264,10 +277,26 @@ export default function LavagnaCanvas({
     isAdmin,
   })
 
+  // ── Salva posizione/dimensione/rotazione forma su DB + Ably ─────────────────
+  const onSaveShape = useCallback(async (shapeId: string) => {
+    const s = useWhiteboardStore.getState().shapes.find(x => x.id === shapeId)
+    if (!s?.dbId) return
+    fetch(`/api/lavagna-v2/shape?id=${s.dbId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x: s.x, y: s.y, x2: s.x2, y2: s.y2, w: s.width, h: s.height, rotation: s.rotation }),
+    }).catch(() => {})
+    emitShapeUpdate(s)
+  }, [emitShapeUpdate])
+
   // ── Selection tool ───────────────────────────────────────────────────────────
   const { onPointerDown: selDown, onPointerMove: selMove, onPointerUp: selUp } = useSelectionTool(
     engineRef,
-    () => { /* future: persist moved items positions */ }
+    async () => {
+      // Persist moved shapes to DB + Ably
+      const { selectedShapeIds } = useWhiteboardStore.getState()
+      for (const id of selectedShapeIds) onSaveShape(id)
+    }
   )
 
   // ── Text tool ────────────────────────────────────────────────────────────────
@@ -323,7 +352,7 @@ export default function LavagnaCanvas({
         if (!file) continue
 
         // Comprimi a max 600px, JPEG 65% → base64 tipicamente 15-45KB (sotto limite Ably 64KB)
-        const imageUrl = await imageToDataUrl(file, 600, 600, 0.65)
+        const imageUrl = await imageFileToDataUrl(file, 600, 600, 0.65)
         if (!imageUrl) return
 
         const dims = await getImageDimensions(imageUrl)
@@ -331,7 +360,8 @@ export default function LavagnaCanvas({
         if (!eng) return
         const cssW = eng['baseCanvas'].width / eng['dpr']
         const cssH = eng['baseCanvas'].height / eng['dpr']
-        const center = eng.screenToWorld(cssW / 2, cssH / 2)
+        // Centra nell'area visibile (sottrae ~60px per toolbar a fixed bottom)
+        const center = eng.screenToWorld(cssW / 2, (cssH - 60) / 2)
         const maxW = (cssW / eng.zoom) * 0.6
         const scale = Math.min(1, maxW / (dims.w || 400))
         const w = (dims.w || 400) * scale
@@ -593,6 +623,9 @@ export default function LavagnaCanvas({
         onRedo={handleRedo}
       />
 
+      {/* Image resize/rotation overlay */}
+      <ImageTransformOverlay engineRef={engineRef} onSaveShape={onSaveShape} />
+
       {/* Off-screen cursor indicators */}
       <OffscreenCursors engineRef={engineRef} />
 
@@ -607,7 +640,7 @@ export default function LavagnaCanvas({
 // ─── Image helpers ─────────────────────────────────────────────────────────────
 
 // Converte File immagine in base64 data URL compressa (nessun servizio esterno)
-function imageToDataUrl(file: File, maxW: number, maxH: number, quality: number): Promise<string | null> {
+function imageFileToDataUrl(file: File, maxW: number, maxH: number, quality: number): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
@@ -673,6 +706,123 @@ function TextOverlay({ screenX, screenY, value, onChange, onCommit, onCancel, co
       }}
       placeholder="Scrivi testo…"
     />
+  )
+}
+
+// ─── Image transform overlay (resize + rotation handles) ─────────────────────
+
+function ImageTransformOverlay({
+  engineRef,
+  onSaveShape,
+}: {
+  engineRef: React.RefObject<CanvasEngine>
+  onSaveShape: (shapeId: string) => void
+}) {
+  const selectedShapeIds = useWhiteboardStore(s => s.selectedShapeIds)
+  const shapes = useWhiteboardStore(s => s.shapes)
+  const [, forceUpdate] = useState(0)
+  const dragRef = useRef<{ type: string; startX: number; startY: number; origShape: any } | null>(null)
+
+  // Re-render su pan/zoom
+  useEffect(() => {
+    const eng = engineRef.current
+    if (!eng) return
+    const listener = () => forceUpdate(n => n + 1)
+    eng.on(listener)
+    return () => eng.off(listener)
+  }, [engineRef])
+
+  if (selectedShapeIds.length !== 1) return null
+  const shape = shapes.find(s => s.id === selectedShapeIds[0] && s.type === 'image')
+  if (!shape) return null
+  const eng = engineRef.current
+  if (!eng) return null
+
+  const iw = shape.width ?? 200
+  const ih = shape.height ?? 150
+  const tl = eng.worldToScreen(shape.x, shape.y)
+  const sw = iw * eng.zoom
+  const sh = ih * eng.zoom
+  const rotation = shape.rotation ?? 0
+
+  const onHDown = (e: React.PointerEvent, type: string) => {
+    e.stopPropagation()
+    e.preventDefault()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    dragRef.current = { type, startX: e.clientX, startY: e.clientY, origShape: { ...shape, width: iw, height: ih } }
+  }
+
+  const onHMove = (e: React.PointerEvent, type: string) => {
+    if (!dragRef.current || dragRef.current.type !== type) return
+    e.stopPropagation()
+    const orig = dragRef.current.origShape
+    const dx = (e.clientX - dragRef.current.startX) / eng.zoom
+    const dy = (e.clientY - dragRef.current.startY) / eng.zoom
+
+    if (type === 'rotate') {
+      const cx = tl.x + sw / 2
+      const cy2 = tl.y + sh / 2
+      const angle = Math.atan2(e.clientY - cy2, e.clientX - cx)
+      const initAngle = Math.atan2(dragRef.current.startY - cy2, dragRef.current.startX - cx)
+      useWhiteboardStore.getState().updateShape(shape.id, { rotation: (orig.rotation ?? 0) + (angle - initAngle) })
+    } else {
+      let { x, y, width, height } = { x: orig.x, y: orig.y, width: orig.width, height: orig.height }
+      if (type === 'tl') { x += dx; y += dy; width -= dx; height -= dy }
+      else if (type === 'tr') { width += dx; y += dy; height -= dy }
+      else if (type === 'bl') { x += dx; width -= dx; height += dy }
+      else if (type === 'br') { width += dx; height += dy }
+      if (width > 30 && height > 20) useWhiteboardStore.getState().updateShape(shape.id, { x, y, width, height })
+    }
+  }
+
+  const onHUp = (e: React.PointerEvent, type: string) => {
+    if (!dragRef.current || dragRef.current.type !== type) return
+    e.stopPropagation()
+    dragRef.current = null
+    onSaveShape(shape.id)
+  }
+
+  const corners = [
+    { type: 'tl', left: '0%', top: '0%', cursor: 'nwse-resize' },
+    { type: 'tr', left: '100%', top: '0%', cursor: 'nesw-resize' },
+    { type: 'bl', left: '0%', top: '100%', cursor: 'nesw-resize' },
+    { type: 'br', left: '100%', top: '100%', cursor: 'nwse-resize' },
+  ]
+
+  const hBase: React.CSSProperties = {
+    position: 'absolute', width: 12, height: 12,
+    background: '#fff', border: '2px solid #0078d4', borderRadius: 3,
+    transform: 'translate(-50%, -50%)', pointerEvents: 'auto', touchAction: 'none',
+  }
+
+  return (
+    <div style={{
+      position: 'absolute', left: tl.x, top: tl.y, width: sw, height: sh,
+      transform: rotation ? `rotate(${rotation}rad)` : undefined,
+      transformOrigin: 'center center',
+      border: '1.5px solid #0078d4', boxSizing: 'border-box',
+      pointerEvents: 'none', zIndex: 55,
+    }}>
+      {/* Stalk */}
+      <div style={{ position: 'absolute', left: '50%', top: -28, width: 1.5, height: 28, background: '#0078d4', transform: 'translateX(-50%)', pointerEvents: 'none' }} />
+      {/* Rotation handle */}
+      <div
+        style={{ ...hBase, left: '50%', top: -36, borderRadius: '50%', cursor: 'grab', width: 14, height: 14 }}
+        onPointerDown={e => onHDown(e, 'rotate')}
+        onPointerMove={e => onHMove(e, 'rotate')}
+        onPointerUp={e => onHUp(e, 'rotate')}
+      />
+      {/* Corner handles */}
+      {corners.map(c => (
+        <div
+          key={c.type}
+          style={{ ...hBase, left: c.left, top: c.top, cursor: c.cursor }}
+          onPointerDown={e => onHDown(e, c.type)}
+          onPointerMove={e => onHMove(e, c.type)}
+          onPointerUp={e => onHUp(e, c.type)}
+        />
+      ))}
+    </div>
   )
 }
 

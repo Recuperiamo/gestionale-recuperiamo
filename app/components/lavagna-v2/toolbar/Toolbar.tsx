@@ -470,9 +470,8 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
         <button
           ref={penBtnRef}
           style={{ ...S.btn(tool === 'pen'), ...(tool === 'pen' ? { background: color, color: '#fff' } : {}) }}
-          onClick={() => setTool('pen')}
-          onDoubleClick={() => togglePop('pen', penBtnRef)}
-          title="Penna (P)"
+          onClick={() => tool === 'pen' ? togglePop('pen', penBtnRef) : (setTool('pen'), closePop())}
+          title="Penna — click per attivare, click di nuovo per opzioni"
         >
           <Icon.Pen />
         </button>
@@ -481,9 +480,8 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
         <button
           ref={hlBtnRef}
           style={{ ...S.btn(tool === 'highlighter'), ...(tool === 'highlighter' ? { background: color + '99', color: '#1a1a1a' } : {}) }}
-          onClick={() => setTool('highlighter')}
-          onDoubleClick={() => togglePop('hl', hlBtnRef)}
-          title="Evidenziatore (H)"
+          onClick={() => tool === 'highlighter' ? togglePop('hl', hlBtnRef) : (setTool('highlighter'), closePop())}
+          title="Evidenziatore — click per attivare, click di nuovo per opzioni"
         >
           <Icon.Highlighter />
         </button>
