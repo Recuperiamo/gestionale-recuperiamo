@@ -46,6 +46,7 @@ export default function PacchettiLezioniPage() {
   const [filtroAdminDa, setFiltroAdminDa] = useState("");
   const [filtroAdminA, setFiltroAdminA] = useState("");
   const [filtroMese, setFiltroMese] = useState("");
+  const [filtroOreExtra, setFiltroOreExtra] = useState(""); // "" | "extra" | "normale"
   const [ordinamento, setOrdinamento] = useState("cronologico"); // cronologico | alfabetico
   
   // Filtri Cliente
@@ -263,8 +264,13 @@ export default function PacchettiLezioniPage() {
         a.setHours(23, 59, 59, 999);
         filtered = filtered.filter(att => parseStart(att) <= a);
       }
+      if (filtroOreExtra === "extra") {
+        filtered = filtered.filter(a => a.extraPacchetto === true);
+      } else if (filtroOreExtra === "normale") {
+        filtered = filtered.filter(a => !a.extraPacchetto);
+      }
     }
-    
+
     // Applica filtri CLIENTE
     if (isCliente) {
       if (filtroTipologia) {
@@ -324,7 +330,7 @@ export default function PacchettiLezioniPage() {
     }
     
     return { prenotate: future, svolte: past, cancellate: canc };
-  }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, ordinamento, isAdmin, isCliente]);
+  }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, filtroOreExtra, ordinamento, isAdmin, isCliente]);
 
   // Helpers per il calcolo ore
   function oreFromAttivita(a) {
@@ -955,6 +961,20 @@ export default function PacchettiLezioniPage() {
                     <option value="archiviato">Archiviato</option>
                   </select>
                 </div>
+                <div style={{ flex: "1 1 140px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Ore extra
+                  </label>
+                  <select
+                    value={filtroOreExtra}
+                    onChange={(e) => setFiltroOreExtra(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Tutte le lezioni</option>
+                    <option value="extra">Solo ore extra</option>
+                    <option value="normale">Solo ore normali</option>
+                  </select>
+                </div>
                 <div style={{ flex: "1 1 130px" }}>
                   <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
                     Da
@@ -995,6 +1015,7 @@ export default function PacchettiLezioniPage() {
                     setFiltroCliente("");
                     setFiltroPacchetto("");
                     setFiltroStatoPacchetto("");
+                    setFiltroOreExtra("");
                     setFiltroAdminDa(""); setFiltroAdminA("");
                     setOrdinamento("cronologico");
                   }}
