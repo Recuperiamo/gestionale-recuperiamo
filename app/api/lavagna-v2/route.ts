@@ -95,7 +95,7 @@ export async function GET(req) {
     let lavagna = await prisma.lavagna.findUnique({ where: { attivitaId } })
     if (!lavagna) {
       lavagna = await prisma.lavagna.create({
-        data: { attivitaId, titolo: baseTitolo },
+        data: { attivitaId, titolo: baseTitolo, clienteId: att.clienteId ?? null },
       })
     }
 
