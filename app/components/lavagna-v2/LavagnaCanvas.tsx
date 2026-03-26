@@ -186,22 +186,10 @@ export default function LavagnaCanvas({
         e.preventDefault()
         handleRedo()
       }
-      // [ / ] → ruota immagine selezionata di ±15°
-      if (e.key === '[' || e.key === ']') {
-        const { selectedShapeIds, shapes } = store
-        if (selectedShapeIds.length !== 1) return
-        const img = shapes.find(s => s.id === selectedShapeIds[0] && s.type === 'image')
-        if (!img) return
-        e.preventDefault()
-        const delta = e.key === '[' ? -Math.PI / 12 : Math.PI / 12
-        const newRotation = (img.rotation ?? 0) + delta
-        store.updateShape(img.id, { rotation: newRotation })
-        onSaveShape(img.id)
-      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [store, saveStroke, deleteStroke, onSaveShape])
+  }, [handleUndo, handleRedo])
 
   // Callbacks per useAblySync — devono stare al top-level del componente (regole hooks)
   const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
@@ -287,6 +275,23 @@ export default function LavagnaCanvas({
     }).catch(() => {})
     emitShapeUpdate(s)
   }, [emitShapeUpdate])
+
+  // ── Keyboard shortcut [ / ] → ruota immagine selezionata di ±15° ────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== '[' && e.key !== ']') return
+      const { selectedShapeIds, shapes } = store
+      if (selectedShapeIds.length !== 1) return
+      const img = shapes.find(s => s.id === selectedShapeIds[0] && s.type === 'image')
+      if (!img) return
+      e.preventDefault()
+      const delta = e.key === '[' ? -Math.PI / 12 : Math.PI / 12
+      store.updateShape(img.id, { rotation: (img.rotation ?? 0) + delta })
+      onSaveShape(img.id)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [store, onSaveShape])
 
   // ── Selection tool ───────────────────────────────────────────────────────────
   const { onPointerDown: selDown, onPointerMove: selMove, onPointerUp: selUp } = useSelectionTool(
