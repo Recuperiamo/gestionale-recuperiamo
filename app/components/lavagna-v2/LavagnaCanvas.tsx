@@ -186,7 +186,6 @@ export default function LavagnaCanvas({
         e.preventDefault()
         handleRedo()
       }
-    }
       // [ / ] → ruota immagine selezionata di ±15°
       if (e.key === '[' || e.key === ']') {
         const { selectedShapeIds, shapes } = store
