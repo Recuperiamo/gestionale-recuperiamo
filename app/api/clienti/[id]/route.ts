@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // GET /api/clienti/[id] - dettaglio cliente
 export async function GET(req, ctx) {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+  if (!session) {
     return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 401 });
   }
   try {
@@ -16,6 +16,11 @@ export async function GET(req, ctx) {
     const id = Number(idStr);
     if (!id || Number.isNaN(id)) {
       return new Response(JSON.stringify({ error: 'ID non valido' }), { status: 400 });
+    }
+    const isStaff = session.user?.role === 'admin' || session.user?.role === 'operatore';
+    // Studente può leggere solo se stesso
+    if (!isStaff && session.user?.clienteId !== id) {
+      return new Response(JSON.stringify({ error: 'Non autorizzato' }), { status: 403 });
     }
     const cliente = await prisma.client.findUnique({ where: { id } });
     if (!cliente) return new Response(JSON.stringify({ error: 'Cliente non trovato' }), { status: 404 });

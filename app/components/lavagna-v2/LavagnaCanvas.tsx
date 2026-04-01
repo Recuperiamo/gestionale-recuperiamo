@@ -412,6 +412,60 @@ export default function LavagnaCanvas({
     return () => window.removeEventListener('paste', handlePaste)
   }, [engineRef, store, utenteId, lavagnaId, emitStrokeEvent])
 
+  // ── Paste immagine via bottone toolbar (iOS: Clipboard API) ──────────────────
+  // Su iOS non esiste Ctrl+V; navigator.clipboard.read() richiede gesto utente
+  // (tap sul bottone) ed è supportato da iOS 15.4+
+  const handlePasteFromButton = useCallback(async () => {
+    try {
+      if (!navigator.clipboard?.read) {
+        alert('Incolla non supportato su questo browser. Aggiorna iOS alla versione 15.4 o superiore.')
+        return
+      }
+      const items = await navigator.clipboard.read()
+      for (const item of items) {
+        const imageType = item.types.find(t => t.startsWith('image/'))
+        if (!imageType) continue
+        const blob = await item.getType(imageType)
+        const file = new File([blob], 'paste.png', { type: imageType })
+        const imageUrl = await imageFileToDataUrl(file, 600, 600, 0.65)
+        if (!imageUrl) return
+        const dims = await getImageDimensions(imageUrl)
+        const eng = engineRef.current
+        if (!eng) return
+        const cssW = eng['baseCanvas'].width / eng['dpr']
+        const cssH = eng['baseCanvas'].height / eng['dpr']
+        const center = eng.screenToWorld(cssW / 2, (cssH - 60) / 2)
+        const maxW = (cssW / eng.zoom) * 0.6
+        const scale = Math.min(1, maxW / (dims.w || 400))
+        const w = (dims.w || 400) * scale
+        const h = (dims.h || 300) * scale
+        const shape = {
+          id: generateId(), type: 'image' as const,
+          x: center.x - w / 2, y: center.y - h / 2,
+          width: w, height: h, imageUrl,
+          color: 'transparent', strokeWidth: 0, fillColor: 'transparent',
+          rotation: 0, authorId: utenteId,
+        }
+        store.addShape(shape)
+        store.pushUndo({ type: 'add-shape', shape })
+        emitStrokeEvent({ type: 'commit-shape', shape })
+        try {
+          const res = await fetch('/api/lavagna-v2/shape', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...shape, lavagnaId }),
+          })
+          if (res.ok) {
+            const js = await res.json()
+            if (js.shape?.dbId) store.updateShape(shape.id, { dbId: js.shape.dbId })
+          }
+        } catch (_) {}
+        break
+      }
+    } catch (err) {
+      alert('Impossibile leggere gli appunti. Assicurati di aver copiato un\'immagine.')
+    }
+  }, [engineRef, store, utenteId, lavagnaId, emitStrokeEvent])
+
   // ── Catch-up poll: recupera tratti persi da Ably ogni 4 secondi ──────────────
   // Se Ably droppa un messaggio stroke:done, il tratto appare nel DB ma non nello store.
   // Questo poll confronta il DB (solo nuovi tratti dall'ultima sync) con lo store
@@ -625,6 +679,7 @@ export default function LavagnaCanvas({
         onToggleStudentDraw={isAdmin ? toggleStudentDraw : undefined}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onPasteImage={handlePasteFromButton}
       />
 
       {/* Image resize/rotation overlay */}

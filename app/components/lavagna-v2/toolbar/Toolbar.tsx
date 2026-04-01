@@ -23,6 +23,7 @@ interface Props {
   onToggleStudentDraw?: (enable: boolean) => void
   onUndo?: () => void
   onRedo?: () => void
+  onPasteImage?: () => void
   lavagnaId?: string
   attivitaId?: string
 }
@@ -258,7 +259,7 @@ const Icon = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onRequestDraw, onToggleStudentDraw, onUndo, onRedo }: Props) {
+export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onRequestDraw, onToggleStudentDraw, onUndo, onRedo, onPasteImage }: Props) {
   const { tool, color, strokeWidth, opacity, background, undoStack, redoStack,
     setTool, setColor, setStrokeWidth, setBackground, setEraserMode } = useWhiteboardStore()
 
@@ -356,6 +357,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
             onClear={onClear} onForceSyncViewport={onForceSyncViewport}
             onExportPNG={onExportPNG} onExportPDF={onExportPDF}
             onToggleStudentDraw={onToggleStudentDraw} onClose={closePop}
+            onPasteImage={onPasteImage}
             toolbarVertical={false} onToggleVertical={() => {}}
             zoomIn={zoomIn} zoomOut={zoomOut} fitView={fitView} resetZoom={resetZoom} zoomPct={zoomPct}
           />
@@ -436,6 +438,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
           onExportPDF={onExportPDF}
           onToggleStudentDraw={onToggleStudentDraw}
           onClose={closePop}
+          onPasteImage={onPasteImage}
           toolbarVertical={toolbarVertical}
           onToggleVertical={() => setToolbarVertical(v => !v)}
           zoomIn={zoomIn} zoomOut={zoomOut} fitView={fitView} resetZoom={resetZoom} zoomPct={zoomPct}
@@ -671,7 +674,7 @@ function RequestDrawButton({ onRequestDraw }) {
   )
 }
 
-function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onToggleStudentDraw, onClose, toolbarVertical, onToggleVertical, zoomIn, zoomOut, fitView, resetZoom, zoomPct }) {
+function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onToggleStudentDraw, onPasteImage, onClose, toolbarVertical, onToggleVertical, zoomIn, zoomOut, fitView, resetZoom, zoomPct }) {
   const { background, setBackground, tool, setTool } = useWhiteboardStore()
 
   const mobilePopoverStyle = {
@@ -753,6 +756,17 @@ function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClea
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="4" height="18" rx="1"/><line x1="10" y1="7" x2="21" y2="7"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="17" x2="21" y2="17"/></svg>
         {toolbarVertical ? 'Barra orizzontale' : 'Barra verticale'}
       </button>
+
+      {/* Incolla immagine (iOS: usa Clipboard API invece di Ctrl+V) */}
+      {onPasteImage && (
+        <button
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#f0f7ff', border: '1px solid #bfdbfe', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', color: '#1d4ed8' }}
+          onClick={() => { onPasteImage(); onClose() }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+          Incolla immagine
+        </button>
+      )}
 
       {/* Export */}
       <button
