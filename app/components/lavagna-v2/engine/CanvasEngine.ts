@@ -442,11 +442,12 @@ export class CanvasEngine {
 
     applyTransform(cc, this.pan, this.zoom, dpr)
 
-    for (const s of this.strokes) {
-      drawSingleStroke(cc, s, this.background)
-    }
+    // Shapes (immagini, rettangoli, ecc.) prima — i tratti ci vanno sempre sopra
     for (const s of this.shapes) {
       drawShape(cc, s, this.imageCache, () => this.markBaseDirty())
+    }
+    for (const s of this.strokes) {
+      drawSingleStroke(cc, s, this.background)
     }
 
     // 3. Composite contentCanvas onto baseCtx
