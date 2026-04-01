@@ -77,7 +77,7 @@ export default function LavagnaV2ListPage() {
     setLoading(true);
     const params = new URLSearchParams();
     if (filtroId) params.set("clienteId", filtroId);
-    if (!tutte) params.set("days", "7");
+    if (!tutte) params.set("days", "1");
     const qs = params.toString() ? `?${params}` : "";
     fetch(`/api/lavagna-v2/list${qs}`)
       .then(r => r.ok ? r.json() : { lavagne: [] })
@@ -192,7 +192,7 @@ export default function LavagnaV2ListPage() {
                 Lavagna
               </h1>
               <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                {mostraTutte ? "Tutte le lavagne" : "Ultimi 7 giorni"} · {filtered.length} lavagn{filtered.length === 1 ? "a" : "e"}
+                {mostraTutte ? "Tutte le lavagne" : "Oggi"} · {filtered.length} lavagn{filtered.length === 1 ? "a" : "e"}
               </div>
             </div>
             {isAdmin && (
@@ -425,7 +425,7 @@ export default function LavagnaV2ListPage() {
                   onClick={() => { setMostraTutte(false); setCercaQuery(""); fetchLavagne(clienteFiltro, false); }}
                   style={{ background: "none", border: "1px solid #e2e8f0", color: "#6b7280", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
                 >
-                  Torna agli ultimi 7 giorni
+                  Torna alle lavagne di oggi
                 </button>
               </div>
               {loading ? (
