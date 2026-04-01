@@ -57,11 +57,11 @@ export default function LavagnaCanvas({
   // ── Store ────────────────────────────────────────────────────────────────────
   const store = useWhiteboardStore()
 
-  // ── Channel name (same as v1) ────────────────────────────────────────────────
+  // ── Channel name — sempre basato sull'ID DB della lavagna (non attivitaId)
+  // Così admin (apre via ?attivitaId) e studente (apre via ?lavagnaId) usano lo stesso canale
   const channelName = useMemo(() => {
-    const base = attivitaId || lavagnaId   // || not ?? : empty string must fall back to lavagnaId
-    return base ? `lavagna:${base}` : null
-  }, [lavagnaId, attivitaId])
+    return lavagnaId ? `lavagna:${lavagnaId}` : null
+  }, [lavagnaId])
 
   // ── Init engine ──────────────────────────────────────────────────────────────
   useEffect(() => {

@@ -20,7 +20,7 @@ export async function GET(req) {
   const url = new URL(req.url)
   const clienteIdParam = url.searchParams.get('clienteId')
 
-  let where: any = { attivitaId: null }
+  let where: any = {}
 
   if (isStaff) {
     // Admin: filtra per clienteId se passato, altrimenti mostra tutte
