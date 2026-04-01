@@ -164,7 +164,6 @@ export default function LavagnaV2Page() {
           {/* Title */}
           <div style={{ flex: 1, fontWeight: 600, fontSize: 14, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {titolo}
-            <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, background: "#dbeafe", color: "#1d4ed8", borderRadius: 6, padding: "2px 6px", verticalAlign: "middle" }}>v2 beta</span>
           </div>
 
           {/* Fullscreen */}

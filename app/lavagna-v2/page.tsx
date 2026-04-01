@@ -190,7 +190,6 @@ export default function LavagnaV2ListPage() {
             <div>
               <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#20489a" }}>
                 Lavagna
-                <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: 6, padding: "3px 8px", verticalAlign: "middle" }}>v2 beta</span>
               </h1>
               <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
                 {mostraTutte ? "Tutte le lavagne" : "Ultimi 7 giorni"} · {filtered.length} lavagn{filtered.length === 1 ? "a" : "e"}
