@@ -321,16 +321,16 @@ export default function LavagnaV2ListPage() {
             )}
           </div>
 
-          {/* Lista */}
-          {loading ? (
+          {/* Lista (solo in modalità 7 giorni) */}
+          {!mostraTutte && loading ? (
             <div style={{ color: "#9ab0d4", fontSize: 14, padding: "20px 0" }}>Caricamento lavagne…</div>
-          ) : filtered.length === 0 ? (
+          ) : !mostraTutte && filtered.length === 0 ? (
             <div style={{ background: "#f0f5ff", border: "1px solid #d4dff6", color: "#20489a", padding: "16px 20px", borderRadius: 12, fontSize: 14, fontWeight: 500 }}>
               {lavagne.length === 0
                 ? (isAdmin ? "Nessuna lavagna. Creane una nuova." : "Nessuna lavagna disponibile.")
                 : `Nessun risultato per "${search}".`}
             </div>
-          ) : (
+          ) : !mostraTutte ? (
             <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
               {filtered.map(l => {
                 const nomeStudente = l.cliente?.nomeReferente || l.cliente?.email || null;
@@ -387,7 +387,7 @@ export default function LavagnaV2ListPage() {
                 );
               })}
             </ul>
-          )}
+          ) : null}
 
           {/* ── Sezione lavagne precedenti ────────────────────────────────── */}
           {!mostraTutte ? (
