@@ -19,8 +19,19 @@ export async function GET(req) {
   const isStaff = session.user?.role === 'admin' || session.user?.role === 'operatore'
   const url = new URL(req.url)
   const clienteIdParam = url.searchParams.get('clienteId')
+  const daysParam = url.searchParams.get('days')
 
   let where: any = {}
+
+  // Filtro per data: se passato ?days=N mostra solo le lavagne degli ultimi N giorni
+  if (daysParam) {
+    const days = Number(daysParam)
+    if (!isNaN(days) && days > 0) {
+      const from = new Date()
+      from.setDate(from.getDate() - days)
+      where.createdAt = { gte: from }
+    }
+  }
 
   if (isStaff) {
     // Admin: filtra per clienteId se passato, altrimenti mostra tutte

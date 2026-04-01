@@ -199,6 +199,13 @@ export default function CalendarioAttivita({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ attivitaIds: upcomingIds })
     }).catch(() => {});
+
+    // Pre-crea anche la lavagna v2 per le stesse attività
+    fetch("/api/lavagna-v2/precreate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attivitaIds: upcomingIds })
+    }).catch(() => {});
   }, [events]);
 
   const recomputeWeekLayout = useCallback(

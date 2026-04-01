@@ -24,6 +24,8 @@ export default function LavagnaV2ListPage() {
   const [search, setSearch] = useState("");
   const [hoveredId, setHoveredId] = useState(null);
   const [clienteFiltro, setClienteFiltro] = useState("");
+  const [mostraTutte, setMostraTutte] = useState(false);
+  const [cercaQuery, setCercaQuery] = useState("");
 
   // Form crea
   const [selectedClienteId, setSelectedClienteId] = useState("");
@@ -71,9 +73,12 @@ export default function LavagnaV2ListPage() {
   }, [selectedAttivitaId, attivitaList, clienti, selectedClienteId]);
 
   // ── Carica lista lavagne ───────────────────────────────────────────────────
-  const fetchLavagne = (filtroId = "") => {
+  const fetchLavagne = (filtroId = "", tutte = false) => {
     setLoading(true);
-    const qs = filtroId ? `?clienteId=${filtroId}` : "";
+    const params = new URLSearchParams();
+    if (filtroId) params.set("clienteId", filtroId);
+    if (!tutte) params.set("days", "7");
+    const qs = params.toString() ? `?${params}` : "";
     fetch(`/api/lavagna-v2/list${qs}`)
       .then(r => r.ok ? r.json() : { lavagne: [] })
       .then(d => setLavagne(Array.isArray(d.lavagne) ? d.lavagne : []))
@@ -145,13 +150,23 @@ export default function LavagnaV2ListPage() {
 
   // ── Filtra per ricerca ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    if (!search.trim()) return lavagne;
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
+    if (!q) return lavagne;
     return lavagne.filter(l =>
       (l.titolo || "").toLowerCase().includes(q) ||
       (l.cliente?.nomeReferente || l.cliente?.email || "").toLowerCase().includes(q)
     );
   }, [lavagne, search]);
+
+  // ── Filtra lavagne precedenti per query ───────────────────────────────────
+  const filteredCerca = useMemo(() => {
+    const q = cercaQuery.trim().toLowerCase();
+    if (!q) return lavagne;
+    return lavagne.filter(l =>
+      (l.titolo || "").toLowerCase().includes(q) ||
+      (l.cliente?.nomeReferente || l.cliente?.email || "").toLowerCase().includes(q)
+    );
+  }, [lavagne, cercaQuery]);
 
   if (status === "loading") {
     return (
@@ -178,7 +193,7 @@ export default function LavagnaV2ListPage() {
                 <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, background: "#dbeafe", color: "#1d4ed8", borderRadius: 6, padding: "3px 8px", verticalAlign: "middle" }}>v2 beta</span>
               </h1>
               <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                {lavagne.length} lavagn{lavagne.length === 1 ? "a" : "e"}
+                {mostraTutte ? "Tutte le lavagne" : "Ultimi 7 giorni"} · {filtered.length} lavagn{filtered.length === 1 ? "a" : "e"}
               </div>
             </div>
             {isAdmin && (
@@ -280,7 +295,7 @@ export default function LavagnaV2ListPage() {
             {isAdmin && clienti.length > 0 && (
               <select
                 value={clienteFiltro}
-                onChange={e => { setClienteFiltro(e.target.value); fetchLavagne(e.target.value); }}
+                onChange={e => { setClienteFiltro(e.target.value); fetchLavagne(e.target.value, mostraTutte); }}
                 style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none" }}
               >
                 <option value="">Tutti gli studenti</option>
@@ -372,6 +387,85 @@ export default function LavagnaV2ListPage() {
                 );
               })}
             </ul>
+          )}
+
+          {/* ── Sezione lavagne precedenti ────────────────────────────────── */}
+          {!mostraTutte ? (
+            <div style={{ marginTop: 28, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
+              <button
+                onClick={() => {
+                  setMostraTutte(true);
+                  fetchLavagne(clienteFiltro, true);
+                }}
+                style={{ background: "none", border: "1px solid #b0c8f5", color: "#2563eb", borderRadius: 8, padding: "8px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/>
+                </svg>
+                Cerca lavagne precedenti
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginTop: 28, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+                  <input
+                    type="text"
+                    placeholder="Cerca per titolo o studente…"
+                    value={cercaQuery}
+                    onChange={e => setCercaQuery(e.target.value)}
+                    autoFocus
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px 8px 34px", borderRadius: 8, border: "1px solid #b0c8f5", fontSize: 13, outline: "none", background: "#f8fbff" }}
+                  />
+                  <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
+                    <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <button
+                  onClick={() => { setMostraTutte(false); setCercaQuery(""); fetchLavagne(clienteFiltro, false); }}
+                  style={{ background: "none", border: "1px solid #e2e8f0", color: "#6b7280", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                >
+                  Torna agli ultimi 7 giorni
+                </button>
+              </div>
+              {loading ? (
+                <div style={{ color: "#9ab0d4", fontSize: 14 }}>Caricamento…</div>
+              ) : filteredCerca.length === 0 ? (
+                <div style={{ color: "#6b7280", fontSize: 13 }}>
+                  {cercaQuery ? `Nessun risultato per "${cercaQuery}".` : "Nessuna lavagna trovata."}
+                </div>
+              ) : (
+                <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {filteredCerca.map(l => {
+                    const nomeStudente = l.cliente?.nomeReferente || l.cliente?.email || null;
+                    return (
+                      <li key={l.id} onMouseEnter={() => setHoveredId(l.id)} onMouseLeave={() => setHoveredId(null)}
+                        style={{ background: hoveredId === l.id ? "#eef4ff" : "#f8fbff", border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, transition: "background 0.15s, border-color 0.15s" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.titolo || "Lavagna"}</div>
+                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {nomeStudente && isAdmin && <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>{nomeStudente}</span>}
+                            <span>Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => window.open(`/lavagna-v2/canvas?lavagnaId=${l.id}`, "_blank")}
+                          style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer", flexShrink: 0 }}
+                        >
+                          Apri
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           )}
         </main>
       </div>
