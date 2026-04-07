@@ -47,6 +47,7 @@ export default function PacchettiLezioniPage() {
   const [filtroAdminA, setFiltroAdminA] = useState("");
   const [filtroMese, setFiltroMese] = useState("");
   const [filtroOreExtra, setFiltroOreExtra] = useState(""); // "" | "extra" | "normale"
+  const [filtroSaldato, setFiltroSaldato] = useState(""); // "" | "saldato" | "non_saldato"
   const [ordinamento, setOrdinamento] = useState("cronologico"); // cronologico | alfabetico
   
   // Filtri Cliente
@@ -269,6 +270,11 @@ export default function PacchettiLezioniPage() {
       } else if (filtroOreExtra === "normale") {
         filtered = filtered.filter(a => !a.extraPacchetto);
       }
+      if (filtroSaldato === "saldato") {
+        filtered = filtered.filter(a => a.pacchetto?.saldato === true);
+      } else if (filtroSaldato === "non_saldato") {
+        filtered = filtered.filter(a => a.pacchetto?.saldato !== true);
+      }
     }
 
     // Applica filtri CLIENTE
@@ -330,7 +336,7 @@ export default function PacchettiLezioniPage() {
     }
     
     return { prenotate: future, svolte: past, cancellate: canc };
-  }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, filtroOreExtra, ordinamento, isAdmin, isCliente]);
+  }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, filtroOreExtra, filtroSaldato, ordinamento, isAdmin, isCliente]);
 
   // Helpers per il calcolo ore
   function oreFromAttivita(a) {
@@ -975,6 +981,20 @@ export default function PacchettiLezioniPage() {
                     <option value="normale">Solo ore normali</option>
                   </select>
                 </div>
+                <div style={{ flex: "1 1 140px" }}>
+                  <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                    Saldo pacchetto
+                  </label>
+                  <select
+                    value={filtroSaldato}
+                    onChange={(e) => setFiltroSaldato(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Tutti</option>
+                    <option value="saldato">Saldato</option>
+                    <option value="non_saldato">Non saldato</option>
+                  </select>
+                </div>
                 <div style={{ flex: "1 1 130px" }}>
                   <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
                     Da
@@ -1016,6 +1036,7 @@ export default function PacchettiLezioniPage() {
                     setFiltroPacchetto("");
                     setFiltroStatoPacchetto("");
                     setFiltroOreExtra("");
+                    setFiltroSaldato("");
                     setFiltroAdminDa(""); setFiltroAdminA("");
                     setOrdinamento("cronologico");
                   }}

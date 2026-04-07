@@ -80,16 +80,32 @@ export default function PacchettiCardsAdmin() {
         body: JSON.stringify({ stato: nuovoStato }),
         credentials: "include"
       });
-      
+
       if (!res.ok) {
         throw new Error("Errore aggiornamento stato");
       }
-      
+
       // Ricarica pacchetti
       handleCreateSuccess();
     } catch (error) {
       console.error("Errore cambio stato:", error);
       alert("Errore durante il cambio di stato");
+    }
+  }
+
+  async function handleToggleSaldato(pacchettoId, nuovoValore) {
+    try {
+      const res = await fetch(`/api/pacchetti/${pacchettoId}/saldato`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saldato: nuovoValore }),
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error("Errore aggiornamento saldato");
+      handleCreateSuccess();
+    } catch (error) {
+      console.error("Errore toggle saldato:", error);
+      alert("Errore durante l'aggiornamento del saldo");
     }
   }
 
@@ -194,6 +210,7 @@ export default function PacchettiCardsAdmin() {
                 onEdit={() => setEditPacchetto(p)}
                 onDelete={() => setDeletePacchetto(p)}
                 onCambiaStato={handleCambiaStato}
+                onToggleSaldato={handleToggleSaldato}
               />
             ))}
           </div>
@@ -222,6 +239,7 @@ export default function PacchettiCardsAdmin() {
                 onEdit={() => setEditPacchetto(p)}
                 onDelete={() => setDeletePacchetto(p)}
                 onCambiaStato={handleCambiaStato}
+                onToggleSaldato={handleToggleSaldato}
               />
             ))}
           </div>
@@ -250,6 +268,7 @@ export default function PacchettiCardsAdmin() {
                 onEdit={() => setEditPacchetto(p)}
                 onDelete={() => setDeletePacchetto(p)}
                 onCambiaStato={handleCambiaStato}
+                onToggleSaldato={handleToggleSaldato}
               />
             ))}
           </div>
@@ -349,7 +368,7 @@ function SezioneDropdown({ titolo, count, isOpen, onToggle, badgeColor, children
   );
 }
 
-function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato }) {
+function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato }) {
   const GRACE_MS = 5 * 60 * 1000;
   const now = Date.now();
   
@@ -414,6 +433,14 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato })
           </p>
           <p style={cardSubtitleStyle}>
             Stato: <span style={getStatoBadgeStyle(pacchetto.stato)}>{statoCompleto}</span>
+            {" "}
+            <span style={{
+              padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, display: 'inline-block',
+              background: pacchetto.saldato ? '#D1FAE5' : '#FEF3C7',
+              color: pacchetto.saldato ? '#065F46' : '#92400E',
+            }}>
+              {pacchetto.saldato ? '✓ Saldato' : 'Non saldato'}
+            </span>
           </p>
         </div>
       </div>
@@ -505,6 +532,17 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato })
             ▶️ Riattiva
           </button>
         )}
+        <button
+          onClick={() => onToggleSaldato(pacchetto.id, !pacchetto.saldato)}
+          style={{
+            ...btnStatoStyle,
+            background: pacchetto.saldato ? '#FEF3C7' : '#D1FAE5',
+            color: pacchetto.saldato ? '#92400E' : '#065F46',
+          }}
+          title={pacchetto.saldato ? "Segna come non saldato" : "Segna come saldato"}
+        >
+          {pacchetto.saldato ? '✗ Rimuovi saldo' : '✓ Segna saldato'}
+        </button>
       </div>
     </div>
   );

@@ -436,7 +436,7 @@ export default function ProfiloPage() {
         {isAdmin && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 32 }}>
             {[
-              { href: "/attivita",  label: "➕ Nuova lezione" },
+              { href: "/attivita?new=1",  label: "➕ Nuova lezione" },
               { href: "/clienti",   label: "👤 Clienti" },
               { href: "/pacchetti", label: "📦 Pacchetti" },
               { href: "/calendario",label: "📅 Calendario" },

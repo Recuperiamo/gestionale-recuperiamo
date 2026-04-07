@@ -3,19 +3,17 @@
 
 import React, { useState } from "react";
 import Navbar from "../components/Navbar";
-import StoricoAttivitaTable from "../components/attivita/StoricoAttivitaTable";
 import ChangelogTable from "../components/ChangelogTable";
 import StoricoRichiesteModificaTable from "../components/modifiche/StoricoRichiesteModificaTable";
 import { useSession } from "next-auth/react";
 
 const TABS = [
-  { key: "storico-attivita", label: "Storico Attività" },
   { key: "storico-modifiche", label: "Storico Modifiche Pacchetto" },
   { key: "storico-richieste", label: "Richieste Modifica Lezioni" }
 ];
 
 export default function StoricoUnificatoPage() {
-  const [activeTab, setActiveTab] = useState("storico-attivita");
+  const [activeTab, setActiveTab] = useState("storico-modifiche");
   const { data: session } = useSession();
   const isCliente = session?.user?.role === "cliente";
 
@@ -40,7 +38,6 @@ export default function StoricoUnificatoPage() {
           ))}
         </div>
         <div className="bg-white p-4 rounded-b shadow">
-          {activeTab === "storico-attivita" && <StoricoAttivitaTable />}
           {activeTab === "storico-modifiche" && <ChangelogTable />}
           {activeTab === "storico-richieste" && (
             <StoricoRichiesteWrapper isCliente={isCliente} />

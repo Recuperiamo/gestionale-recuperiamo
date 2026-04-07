@@ -107,6 +107,7 @@ model PacchettoOre {
   dataAttivazione     DateTime
   dataScadenza        DateTime?
   stato               String
+  saldato             Boolean               @default(false)
   note                String?
   sogliaOreResidue    Int?
   attivita            Attivita[]

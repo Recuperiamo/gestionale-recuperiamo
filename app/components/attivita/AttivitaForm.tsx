@@ -242,22 +242,12 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const result = await res.json();
-        let resultPatch;
-        try {
-          resultPatch = await res.json();
-        } catch (e) {
-          console.error('[AttivitaForm] Errore parsing JSON risposta PATCH:', e);
-          setErrorForm('Errore parsing risposta PATCH: ' + e.message);
-          setLoadingSubmit(false);
-          return;
-        }
+        const resultPatch = await res.json();
         if (!res.ok) {
           let msg = resultPatch?.error || "Errore modifica ricorrenza";
           if (resultPatch?.stack) {
             msg += "\n" + resultPatch.stack;
           }
-          console.error('[AttivitaForm] PATCH batch errore:', msg);
           setErrorForm(msg);
           setLoadingSubmit(false);
           return;
@@ -283,22 +273,12 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
             }
           })
         });
-        const result = await res.json();
-        let resultRic;
-        try {
-          resultRic = await res.json();
-        } catch (e) {
-          console.error('[AttivitaForm] Errore parsing JSON risposta ricorrenza:', e);
-          setErrorForm('Errore parsing risposta ricorrenza: ' + e.message);
-          setLoadingSubmit(false);
-          return;
-        }
+        const resultRic = await res.json();
         if (!res.ok) {
           let msg = resultRic?.error || "Errore creazione ricorrenza";
           if (resultRic?.stack) {
             msg += "\n" + resultRic.stack;
           }
-          console.error('[AttivitaForm] POST ricorrenza errore:', msg);
           setErrorForm(msg);
           setLoadingSubmit(false);
           return;
