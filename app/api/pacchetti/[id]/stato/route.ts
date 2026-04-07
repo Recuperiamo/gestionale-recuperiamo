@@ -39,6 +39,16 @@ export async function PATCH(req, { params }) {
       );
     }
 
+    if (stato === "archiviato") {
+      const current = await prisma.pacchettoOre.findUnique({ where: { id: parseInt(id) } });
+      if (!current?.saldato) {
+        return NextResponse.json(
+          { error: "Il pacchetto deve essere saldato prima di poterlo archiviare." },
+          { status: 422 }
+        );
+      }
+    }
+
     const pacchetto = await prisma.pacchettoOre.update({
       where: { id: parseInt(id) },
       data: { stato }

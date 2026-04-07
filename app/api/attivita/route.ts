@@ -9,6 +9,21 @@ import { authOptions } from '../auth/[...nextauth]/authOptions'
 export const runtime = 'nodejs';
 
 // ------------------ Helpers ------------------
+
+/**
+ * Se il pacchetto è saldato e le ore residue sono arrivate a zero, lo archivia automaticamente.
+ */
+async function autoArchiviaSeNecessario(pacchettoId: number) {
+  if (!pacchettoId) return
+  const p = await prisma.pacchettoOre.findUnique({ where: { id: pacchettoId } })
+  if (p && p.saldato && p.oreResidue <= 0 && p.stato !== 'archiviato') {
+    await prisma.pacchettoOre.update({
+      where: { id: pacchettoId },
+      data: { stato: 'archiviato' }
+    })
+  }
+}
+
 function toPositiveNumber(value) {
   if (value === null || value === undefined) return null
   const n = Number(value)
@@ -291,6 +306,7 @@ export async function POST(request) {
         })
       }
 
+      await autoArchiviaSeNecessario(Number(pacchettoId))
       return NextResponse.json({
         ok: true,
         tipo: 'ricorrente',
@@ -352,6 +368,7 @@ export async function POST(request) {
       pacchettoDescrizione: pacchetto.descrizione
     })
 
+    await autoArchiviaSeNecessario(Number(pacchettoId))
     return NextResponse.json({ attivita: attivitaCreata, pacchetto: pacchettoAggiornato }, { status: 201 })
   } catch (err) {
     console.error('[API][POST /api/attivita] Errore:', err);

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
 import Link from "next/link";
+import AttivitaForm from "../components/attivita/AttivitaForm";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -356,6 +357,7 @@ export default function ProfiloPage() {
   const [clienti, setClienti] = useState([]);
   const [noteLoading, setNoteLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | { nota: null | <obj> }
+  const [showNuovaLezione, setShowNuovaLezione] = useState(false);
 
   const isAdmin = ["admin", "operatore"].includes(session?.user?.role);
 
@@ -435,8 +437,16 @@ export default function ProfiloPage() {
         {/* Azioni rapide (solo admin) */}
         {isAdmin && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 32 }}>
+            <button
+              onClick={() => setShowNuovaLezione(true)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 16px", background: "#e3eefe", color: "#20489a",
+                borderRadius: 10, fontWeight: 600, fontSize: 13,
+                border: "1px solid #b2ccfc", cursor: "pointer",
+              }}
+            >➕ Nuova lezione</button>
             {[
-              { href: "/attivita?new=1",  label: "➕ Nuova lezione" },
               { href: "/clienti",   label: "👤 Clienti" },
               { href: "/pacchetti", label: "📦 Pacchetti" },
               { href: "/calendario",label: "📅 Calendario" },
@@ -518,6 +528,14 @@ export default function ProfiloPage() {
           />
         </section>
       </main>
+
+      {showNuovaLezione && (
+        <AttivitaForm
+          initialData={null}
+          onSuccess={() => setShowNuovaLezione(false)}
+          onClose={() => setShowNuovaLezione(false)}
+        />
+      )}
     </div>
   );
 }

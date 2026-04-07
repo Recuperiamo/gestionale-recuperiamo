@@ -50,14 +50,6 @@ export default function AttivitaPage() {
   useEffect(() => { fetchClienti(); }, []);
   useEffect(() => { fetchPacchetti(); }, []);
 
-  // Auto-open form when ?new=1 is in URL
-  useEffect(() => {
-    const qp = new URLSearchParams(window.location.search);
-    if (qp.get("new") === "1") {
-      setFormInitialData(null);
-      setShowForm(true);
-    }
-  }, []);
 
   function isInRange(data, da, a) {
     if (!data) return false;

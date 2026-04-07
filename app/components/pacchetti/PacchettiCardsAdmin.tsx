@@ -73,6 +73,13 @@ export default function PacchettiCardsAdmin() {
   }
 
   async function handleCambiaStato(pacchettoId, nuovoStato) {
+    if (nuovoStato === "archiviato") {
+      const p = pacchetti.find(x => x.id === pacchettoId);
+      if (p && !p.saldato) {
+        alert("Non è possibile archiviare il pacchetto: deve essere prima saldato.");
+        return;
+      }
+    }
     try {
       const res = await fetch(`/api/pacchetti/${pacchettoId}/stato`, {
         method: "PATCH",
