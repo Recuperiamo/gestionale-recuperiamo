@@ -190,27 +190,8 @@ export function useSelectionTool(engineRef: React.RefObject<CanvasEngine>, onMov
     try { (e.target as HTMLElement).releasePointerCapture?.(e.nativeEvent?.pointerId ?? e.pointerId) } catch (_) {}
   }, [rectSelect, engineRef, onMoveCommit])
 
-  // ── Keyboard delete ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (store.tool !== 'select') return
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      const { selectedStrokeIds, selectedShapeIds } = store
-      selectedStrokeIds.forEach(id => {
-        const s = store.strokes.find(x => x.id === id)
-        store.deleteStroke(id)
-        if (s) store.pushUndo({ type: 'delete-stroke', stroke: s })
-      })
-      selectedShapeIds.forEach(id => {
-        const s = store.shapes.find(x => x.id === id)
-        store.deleteShape(id)
-        if (s) store.pushUndo({ type: 'delete-shape', shape: s })
-      })
-      store.clearSelection()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [store])
+  // NOTE: keyboard delete (Delete/Backspace) è gestito in LavagnaCanvas
+  // dove si ha accesso a emitStrokeEvent e deleteShape/deleteStroke per persistenza e sync Ably.
 
   return { onPointerDown, onPointerMove, onPointerUp }
 }

@@ -93,7 +93,11 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         if (event.shape) publish('shape:add', { shape: event.shape, lavagnaId })
         break
       case 'delete-shape':
-        if (event.shape) publish('shape:delete', { shapeId: event.shape.id, lavagnaId })
+        if (event.shape) publish('shape:delete', {
+          shapeId: event.shape.id,
+          shapeDbId: event.shape.dbId ?? null,  // necessario per studenti che hanno caricato la shape da DB
+          lavagnaId,
+        })
         break
       case 'cursor':
         publish('cursor:move', { x: event.x, y: event.y, role, lavagnaId })
@@ -223,6 +227,14 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         const onShapeDelete = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
+          // Prova prima per dbId (shapes caricate da DB hanno id diverso da chi le ha create)
+          if (d.shapeDbId) {
+            const byDbId = store.shapes.find(
+              x => x.dbId && (x.dbId === d.shapeDbId || String(x.dbId) === String(d.shapeDbId))
+            )
+            if (byDbId) { store.deleteShape(byDbId.id); return }
+          }
+          // Fallback: id locale (shapes ricevute via Ably shape:add hanno lo stesso id)
           if (d.shapeId) store.deleteShape(d.shapeId)
         }
 

@@ -237,7 +237,9 @@ function drawShape(ctx: CanvasRenderingContext2D, s: Shape, imageCache?: Map<str
     let img = imageCache?.get(url)
     if (!img) {
       img = new Image()
-      img.crossOrigin = 'anonymous'
+      // Non impostare crossOrigin per data URL: su alcuni browser Windows
+      // causa canvas "tainted" e impedisce il rendering dell'immagine
+      if (!url.startsWith('data:')) img.crossOrigin = 'anonymous'
       img.onload = () => onImageLoad?.()
       img.src = url
       imageCache?.set(url, img)

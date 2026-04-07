@@ -175,21 +175,47 @@ export default function LavagnaCanvas({
     }
   }, [store, saveStroke, deleteStroke, saveShape, deleteShape])
 
-  // ── Keyboard shortcuts Ctrl+Z / Ctrl+Y ──────────────────────────────────────
+  // ── Keyboard shortcuts Ctrl+Z / Ctrl+Y / Delete ──────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
         handleUndo()
+        return
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault()
         handleRedo()
+        return
+      }
+      // Delete/Backspace: elimina gli elementi selezionati con persistenza DB + sync Ably
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const { tool, selectedStrokeIds, selectedShapeIds, strokes, shapes } = useWhiteboardStore.getState()
+        if (tool !== 'select') return
+        if (!selectedStrokeIds.length && !selectedShapeIds.length) return
+        e.preventDefault()
+        selectedStrokeIds.forEach(id => {
+          const s = strokes.find(x => x.id === id)
+          if (!s) return
+          store.deleteStroke(id)
+          store.pushUndo({ type: 'delete-stroke', stroke: s })
+          if (s.dbId) deleteStroke(s.dbId)
+          emitStrokeEvent({ type: 'delete-stroke', stroke: s })
+        })
+        selectedShapeIds.forEach(id => {
+          const s = shapes.find(x => x.id === id)
+          if (!s) return
+          store.deleteShape(id)
+          store.pushUndo({ type: 'delete-shape', shape: s })
+          if (s.dbId) deleteShape(s.dbId)
+          emitStrokeEvent({ type: 'delete-shape', shape: s })
+        })
+        store.clearSelection()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [handleUndo, handleRedo])
+  }, [handleUndo, handleRedo, deleteStroke, deleteShape, emitStrokeEvent, store])
 
   // Callbacks per useAblySync — devono stare al top-level del componente (regole hooks)
   const emitPermissionsUpdateRef = useRef<((d: { canStudentDraw: boolean }) => void) | null>(null)
