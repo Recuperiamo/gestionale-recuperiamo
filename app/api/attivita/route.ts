@@ -11,12 +11,34 @@ export const runtime = 'nodejs';
 // ------------------ Helpers ------------------
 
 /**
- * Se il pacchetto è saldato e le ore residue sono arrivate a zero, lo archivia automaticamente.
+ * Auto-archivia il pacchetto se:
+ * - è saldato
+ * - non è già archiviato
+ * - tutte le sue attività non cancellate hanno orario nel passato (sono "svolte")
+ * - esiste almeno un'attività non cancellata
  */
 async function autoArchiviaSeNecessario(pacchettoId: number) {
   if (!pacchettoId) return
   const p = await prisma.pacchettoOre.findUnique({ where: { id: pacchettoId } })
-  if (p && p.saldato && p.oreResidue <= 0 && p.stato !== 'archiviato') {
+  if (!p || !p.saldato || p.stato === 'archiviato') return
+
+  const attivita = await prisma.attivita.findMany({
+    where: {
+      pacchettoId,
+      NOT: { stato: { in: ['cancellata', 'Cancellata', 'CANCELLATA'] } }
+    },
+    select: { orario: true, createdAt: true }
+  })
+
+  if (attivita.length === 0) return // nessuna attività → non archiviare
+
+  const now = new Date()
+  const tuttePassate = attivita.every(a => {
+    const t = a.orario ?? a.createdAt
+    return new Date(t) < now
+  })
+
+  if (tuttePassate) {
     await prisma.pacchettoOre.update({
       where: { id: pacchettoId },
       data: { stato: 'archiviato' }
@@ -306,7 +328,6 @@ export async function POST(request) {
         })
       }
 
-      await autoArchiviaSeNecessario(Number(pacchettoId))
       return NextResponse.json({
         ok: true,
         tipo: 'ricorrente',
@@ -368,7 +389,6 @@ export async function POST(request) {
       pacchettoDescrizione: pacchetto.descrizione
     })
 
-    await autoArchiviaSeNecessario(Number(pacchettoId))
     return NextResponse.json({ attivita: attivitaCreata, pacchetto: pacchettoAggiornato }, { status: 201 })
   } catch (err) {
     console.error('[API][POST /api/attivita] Errore:', err);
@@ -526,7 +546,8 @@ export async function PATCH(request) {
           })
         }
 
-        return NextResponse.json({ 
+        if (att.pacchettoId) await autoArchiviaSeNecessario(att.pacchettoId)
+        return NextResponse.json({
           ok: true,
           tipo: 'batch',
           updatedCount: result.updatedAttivita.length,
@@ -646,6 +667,7 @@ export async function PATCH(request) {
         })
       }
 
+      if (att.pacchettoId) await autoArchiviaSeNecessario(att.pacchettoId)
       return NextResponse.json({ attivita: result.updated, pacchetto: result.pacchettoAfter ?? null })
     } catch (errTx) {
       if (errTx?.code === 'ORE_INSUFFICIENTI') {
