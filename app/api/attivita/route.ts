@@ -27,18 +27,23 @@ async function autoArchiviaSeNecessario(pacchettoId: number) {
       pacchettoId,
       NOT: { stato: { in: ['cancellata', 'Cancellata', 'CANCELLATA'] } }
     },
-    select: { orario: true, createdAt: true }
+    select: { orario: true, stato: true }
   })
 
   if (attivita.length === 0) return // nessuna attività → non archiviare
 
   const now = new Date()
-  const tuttePassate = attivita.every(a => {
-    const t = a.orario ?? a.createdAt
-    return new Date(t) < now
+  // Un'attività è considerata svolta solo se:
+  // - ha orario esplicito nel passato, OPPURE
+  // - ha stato esplicitamente 'svolta' (qualsiasi casing)
+  const tutteSvolte = attivita.every(a => {
+    const statoLower = (a.stato || '').toLowerCase()
+    if (statoLower === 'svolta') return true
+    if (a.orario && new Date(a.orario) < now) return true
+    return false
   })
 
-  if (tuttePassate) {
+  if (tutteSvolte) {
     await prisma.pacchettoOre.update({
       where: { id: pacchettoId },
       data: { stato: 'archiviato' }

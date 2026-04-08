@@ -2245,7 +2245,17 @@ export default function LavagnaCanvas({
           } catch (_) {}
           // Invalidate cached bounding box when shape is updated (especially for rotation)
           delete normalized._bb;
-          setForme((prev) => prev.map((f) => (f.id === data.id ? { ...f, ...normalized } : f)));
+          setForme((prev) => prev.map((f) => {
+            if (f.id !== data.id) return f;
+            const merged = { ...f, ...normalized };
+            // Preserve existing image src/srcPreview when update doesn't include them
+            // (position-only updates strip image data to stay within Ably's 64KB limit)
+            if (normalized.kind === 'immagine') {
+              if (!normalized.src && f.src) merged.src = f.src;
+              if (!normalized.srcPreview && f.srcPreview) merged.srcPreview = f.srcPreview;
+            }
+            return merged;
+          }));
           // Per le immagini, precarica e ridisegna quando pronta
           if (normalized.kind === 'immagine' && normalized.src) {
             const img = new Image();
@@ -2644,16 +2654,19 @@ export default function LavagnaCanvas({
       }
     } catch (_) {}
     if (emit) {
-      // Include srcPreview for realtime sync of pasted images
+      // For images with embedded data URLs: send only the small srcPreview thumbnail via Ably
+      // (full src is persisted to DB; Ably has a ~64KB message size limit)
       const payload = { ...normalized, lavagnaId };
       if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
-        payload.srcPreview = normalized.src;
+        payload.srcPreview = normalized.srcPreview || normalized.src;
+        delete payload.src;
       }
-
       emitOrPublish('shape:create', payload);
     }
-    // try persist async (best-effort)
-    persistShape(normalized).then((s) => {
+    // Persist to DB: strip srcPreview so DB always serves the full-res src
+    const shapeForDB = { ...normalized };
+    delete shapeForDB.srcPreview;
+    persistShape(shapeForDB).then((s) => {
       if (s && s.id) {
         setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, dbId: s.id } : f)));
         // If this shape was queued for deletion before dbId arrived, delete now
@@ -2671,19 +2684,23 @@ export default function LavagnaCanvas({
     if (!normalized) return;
     setForme((prev) => prev.map((f) => (f.id === normalized.id ? { ...f, ...normalized } : f)));
     if (emit) {
-      // Include srcPreview for realtime sync of updated images and senderId to prevent echo
+      // For image updates (move/rotate/resize): don't resend image data — recipients already
+      // have it from shape:create; stripping prevents exceeding Ably's 64KB message limit
       const payload = { ...normalized, lavagnaId, senderId: utenteId };
-      if (normalized.kind === 'immagine' && normalized.src && normalized.src.startsWith('data:')) {
-        payload.srcPreview = normalized.src;
+      if (normalized.kind === 'immagine') {
+        delete payload.src;
+        delete payload.srcPreview;
       }
       emitOrPublish('shape:update', payload);
     }
     const dbId = shape.dbId || shape.id;
-
+    // Strip srcPreview from DB update so the DB always serves only the full-res src
+    const shapeForDB = { ...normalized };
+    delete shapeForDB.srcPreview;
     fetch(`/api/lavagna/shape/${dbId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...normalized, dbId })
+      body: JSON.stringify({ ...shapeForDB, dbId })
     })
       .then(res => {
 
@@ -3073,9 +3090,9 @@ export default function LavagnaCanvas({
         }
         // do not prevent default so images/links from system clipboard still arrive in onPaste
       }
-      // Snap rotation shortcuts: R = clockwise 90°, Shift+R = counterclockwise 90°
+      // Snap rotation shortcuts: R = antiorario 90°, Shift+R = orario 90°
       if (e.key.toLowerCase() === 'r' && !mod) {
-        rotateSelectionQuarter(e.shiftKey ? -1 : 1);
+        rotateSelectionQuarter(e.shiftKey ? 1 : -1);
         e.preventDefault();
       }
       if (e.key === 'Delete') { // delete selection
@@ -3136,7 +3153,20 @@ export default function LavagnaCanvas({
                     tempShape.h = desiredH;
                     tempShape.x = anchor.x - desiredW / 2;
                     tempShape.y = anchor.y - desiredH / 2;
-                    
+
+                    // Generate small thumbnail (≤400px JPEG q0.5) for Ably realtime sync
+                    // The full-res src goes to DB only; Ably has a 64KB message limit.
+                    try {
+                      const MAX_THUMB = 400;
+                      const tw = Math.min(MAX_THUMB, img.naturalWidth);
+                      const th = Math.round(tw / aspect);
+                      const thumbCanvas = document.createElement('canvas');
+                      thumbCanvas.width = tw;
+                      thumbCanvas.height = th;
+                      thumbCanvas.getContext('2d').drawImage(img, 0, 0, tw, th);
+                      tempShape.srcPreview = thumbCanvas.toDataURL('image/jpeg', 0.5);
+                    } catch (_) {}
+
                     // Create shape locally and persist to lavagna DB (not materiale!)
                     createShapeLocal(tempShape, true);
                     drawAll();
@@ -4794,15 +4824,22 @@ export default function LavagnaCanvas({
           }
           
           // Scale width and height
-          // For images, preserve aspect ratio by using only scaleX
           if (originalShape.kind === 'immagine') {
-            if (typeof originalShape.w === 'number') {
-              updated.w = originalShape.w * scaleX;
+            // Images always resize proportionally: determine single scale from handle type
+            let imgScale;
+            if (handle === 'left' || handle === 'right') {
+              imgScale = scaleX;
+            } else if (handle === 'top' || handle === 'bottom') {
+              imgScale = scaleY;
+            } else {
+              // Corner handle: use axis with larger relative change
+              imgScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
             }
-            if (typeof originalShape.h === 'number') {
-              // Preserve aspect ratio for images
-              updated.h = originalShape.h * scaleX;
-            }
+            if (typeof originalShape.w === 'number') updated.w = originalShape.w * imgScale;
+            if (typeof originalShape.h === 'number') updated.h = originalShape.h * imgScale;
+            // Recompute position using imgScale for both axes
+            if (typeof originalShape.x === 'number') updated.x = anchorX + (originalShape.x - anchorX) * imgScale;
+            if (typeof originalShape.y === 'number') updated.y = anchorY + (originalShape.y - anchorY) * imgScale;
           } else {
             // For other shapes, scale independently
             if (typeof originalShape.w === 'number') {

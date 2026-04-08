@@ -49,24 +49,6 @@ export async function GET(request) {
       },
     });
 
-    // Auto-archivia pacchetti saldati con tutte le lezioni svolte (lazy check al caricamento lista)
-    const now = new Date();
-    const daArchiviare = pacchetti.filter(p => {
-      if (!p.saldato || p.stato === 'archiviato') return false;
-      const attivitaAttive = (p.attivita || []).filter(
-        a => !['cancellata', 'Cancellata', 'CANCELLATA'].includes(a.stato || '')
-      );
-      if (attivitaAttive.length === 0) return false;
-      return attivitaAttive.every(a => new Date(a.orario ?? a.createdAt) < now);
-    });
-    if (daArchiviare.length > 0) {
-      await prisma.pacchettoOre.updateMany({
-        where: { id: { in: daArchiviare.map(p => p.id) } },
-        data: { stato: 'archiviato' }
-      });
-      daArchiviare.forEach(p => { p.stato = 'archiviato'; });
-    }
-
     return Response.json(pacchetti);
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400 });
