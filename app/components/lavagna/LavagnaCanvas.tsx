@@ -447,10 +447,11 @@ export default function LavagnaCanvas({
   }
   function rotateSelectionQuarter(direction = 1) {
     // direction: +1 = clockwise 90°, -1 = counter-clockwise 90°
-    const sel = selectedItems;
+    // Use ref to avoid stale closure issues with selectedItems
+    const sel = selectedItemsRef.current;
     if (!sel || (!sel.forme || sel.forme.length === 0)) return;
     const delta = direction * SNAP_ANGLE;
-    
+
     const updatedShapes = [];
     setForme(prev => {
       const updated = prev.map(f => {
@@ -465,19 +466,21 @@ export default function LavagnaCanvas({
       });
       return updated;
     });
-    
+
     // Persist and emit updates for each rotated shape (after state update completes)
     setTimeout(() => {
       updatedShapes.forEach(shape => {
         updateShapeLocal(shape, true);
       });
     }, 0);
-    
-    // Force redraw to update selection box with new rotated bounds
-    requestAnimationFrame(() => drawAll());
+
+    // Force redraw using ref so we always get the latest drawAll (not a stale closure)
+    requestAnimationFrame(() => drawAllRef.current?.());
   }
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
   const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
+  const selectedItemsRef = useRef(selectedItems); // always-current ref, avoids stale closures
+  useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems]);
   const draggingSelectionRef = useRef({
     active: false,
     lastWorld: null,
@@ -3091,9 +3094,12 @@ export default function LavagnaCanvas({
         // do not prevent default so images/links from system clipboard still arrive in onPaste
       }
       // Snap rotation shortcuts: R = antiorario 90°, Shift+R = orario 90°
+      // Note: rotateSelectionQuarter reads selectedItemsRef.current internally
       if (e.key.toLowerCase() === 'r' && !mod) {
-        rotateSelectionQuarter(e.shiftKey ? 1 : -1);
-        e.preventDefault();
+        if (selectedItemsRef.current?.forme?.length > 0) {
+          rotateSelectionQuarter(e.shiftKey ? 1 : -1);
+          e.preventDefault();
+        }
       }
       if (e.key === 'Delete') { // delete selection
 
@@ -4738,30 +4744,42 @@ export default function LavagnaCanvas({
         const origHeight = origBounds.maxY - origBounds.minY;
         let newWidth = newBounds.maxX - newBounds.minX;
         let newHeight = newBounds.maxY - newBounds.minY;
-        
+
         if (origWidth <= 0 || origHeight <= 0 || newWidth <= 0 || newHeight <= 0) return;
-        
+
         let scaleX = newWidth / origWidth;
         let scaleY = newHeight / origHeight;
-        
-        // If proportional resize is enabled, use uniform scaling
-        if (proportionalResize) {
-          // Use the scale factor with the larger absolute change
-          const scale = Math.abs(scaleX - 1) > Math.abs(scaleY - 1) ? scaleX : scaleY;
+
+        // Check if every selected shape is an image — images always resize proportionally
+        const selFormes = resizeInfo.selectionSnapshot?.forme || [];
+        const allImages = selFormes.length > 0 &&
+          selFormes.every(id => resizeInfo.originalShapes?.[id]?.kind === 'immagine');
+
+        // If proportional resize is enabled (or selection is all images), use uniform scaling
+        if (proportionalResize || allImages) {
+          // For side-only handles: use that axis; for corners: dominant axis wins
+          let scale;
+          if (handle === 'left' || handle === 'right') {
+            scale = scaleX;
+          } else if (handle === 'top' || handle === 'bottom') {
+            scale = scaleY;
+          } else {
+            scale = Math.abs(scaleX - 1) > Math.abs(scaleY - 1) ? scaleX : scaleY;
+          }
           scaleX = scale;
           scaleY = scale;
-          
+
           // Recalculate bounds to maintain aspect ratio
           newWidth = origWidth * scale;
           newHeight = origHeight * scale;
-          
+
           // Adjust bounds based on handle position
           if (handle.includes('left')) {
             newBounds.minX = origBounds.maxX - newWidth;
           } else if (handle.includes('right')) {
             newBounds.maxX = origBounds.minX + newWidth;
           }
-          
+
           if (handle.includes('top')) {
             newBounds.minY = origBounds.maxY - newHeight;
           } else if (handle.includes('bottom')) {
