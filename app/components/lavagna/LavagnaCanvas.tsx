@@ -427,6 +427,12 @@ export default function LavagnaCanvas({
       id: `shape-${s.id}` // Unique client-side ID
     }))
   ); // shapes: { id, kind, x,y,w,h, x2,y2, colore, spessore }
+  // formeRef: always-current ref so non-React callbacks can read latest forms without stale closures
+  const formeRef = useRef([]);
+  useEffect(() => { formeRef.current = forme; }, [forme]);
+  // liveShapePatchRef: overrides for shapes being actively resized — Map<id, shape>
+  // drawAll reads from this to show correct preview without waiting for React re-render
+  const liveShapePatchRef = useRef(null);
   const pendingDeletions = useRef(new Map()); // localId -> true (queued for deletion once dbId arrives)
   const previewShapeRef = useRef(null);
   const drawingShapeRef = useRef(false);
@@ -447,34 +453,32 @@ export default function LavagnaCanvas({
   }
   function rotateSelectionQuarter(direction = 1) {
     // direction: +1 = clockwise 90°, -1 = counter-clockwise 90°
-    // Use ref to avoid stale closure issues with selectedItems
     const sel = selectedItemsRef.current;
-    if (!sel || (!sel.forme || sel.forme.length === 0)) return;
+    if (!sel || !sel.forme || sel.forme.length === 0) return;
     const delta = direction * SNAP_ANGLE;
 
+    // Read current forms from formeRef (avoids stale closure — no async updater needed)
+    const currentForme = formeRef.current;
     const updatedShapes = [];
-    setForme(prev => {
-      const updated = prev.map(f => {
-        if (!sel.forme.includes(f.id)) return f;
-        const current = Number(f.rotation) || 0;
-        const target = snapToQuarterTurns(current + delta);
-        const rotated = { ...f, rotation: target };
-        // Invalidate cached bbox to force recalc on next draw
-        delete rotated._bb;
-        updatedShapes.push(rotated);
-        return rotated;
-      });
-      return updated;
+
+    const newForme = currentForme.map(f => {
+      if (!sel.forme.includes(f.id)) return f;
+      const current = Number(f.rotation) || 0;
+      const target = snapToQuarterTurns(current + delta);
+      const rotated = { ...f, rotation: target };
+      delete rotated._bb; // Invalidate cached bbox so getShapeBounds recalculates
+      updatedShapes.push(rotated);
+      return rotated;
     });
 
-    // Persist and emit updates for each rotated shape (after state update completes)
-    setTimeout(() => {
-      updatedShapes.forEach(shape => {
-        updateShapeLocal(shape, true);
-      });
-    }, 0);
+    if (updatedShapes.length === 0) return; // nothing selected that matched
 
-    // Force redraw using ref so we always get the latest drawAll (not a stale closure)
+    setForme(newForme); // direct value, no async updater — shapes are pre-computed
+
+    // Persist and emit immediately (shapes are already computed above)
+    updatedShapes.forEach(shape => updateShapeLocal(shape, true));
+
+    // Force redraw on next frame so the new forme state is visible
     requestAnimationFrame(() => drawAllRef.current?.());
   }
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
@@ -660,7 +664,11 @@ export default function LavagnaCanvas({
 
     // Tratti persistiti (coordinate in unità mondo)
     // Disegno forme preesistenti (prima dei tratti)
-    for (const f of forme) {
+    for (const fOrig of forme) {
+      // During active resize, use live preview values instead of stale React state
+      const f = (liveShapePatchRef.current && liveShapePatchRef.current.has(fOrig.id))
+        ? liveShapePatchRef.current.get(fOrig.id)
+        : fOrig;
       ctx.save();
   ctx.globalCompositeOperation = 'source-over';
   ctx.strokeStyle = f.colore || '#111827';
@@ -4821,16 +4829,18 @@ export default function LavagnaCanvas({
         }
         
         // Apply scaling to all selected shapes relative to the anchor point
+        // We compute live shapes into a ref (liveShapePatchRef) so drawAll() can render
+        // the correct preview immediately, without waiting for React's setForme re-render cycle.
         const selectionSnapshot = resizeInfo.selectionSnapshot || selectedItems;
-        setForme(prev => prev.map(f => {
-          if (!selectionSnapshot.forme.includes(f.id)) return f;
-          
-          // Get the original shape from the snapshot
+        const liveMap = new Map();
+        const currentForme = formeRef.current;
+
+        for (const f of currentForme) {
+          if (!selectionSnapshot.forme.includes(f.id)) continue;
+
           const originalShape = resizeInfo.originalShapes?.[f.id] || f;
-          
-          // Calculate offset from anchor point for each coordinate
           const updated = { ...f };
-          
+
           // Scale x, y coordinates (top-left of the shape)
           if (typeof originalShape.x === 'number') {
             const offsetX = originalShape.x - anchorX;
@@ -4840,55 +4850,40 @@ export default function LavagnaCanvas({
             const offsetY = originalShape.y - anchorY;
             updated.y = anchorY + offsetY * scaleY;
           }
-          
+
           // Scale width and height
           if (originalShape.kind === 'immagine') {
-            // Images always resize proportionally: determine single scale from handle type
+            // Images always resize proportionally: pick a single scale factor
             let imgScale;
             if (handle === 'left' || handle === 'right') {
               imgScale = scaleX;
             } else if (handle === 'top' || handle === 'bottom') {
               imgScale = scaleY;
             } else {
-              // Corner handle: use axis with larger relative change
               imgScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
             }
             if (typeof originalShape.w === 'number') updated.w = originalShape.w * imgScale;
             if (typeof originalShape.h === 'number') updated.h = originalShape.h * imgScale;
-            // Recompute position using imgScale for both axes
+            // Use imgScale for position too (uniform scaling around anchor)
             if (typeof originalShape.x === 'number') updated.x = anchorX + (originalShape.x - anchorX) * imgScale;
             if (typeof originalShape.y === 'number') updated.y = anchorY + (originalShape.y - anchorY) * imgScale;
           } else {
-            // For other shapes, scale independently
-            if (typeof originalShape.w === 'number') {
-              updated.w = originalShape.w * scaleX;
-            }
-            if (typeof originalShape.h === 'number') {
-              updated.h = originalShape.h * scaleY;
-            }
+            if (typeof originalShape.w === 'number') updated.w = originalShape.w * scaleX;
+            if (typeof originalShape.h === 'number') updated.h = originalShape.h * scaleY;
           }
-          
+
           // Handle shapes with x1, y1, x2, y2 (lines, arrows, etc.)
-          if (typeof originalShape.x1 === 'number') {
-            const offsetX1 = originalShape.x1 - anchorX;
-            updated.x1 = anchorX + offsetX1 * scaleX;
-          }
-          if (typeof originalShape.y1 === 'number') {
-            const offsetY1 = originalShape.y1 - anchorY;
-            updated.y1 = anchorY + offsetY1 * scaleY;
-          }
-          if (typeof originalShape.x2 === 'number') {
-            const offsetX2 = originalShape.x2 - anchorX;
-            updated.x2 = anchorX + offsetX2 * scaleX;
-          }
-          if (typeof originalShape.y2 === 'number') {
-            const offsetY2 = originalShape.y2 - anchorY;
-            updated.y2 = anchorY + offsetY2 * scaleY;
-          }
-          
-          return updated;
-        }));
-        
+          if (typeof originalShape.x1 === 'number') updated.x1 = anchorX + (originalShape.x1 - anchorX) * scaleX;
+          if (typeof originalShape.y1 === 'number') updated.y1 = anchorY + (originalShape.y1 - anchorY) * scaleY;
+          if (typeof originalShape.x2 === 'number') updated.x2 = anchorX + (originalShape.x2 - anchorX) * scaleX;
+          if (typeof originalShape.y2 === 'number') updated.y2 = anchorY + (originalShape.y2 - anchorY) * scaleY;
+
+          delete updated._bb; // force bbox recalc from new w/h
+          liveMap.set(f.id, updated);
+        }
+
+        liveShapePatchRef.current = liveMap;
+
         drawAll();
       } catch (_) {}
       return;
@@ -5262,44 +5257,53 @@ export default function LavagnaCanvas({
     // Finalize resize if active
     if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
       try {
-        // Save current state to undo stack before finishing
+        // Commit live shapes (from liveShapePatchRef) to React state and persist
         const selectionSnapshot = resizingSelectionRef.current.selectionSnapshot || selectedItems;
         const originalShapes = resizingSelectionRef.current.originalShapes || {};
-        const currentShapes = {};
-        
+        const liveMap = liveShapePatchRef.current;
+
+        // Build final shapes: use live values if available, otherwise current forme
+        const finalShapes = {};
         for (const shapeId of selectionSnapshot.forme) {
-          const shape = forme.find(f => f.id === shapeId);
-          if (shape) {
-            currentShapes[shapeId] = { ...shape };
+          const liveShape = liveMap?.get(shapeId);
+          const currentShape = forme.find(f => f.id === shapeId);
+          if (liveShape) {
+            finalShapes[shapeId] = liveShape;
+          } else if (currentShape) {
+            finalShapes[shapeId] = { ...currentShape };
           }
         }
-        
+
+        // Commit to React state
+        if (Object.keys(finalShapes).length > 0) {
+          setForme(prev => prev.map(f => finalShapes[f.id] ? { ...f, ...finalShapes[f.id] } : f));
+        }
+
         // Add to undo stack
         setUndoStack(prev => [...prev, {
           type: 'resize',
           shapes: Object.entries(originalShapes).map(([id, shape]) => ({
             id,
             before: shape,
-            after: currentShapes[id]
+            after: finalShapes[id]
           }))
         }]);
         setRedoStack([]);
-        
-        // Emit shape:update events for all resized shapes
-        for (const shapeId of selectionSnapshot.forme) {
-          const shape = forme.find(f => f.id === shapeId);
-          if (shape) {
-            emitOrPublish('shape:update', { ...shape, lavagnaId });
-            // Also persist to database
-            fetch(`/api/lavagna/shape/${shape.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(shape)
-            }).catch(() => {});
-          }
+
+        // Emit and persist final shapes
+        for (const shape of Object.values(finalShapes)) {
+          if (!shape) continue;
+          emitOrPublish('shape:update', { ...shape, lavagnaId });
+          fetch(`/api/lavagna/shape/${shape.dbId || shape.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(shape)
+          }).catch(() => {});
         }
       } catch (_) {}
-      
+
+      // Clear live patch and reset resize state
+      liveShapePatchRef.current = null;
       resizingSelectionRef.current.active = false;
       resizingSelectionRef.current.handle = null;
       resizingSelectionRef.current.originalBounds = null;
@@ -5619,6 +5623,16 @@ export default function LavagnaCanvas({
       selectingRef.current.active = false;
       setSelectionBox(null);
       setTimeout(drawAll, 0);
+    }
+    // cancel any in-progress resize (clear live preview)
+    if (resizingSelectionRef.current && resizingSelectionRef.current.active) {
+      liveShapePatchRef.current = null;
+      resizingSelectionRef.current.active = false;
+      resizingSelectionRef.current.handle = null;
+      resizingSelectionRef.current.originalBounds = null;
+      resizingSelectionRef.current.selectionSnapshot = null;
+      resizingSelectionRef.current.originalShapes = null;
+      resizingSelectionRef.current.startPoint = null;
     }
     // hide overlay on cancel
     try { const ov = overlayRef.current; if (ov) ov.style.display = 'none'; } catch(_) {}
