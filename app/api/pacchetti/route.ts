@@ -99,20 +99,78 @@ export async function POST(request) {
       );
     }
 
-    const pacchetto = await prisma.pacchettoOre.create({
-      data: {
+    const oreAcquistate = Number(body.oreAcquistate);
+
+    // ── Blocco di sicurezza: ore extra pendenti ────────────────────────────────
+    // Le attività con extraPacchetto=true sono ore già erogate ma non ancora
+    // scalate da nessun pacchetto (erano legate al vecchio pacchetto esaurito).
+    // Vanno computate nel NUOVO pacchetto al momento della sua creazione.
+    const attivitaExtra = await prisma.attivita.findMany({
+      where: {
         clienteId: clienteId,
-        descrizione: finalDescrizione,
-        oreAcquistate: Number(body.oreAcquistate),
-        oreResidue: body.oreResidue !== undefined
-          ? Number(body.oreResidue)
-          : Number(body.oreAcquistate),
-        dataAttivazione: new Date(body.dataAttivazione),
-        stato,
-        sogliaOreResidue: body.sogliaOreResidue !== undefined ? body.sogliaOreResidue : null,
+        extraPacchetto: true,
       },
+      select: { id: true, durataOre: true, oreConsumate: true },
     });
-    return Response.json(pacchetto, { status: 201 });
+
+    const totaleOreExtra = attivitaExtra.reduce((sum, a) => {
+      const ore = typeof a.durataOre === 'number' ? a.durataOre : a.oreConsumate;
+      return sum + (ore || 0);
+    }, 0);
+
+    // oreResidue di partenza: se l'admin ha passato un valore esplicito, usalo;
+    // altrimenti usa oreAcquistate come base e scala le extra.
+    const baseResidue = body.oreResidue !== undefined
+      ? Number(body.oreResidue)
+      : oreAcquistate;
+    const oreResidueFinali = Math.max(0, baseResidue - totaleOreExtra);
+
+    const pacchetto = await prisma.$transaction(async (tx) => {
+      // 1. Crea il nuovo pacchetto
+      const nuovoPacchetto = await tx.pacchettoOre.create({
+        data: {
+          clienteId: clienteId,
+          descrizione: finalDescrizione,
+          oreAcquistate: oreAcquistate,
+          oreResidue: oreResidueFinali,
+          dataAttivazione: new Date(body.dataAttivazione),
+          stato,
+          sogliaOreResidue: body.sogliaOreResidue !== undefined ? body.sogliaOreResidue : null,
+        },
+      });
+
+      // 2. Ricollega le attività extra al nuovo pacchetto e segnale come contabilizzate
+      if (attivitaExtra.length > 0) {
+        await tx.attivita.updateMany({
+          where: { id: { in: attivitaExtra.map(a => a.id) } },
+          data: {
+            pacchettoId: nuovoPacchetto.id,
+            extraPacchetto: false, // ora scalate dal nuovo pacchetto → non più "extra pendenti"
+          },
+        });
+
+        // 3. Changelog
+        await tx.pacchetto_ChangeLog.create({
+          data: {
+            pacchettoId: nuovoPacchetto.id,
+            orePrima: oreAcquistate,
+            oreDopo: oreResidueFinali,
+            tipoOperazione: 'riporto-ore-extra',
+            utente: session.user?.name || session.user?.email || 'sistema',
+            motivazione: `Riporto automatico di ${totaleOreExtra} ore extra dal pacchetto precedente (${attivitaExtra.length} attività).`,
+            pacchettoDescrizione: finalDescrizione,
+          },
+        });
+      }
+
+      return nuovoPacchetto;
+    });
+
+    return Response.json({
+      ...pacchetto,
+      _oreExtraRiportate: totaleOreExtra,
+      _attivitaExtraRiportate: attivitaExtra.length,
+    }, { status: 201 });
   } catch (error) {
     console.error("ERRORE POST /api/pacchetti:", error);
     return Response.json({ error: error.message }, { status: 400 });
