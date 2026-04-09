@@ -309,17 +309,24 @@ export default function LavagnaCanvas({
     emitShapeUpdate(s)
   }, [emitShapeUpdate])
 
-  // ── Keyboard shortcut [ / ] → ruota immagine selezionata di ±15° ────────────
+  // ── Keyboard shortcut R / Shift+R → ruota immagine selezionata di ±90° ───────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== '[' && e.key !== ']') return
+      if (e.key.toLowerCase() !== 'r') return
+      const isMac = navigator.platform.toLowerCase().includes('mac')
+      const mod = isMac ? e.metaKey : e.ctrlKey
+      if (mod) return // ignora Ctrl/Cmd+R (refresh)
       const { selectedShapeIds, shapes } = store
       if (selectedShapeIds.length !== 1) return
       const img = shapes.find(s => s.id === selectedShapeIds[0] && s.type === 'image')
       if (!img) return
       e.preventDefault()
-      const delta = e.key === '[' ? -Math.PI / 12 : Math.PI / 12
-      store.updateShape(img.id, { rotation: (img.rotation ?? 0) + delta })
+      // R = antiorario (−90°), Shift+R = orario (+90°); snap al multiplo di 90° più vicino
+      const delta = e.shiftKey ? Math.PI / 2 : -Math.PI / 2
+      const SNAP = Math.PI / 2
+      const raw = (img.rotation ?? 0) + delta
+      const snapped = Math.round(raw / SNAP) * SNAP
+      store.updateShape(img.id, { rotation: snapped })
       onSaveShape(img.id)
     }
     window.addEventListener('keydown', handler)
@@ -859,10 +866,40 @@ function ImageTransformOverlay({
       useWhiteboardStore.getState().updateShape(shape.id, { rotation: (orig.rotation ?? 0) + (angle - initAngle) })
     } else {
       let { x, y, width, height } = { x: orig.x, y: orig.y, width: orig.width, height: orig.height }
-      if (type === 'tl') { x += dx; y += dy; width -= dx; height -= dy }
-      else if (type === 'tr') { width += dx; y += dy; height -= dy }
-      else if (type === 'bl') { x += dx; width -= dx; height += dy }
-      else if (type === 'br') { width += dx; height += dy }
+
+      // Immagini: resize sempre proporzionale usando l'aspect ratio originale
+      if (shape.type === 'image' && orig.width > 0 && orig.height > 0) {
+        const ar = orig.width / orig.height
+        if (type === 'tl') {
+          // Usa l'asse con variazione maggiore come driver
+          const newW = Math.max(30, orig.width + (Math.abs(dx) >= Math.abs(dy) ? -dx : -dy * ar))
+          const newH = newW / ar
+          x = orig.x + (orig.width - newW)
+          y = orig.y + (orig.height - newH)
+          width = newW; height = newH
+        } else if (type === 'tr') {
+          const newW = Math.max(30, orig.width + (Math.abs(dx) >= Math.abs(dy) ? dx : -dy * ar))
+          const newH = newW / ar
+          y = orig.y + (orig.height - newH)
+          width = newW; height = newH
+        } else if (type === 'bl') {
+          const newW = Math.max(30, orig.width + (Math.abs(dx) >= Math.abs(dy) ? -dx : dy * ar))
+          const newH = newW / ar
+          x = orig.x + (orig.width - newW)
+          width = newW; height = newH
+        } else if (type === 'br') {
+          const newW = Math.max(30, orig.width + (Math.abs(dx) >= Math.abs(dy) ? dx : dy * ar))
+          const newH = newW / ar
+          width = newW; height = newH
+        }
+      } else {
+        // Forme non-immagine: resize libero
+        if (type === 'tl') { x += dx; y += dy; width -= dx; height -= dy }
+        else if (type === 'tr') { width += dx; y += dy; height -= dy }
+        else if (type === 'bl') { x += dx; width -= dx; height += dy }
+        else if (type === 'br') { width += dx; height += dy }
+      }
+
       if (width > 30 && height > 20) useWhiteboardStore.getState().updateShape(shape.id, { x, y, width, height })
     }
   }

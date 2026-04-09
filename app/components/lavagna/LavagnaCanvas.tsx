@@ -454,35 +454,24 @@ export default function LavagnaCanvas({
   function rotateSelectionQuarter(direction = 1) {
     // direction: +1 = clockwise 90°, -1 = counter-clockwise 90°
     const sel = selectedItemsRef.current;
-    console.log('[DIAG-ROT] rotateSelectionQuarter chiamata, direction:', direction, 'sel:', JSON.stringify(sel));
-    if (!sel || !sel.forme || sel.forme.length === 0) {
-      console.log('[DIAG-ROT] SKIP: sel.forme vuoto');
-      return;
-    }
+    if (!sel || !sel.forme || sel.forme.length === 0) return;
     const delta = direction * SNAP_ANGLE;
 
-    // Read current forms from formeRef (avoids stale closure — no async updater needed)
     const currentForme = formeRef.current;
-    console.log('[DIAG-ROT] formeRef.current.length:', currentForme?.length, '— cercando IDs:', sel.forme);
     const updatedShapes = [];
 
     const newForme = currentForme.map(f => {
       if (!sel.forme.includes(f.id)) return f;
       const current = Number(f.rotation) || 0;
       const target = snapToQuarterTurns(current + delta);
-      console.log('[DIAG-ROT] ruotando shape', f.id, f.kind, 'rotation:', current, '->', target);
       const rotated = { ...f, rotation: target };
       delete rotated._bb;
       updatedShapes.push(rotated);
       return rotated;
     });
 
-    if (updatedShapes.length === 0) {
-      console.log('[DIAG-ROT] NESSUNA SHAPE TROVATA da ruotare!');
-      return;
-    }
+    if (updatedShapes.length === 0) return;
 
-    console.log('[DIAG-ROT] setForme con', updatedShapes.length, 'shape ruotate');
     setForme(newForme);
     updatedShapes.forEach(shape => updateShapeLocal(shape, true));
     requestAnimationFrame(() => drawAllRef.current?.());
@@ -490,12 +479,7 @@ export default function LavagnaCanvas({
   const [selectionBox, setSelectionBox] = useState(null); // world coords {x1,y1,x2,y2}
   const [selectedItems, setSelectedItems] = useState({ tratti: [], forme: [] });
   const selectedItemsRef = useRef(selectedItems); // always-current ref, avoids stale closures
-  useEffect(() => {
-    selectedItemsRef.current = selectedItems;
-    if (selectedItems.forme.length > 0 || selectedItems.tratti.length > 0) {
-      console.log('[DIAG-SEL] selectedItems aggiornato:', JSON.stringify(selectedItems));
-    }
-  }, [selectedItems]);
+  useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems]);
   const draggingSelectionRef = useRef({
     active: false,
     lastWorld: null,
@@ -1084,14 +1068,6 @@ export default function LavagnaCanvas({
                 // If both w and h are set, adjust to maintain aspect ratio
                 if (f.w && f.h) {
                   h = w / imgAspect;
-                }
-
-                // Throttled log: log only every 60 frames to avoid spam
-                if (!drawAll._imgLogCount) drawAll._imgLogCount = 0;
-                if (drawAll._imgLogCount++ % 60 === 0) {
-                  console.log('[DIAG-IMG] draw', f.id, 'f.w:', f.w?.toFixed(1), 'f.h:', f.h?.toFixed(1),
-                    'rendered w:', w.toFixed(1), 'h:', h.toFixed(1),
-                    'rotation:', f.rotation, 'isLive:', !!(liveShapePatchRef.current?.has(f.id)));
                 }
 
                 ctx.drawImage(imgEl, f.x, f.y, w, h);
@@ -3121,13 +3097,9 @@ export default function LavagnaCanvas({
       }
       // Snap rotation shortcuts: R = antiorario 90°, Shift+R = orario 90°
       if (e.key.toLowerCase() === 'r' && !mod) {
-        console.log('[DIAG-ROT] tasto R premuto — selectedItemsRef.current:', JSON.stringify(selectedItemsRef.current));
-        console.log('[DIAG-ROT] formeRef.current.length:', formeRef.current?.length, 'forme IDs:', formeRef.current?.map(f => f.id));
         if (selectedItemsRef.current?.forme?.length > 0) {
           rotateSelectionQuarter(e.shiftKey ? 1 : -1);
           e.preventDefault();
-        } else {
-          console.log('[DIAG-ROT] SKIP: nessuna forma selezionata in selectedItemsRef');
         }
       }
       if (e.key === 'Delete') { // delete selection
@@ -4853,9 +4825,6 @@ export default function LavagnaCanvas({
         const selectionSnapshot = resizeInfo.selectionSnapshot || selectedItems;
         const liveMap = new Map();
         const currentForme = formeRef.current;
-        console.log('[DIAG-RESIZE] move handle:', handle, 'scaleX:', scaleX.toFixed(3), 'scaleY:', scaleY.toFixed(3),
-          'allImages:', allImages, 'proportionalResize:', proportionalResize,
-          'selForme:', selectionSnapshot.forme, 'currentForme.length:', currentForme.length);
 
         for (const f of currentForme) {
           if (!selectionSnapshot.forme.includes(f.id)) continue;
