@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Navbar from "../../components/Navbar";
 
 const C = {
   bg:"#f0f4ff", card:"#fff", primary:"#4f46e5", light:"#e0e7ff",
@@ -63,7 +64,9 @@ export default function IndiceLezioniPage() {
   const lezioniNonClass = lezFiltrate.filter(l=>!l.argomentoId&&!l.macroArgomentoId);
 
   return (
-    <div style={{ minHeight:"100vh",background:C.bg,padding:"28px 16px" }}>
+    <div style={{ minHeight:"100vh",background:C.bg }}>
+      <Navbar />
+      <div style={{ padding:"28px 16px" }}>
       <div style={{ maxWidth:860,margin:"0 auto" }}>
 
         {/* Header */}
@@ -135,6 +138,7 @@ export default function IndiceLezioniPage() {
             {q ? `Nessuna lezione corrisponde a "${search}"` : "Nessun contenuto ancora"}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

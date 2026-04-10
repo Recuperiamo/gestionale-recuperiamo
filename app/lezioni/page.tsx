@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Navbar from "../components/Navbar";
 
 // ── Materie con ordine fisso ──────────────────────────────────────────────────
 const MATERIE = [
@@ -369,7 +370,9 @@ function LezioniPageInner() {
   if (status==="loading"||loading) return <div style={{padding:40,color:C.sub}}>Carico...</div>;
 
   return (
-    <div style={{ minHeight:"100vh",background:C.bg,padding:"28px 16px" }}>
+    <div style={{ minHeight:"100vh",background:C.bg }}>
+      <Navbar />
+      <div style={{ padding:"28px 16px" }}>
       <div style={{ maxWidth:860,margin:"0 auto" }}>
 
         {/* Header */}
@@ -518,6 +521,7 @@ function LezioniPageInner() {
         <AssegnaModal lezione={modalAssegna} clienti={clienti}
           onClose={()=>setModalAssegna(null)} onSaved={loadAll}/>
       )}
+      </div>
     </div>
   );
 }

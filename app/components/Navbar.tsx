@@ -79,7 +79,7 @@ export default function Navbar() {
       background: active ? "rgba(28,176,246,0.35)" : "transparent",
       border: "none",
       borderRadius: 6,
-      padding: "6px 9px",
+      padding: "6px 11px",
       fontWeight: 600,
       fontSize: 12,
       transition: "all 0.15s",
@@ -105,7 +105,7 @@ export default function Navbar() {
   return (
     <>
       <style>{`
-        .nb-links { display: flex; flex: 1; gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; justify-content: flex-start; }
+        .nb-links { display: flex; flex: 1; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; justify-content: flex-start; }
         .nb-links::-webkit-scrollbar { display: none; }
         .nb-hamburger { display: none !important; }
         @media (max-width: 767px) {

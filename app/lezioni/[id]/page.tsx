@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Navbar from "../../components/Navbar";
 
 const MATERIE = [
   "Matematica","Fisica","Chimica","Biologia","Informatica",
@@ -360,13 +361,17 @@ function LezioneDetailPageInner() {
   }
 
   const pageStyle = { maxWidth: 1100, margin: "0 auto", padding: "28px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" };
+  const wrapStyle = { minHeight: "100vh", background: "#f0f4ff" };
 
-  if (loading) return <div style={pageStyle}><p style={{ color: "#20489a" }}>Caricamento...</p></div>;
+  if (loading) return <div style={wrapStyle}><Navbar /><div style={pageStyle}><p style={{ color: "#20489a" }}>Caricamento...</p></div></div>;
 
   if (error) return (
-    <div style={pageStyle}>
-      <div style={{ background: "#ffebee", border: "1px solid #ffcdd2", borderRadius: 10, padding: 20, color: "#c62828", fontWeight: 600 }}>{error}</div>
-      <Link href="/lezioni" style={{ display: "inline-block", marginTop: 16, color: "#1cb0f6", fontWeight: 600, textDecoration: "none" }}>← Torna alle lezioni</Link>
+    <div style={wrapStyle}>
+      <Navbar />
+      <div style={pageStyle}>
+        <div style={{ background: "#ffebee", border: "1px solid #ffcdd2", borderRadius: 10, padding: 20, color: "#c62828", fontWeight: 600 }}>{error}</div>
+        <Link href="/lezioni" style={{ display: "inline-block", marginTop: 16, color: "#1cb0f6", fontWeight: 600, textDecoration: "none" }}>← Torna alle lezioni</Link>
+      </div>
     </div>
   );
 
@@ -380,7 +385,9 @@ function LezioneDetailPageInner() {
   const currentHtml = htmlContent[tab] || "";
 
   return (
-    <div style={pageStyle}>
+    <div style={wrapStyle}>
+      <Navbar />
+      <div style={pageStyle}>
       {/* Breadcrumb */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <Link href="/lezioni" style={{ color: "#1cb0f6", fontWeight: 600, textDecoration: "none", fontSize: 14 }}>← Lezioni</Link>
@@ -546,6 +553,7 @@ function LezioneDetailPageInner() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

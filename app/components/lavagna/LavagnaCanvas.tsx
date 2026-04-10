@@ -2095,6 +2095,10 @@ export default function LavagnaCanvas({
               punti: puntiFinali,
               autoreUserId: 'remote'
             });
+            // Ripristina i punti completi nel remoteStream per evitare il flash visivo:
+            // drawAll può girare tra setTratti (asincrono) e il commit React, trovando
+            // il remoteStream già eliminato ma il tratto non ancora in tratti → scompare.
+            st.punti = puntiFinali;
             setTratti((prev) => {
               // Check duplicati - non aggiungere se già esiste
               if (prev.find((t) => String(t.id) === String(streamId))) {
@@ -2102,8 +2106,13 @@ export default function LavagnaCanvas({
               }
               return [...prev, definitivo];
             });
+            // Elimina il remoteStream dopo che React ha processato setTratti
+            setTimeout(() => {
+              remoteStreams.current.delete(streamId);
+            }, 0);
+          } else {
+            remoteStreams.current.delete(streamId);
           }
-          remoteStreams.current.delete(streamId);
         };
 
         // Remote stroke canceled mid-drawing: drop any temp stream and clear partials
