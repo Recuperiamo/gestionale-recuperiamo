@@ -307,14 +307,18 @@ function useCommenti(materiali) {
 }
 
 // --- COMPONENTE UPLOAD MODALE (MULTIFILE) ---
-function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStudente = [], coloreTema = "#1cb0f6" }) {
+function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStudente = [], coloreTema = "#1cb0f6", sezioneDefault = "MATERIALE" }) {
   const [files, setFiles] = useState([]);
   const [materia, setMateria] = useState("");
-  const [sezione, setSezione] = useState("MATERIALE");
+  const [sezione, setSezione] = useState(sezioneDefault);
   const [sottocategoria, setSottocategoria] = useState("TEORIA"); // Default for MATERIALE
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef();
+
+  useEffect(() => {
+    if (open) setSezione(sezioneDefault);
+  }, [open, sezioneDefault]);
 
   function getDatalogString() {
     const now = new Date();
@@ -325,7 +329,7 @@ function UploadMaterialeModal({ open, onClose, onUploaded, clienteId, materieStu
   function resetForm() {
     setFiles([]);
     setMateria("");
-    setSezione("MATERIALE");
+    setSezione(sezioneDefault);
     setSottocategoria("TEORIA");
     setNome("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1532,6 +1536,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         clienteId={targetClienteId}
         materieStudente={materieStudente}
         coloreTema={coloreTema}
+        sezioneDefault={(activeTab === 'compiti' ? 'COMPITI' : 'MATERIALE')}
       />
 
       {/* MODALE VOTI */}
