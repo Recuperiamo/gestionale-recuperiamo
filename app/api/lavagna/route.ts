@@ -68,13 +68,13 @@ export async function GET(req) {
 
     let lavagna = await prisma.lavagna.findUnique({
       where: { attivitaId },
-      select: { id: true, attivitaId: true, titolo: true }
+      select: { id: true, attivitaId: true, titolo: true, sfondo: true }
     });
 
     if (!lavagna) {
       lavagna = await prisma.lavagna.create({
         data: { attivitaId, titolo: baseTitolo },
-        select: { id: true, attivitaId: true, titolo: true }
+        select: { id: true, attivitaId: true, titolo: true, sfondo: true }
       });
     } else {
       if (
@@ -84,7 +84,7 @@ export async function GET(req) {
         lavagna = await prisma.lavagna.update({
           where: { attivitaId },
           data: { titolo: baseTitolo },
-          select: { id: true, attivitaId: true, titolo: true }
+          select: { id: true, attivitaId: true, titolo: true, sfondo: true }
         });
       }
     }
@@ -161,6 +161,7 @@ export async function GET(req) {
         titolo: lavagna.titolo,
         titoloVisuale,
         nomeStudente,
+        sfondo: lavagna.sfondo || "bianco",
         tratti,
         forme
       }
@@ -237,6 +238,32 @@ export async function POST(req) {
     return Response.json({ lavagna });
   } catch (e) {
     return new Response("Errore creazione lavagna", { status: 500 });
+  }
+}
+
+// PATCH: aggiorna campi della lavagna (es. sfondo)
+export async function PATCH(req) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return Response.json({ error: "Non autorizzato" }, { status: 401 });
+  }
+  const role = (session.user.role || "").toLowerCase();
+  if (role !== "admin" && role !== "operatore") {
+    return Response.json({ error: "Solo admin/operatori" }, { status: 403 });
+  }
+  try {
+    const body = await req.json().catch(() => ({}));
+    const { lavagnaId, attivitaId, sfondo } = body;
+    const validSfondi = ["bianco", "nero", "righe", "quadretti", "punti"];
+    if (sfondo && !validSfondi.includes(sfondo)) {
+      return Response.json({ error: "Valore sfondo non valido" }, { status: 400 });
+    }
+    const where = lavagnaId ? { id: Number(lavagnaId) } : attivitaId ? { attivitaId: Number(attivitaId) } : null;
+    if (!where) return Response.json({ error: "lavagnaId o attivitaId obbligatorio" }, { status: 400 });
+    const updated = await prisma.lavagna.update({ where, data: { sfondo } });
+    return Response.json({ ok: true, sfondo: updated.sfondo });
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 500 });
   }
 }
 

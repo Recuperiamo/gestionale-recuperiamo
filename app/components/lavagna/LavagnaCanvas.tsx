@@ -22,6 +22,7 @@ export default function LavagnaCanvas({
   attivitaId,
   trattiIniziali,
   formeIniziali,
+  sfondoIniziale,
   utenteId,
   clienteId,
   ruolo,
@@ -78,7 +79,7 @@ export default function LavagnaCanvas({
   const [enableSingleFingerPan, setEnableSingleFingerPan] = useState(false);
   const [showTools, setShowTools] = useState(true);
   const [toolbarVisible, setToolbarVisible] = useState(true);
-  const [sfondo, setSfondo] = useState("bianco"); // bianco|nero|righe|quadretti|punti
+  const [sfondo, setSfondo] = useState(sfondoIniziale || "bianco"); // bianco|nero|righe|quadretti|punti
   const sfondoRef = useRef(sfondo);
   const backgroundStorageKey = useMemo(() => {
     const keySource = attivitaId ?? lavagnaId;
@@ -6137,6 +6138,14 @@ export default function LavagnaCanvas({
     setSfondo(next);
     emitOrPublish('background:change', { lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current, sfondo: next });
     requestAnimationFrame(() => drawAll());
+    // Persisti sfondo nel DB così gli studenti lo vedono anche senza sync real-time
+    try {
+      fetch('/api/lavagna', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lavagnaId: lavagnaIdRef.current, attivitaId: attivitaIdRef.current, sfondo: next })
+      }).catch(() => {});
+    } catch (_) {}
   }, [emitOrPublish, drawAll]);
 
   // == TOOLBAR ==

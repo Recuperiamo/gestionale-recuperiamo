@@ -242,6 +242,7 @@ model Lavagna {
   clienteId        Int?
   titolo           String?         @default("Lavagna")
   snapshot         Json?
+  sfondo           String?         @default("bianco")
   canStudentDraw   Boolean         @default(false)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
