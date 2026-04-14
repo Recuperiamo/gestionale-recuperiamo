@@ -274,6 +274,7 @@ export default function LavagnaFullScreenPage() {
             clienteId={lavagna.clienteId}
             trattiIniziali={lavagna.tratti}
             formeIniziali={lavagna.forme}
+            sfondoIniziale={lavagna.sfondo || "bianco"}
             utenteId={session.user.id}
             ruolo={session.user.role}
             altezza={canvasHFinal}
