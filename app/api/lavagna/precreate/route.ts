@@ -37,7 +37,7 @@ export async function POST(req) {
                 a.orarioOriginale ? new Date(a.orarioOriginale) : new Date();
       const titolo = formatDataOra(d);
       await prisma.lavagna.create({
-        data: { attivitaId: a.id, titolo }
+        data: { attivitaId: a.id, titolo, clienteId: a.clienteId ?? null }
       });
       created++;
     }

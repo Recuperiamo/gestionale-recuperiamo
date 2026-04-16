@@ -11,6 +11,10 @@ const giorniSettimana = [
   { value: "Sun", label: "Domenica" },
 ];
 
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const isEdit = !!initialData?.id;
   const isRicorrente = !!initialData?.ricorrenzaId;
@@ -27,7 +31,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
   const [descrizione, setDescrizione] = useState(initialData?.descrizione || "");
   const [dataSingola, setDataSingola] = useState(
-    initialOrarioDate ? initialOrarioDate.toISOString().slice(0, 10) : ""
+    initialOrarioDate ? toLocalDateStr(initialOrarioDate) : ""
   );
   const [oraInizioSingola, setOraInizioSingola] = useState(
     initialOrarioDate
@@ -66,7 +70,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   useEffect(() => {
     if (!isEdit && initialData?.orario) {
       const dt = new Date(initialData.orario);
-      setDataSingola(dt.toISOString().slice(0, 10));
+      setDataSingola(toLocalDateStr(dt));
       setOraInizioSingola(
         `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`
       );

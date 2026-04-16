@@ -45,7 +45,13 @@ export async function POST(req) {
       }
       // Non duplica se esiste già (stessa tabella Lavagna, unique su attivitaId)
       const exists = await prisma.lavagna.findUnique({ where: { attivitaId: a.id } })
-      if (exists) { skipped++; continue }
+      if (exists) {
+        // Ripara clienteId mancante: può succedere se v1 precreate ha vinto la race
+        if (!exists.clienteId && a.clienteId) {
+          await prisma.lavagna.update({ where: { id: exists.id }, data: { clienteId: a.clienteId } })
+        }
+        skipped++; continue
+      }
 
       const d = a.orario ? new Date(a.orario)
                : a.orarioOriginale ? new Date(a.orarioOriginale) : new Date()

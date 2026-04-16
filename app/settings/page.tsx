@@ -9,13 +9,37 @@ import Navbar from "../components/Navbar";
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [repairLoading, setRepairLoading] = useState(false);
+  const [repairResult, setRepairResult] = useState(null);
+
+  const isAdmin = ["admin", "operatore"].includes(session?.user?.role);
+
+  const handleRepairLavagne = async () => {
+    if (!window.confirm("Avvia la correzione retroattiva di titoli e clienteId sulle lavagne?")) return;
+    setRepairLoading(true);
+    setRepairResult(null);
+    try {
+      const res = await fetch("/api/lavagna/repair", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setRepairResult({ ok: true, ...data });
+      } else {
+        setRepairResult({ ok: false, error: data.error || "Errore sconosciuto" });
+      }
+    } catch {
+      setRepairResult({ ok: false, error: "Errore di rete" });
+    } finally {
+      setRepairLoading(false);
+    }
+  };
 
   if (status === "loading") return null;
   if (!session) {
@@ -155,6 +179,39 @@ export default function SettingsPage() {
             {loading ? "Aggiornamento..." : "Cambia Password"}
           </button>
         </form>
+
+        {isAdmin && (
+          <div style={{ marginTop: 36, paddingTop: 24, borderTop: "1px solid #e3eefe" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: "#20489a" }}>
+              Manutenzione Lavagne
+            </h3>
+            <p style={{ fontSize: 13, color: "#4268b3", marginBottom: 14 }}>
+              Corregge retroattivamente tutte le lavagne: rigenera i titoli con il fuso orario Europe/Rome
+              e ripara i <code>clienteId</code> mancanti (visibilità studenti).
+            </p>
+            <button
+              onClick={handleRepairLavagne}
+              disabled={repairLoading}
+              style={repairLoading ? btnDisabledStyle : { ...btnStyle, background: "#f59e0b" }}
+            >
+              {repairLoading ? "Correzione in corso..." : "Correggi lavagne"}
+            </button>
+            {repairResult && (
+              <div style={{ marginTop: 12, ...(repairResult.ok ? successStyle : errorStyle) }}>
+                {repairResult.ok ? (
+                  <>
+                    Correzione completata su <strong>{repairResult.totale}</strong> lavagne:
+                    titoli aggiornati <strong>{repairResult.fixedTitoli}</strong>,
+                    clienteId ripristinati <strong>{repairResult.fixedClienteId}</strong>
+                    {repairResult.errors > 0 && `, errori: ${repairResult.errors}`}.
+                  </>
+                ) : (
+                  <>Errore: {repairResult.error}</>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
