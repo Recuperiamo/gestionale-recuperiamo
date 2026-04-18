@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 
-export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDelete }) {
+export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDelete, onSposta }) {
   if (!attivita) return null;
 
   const pacchettoLabel = attivita.pacchetto?.descrizione || attivita.pacchetto?.nome || "";
@@ -87,7 +87,25 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
         <div style={{ marginBottom: 8 }}>
           <b>Cliente:</b> {clienteLabel}
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 22, gap: 10 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 22, gap: 10, flexWrap: "wrap" }}>
+          {onSposta && (
+            <button
+              onClick={() => onSposta(attivita)}
+              style={{
+                background: "#f59e0b",
+                color: "#fff",
+                border: "none",
+                borderRadius: 7,
+                padding: "7px 14px",
+                fontWeight: 700,
+                fontSize: 15,
+                cursor: "pointer",
+                boxShadow: "0 1px 4px #f59e0b40"
+              }}
+            >
+              Sposta pacchetto
+            </button>
+          )}
           <button
             onClick={() => onEdit(attivita)}
             style={{

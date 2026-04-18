@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import AttivitaList from '../components/attivita/AttivitaList';
 import AttivitaForm from '../components/attivita/AttivitaForm';
 import AttivitaDettaglioModal from '../components/attivita/AttivitaDettaglioModal';
+import SpostaAttivitaModal from '../components/attivita/SpostaAttivitaModal';
 
 export default function AttivitaPage() {
   const [attivitaList, setAttivitaList] = useState([]);
@@ -20,6 +21,7 @@ export default function AttivitaPage() {
   const [dettaglioAttivita, setDettaglioAttivita] = useState(null);
   const [purgeLoading, setPurgeLoading] = useState(false);
   const [batchEdit, setBatchEdit] = useState(false); // Nuovo stato per modifica batch selezione multipla
+  const [spostaAttivita, setSpostaAttivita] = useState(null);
 
   // FILTRI
   const [filtroCliente, setFiltroCliente] = useState('');
@@ -347,7 +349,20 @@ export default function AttivitaPage() {
           onToggleRow={toggleRow}
           onToggleAll={toggleAll}
         />
-        <AttivitaDettaglioModal attivita={dettaglioAttivita} onClose={handleCloseDettaglio} onEdit={handleEdit} onDelete={handleDeleteDettaglio} />
+        <AttivitaDettaglioModal
+          attivita={dettaglioAttivita}
+          onClose={handleCloseDettaglio}
+          onEdit={handleEdit}
+          onDelete={handleDeleteDettaglio}
+          onSposta={(a) => { setDettaglioAttivita(null); setSpostaAttivita(a); }}
+        />
+        {spostaAttivita && (
+          <SpostaAttivitaModal
+            attivita={spostaAttivita}
+            onClose={() => setSpostaAttivita(null)}
+            onSuccess={() => { setSpostaAttivita(null); fetchAttivita(); }}
+          />
+        )}
         
         {/* Modale modifica batch */}
         {batchEdit && <BatchEditModal 

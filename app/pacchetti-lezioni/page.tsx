@@ -11,6 +11,7 @@ import html2canvas from "html2canvas";
 
 import { useRichiesteModifica } from "../components/modifiche/useRichiesteModifica";
 import AttivitaDettaglioModal from "../components/attivita/AttivitaDettaglioModal";
+import SpostaAttivitaModal from "../components/attivita/SpostaAttivitaModal";
 import RichiestaModificaModal from "../components/modifiche/RichiestaModificaModal";
 import ApprovaRichiestaModal from "../admin/modifiche/ApprovaRichiestaModal";
 import PacchettoSummaryPanel from "../components/pacchetti/PacchettoSummaryPanel";
@@ -28,6 +29,7 @@ export default function PacchettiLezioniPage() {
 
   const [attivitaSelezionata, setAttivitaSelezionata] = useState(null);
   const [editingAttivita, setEditingAttivita] = useState(null);
+  const [spostaAttivita, setSpostaAttivita] = useState(null);
   const [attivitaPerRichiesta, setAttivitaPerRichiesta] = useState(null);
   const [showRichiesta, setShowRichiesta] = useState(false);
 
@@ -1621,6 +1623,15 @@ export default function PacchettiLezioniPage() {
               alert('Impossibile eliminare: ' + (err.message || err));
             }
           }}
+          onSposta={(a) => { setAttivitaSelezionata(null); setSpostaAttivita(a); }}
+        />
+      )}
+
+      {spostaAttivita && (
+        <SpostaAttivitaModal
+          attivita={spostaAttivita}
+          onClose={() => setSpostaAttivita(null)}
+          onSuccess={() => { setSpostaAttivita(null); fetchAttivita(); }}
         />
       )}
 
