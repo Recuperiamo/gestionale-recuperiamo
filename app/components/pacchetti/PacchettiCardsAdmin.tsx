@@ -70,7 +70,23 @@ export default function PacchettiCardsAdmin() {
       
       const letti = await fetchAlertLetti();
       setAlertLetti(letti);
-      
+
+      // Sweep fire-and-forget: archivia pacchetti saldati esauriti
+      fetch("/api/pacchetti/sweep-archivia", { method: "POST", credentials: "include" })
+        .then(r => r.json())
+        .then(({ archiviati }) => {
+          if (archiviati > 0) {
+            // Ricarica la lista se qualcosa è stato archiviato
+            fetchPacchetti().then((packs) => {
+              setPacchetti(packs || []);
+              const attMap = {};
+              for (const p of packs || []) attMap[p.id] = Array.isArray(p.attivita) ? p.attivita : [];
+              setAttivitaMap(attMap);
+            });
+          }
+        })
+        .catch(() => {});
+
       setLoading(false);
     }
     load();
