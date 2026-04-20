@@ -7,6 +7,7 @@ import PacchettoForm from "./PacchettoForm";
 import PacchettoEditForm from "./PacchettoEditForm";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import PacchettoLezioniModal from "./PacchettoLezioniModal";
+import RettificaOreModal from "./RettificaOreModal";
 import Alert from "../Alert";
 import { calcolaSottostato, getStatoCompleto, calcolaStatsPacchetto } from "../../utils/pacchettoStato";
 
@@ -41,6 +42,7 @@ export default function PacchettiCardsAdmin() {
   const [editPacchetto, setEditPacchetto] = useState(null);
   const [deletePacchetto, setDeletePacchetto] = useState(null);
   const [lezioniPacchetto, setLezioniPacchetto] = useState(null);
+  const [rettificaPacchetto, setRettificaPacchetto] = useState(null);
   const [alertLetti, setAlertLetti] = useState([]);
   const [sezioneAperta, setSezioneAperta] = useState({
     attivi: true,
@@ -392,6 +394,7 @@ export default function PacchettiCardsAdmin() {
                 onCambiaStato={handleCambiaStato}
                 onToggleSaldato={handleToggleSaldato}
                 onLezioni={() => setLezioniPacchetto(p)}
+                onRettifica={() => setRettificaPacchetto(p)}
               />
             ))}
           </div>
@@ -423,6 +426,7 @@ export default function PacchettiCardsAdmin() {
                 onCambiaStato={handleCambiaStato}
                 onToggleSaldato={handleToggleSaldato}
                 onLezioni={() => setLezioniPacchetto(p)}
+                onRettifica={() => setRettificaPacchetto(p)}
               />
             ))}
           </div>
@@ -454,6 +458,7 @@ export default function PacchettiCardsAdmin() {
                 onCambiaStato={handleCambiaStato}
                 onToggleSaldato={handleToggleSaldato}
                 onLezioni={() => setLezioniPacchetto(p)}
+                onRettifica={() => setRettificaPacchetto(p)}
               />
             ))}
           </div>
@@ -499,6 +504,14 @@ export default function PacchettiCardsAdmin() {
           pacchetto={lezioniPacchetto}
           onClose={() => setLezioniPacchetto(null)}
           onRefreshPacchetti={handleCreateSuccess}
+        />
+      )}
+
+      {rettificaPacchetto && (
+        <RettificaOreModal
+          pacchetto={rettificaPacchetto}
+          onClose={() => setRettificaPacchetto(null)}
+          onSuccess={() => { setRettificaPacchetto(null); handleCreateSuccess(); }}
         />
       )}
     </div>
@@ -561,7 +574,7 @@ function SezioneDropdown({ titolo, count, countTotal, isOpen, onToggle, badgeCol
   );
 }
 
-function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato, onLezioni }) {
+function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato, onLezioni, onRettifica }) {
   const GRACE_MS = 5 * 60 * 1000;
   const now = Date.now();
   
@@ -738,6 +751,13 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, o
           title={pacchetto.saldato ? "Segna come non saldato" : "Segna come saldato"}
         >
           {pacchetto.saldato ? '✗ Rimuovi saldo' : '✓ Segna saldato'}
+        </button>
+        <button
+          onClick={onRettifica}
+          style={{ ...btnStatoStyle, background: '#EDE9FE', color: '#5B21B6' }}
+          title="Rettifica manuale ore residue/acquistate"
+        >
+          ⚖️ Rettifica ore
         </button>
       </div>
     </div>
