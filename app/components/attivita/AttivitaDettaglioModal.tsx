@@ -103,7 +103,7 @@ export default function AttivitaDettaglioModal({ attivita, onClose, onEdit, onDe
                 boxShadow: "0 1px 4px #f59e0b40"
               }}
             >
-              Sposta pacchetto
+              Sposta lezione
             </button>
           )}
           <button

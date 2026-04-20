@@ -412,13 +412,22 @@ export async function PATCH(request) {
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
 
     const body = await request.json()
-    const { id, descrizione, durataOre, oreConsumate, orario, modificaBatch, ricorrenzaId } = body
+    const { id, descrizione, durataOre, oreConsumate, orario, modificaBatch, ricorrenzaId, disconnectRicorrenza } = body
     if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
 
     const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
     if (!att) return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
     if (session.user.role === 'cliente' && att.clienteId !== Number(session.user.clienteId))
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    // ===== SCOLLEGA DALLA RICORRENZA =====
+    if (disconnectRicorrenza) {
+      const updated = await prisma.attivita.update({
+        where: { id: Number(id) },
+        data: { ricorrenzaId: null }
+      })
+      return NextResponse.json({ attivita: updated, ok: true })
+    }
 
     // ===== MODIFICA BATCH DI RICORRENZA =====
     if (modificaBatch && ricorrenzaId) {

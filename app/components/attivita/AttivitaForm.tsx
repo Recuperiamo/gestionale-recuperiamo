@@ -18,9 +18,12 @@ function toLocalDateStr(d: Date): string {
 export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const isEdit = !!initialData?.id;
   const isRicorrente = !!initialData?.ricorrenzaId;
-  const [modificaBatch, setModificaBatch] = useState(null); // Rimosso default "singola"
-  const [showConfirmModal, setShowConfirmModal] = useState(false); // Nuovo stato per modale conferma
-  const [pendingData, setPendingData] = useState(null); // Dati in attesa di conferma
+  const [modificaBatch, setModificaBatch] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingData, setPendingData] = useState(null);
+  // conversione singola ↔ ricorrente
+  const [scollegaRicorrenza, setScollegaRicorrenza] = useState(false);
+  const [convertToRicorrente, setConvertToRicorrente] = useState(false);
 
   const initialOrarioDate =
     initialData?.orario
@@ -49,11 +52,13 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const [extraPacchetto, setExtraPacchetto] = useState(initialData?.extraPacchetto || false);
 
   // Ricorrenza
-  const [tipoLezione, setTipoLezione] = useState(isEdit && isRicorrente ? "singola" : "singola");
+  const [tipoLezione, setTipoLezione] = useState("singola");
   const [selectedDays, setSelectedDays] = useState([]);
-  const [orarioInizio, setOrarioInizio] = useState(""); // per ricorrenza
-  const [durata, setDurata] = useState("");
-  const [dataInizioRic, setDataInizioRic] = useState("");
+  const [orarioInizio, setOrarioInizio] = useState("");
+  const [durata, setDurata] = useState(initialData?.durataOre || initialData?.oreConsumate || "");
+  const [dataInizioRic, setDataInizioRic] = useState(
+    initialOrarioDate ? toLocalDateStr(initialOrarioDate) : ""
+  );
   const [dataFineRic, setDataFineRic] = useState("");
 
   const [clienti, setClienti] = useState([]);
@@ -138,6 +143,73 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorForm(null);
+
+    // Caso: scollega dalla ricorrenza
+    if (isEdit && isRicorrente && scollegaRicorrenza) {
+      setLoadingSubmit(true);
+      try {
+        const res = await fetch("/api/attivita", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: initialData.id, disconnectRicorrenza: true }),
+        });
+        const result = await res.json();
+        if (!res.ok) { setErrorForm(result.error || "Errore scollegamento"); return; }
+        onSuccess && onSuccess(result.attivita);
+      } catch { setErrorForm("Errore di rete."); }
+      finally { setLoadingSubmit(false); }
+      return;
+    }
+
+    // Caso: converti singola in ricorrente
+    if (isEdit && !isRicorrente && convertToRicorrente) {
+      if (!descrizione || !orarioInizio || !durata || !dataInizioRic || !dataFineRic || selectedDays.length === 0) {
+        setErrorForm("Compila tutti i campi della ricorrenza.");
+        return;
+      }
+      if (dataInizioRic > dataFineRic) {
+        setErrorForm("Data inizio deve precedere data fine.");
+        return;
+      }
+      setLoadingSubmit(true);
+      try {
+        // 1. Crea la nuova ricorrenza
+        const resCreate = await fetch("/api/attivita", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            descrizione,
+            clienteId: initialData.clienteId,
+            pacchettoId: initialData.pacchettoId,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ricorrenza: {
+              giorni: selectedDays,
+              orarioInizio,
+              durata: Number(durata),
+              dataInizio: dataInizioRic,
+              dataFine: dataFineRic,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+          }),
+        });
+        const resCreateData = await resCreate.json();
+        if (!resCreate.ok) { setErrorForm(resCreateData.error || "Errore creazione ricorrenza"); return; }
+        // 2. Elimina la lezione singola originale
+        const resDel = await fetch("/api/attivita", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: initialData.id }),
+        });
+        if (!resDel.ok) {
+          const delData = await resDel.json().catch(() => ({}));
+          setErrorForm("Ricorrenza creata ma errore eliminando la lezione originale: " + (delData.error || resDel.status));
+          return;
+        }
+        onSuccess && onSuccess(resCreateData);
+      } catch { setErrorForm("Errore di rete."); }
+      finally { setLoadingSubmit(false); }
+      return;
+    }
 
     // Validazione base
     if ((tipoLezione === "singola" || isEdit) && (!isRicorrente || modificaBatch !== null)) {
@@ -326,6 +398,104 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         <h3 style={{ color:"#1976d2", fontWeight:700, margin:0, marginBottom:18 }}>
           {isEdit ? "Modifica lezione" : "Nuova lezione"}
         </h3>
+
+        {/* Toggle scollega dalla ricorrenza */}
+        {isEdit && isRicorrente && (
+          <div style={{
+            marginBottom: 16, padding: "10px 14px", borderRadius: 8,
+            background: scollegaRicorrenza ? "#fef3c7" : "#e0e7ff",
+            border: `1.5px solid ${scollegaRicorrenza ? "#f59e0b" : "#818cf8"}`,
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={scollegaRicorrenza}
+                onChange={(e) => setScollegaRicorrenza(e.target.checked)}
+              />
+              Scollega dalla ricorrenza (diventa lezione singola)
+            </label>
+            {scollegaRicorrenza && (
+              <p style={{ margin: "6px 0 0 26px", fontSize: 12, color: "#92400e" }}>
+                Questa lezione verrà scollegata dalla serie ricorrente. Le altre rimangono invariate.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Toggle converti singola in ricorrente */}
+        {isEdit && !isRicorrente && (
+          <div style={{
+            marginBottom: 16, padding: "10px 14px", borderRadius: 8,
+            background: convertToRicorrente ? "#ede9fe" : "#f8fafc",
+            border: `1.5px solid ${convertToRicorrente ? "#7c3aed" : "#e2e8f0"}`,
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={convertToRicorrente}
+                onChange={(e) => {
+                  setConvertToRicorrente(e.target.checked);
+                  if (e.target.checked && initialOrarioDate) {
+                    setOrarioInizio(`${String(initialOrarioDate.getHours()).padStart(2,"0")}:${String(initialOrarioDate.getMinutes()).padStart(2,"0")}`);
+                  }
+                }}
+              />
+              Converti in lezione ricorrente
+            </label>
+            {convertToRicorrente && (
+              <p style={{ margin: "6px 0 0 26px", fontSize: 12, color: "#5b21b6" }}>
+                Questa lezione sarà eliminata e sostituita con una nuova serie ricorrente (stesse ore scalate dal pacchetto).
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Campi ricorrenza in modalità converti */}
+        {isEdit && !isRicorrente && convertToRicorrente && (
+          <>
+            <div style={{ marginBottom:12 }}>
+              <span style={{ fontWeight:500 }}>Giorni *</span>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginTop:6 }}>
+                {giorniSettimana.map(g => (
+                  <label key={g.value} style={{ fontWeight:400 }}>
+                    <input
+                      type="checkbox"
+                      value={g.value}
+                      checked={selectedDays.includes(g.value)}
+                      onChange={() => handleDayToggle(g.value)}
+                      style={{ marginRight:4 }}
+                    />
+                    {g.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:14, marginBottom:16 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontWeight:500 }}>Ora inizio *</label><br/>
+                <input type="time" value={orarioInizio} onChange={e => setOrarioInizio(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontWeight:500 }}>Durata (h) *</label><br/>
+                <input type="number" min={0.25} step={0.25} value={durata} onChange={e => setDurata(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontWeight:500 }}>Fine (auto)</label><br/>
+                <input type="text" value={calcolaOrarioFine(orarioInizio, durata)} readOnly style={{ ...inputStyle, background:"#f2f4f8", color:"#777" }} />
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:14, marginBottom:16 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontWeight:500 }}>Dal *</label><br/>
+                <input type="date" value={dataInizioRic} onChange={e => setDataInizioRic(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontWeight:500 }}>Al *</label><br/>
+                <input type="date" value={dataFineRic} onChange={e => setDataFineRic(e.target.value)} style={inputStyle} />
+              </div>
+            </div>
+          </>
+        )}
 
         {!isEdit && (
           <div style={{ marginBottom:16 }}>
