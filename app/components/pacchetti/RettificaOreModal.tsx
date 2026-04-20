@@ -9,7 +9,7 @@ export default function RettificaOreModal({ pacchetto, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const deltaNum = parseFloat(delta) || 0;
+  const deltaNum = parseFloat(delta.replace(",", ".")) || 0;
   const oreResidueAttuali = pacchetto.oreResidue ?? 0;
   const oreAcquistateAttuali = pacchetto.oreAcquistate ?? 0;
   const oreResidueDopo = oreResidueAttuali + deltaNum;
@@ -77,14 +77,15 @@ export default function RettificaOreModal({ pacchetto, onClose, onSuccess }) {
             </label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
-                type="number"
-                step={0.25}
+                type="text"
+                inputMode="decimal"
                 value={delta}
                 onChange={e => setDelta(e.target.value)}
                 placeholder="es. +2 oppure -1.5"
                 style={{
                   flex: 1, padding: "9px 12px", borderRadius: 8,
-                  border: "1.5px solid #cbd5e1", fontSize: 14,
+                  border: `1.5px solid ${deltaNum > 0 ? "#86efac" : deltaNum < 0 ? "#fca5a5" : "#cbd5e1"}`,
+                  fontSize: 14,
                   color: deltaNum > 0 ? "#065f46" : deltaNum < 0 ? "#991b1b" : "#1e293b",
                   fontWeight: 700,
                 }}
