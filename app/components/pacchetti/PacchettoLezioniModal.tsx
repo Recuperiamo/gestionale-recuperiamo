@@ -18,11 +18,21 @@ function fmtOrario(att) {
   });
 }
 
+// Stato effettivo: se il DB dice "Prenotata" ma il momento è passato → "Svolta"
+function statoEffettivo(att) {
+  const s = (att.stato || "").toLowerCase();
+  if (s === "cancellata" || s === "ripianificata" || s === "extra" || s === "svolta") return att.stato;
+  const orario = att.orario ? new Date(att.orario) : null;
+  if (orario && orario < new Date()) return "Svolta";
+  return att.stato || "Prenotata";
+}
+
 function statoColor(stato) {
   const s = (stato || "").toLowerCase();
   if (s === "cancellata") return { bg: "#fee2e2", color: "#991b1b" };
   if (s === "ripianificata") return { bg: "#fef3c7", color: "#92400e" };
   if (s === "extra") return { bg: "#ede9fe", color: "#5b21b6" };
+  if (s === "svolta") return { bg: "#e2e8f0", color: "#475569" };
   return { bg: "#d1fae5", color: "#065f46" };
 }
 
@@ -40,6 +50,7 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
   const [selezioneMassiva, setSelezioneMassiva] = useState(false);
   const [selezionati, setSelezionati] = useState<Set<number>>(new Set());
   const [bulkSposta, setBulkSposta] = useState(false);
+  const [filtroStato, setFiltroStato] = useState<"tutte" | "prenotate" | "svolte">("tutte");
 
   const fetchAttivita = useCallback(async () => {
     setLoading(true);
@@ -94,6 +105,14 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
   const totOre = attivita.reduce((s, a) => s + (a.oreConsumate ?? a.durataOre ?? 0), 0);
   const clienteLabel = pacchetto.cliente?.nomeReferente || `Cliente #${pacchetto.clienteId}`;
 
+  const filteredSorted = sorted.filter(a => {
+    if (filtroStato === "tutte") return true;
+    const se = statoEffettivo(a).toLowerCase();
+    if (filtroStato === "svolte") return se === "svolta";
+    if (filtroStato === "prenotate") return se !== "svolta" && se !== "cancellata";
+    return true;
+  });
+
   async function handleDelete(att) {
     if (!confirm(`Elimina la lezione "${att.descrizione || "#" + att.id}"?`)) return;
     try {
@@ -124,10 +143,10 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
   }
 
   function toggleSelezionaTutto() {
-    if (selezionati.size === sorted.length) {
+    if (selezionati.size === filteredSorted.length) {
       setSelezionati(new Set());
     } else {
-      setSelezionati(new Set(sorted.map(a => a.id)));
+      setSelezionati(new Set(filteredSorted.map(a => a.id)));
     }
   }
 
@@ -190,7 +209,29 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
                 {clienteLabel} · {attivita.length} lezioni · {totOre.toFixed(1)} ore totali
               </p>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {/* Tabs filtro stato */}
+              {(["tutte", "prenotate", "svolte"] as const).map(tab => {
+                const count = tab === "tutte" ? attivita.length
+                  : tab === "svolte" ? attivita.filter(a => statoEffettivo(a).toLowerCase() === "svolta").length
+                  : attivita.filter(a => { const se = statoEffettivo(a).toLowerCase(); return se !== "svolta" && se !== "cancellata"; }).length;
+                const active = filtroStato === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setFiltroStato(tab)}
+                    style={{
+                      background: active ? "#20489a" : "#f1f5f9",
+                      color: active ? "#fff" : "#64748b",
+                      border: "none", borderRadius: 8, padding: "7px 13px",
+                      fontSize: 12, fontWeight: 700, cursor: "pointer",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {tab === "tutte" ? "Tutte" : tab === "prenotate" ? "Attive" : "Svolte"} <span style={{ opacity: 0.75, fontWeight: 400 }}>({count})</span>
+                  </button>
+                );
+              })}
               <button
                 onClick={() => {
                   setSelezioneMassiva(v => !v);
@@ -293,7 +334,7 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
                     <Th style={{ width: 36, textAlign: "center" }}>
                       <input
                         type="checkbox"
-                        checked={selezionati.size === sorted.length && sorted.length > 0}
+                        checked={selezionati.size === filteredSorted.length && filteredSorted.length > 0}
                         onChange={toggleSelezionaTutto}
                         title="Seleziona tutto"
                       />
@@ -313,9 +354,10 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((att, i) => {
+                {filteredSorted.map((att, i) => {
                   const ore = att.oreConsumate ?? att.durataOre ?? 0;
-                  const sc = statoColor(att.stato);
+                  const se = statoEffettivo(att);
+                  const sc = statoColor(se);
                   return (
                     <tr
                       key={att.id}
@@ -354,7 +396,7 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
                           borderRadius: 10, padding: "2px 10px",
                           fontSize: 11, fontWeight: 700,
                         }}>
-                          {att.stato || "Prenotata"}
+                          {se}
                         </span>
                       </td>
                       <td style={{ padding: "10px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
