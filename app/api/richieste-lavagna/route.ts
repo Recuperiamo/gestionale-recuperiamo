@@ -54,7 +54,7 @@ export async function POST(req) {
     const richiesta = await prisma.richiestaLavagna.create({
       data: {
         clienteId: parseInt(clienteId),
-        titolo: titolo || `Lavagna ${new Date().toLocaleString("it-IT")}`,
+        titolo: titolo || `Lavagna ${new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" })}`,
         noteStudente: noteStudente || null,
         stato: "pending",
       },
@@ -108,6 +108,7 @@ export async function PATCH(req) {
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "Europe/Rome",
       });
       const titoloLavagna = `[Richiesta] ${nomeStudente} - ${timestamp}`;
 

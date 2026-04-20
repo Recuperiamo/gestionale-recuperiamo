@@ -10,6 +10,7 @@ import { prisma } from "../../../lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/authOptions";
 import { logPacchettoChange } from "../../utils/pacchettoChangelog";
+import { autoArchiviaSeNecessario } from "../../utils/autoArchivia";
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -124,6 +125,10 @@ export async function POST(req) {
         pacchettoDescrizione: result.targetBefore.descrizione,
       });
     }
+
+    // Auto-archivia entrambi i pacchetti se necessario
+    if (sourcePacchettoId) await autoArchiviaSeNecessario(sourcePacchettoId);
+    await autoArchiviaSeNecessario(Number(targetPacchettoId));
 
     return NextResponse.json({ ok: true, attivita: result.updated });
   } catch (e) {

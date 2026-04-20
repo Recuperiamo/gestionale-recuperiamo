@@ -8,19 +8,11 @@ const prisma = global.prisma || new PrismaClient()
 if (process.env.NODE_ENV !== 'production') global.prisma = prisma
 
 function formatDataOra(d) {
-  try {
-    return new Date(d).toLocaleString('it-IT', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false,
-      timeZone: 'Europe/Rome',
-    }).replace(/, /, ' ')
-  } catch {
-    const dd = String(d.getDate()).padStart(2, '0')
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const hh = String(d.getHours()).padStart(2, '0')
-    const mi = String(d.getMinutes()).padStart(2, '0')
-    return `${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`
-  }
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Europe/Rome',
+  }).format(new Date(d)).replace(/, /, ' ')
 }
 
 export async function POST(req) {

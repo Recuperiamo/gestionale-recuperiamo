@@ -30,7 +30,7 @@ export async function POST(req) {
         // create ad-hoc attivita
         const created = await prisma.attivita.create({
           data: {
-            descrizione: titolo || `Lavagna ${new Date().toLocaleString('it-IT')}`,
+            descrizione: titolo || `Lavagna ${new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`,
             oreConsumate: 0,
             durataOre: 0,
             clienteId: Number(clienteId),

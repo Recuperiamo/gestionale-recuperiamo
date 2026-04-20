@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/authOptions";
 import prisma from "../../../../../lib/prisma";
+import { autoArchiviaSeNecessario } from "../../../utils/autoArchivia";
 
 /**
  * PATCH /api/pacchetti/[id]/saldato
@@ -37,6 +38,11 @@ export async function PATCH(req, { params }) {
       where: { id: parseInt(id) },
       data: { saldato: body.saldato }
     });
+
+    // Se appena saldato, verifica se archiviare automaticamente
+    if (body.saldato) {
+      await autoArchiviaSeNecessario(parseInt(id));
+    }
 
     return NextResponse.json(pacchetto);
   } catch (error) {

@@ -3,53 +3,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '../../lib/prisma'
 import { zonedTimeToUtc } from 'date-fns-tz'
 import { logPacchettoChange } from '../utils/pacchettoChangelog'
+import { autoArchiviaSeNecessario } from '../utils/autoArchivia'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/authOptions'
 
 export const runtime = 'nodejs';
-
-// ------------------ Helpers ------------------
-
-/**
- * Auto-archivia il pacchetto se:
- * - è saldato
- * - non è già archiviato
- * - tutte le sue attività non cancellate hanno orario nel passato (sono "svolte")
- * - esiste almeno un'attività non cancellata
- */
-async function autoArchiviaSeNecessario(pacchettoId: number) {
-  if (!pacchettoId) return
-  const p = await prisma.pacchettoOre.findUnique({ where: { id: pacchettoId } })
-  if (!p || !p.saldato || p.stato === 'archiviato') return
-
-  const attivita = await prisma.attivita.findMany({
-    where: {
-      pacchettoId,
-      NOT: { stato: { in: ['cancellata', 'Cancellata', 'CANCELLATA'] } }
-    },
-    select: { orario: true, stato: true }
-  })
-
-  if (attivita.length === 0) return // nessuna attività → non archiviare
-
-  const now = new Date()
-  // Un'attività è considerata svolta solo se:
-  // - ha orario esplicito nel passato, OPPURE
-  // - ha stato esplicitamente 'svolta' (qualsiasi casing)
-  const tutteSvolte = attivita.every(a => {
-    const statoLower = (a.stato || '').toLowerCase()
-    if (statoLower === 'svolta') return true
-    if (a.orario && new Date(a.orario) < now) return true
-    return false
-  })
-
-  if (tutteSvolte) {
-    await prisma.pacchettoOre.update({
-      where: { id: pacchettoId },
-      data: { stato: 'archiviato' }
-    })
-  }
-}
 
 function toPositiveNumber(value) {
   if (value === null || value === undefined) return null
