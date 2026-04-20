@@ -5,9 +5,7 @@ import { prisma } from '../../lib/prisma'
  * Archivia automaticamente un pacchetto se:
  * - è saldato
  * - non è già archiviato
- * - tutte le attività non cancellate sono nel passato (o stato='svolta')
- *   OPPURE le ore residue sono <= 0 (ore esaurite)
- * - esiste almeno un'attività non cancellata
+ * - oreSvolte >= oreAcquistate (tutte le ore acquistate sono state effettivamente svolte)
  */
 export async function autoArchiviaSeNecessario(pacchettoId: number) {
   if (!pacchettoId) return
@@ -19,21 +17,22 @@ export async function autoArchiviaSeNecessario(pacchettoId: number) {
       pacchettoId,
       NOT: { stato: { in: ['cancellata', 'Cancellata', 'CANCELLATA'] } },
     },
-    select: { orario: true, stato: true, oreConsumate: true, durataOre: true },
+    select: { orario: true, createdAt: true, oreConsumate: true, durataOre: true },
   })
 
   if (attivita.length === 0) return
 
-  const now = new Date()
-  const tutteSvolte = attivita.every(a => {
-    if ((a.stato || '').toLowerCase() === 'svolta') return true
-    if (a.orario && new Date(a.orario) < now) return true
-    return false
-  })
+  const GRACE_MS = 5 * 60 * 1000
+  const now = Date.now()
+  let oreSvolte = 0
+  for (const a of attivita) {
+    const orario = a.orario ? new Date(a.orario) : new Date(a.createdAt)
+    if (orario.getTime() < now - GRACE_MS) {
+      oreSvolte += a.oreConsumate ?? a.durataOre ?? 0
+    }
+  }
 
-  // Archivia se tutte le lezioni sono passate, oppure le ore sono esaurite
-  const oreEsaurite = (p.oreResidue ?? 0) <= 0
-  if (tutteSvolte || oreEsaurite) {
+  if (oreSvolte >= (p.oreAcquistate ?? 0)) {
     await prisma.pacchettoOre.update({
       where: { id: pacchettoId },
       data: { stato: 'archiviato' },
