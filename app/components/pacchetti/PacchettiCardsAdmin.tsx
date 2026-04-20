@@ -6,6 +6,7 @@ import Link from "next/link";
 import PacchettoForm from "./PacchettoForm";
 import PacchettoEditForm from "./PacchettoEditForm";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import PacchettoLezioniModal from "./PacchettoLezioniModal";
 import Alert from "../Alert";
 import { calcolaSottostato, getStatoCompleto, calcolaStatsPacchetto } from "../../utils/pacchettoStato";
 
@@ -39,12 +40,18 @@ export default function PacchettiCardsAdmin() {
   const [loading, setLoading] = useState(true);
   const [editPacchetto, setEditPacchetto] = useState(null);
   const [deletePacchetto, setDeletePacchetto] = useState(null);
+  const [lezioniPacchetto, setLezioniPacchetto] = useState(null);
   const [alertLetti, setAlertLetti] = useState([]);
   const [sezioneAperta, setSezioneAperta] = useState({
     attivi: true,
     archiviati: false,
     sospesi: false
   });
+  const [ricerca, setRicerca] = useState("");
+  const [ordinamento, setOrdinamento] = useState("nome-az");
+  const [filtroSaldato, setFiltroSaldato] = useState<"tutti" | "saldato" | "non-saldato">("tutti");
+  const [filtroEsauriti, setFiltroEsauriti] = useState(false);
+  const [filtroInScadenza, setFiltroInScadenza] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -140,10 +147,63 @@ export default function PacchettiCardsAdmin() {
       !alertLetti.includes(p.id)
   );
 
-  // Raggruppa pacchetti per stato
-  const pacchettiAttivi = pacchetti.filter(p => p.stato === 'attivo');
-  const pacchettiArchiviati = pacchetti.filter(p => p.stato === 'archiviato');
-  const pacchettiSospesi = pacchetti.filter(p => p.stato === 'sospeso');
+  function applyFiltersSort(list) {
+    const q = ricerca.trim().toLowerCase();
+    let result = list.filter((p) => {
+      if (q) {
+        const nome = (p.descrizione || "").toLowerCase();
+        const cliente = (p.cliente?.nomeReferente || "").toLowerCase();
+        if (!nome.includes(q) && !cliente.includes(q)) return false;
+      }
+      if (filtroSaldato === "saldato" && !p.saldato) return false;
+      if (filtroSaldato === "non-saldato" && p.saldato) return false;
+      if (filtroEsauriti && Number(p.oreResidue) > 0) return false;
+      if (filtroInScadenza && !(Number(p.oreResidue) > 0 && Number(p.oreResidue) <= 5)) return false;
+      return true;
+    });
+
+    result = [...result].sort((a, b) => {
+      switch (ordinamento) {
+        case "nome-az": return (a.descrizione || "").localeCompare(b.descrizione || "", "it");
+        case "nome-za": return (b.descrizione || "").localeCompare(a.descrizione || "", "it");
+        case "cliente-az": return (a.cliente?.nomeReferente || "").localeCompare(b.cliente?.nomeReferente || "", "it");
+        case "ore-residue-desc": return Number(b.oreResidue ?? 0) - Number(a.oreResidue ?? 0);
+        case "ore-residue-asc": return Number(a.oreResidue ?? 0) - Number(b.oreResidue ?? 0);
+        case "ore-acquistate-desc": return Number(b.oreAcquistate ?? 0) - Number(a.oreAcquistate ?? 0);
+        case "utilizzo-desc": {
+          const ua = a.oreAcquistate ? (a.oreAcquistate - (a.oreResidue ?? 0)) / a.oreAcquistate : 0;
+          const ub = b.oreAcquistate ? (b.oreAcquistate - (b.oreResidue ?? 0)) / b.oreAcquistate : 0;
+          return ub - ua;
+        }
+        case "utilizzo-asc": {
+          const ua = a.oreAcquistate ? (a.oreAcquistate - (a.oreResidue ?? 0)) / a.oreAcquistate : 0;
+          const ub = b.oreAcquistate ? (b.oreAcquistate - (b.oreResidue ?? 0)) / b.oreAcquistate : 0;
+          return ua - ub;
+        }
+        default: return 0;
+      }
+    });
+    return result;
+  }
+
+  const filtriAttivi =
+    ricerca.trim() !== "" ||
+    filtroSaldato !== "tutti" ||
+    filtroEsauriti ||
+    filtroInScadenza;
+
+  function resetFiltri() {
+    setRicerca("");
+    setOrdinamento("nome-az");
+    setFiltroSaldato("tutti");
+    setFiltroEsauriti(false);
+    setFiltroInScadenza(false);
+  }
+
+  // Raggruppa pacchetti per stato (con filtri applicati)
+  const pacchettiAttivi = applyFiltersSort(pacchetti.filter(p => p.stato === 'attivo'));
+  const pacchettiArchiviati = applyFiltersSort(pacchetti.filter(p => p.stato === 'archiviato'));
+  const pacchettiSospesi = applyFiltersSort(pacchetti.filter(p => p.stato === 'sospeso'));
 
   const toggleSezione = (nome) => {
     setSezioneAperta(prev => ({ ...prev, [nome]: !prev[nome] }));
@@ -199,10 +259,123 @@ export default function PacchettiCardsAdmin() {
         />
       )}
 
+      {/* Barra filtri e ordinamento */}
+      <div style={{
+        background: "#f8fafc",
+        border: "1.5px solid #e2e8f0",
+        borderRadius: 14,
+        padding: "16px 20px",
+        marginBottom: 20,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}>
+        {/* Riga 1: ricerca + ordinamento */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ position: "relative", flex: "1 1 220px" }}>
+            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "#94a3b8" }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Cerca per nome o cliente…"
+              value={ricerca}
+              onChange={(e) => setRicerca(e.target.value)}
+              style={{
+                width: "100%", boxSizing: "border-box",
+                padding: "8px 12px 8px 32px",
+                borderRadius: 8, border: "1.5px solid #cbd5e1",
+                fontSize: 13, color: "#1e293b", background: "#fff",
+                outline: "none",
+              }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 220px" }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", whiteSpace: "nowrap" }}>Ordina per</label>
+            <select
+              value={ordinamento}
+              onChange={(e) => setOrdinamento(e.target.value)}
+              style={{
+                flex: 1, padding: "8px 10px", borderRadius: 8,
+                border: "1.5px solid #cbd5e1", fontSize: 13,
+                color: "#1e293b", background: "#fff", cursor: "pointer",
+              }}
+            >
+              <option value="nome-az">Nome A → Z</option>
+              <option value="nome-za">Nome Z → A</option>
+              <option value="cliente-az">Cliente A → Z</option>
+              <option value="ore-residue-desc">Ore residue (più → meno)</option>
+              <option value="ore-residue-asc">Ore residue (meno → più)</option>
+              <option value="ore-acquistate-desc">Ore acquistate (più → meno)</option>
+              <option value="utilizzo-desc">% Utilizzo (più usati prima)</option>
+              <option value="utilizzo-asc">% Utilizzo (meno usati prima)</option>
+            </select>
+          </div>
+          {filtriAttivi && (
+            <button
+              onClick={resetFiltri}
+              style={{
+                padding: "8px 14px", borderRadius: 8, border: "none",
+                background: "#fee2e2", color: "#991b1b",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ✕ Reset filtri
+            </button>
+          )}
+        </div>
+        {/* Riga 2: chip filtri */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Filtri:</span>
+          {(["tutti", "saldato", "non-saldato"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setFiltroSaldato(v)}
+              style={{
+                padding: "5px 12px", borderRadius: 20,
+                border: "1.5px solid",
+                borderColor: filtroSaldato === v ? "#20489a" : "#cbd5e1",
+                background: filtroSaldato === v ? "#20489a" : "#fff",
+                color: filtroSaldato === v ? "#fff" : "#64748b",
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              {v === "tutti" ? "Tutti" : v === "saldato" ? "✓ Saldati" : "✗ Non saldati"}
+            </button>
+          ))}
+          <button
+            onClick={() => { setFiltroEsauriti(v => !v); if (!filtroEsauriti) setFiltroInScadenza(false); }}
+            style={{
+              padding: "5px 12px", borderRadius: 20,
+              border: "1.5px solid",
+              borderColor: filtroEsauriti ? "#ef4444" : "#cbd5e1",
+              background: filtroEsauriti ? "#ef4444" : "#fff",
+              color: filtroEsauriti ? "#fff" : "#64748b",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            🚨 Esauriti
+          </button>
+          <button
+            onClick={() => { setFiltroInScadenza(v => !v); if (!filtroInScadenza) setFiltroEsauriti(false); }}
+            style={{
+              padding: "5px 12px", borderRadius: 20,
+              border: "1.5px solid",
+              borderColor: filtroInScadenza ? "#f59e0b" : "#cbd5e1",
+              background: filtroInScadenza ? "#f59e0b" : "#fff",
+              color: filtroInScadenza ? "#fff" : "#64748b",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            ⚠️ In scadenza (≤5h)
+          </button>
+        </div>
+      </div>
+
       {/* Sezione Pacchetti Attivi */}
       <SezioneDropdown
         titolo="📦 Pacchetti Attivi"
         count={pacchettiAttivi.length}
+        countTotal={filtriAttivi ? pacchetti.filter(p => p.stato === 'attivo').length : undefined}
         isOpen={sezioneAperta.attivi}
         onToggle={() => toggleSezione('attivi')}
         badgeColor="#10B981"
@@ -218,12 +391,13 @@ export default function PacchettiCardsAdmin() {
                 onDelete={() => setDeletePacchetto(p)}
                 onCambiaStato={handleCambiaStato}
                 onToggleSaldato={handleToggleSaldato}
+                onLezioni={() => setLezioniPacchetto(p)}
               />
             ))}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 14 }}>
-            Nessun pacchetto attivo
+            {filtriAttivi ? "Nessun pacchetto attivo corrisponde ai filtri." : "Nessun pacchetto attivo"}
           </div>
         )}
       </SezioneDropdown>
@@ -232,6 +406,7 @@ export default function PacchettiCardsAdmin() {
       <SezioneDropdown
         titolo="📁 Pacchetti Archiviati"
         count={pacchettiArchiviati.length}
+        countTotal={filtriAttivi ? pacchetti.filter(p => p.stato === 'archiviato').length : undefined}
         isOpen={sezioneAperta.archiviati}
         onToggle={() => toggleSezione('archiviati')}
         badgeColor="#6B7280"
@@ -247,12 +422,13 @@ export default function PacchettiCardsAdmin() {
                 onDelete={() => setDeletePacchetto(p)}
                 onCambiaStato={handleCambiaStato}
                 onToggleSaldato={handleToggleSaldato}
+                onLezioni={() => setLezioniPacchetto(p)}
               />
             ))}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 14 }}>
-            Nessun pacchetto archiviato
+            {filtriAttivi ? "Nessun pacchetto archiviato corrisponde ai filtri." : "Nessun pacchetto archiviato"}
           </div>
         )}
       </SezioneDropdown>
@@ -261,6 +437,7 @@ export default function PacchettiCardsAdmin() {
       <SezioneDropdown
         titolo="⏸️ Pacchetti Sospesi"
         count={pacchettiSospesi.length}
+        countTotal={filtriAttivi ? pacchetti.filter(p => p.stato === 'sospeso').length : undefined}
         isOpen={sezioneAperta.sospesi}
         onToggle={() => toggleSezione('sospesi')}
         badgeColor="#F59E0B"
@@ -276,12 +453,13 @@ export default function PacchettiCardsAdmin() {
                 onDelete={() => setDeletePacchetto(p)}
                 onCambiaStato={handleCambiaStato}
                 onToggleSaldato={handleToggleSaldato}
+                onLezioni={() => setLezioniPacchetto(p)}
               />
             ))}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 14 }}>
-            Nessun pacchetto sospeso
+            {filtriAttivi ? "Nessun pacchetto sospeso corrisponde ai filtri." : "Nessun pacchetto sospeso"}
           </div>
         )}
       </SezioneDropdown>
@@ -315,12 +493,20 @@ export default function PacchettiCardsAdmin() {
           onSuccess={handleCreateSuccess}
         />
       )}
+
+      {lezioniPacchetto && (
+        <PacchettoLezioniModal
+          pacchetto={lezioniPacchetto}
+          onClose={() => setLezioniPacchetto(null)}
+          onRefreshPacchetti={handleCreateSuccess}
+        />
+      )}
     </div>
   );
 }
 
 // Componente SezioneDropdown
-function SezioneDropdown({ titolo, count, isOpen, onToggle, badgeColor, children }) {
+function SezioneDropdown({ titolo, count, countTotal, isOpen, onToggle, badgeColor, children }) {
   return (
     <div style={{ marginBottom: 24 }}>
       <button
@@ -353,7 +539,7 @@ function SezioneDropdown({ titolo, count, isOpen, onToggle, badgeColor, children
             fontSize: 13,
             fontWeight: 700,
           }}>
-            {count}
+            {countTotal !== undefined ? `${count} / ${countTotal}` : count}
           </span>
         </div>
         <span style={{
@@ -375,7 +561,7 @@ function SezioneDropdown({ titolo, count, isOpen, onToggle, badgeColor, children
   );
 }
 
-function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato }) {
+function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato, onLezioni }) {
   const GRACE_MS = 5 * 60 * 1000;
   const now = Date.now();
   
@@ -496,6 +682,9 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, o
       )}
 
       <div style={actionsStyle}>
+        <button onClick={onLezioni} style={btnLezioniStyle}>
+          📋 Lezioni
+        </button>
         <button onClick={onEdit} style={btnEditStyle}>
           ✏️ Modifica
         </button>
@@ -657,6 +846,19 @@ const actionsStyle = {
   display: 'flex',
   gap: 8,
   justifyContent: 'space-between',
+};
+
+const btnLezioniStyle = {
+  flex: 1,
+  padding: '8px 12px',
+  background: '#EDE9FE',
+  color: '#5B21B6',
+  border: 'none',
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
 };
 
 const btnEditStyle = {
