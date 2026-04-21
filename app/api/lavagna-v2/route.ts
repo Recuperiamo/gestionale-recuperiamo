@@ -15,12 +15,11 @@ const prisma = global.prisma || new PrismaClient()
 if (process.env.NODE_ENV !== 'production') global.prisma = prisma
 
 function formatDataOra(d: Date) {
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Europe/Rome',
+  }).format(new Date(d)).replace(/, /, ' ')
 }
 
 // ── Leggi lavagna (tratti + forme) ────────────────────────────────────────────
