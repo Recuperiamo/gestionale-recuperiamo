@@ -9,5 +9,6 @@ export async function GET() {
   if (!session || !['admin', 'operatore'].includes(session.user?.role)) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
-  return NextResponse.json(storageStatus())
+  const status = storageStatus()
+  return NextResponse.json(status)
 }
