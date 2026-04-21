@@ -78,14 +78,6 @@ export async function GET(req) {
       if (session.user.clienteId !== att.clienteId) {
         return NextResponse.json({ error: 'Accesso negato' }, { status: 403 })
       }
-      // Verifica che la lavagna v2 sia abilitata per questo studente
-      const clienteCheck = await prisma.client.findUnique({
-        where: { id: att.clienteId },
-        select: { lavagnaV2Abilitata: true },
-      })
-      if (!clienteCheck?.lavagnaV2Abilitata) {
-        return NextResponse.json({ error: 'Accesso non abilitato' }, { status: 403 })
-      }
     }
 
     const dataLezione = att.orario ? new Date(att.orario) : att.orarioOriginale ? new Date(att.orarioOriginale) : null

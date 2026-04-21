@@ -284,6 +284,10 @@ export class CanvasEngine {
   liveShape: { type: string; x: number; y: number; x2: number; y2: number; color: string; strokeWidth: number } | null = null
   remoteCursors: RemoteCursorRender[] = []
 
+  // Live rubber-band selection rect (drawn on liveCanvas by the engine loop)
+  liveSelectionRect: { x1: number; y1: number; x2: number; y2: number } | null = null
+  rotationMode = false
+
   // Internal
   private baseDirty = true
   private lastBaseDrawTs = 0

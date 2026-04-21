@@ -37,15 +37,9 @@ export async function GET(req) {
     // Admin: filtra per clienteId se passato, altrimenti mostra tutte
     if (clienteIdParam) where.clienteId = Number(clienteIdParam)
   } else {
-    // Studente: vede solo le proprie lavagne se abilitato
+    // Studente: vede solo le proprie lavagne
     const clienteId = session.user?.clienteId
     if (!clienteId) return NextResponse.json({ lavagne: [] })
-    // Verifica accesso dal DB (sempre aggiornato, indipendente dal token)
-    const cliente = await prisma.client.findUnique({
-      where: { id: clienteId },
-      select: { lavagnaV2Abilitata: true },
-    })
-    if (!cliente?.lavagnaV2Abilitata) return NextResponse.json({ error: 'Accesso non abilitato' }, { status: 403 })
     where.clienteId = clienteId
   }
 

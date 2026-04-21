@@ -138,8 +138,6 @@ export default function ClientiPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [alert, setAlert] = useState({ message: '', type: 'error' });
   const [loading, setLoading] = useState(false);
-  const [lavagnaV2, setLavagnaV2] = useState(false);
-  const [lavagnaV2Loading, setLavagnaV2Loading] = useState(false);
   const [clienti, setClienti] = useState([]);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -194,13 +192,6 @@ export default function ClientiPage() {
   };
 
   const handleEdit = (cliente) => {
-    setLavagnaV2(false);
-    if (cliente.tipo === 'STUDENTE') {
-      fetch(`/api/clienti/${cliente.id}/lavagnav2`)
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d) setLavagnaV2(d.lavagnaV2Abilitata); })
-        .catch(() => {});
-    }
     setForm({
       nome: cliente.nomeReferente || cliente.nome || '',
       email: cliente.email || '',
@@ -253,19 +244,6 @@ export default function ClientiPage() {
       fetchClienti();
     } catch { setAlert({ message: 'Errore di rete', type: 'error' }); }
     setLoading(false);
-  };
-
-  const toggleLavagnaV2 = async () => {
-    if (!editId) return;
-    setLavagnaV2Loading(true);
-    try {
-      const res = await fetch(`/api/clienti/${editId}/lavagnav2`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lavagnaV2Abilitata: !lavagnaV2 }),
-      });
-      if (res.ok) { const d = await res.json(); setLavagnaV2(d.lavagnaV2Abilitata); }
-    } finally { setLavagnaV2Loading(false); }
   };
 
   const handleFormSubmit = (data) => editId ? handleUpdate(data) : handleAdd(data);
@@ -392,34 +370,6 @@ export default function ClientiPage() {
                   ×
                 </button>
               </div>
-              {/* Toggle lavagna v2 — solo in modifica studente */}
-              {editId && form.tipo === 'STUDENTE' && (
-                <div style={{ margin: '8px 0 12px', padding: '10px 14px', background: '#f0f7ff', borderRadius: 8, border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1e40af' }}>Lavagna v2 (beta)</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                      {lavagnaV2 ? 'Accesso alla nuova lavagna abilitato' : 'Accesso alla nuova lavagna disabilitato'}
-                    </div>
-                  </div>
-                  <button
-                    onClick={toggleLavagnaV2}
-                    disabled={lavagnaV2Loading}
-                    style={{
-                      width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                      background: lavagnaV2 ? '#2563eb' : '#d1d5db',
-                      position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-                      opacity: lavagnaV2Loading ? 0.6 : 1,
-                    }}
-                    title={lavagnaV2 ? 'Disabilita accesso' : 'Abilita accesso'}
-                  >
-                    <span style={{
-                      position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%',
-                      background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                      transition: 'left 0.2s', left: lavagnaV2 ? 23 : 3,
-                    }} />
-                  </button>
-                </div>
-              )}
               <ClientiForm
                 onAdd={handleFormSubmit}
                 form={form}

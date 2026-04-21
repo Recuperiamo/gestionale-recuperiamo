@@ -101,17 +101,6 @@ export default function LavagnaV2Page() {
     else setError("Nessun parametro fornito. Torna alla lista lavagne.");
   }, [status, load]);
 
-  // ── Auth check ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (status !== "authenticated" || !session) return;
-    const isAdmin = session.user?.role === "admin" || session.user?.role === "operatore";
-    if (isAdmin) return; // admin: sempre accesso
-
-    // Studente: verifica accesso lavagna v2 dal token (aggiornato al login)
-    if (!session.user?.lavagnaV2Abilitata) {
-      setError("La lavagna v2 non è ancora disponibile per te. Chiedi al tuo insegnante di abilitarla.");
-    }
-  }, [status, session]);
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
   function toggleFullscreen() {

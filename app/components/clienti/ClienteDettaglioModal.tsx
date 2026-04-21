@@ -1,35 +1,8 @@
 // @ts-nocheck
-import React, { useState, useEffect } from "react";
+import React from "react";
 import PacchettiClienteList from "./PacchettiClienteList";
 
 export default function ClienteDettaglioModal({ cliente, onClose }) {
-  const [lavagnaV2, setLavagnaV2] = useState(false);
-  const [lavagnaV2Loading, setLavagnaV2Loading] = useState(false);
-
-  useEffect(() => {
-    if (!cliente?.id) return;
-    fetch(`/api/clienti/${cliente.id}/lavagnav2`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setLavagnaV2(d.lavagnaV2Abilitata) })
-      .catch(() => {});
-  }, [cliente?.id]);
-
-  const toggleLavagnaV2 = async () => {
-    setLavagnaV2Loading(true);
-    try {
-      const res = await fetch(`/api/clienti/${cliente.id}/lavagnav2`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lavagnaV2Abilitata: !lavagnaV2 }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        setLavagnaV2(d.lavagnaV2Abilitata);
-      }
-    } finally {
-      setLavagnaV2Loading(false);
-    }
-  };
   if (!cliente) return null;
 
   const nomeCliente = cliente?.nome || cliente?.nomeReferente || cliente?.ragioneSociale || "-";
@@ -97,34 +70,6 @@ export default function ClienteDettaglioModal({ cliente, onClose }) {
           </a>
         </div>
         <hr />
-        {/* Toggle accesso Lavagna v2 — solo per studenti */}
-        {cliente?.tipo === "STUDENTE" && (
-          <div style={{ margin: '12px 0', padding: '10px 14px', background: '#f0f7ff', borderRadius: 8, border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e40af' }}>Lavagna v2 (beta)</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                {lavagnaV2 ? 'Studente abilitato ad accedere alla nuova lavagna' : 'Accesso alla nuova lavagna disabilitato'}
-              </div>
-            </div>
-            <button
-              onClick={toggleLavagnaV2}
-              disabled={lavagnaV2Loading}
-              style={{
-                width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                background: lavagnaV2 ? '#2563eb' : '#d1d5db',
-                position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-                opacity: lavagnaV2Loading ? 0.6 : 1,
-              }}
-              title={lavagnaV2 ? 'Disabilita accesso' : 'Abilita accesso'}
-            >
-              <span style={{
-                position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%',
-                background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                transition: 'left 0.2s', left: lavagnaV2 ? 23 : 3,
-              }} />
-            </button>
-          </div>
-        )}
         <PacchettiClienteList clienteId={cliente.id} />
         <div className="footer">
           <button className="close-btn" onClick={onClose}>Chiudi</button>
