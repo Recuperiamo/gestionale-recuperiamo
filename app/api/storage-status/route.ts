@@ -10,5 +10,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
   const status = storageStatus()
+  console.log('[storage-status]', {
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? '✓' : 'MISSING',
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '✓' : 'MISSING',
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '✓' : 'MISSING',
+    cloudinaryOk: status.cloudinaryOk,
+  })
   return NextResponse.json(status)
 }
