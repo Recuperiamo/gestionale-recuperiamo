@@ -2,21 +2,19 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '../auth/[...nextauth]/authOptions'
-import { storageStatus } from '../../lib/storage'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session || !['admin', 'operatore'].includes(session.user?.role)) {
-    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
-  }
-  const status = storageStatus()
-  console.log('[storage-status]', {
-    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? '✓' : 'MISSING',
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? '✓' : 'MISSING',
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? '✓' : 'MISSING',
-    cloudinaryOk: status.cloudinaryOk,
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME
+  const key = process.env.CLOUDINARY_API_KEY
+  const secret = process.env.CLOUDINARY_API_SECRET
+
+  console.log('[storage-status-raw]', {
+    cloud: cloud ? `"${cloud}"` : 'MISSING',
+    key: key ? '✓' : 'MISSING',
+    secret: secret ? '✓' : 'MISSING',
+    allKeys: Object.keys(process.env).filter(k => k.startsWith('CLOUDINARY')),
   })
-  return NextResponse.json(status)
+
+  const cloudinaryOk = !!(cloud && key && secret)
+  return NextResponse.json({ vercelReset: '2026-05-16', cloudinaryOk })
 }
