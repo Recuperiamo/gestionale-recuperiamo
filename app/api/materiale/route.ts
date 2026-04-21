@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { NextResponse } from "next/server";
-import { put, del } from '@vercel/blob';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/authOptions';
 import { prisma } from '../../../lib/prisma';
+import { uploadFile, deleteFile } from '../../lib/storage';
 // Ably removed: realtime notifications are now handled client-side via Socket.IO
 
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB safeguard for uploads
@@ -142,11 +142,7 @@ export async function POST(req) {
   const uploadBatchId = formData.get("uploadBatchId") || null;
 
   try {
-    // Upload to Vercel Blob
-    const blob = await put(file.name, file, {
-      access: 'public',
-      addRandomSuffix: true,
-    });
+    const { url, provider } = await uploadFile(file.name, file, file.type || 'application/octet-stream');
 
     // Save metadata to database
     const materiale = await prisma.materialeDidattico.create({
@@ -157,13 +153,14 @@ export async function POST(req) {
         sezione,
         sottocategoria: sottocategoria || null,
         nomeOriginale: file.name,
-        blobUrl: blob.url,
+        blobUrl: url,
         mimeType: file.type || 'application/octet-stream',
         fileSize: file.size,
         uploadedBy: user.email || 'unknown',
         uploadBatchId: uploadBatchId
       }
     });
+    console.log(`[materiale] uploaded via ${provider}: ${url}`);
 
     // Realtime: emission handled on client after successful upload
 
@@ -214,11 +211,9 @@ export async function DELETE(req) {
     }
 
     try {
-      // Delete from Vercel Blob
-      await del(materiale.blobUrl);
+      await deleteFile(materiale.blobUrl);
     } catch (err) {
-      console.error('[materiale] blob delete error:', err);
-      // Continue even if blob delete fails
+      console.error('[materiale] storage delete error:', err);
     }
 
     // Delete from database
@@ -247,9 +242,9 @@ export async function DELETE(req) {
     // Delete from Vercel Blob
     for (const mat of toDelete) {
       try {
-        await del(mat.blobUrl);
+        await deleteFile(mat.blobUrl);
       } catch (err) {
-        console.error(`[materiale] blob delete error for ${mat.id}:`, err);
+        console.error(`[materiale] storage delete error for ${mat.id}:`, err);
       }
     }
 

@@ -635,6 +635,13 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
   const targetClienteId = isAdmin ? initialClienteIdStr : myClienteId;
   const hasTarget = Boolean(targetClienteId);
 
+  // --- STORAGE STATUS BANNER (solo admin) ---
+  const [storageInfo, setStorageInfo] = useState<{ vercelReset: string; r2Ok: boolean } | null>(null);
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetch('/api/storage-status').then(r => r.json()).then(setStorageInfo).catch(() => {});
+  }, [isAdmin]);
+
   // --- COMMENTI
   const [commenti, addCommento] = useCommenti(items);
 
@@ -1122,6 +1129,34 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
         }
       `}</style>
       <Navbar />
+
+      {/* Banner storage (solo admin) */}
+      {isAdmin && storageInfo && (
+        <div style={{
+          background: storageInfo.r2Ok ? "#fef9c3" : "#fee2e2",
+          borderBottom: `2px solid ${storageInfo.r2Ok ? "#fde047" : "#fca5a5"}`,
+          padding: "10px 24px",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          fontSize: 13,
+          fontWeight: 600,
+          color: storageInfo.r2Ok ? "#713f12" : "#991b1b",
+        }}>
+          <span style={{ fontSize: 18 }}>{storageInfo.r2Ok ? "🟡" : "🔴"}</span>
+          <span>
+            {storageInfo.r2Ok
+              ? `Storage Vercel sospeso — i file vengono caricati su Cloudflare R2. Vercel si rinnova il ${new Date(storageInfo.vercelReset).toLocaleDateString("it-IT")}.`
+              : `Storage Vercel sospeso e R2 non configurato — i caricamenti falliranno. Configura le variabili R2_* su Vercel.`}
+          </span>
+          {storageInfo.r2Ok && (
+            <span style={{ marginLeft: "auto", background: "#15803d", color: "#fff", borderRadius: 6, padding: "3px 10px", fontSize: 12 }}>
+              R2 attivo ✓
+            </span>
+          )}
+        </div>
+      )}
+
       {/* HEADER stile classroom con gradiente coloreTema */}
       <header ref={headerRef} style={{
         ...headerStyle, 
