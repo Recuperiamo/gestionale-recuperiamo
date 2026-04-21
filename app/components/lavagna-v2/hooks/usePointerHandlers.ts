@@ -30,6 +30,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
   const streamId = useRef<string | null>(null)
   const allPoints = useRef([])            // all collected points (never trimmed)
   const lastSentIdx = useRef(0)           // index of last point sent via Ably (avoids duplicates)
+  const lastSentTs = useRef(0)            // timestamp ultimo invio Ably (throttle ~60fps)
   const activePointerId = useRef<number | null>(null)
 
   // Panning state
@@ -218,12 +219,16 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     // Update live display (unsimplified = responsive feel)
     eng.updateLiveStroke([...allPoints.current])
 
-    // Stream only NEW points to Ably — no overlap with previous batch
+    // Stream only NEW points to Ably — throttled a ~60fps per ridurre carico di rete
     if (!isLaser.current) {
-      const newPts = allPoints.current.slice(lastSentIdx.current)
-      if (newPts.length > 0) {
-        onStrokeCommit?.({ type: 'points', streamId: streamId.current, points: newPts })
-        lastSentIdx.current = allPoints.current.length
+      const now = Date.now()
+      if (now - lastSentTs.current >= 16) {
+        const newPts = allPoints.current.slice(lastSentIdx.current)
+        if (newPts.length > 0) {
+          onStrokeCommit?.({ type: 'points', streamId: streamId.current, points: newPts })
+          lastSentIdx.current = allPoints.current.length
+          lastSentTs.current = now
+        }
       }
     }
   }, [getPoint, onStrokeCommit])

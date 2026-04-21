@@ -105,15 +105,13 @@ export default function LavagnaCanvas({
   }, [store.selectedStrokeIds, store.selectedShapeIds])
 
   // ── Keep engine remote cursors in sync ───────────────────────────────────────
+  const remoteCursorsList = useMemo(
+    () => Object.values(store.remoteCursors).map(c => ({ userId: String(c.userId), role: c.role, x: c.x, y: c.y })),
+    [store.remoteCursors]
+  )
   useEffect(() => {
-    const cursors = Object.values(store.remoteCursors).map(c => ({
-      userId: String(c.userId),
-      role: c.role,
-      x: c.x,
-      y: c.y,
-    }))
-    engineRef.current?.setRemoteCursors(cursors)
-  }, [store.remoteCursors])
+    engineRef.current?.setRemoteCursors(remoteCursorsList)
+  }, [remoteCursorsList])
 
   // ── Resize observer ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -591,8 +589,22 @@ export default function LavagnaCanvas({
       } catch (_) {}
     }
 
-    const interval = setInterval(poll, 500)
-    return () => clearInterval(interval)
+    let intervalId: ReturnType<typeof setInterval> | null = setInterval(poll, 2000)
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) { clearInterval(intervalId); intervalId = null }
+      } else {
+        poll() // catch-up immediato al ritorno
+        if (!intervalId) intervalId = setInterval(poll, 2000)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [lavagnaId, attivitaId])
 
   // ── Background change broadcast (admin only) ─────────────────────────────────

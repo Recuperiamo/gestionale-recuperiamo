@@ -420,7 +420,10 @@ export class CanvasEngine {
     const loop = () => {
       this.liveRafId = requestAnimationFrame(loop)
       if (this.baseDirty) this.drawBase()
-      this.drawLive()
+      // Salta drawLive se nulla è in movimento: risparmia CPU in idle
+      if (this.liveStroke || this.liveShape || this.remoteCursors.length > 0 || this.baseDirty) {
+        this.drawLive()
+      }
     }
     this.liveRafId = requestAnimationFrame(loop)
   }
