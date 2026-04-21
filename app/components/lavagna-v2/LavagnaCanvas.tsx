@@ -282,7 +282,11 @@ export default function LavagnaCanvas({
         })
         if (res.ok) {
           const js = await res.json()
-          if (js.shape?.dbId) store.updateShape(event.shape.id, { dbId: js.shape.dbId })
+          if (js.shape?.dbId) {
+            store.updateShape(event.shape.id, { dbId: js.shape.dbId })
+            // Propaga il dbId agli studenti: senza questo il polling crea un duplicato
+            emitShapeUpdate({ ...event.shape, dbId: js.shape.dbId })
+          }
         }
       } catch (_) {}
     }
@@ -440,7 +444,7 @@ export default function LavagnaCanvas({
           })
           if (res.ok) {
             const js = await res.json()
-            if (js.shape?.dbId) store.updateShape(shape.id, { dbId: js.shape.dbId })
+            if (js.shape?.dbId) { store.updateShape(shape.id, { dbId: js.shape.dbId }); emitShapeUpdate({ ...shape, dbId: js.shape.dbId }) }
           }
         } catch (_) {}
 
@@ -496,7 +500,7 @@ export default function LavagnaCanvas({
           })
           if (res.ok) {
             const js = await res.json()
-            if (js.shape?.dbId) store.updateShape(shape.id, { dbId: js.shape.dbId })
+            if (js.shape?.dbId) { store.updateShape(shape.id, { dbId: js.shape.dbId }); emitShapeUpdate({ ...shape, dbId: js.shape.dbId }) }
           }
         } catch (_) {}
         break
@@ -563,6 +567,8 @@ export default function LavagnaCanvas({
         // Forme mancanti (incluse immagini)
         for (const f of forme) {
           if (knownShapeDbIds.has(f.id)) continue
+          // Difesa: shape aggiunta via Ably senza dbId, già presente con id calcolato
+          if (st.shapes.some((s: any) => s.id === `shape-${f.id}`)) continue
           const shape = {
             id: `shape-${f.id}`,
             dbId: f.id,

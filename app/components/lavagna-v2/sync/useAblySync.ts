@@ -241,7 +241,16 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         const onShapeUpdate = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
-          if (d.shapeId && d.patch) store.updateShape(d.shapeId, d.patch)
+          if (!d.patch) return
+          // Cerca per id locale (shape aggiunta via Ably shape:add)
+          let target = d.shapeId ? store.shapes.find((s: any) => s.id === d.shapeId) : null
+          // Fallback: cerca per dbId (shape caricata da DB ha id diverso dal prof)
+          if (!target && d.shapeDbId) {
+            target = store.shapes.find((s: any) =>
+              Number(s.dbId) === Number(d.shapeDbId) || s.id === `shape-${d.shapeDbId}`
+            )
+          }
+          if (target) store.updateShape(target.id, d.patch)
         }
 
         const onPermissionsUpdateMsg = (msg: any) => {
@@ -296,7 +305,12 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
   const emitShapeUpdate = useCallback((shape: any) => {
     publish('shape:update', {
       shapeId: shape.id,
-      patch: { x: shape.x, y: shape.y, width: shape.width, height: shape.height, x2: shape.x2, y2: shape.y2, rotation: shape.rotation },
+      shapeDbId: shape.dbId ?? null,  // per studenti con id locale diverso (caricato da DB)
+      patch: {
+        x: shape.x, y: shape.y, width: shape.width, height: shape.height,
+        x2: shape.x2, y2: shape.y2, rotation: shape.rotation,
+        ...(shape.dbId ? { dbId: shape.dbId } : {}),  // propaga dbId agli studenti
+      },
       lavagnaId,
     })
   }, [publish, lavagnaId])
