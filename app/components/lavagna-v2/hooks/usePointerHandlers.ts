@@ -202,7 +202,11 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     if (native.shiftKey && (useWhiteboardStore.getState().tool === 'pen' || useWhiteboardStore.getState().tool === 'highlighter')) {
       const startPt = allPoints.current[0]
       const pt = getPoint(e)
-      if (startPt && pt) eng.updateLiveStroke([startPt, pt])
+      if (startPt && pt) {
+        // Keep only [start, current] so pointerUp sees raw.length >= 2 and commits correctly
+        allPoints.current = [startPt, pt]
+        eng.updateLiveStroke([startPt, pt])
+      }
       return
     }
 

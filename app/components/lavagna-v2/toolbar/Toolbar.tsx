@@ -286,6 +286,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
   const shapesBtnRef = useRef<HTMLButtonElement>(null)
   const colorBtnRef = useRef<HTMLButtonElement>(null)
   const moreBtnRef = useRef<HTMLButtonElement>(null)
+  const shortcutsBtnRef = useRef<HTMLButtonElement>(null)
 
   const togglePop = (name: string, btnRef: React.RefObject<HTMLButtonElement>) => {
     if (openPopover === name) {
@@ -444,6 +445,9 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
           zoomIn={zoomIn} zoomOut={zoomOut} fitView={fitView} resetZoom={resetZoom} zoomPct={zoomPct}
         />
       )}
+      {openPopover === 'shortcuts' && popoverRect && (
+        <ShortcutsPopover rect={popoverRect} vertical={toolbarVertical} onClose={closePop} />
+      )}
 
       <div style={{
         ...S.toolbar,
@@ -542,6 +546,18 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
         <button ref={moreBtnRef} style={S.btn(openPopover === 'more')} onClick={() => togglePop('more', moreBtnRef)} title="Altro">
           <Icon.More />
         </button>
+
+        {/* ── Shortcuts (admin only, hidden) ── */}
+        {isAdmin && (
+          <button
+            ref={shortcutsBtnRef}
+            style={{ ...S.btn(openPopover === 'shortcuts'), opacity: openPopover === 'shortcuts' ? 1 : 0.35, fontSize: 13, fontWeight: 700 }}
+            onClick={() => togglePop('shortcuts', shortcutsBtnRef)}
+            title="Scorciatoie da tastiera"
+          >
+            ?
+          </button>
+        )}
 
       </div>
     </>
@@ -674,8 +690,51 @@ function RequestDrawButton({ onRequestDraw }) {
   )
 }
 
+const SHORTCUTS = [
+  { keys: ['Ctrl', 'Z'], label: 'Annulla' },
+  { keys: ['Ctrl', 'Y'], label: 'Ripeti' },
+  { keys: ['Canc'], label: 'Elimina selezione (strumento →)' },
+  { keys: ['Shift', '+ trascinamento'], label: 'Linea retta (penna/evidenziatore)' },
+  { keys: ['R'], label: 'Ruota immagine −90°' },
+  { keys: ['Shift', 'R'], label: 'Ruota immagine +90°' },
+  { keys: ['Click dx'], label: 'Sposta (pan)' },
+  { keys: ['Ctrl', 'Scroll'], label: 'Zoom' },
+  { keys: ['Pizzica'], label: 'Zoom (touch)' },
+]
+
+function ShortcutsPopover({ rect, vertical, onClose }) {
+  return (
+    <div style={{ ...S.popover(rect, vertical), minWidth: 280 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 10, letterSpacing: '0.05em' }}>
+        SCORCIATOIE DA TASTIERA
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {SHORTCUTS.map((s, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+              {s.keys.map((k, j) => (
+                <React.Fragment key={j}>
+                  {j > 0 && k !== '+ trascinamento' && <span style={{ color: '#9ca3af', fontSize: 11, alignSelf: 'center' }}>+</span>}
+                  <kbd style={{
+                    padding: '2px 7px', borderRadius: 6, background: '#f3f4f6',
+                    border: '1px solid #d1d5db', borderBottom: '2px solid #9ca3af',
+                    fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: '#374151',
+                    whiteSpace: 'nowrap',
+                  }}>{k}</kbd>
+                </React.Fragment>
+              ))}
+            </div>
+            <span style={{ fontSize: 12, color: '#6b7280', textAlign: 'right' }}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClear, onForceSyncViewport, onExportPNG, onExportPDF, onToggleStudentDraw, onPasteImage, onClose, toolbarVertical, onToggleVertical, zoomIn, zoomOut, fitView, resetZoom, zoomPct }) {
   const { background, setBackground, tool, setTool } = useWhiteboardStore()
+  const [showShortcuts, setShowShortcuts] = React.useState(false)
 
   const mobilePopoverStyle = {
     position: 'fixed' as const,
@@ -802,12 +861,36 @@ function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClea
             Sincronizza View
           </button>
           <button
-            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center', color: '#dc2626' }}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'flex', gap: 8, alignItems: 'center', color: '#dc2626' }}
             onClick={() => { if (confirm('Pulire tutta la lavagna?')) { onClear?.(); onClose() } }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
             Pulisci lavagna
           </button>
+          <button
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, background: showShortcuts ? '#f3f4f6' : 'transparent', border: '1px solid #e5e7eb', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 500, display: 'flex', gap: 8, alignItems: 'center', color: '#9ca3af' }}
+            onClick={() => setShowShortcuts(v => !v)}
+          >
+            <span style={{ fontWeight: 700, fontSize: 13 }}>?</span>
+            Scorciatoie
+          </button>
+          {showShortcuts && (
+            <div style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {SHORTCUTS.map((s, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                    {s.keys.map((k, j) => (
+                      <React.Fragment key={j}>
+                        {j > 0 && k !== '+ trascinamento' && <span style={{ color: '#9ca3af', fontSize: 10, alignSelf: 'center' }}>+</span>}
+                        <kbd style={{ padding: '1px 5px', borderRadius: 5, background: '#f3f4f6', border: '1px solid #d1d5db', borderBottom: '2px solid #9ca3af', fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>{k}</kbd>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 11, color: '#6b7280', textAlign: 'right' }}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
