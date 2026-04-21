@@ -12,7 +12,10 @@ export async function GET() {
     cloud: cloud ? `"${cloud}"` : 'MISSING',
     key: key ? '✓' : 'MISSING',
     secret: secret ? '✓' : 'MISSING',
-    allKeys: Object.keys(process.env).filter(k => k.startsWith('CLOUDINARY')),
+    allCloudinaryKeys: Object.keys(process.env).filter(k => k.startsWith('CLOUDINARY')),
+    hasDatabase: !!process.env.DATABASE_URL,
+    hasNextauth: !!process.env.NEXTAUTH_SECRET,
+    nodeEnv: process.env.NODE_ENV,
   })
 
   const cloudinaryOk = !!(cloud && key && secret)
