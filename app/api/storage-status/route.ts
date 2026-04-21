@@ -8,13 +8,14 @@ export async function GET() {
   const key = process.env.CLOUDINARY_API_KEY
   const secret = process.env.CLOUDINARY_API_SECRET
 
+  const allEnvKeys = Object.keys(process.env)
   console.log('[storage-status-raw]', {
     cloud: cloud ? `"${cloud}"` : 'MISSING',
     key: key ? '✓' : 'MISSING',
     secret: secret ? '✓' : 'MISSING',
-    allCloudinaryKeys: Object.keys(process.env).filter(k => k.startsWith('CLOUDINARY')),
+    cloudinaryUrl: process.env.CLOUDINARY_URL ? '✓' : 'MISSING',
+    anyCloudinary: allEnvKeys.filter(k => k.toLowerCase().includes('cloudinary')),
     hasDatabase: !!process.env.DATABASE_URL,
-    hasNextauth: !!process.env.NEXTAUTH_SECRET,
     nodeEnv: process.env.NODE_ENV,
   })
 
