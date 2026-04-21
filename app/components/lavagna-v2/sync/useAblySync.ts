@@ -117,12 +117,17 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
   const emitForceSyncViewport = useCallback(() => {
     const eng = engineRef.current
     if (!eng) return
-    const cssW = eng['baseCanvas']?.width / eng['dpr'] || 800
-    const cssH = eng['baseCanvas']?.height / eng['dpr'] || 600
+    const dpr = eng['dpr'] || 1
+    const cssW = (eng['baseCanvas']?.width || 800) / dpr
+    const cssH = (eng['baseCanvas']?.height || 600) / dpr
+    // Send viewport center in world coordinates so students with different screen sizes
+    // can recompute their own pan and show the same content centered.
     publish('viewport:force-sync', {
-      pan: eng.pan,
+      center: {
+        x: eng.pan.x + (cssW / 2) / eng.zoom,
+        y: eng.pan.y + (cssH / 2) / eng.zoom,
+      },
       zoom: eng.zoom,
-      visibleRect: { x: eng.pan.x, y: eng.pan.y, width: cssW / eng.zoom, height: cssH / eng.zoom },
       lavagnaId,
     })
   }, [publish, lavagnaId])
@@ -212,9 +217,19 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           if (isAdmin) return
           const d = msg.data || {}
           const eng = engineRef.current
-          if (!eng || !d.pan) return
-          eng.setPan(d.pan.x, d.pan.y)
-          if (d.zoom) eng.setZoom(d.zoom)
+          if (!eng) return
+          const zoom = d.zoom || eng.zoom
+          if (d.zoom) eng.setZoom(zoom)
+          if (d.center) {
+            // Compute pan so this screen's center aligns with the admin's world-space center
+            const dpr = eng['dpr'] || 1
+            const cssW = (eng['baseCanvas']?.width || 800) / dpr
+            const cssH = (eng['baseCanvas']?.height || 600) / dpr
+            eng.setPan(d.center.x - (cssW / 2) / zoom, d.center.y - (cssH / 2) / zoom)
+          } else if (d.pan) {
+            // Legacy fallback
+            eng.setPan(d.pan.x, d.pan.y)
+          }
         }
 
         const onClear = (msg: any) => {
@@ -238,30 +253,30 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         const onShapeDelete = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
-          // Prova prima per dbId (shapes caricate da DB hanno id diverso da chi le ha create)
+          // Use getState() for fresh shape list (store in closure may be stale)
+          const { shapes, deleteShape } = useWhiteboardStore.getState()
           if (d.shapeDbId) {
-            const byDbId = store.shapes.find(
-              x => x.dbId && (x.dbId === d.shapeDbId || String(x.dbId) === String(d.shapeDbId))
+            const byDbId = shapes.find(
+              (x: any) => x.dbId && (x.dbId === d.shapeDbId || String(x.dbId) === String(d.shapeDbId))
             )
-            if (byDbId) { store.deleteShape(byDbId.id); return }
+            if (byDbId) { deleteShape(byDbId.id); return }
           }
-          // Fallback: id locale (shapes ricevute via Ably shape:add hanno lo stesso id)
-          if (d.shapeId) store.deleteShape(d.shapeId)
+          if (d.shapeId) deleteShape(d.shapeId)
         }
 
         const onShapeUpdate = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
           if (!d.patch) return
-          // Cerca per id locale (shape aggiunta via Ably shape:add)
-          let target = d.shapeId ? store.shapes.find((s: any) => s.id === d.shapeId) : null
-          // Fallback: cerca per dbId (shape caricata da DB ha id diverso dal prof)
+          // Use getState() for fresh shape list (store in closure may be stale)
+          const { shapes, updateShape } = useWhiteboardStore.getState()
+          let target = d.shapeId ? shapes.find((s: any) => s.id === d.shapeId) : null
           if (!target && d.shapeDbId) {
-            target = store.shapes.find((s: any) =>
+            target = shapes.find((s: any) =>
               Number(s.dbId) === Number(d.shapeDbId) || s.id === `shape-${d.shapeDbId}`
             )
           }
-          if (target) store.updateShape(target.id, d.patch)
+          if (target) updateShape(target.id, d.patch)
         }
 
         const onPermissionsUpdateMsg = (msg: any) => {

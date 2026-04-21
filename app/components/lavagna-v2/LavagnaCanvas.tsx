@@ -54,6 +54,9 @@ export default function LavagnaCanvas({
   const engineRef = useRef<CanvasEngine | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Tracked locally to prevent polling from resurrecting recently-deleted shapes
+  const deletedShapeDbIds = useRef<Set<number>>(new Set())
+
   // ── Store ────────────────────────────────────────────────────────────────────
   // Selettori granulari: il componente re-renderizza solo se cambia il valore specifico,
   // non su ogni aggiornamento dello store (es. cursor moves da altri utenti)
@@ -242,7 +245,7 @@ export default function LavagnaCanvas({
         if (!s) return
         store.deleteShape(id)
         store.pushUndo({ type: 'delete-shape', shape: s })
-        if (s.dbId) deleteShape(s.dbId)
+        if (s.dbId) { deletedShapeDbIds.current.add(Number(s.dbId)); deleteShape(s.dbId) }
         emitStrokeEvent({ type: 'delete-shape', shape: s })
       })
       store.clearSelection()
@@ -276,6 +279,7 @@ export default function LavagnaCanvas({
       await deleteStroke(event.stroke.dbId)
     }
     if (event.type === 'delete-shape' && event.shape?.dbId) {
+      deletedShapeDbIds.current.add(Number(event.shape.dbId))
       await deleteShape(event.shape.dbId)
     }
     if (event.type === 'commit-shape' && event.shape) {
@@ -571,6 +575,8 @@ export default function LavagnaCanvas({
 
         // Forme mancanti (incluse immagini)
         for (const f of forme) {
+          // Skip shapes explicitly deleted in this session (prevent poll resurrection)
+          if (deletedShapeDbIds.current.has(Number(f.id))) continue
           if (knownShapeDbIds.has(f.id)) continue
           // Difesa: shape aggiunta via Ably senza dbId, già presente con id calcolato
           if (st.shapes.some((s: any) => s.id === `shape-${f.id}`)) continue
