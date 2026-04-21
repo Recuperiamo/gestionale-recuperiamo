@@ -8,8 +8,11 @@ export async function GET() {
   const key = process.env.CLOUDINARY_API_KEY
   const secret = process.env.CLOUDINARY_API_SECRET
 
-  const allEnvKeys = Object.keys(process.env).sort()
-  console.log('[storage-status-raw] ALL KEYS:', JSON.stringify(allEnvKeys))
+  console.log('[storage-status-project]', {
+    project: process.env.VERCEL_PROJECT_NAME,
+    url: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? 'MISSING',
+  })
 
   const cloudinaryOk = !!(cloud && key && secret)
   return NextResponse.json({ vercelReset: '2026-05-16', cloudinaryOk })
