@@ -286,9 +286,12 @@ export class CanvasEngine {
 
   // Internal
   private baseDirty = true
+  private lastBaseDrawTs = 0
   private liveRafId: number | null = null
   private listeners: EngineListener[] = []
   private imageCache: Map<string, HTMLImageElement> = new Map()
+  private strokeMap: Map<string, Stroke> = new Map()
+  private shapeMap: Map<string, Shape> = new Map()
 
   // Selection highlight
   selectedStrokeIds: string[] = []
@@ -377,6 +380,8 @@ export class CanvasEngine {
     this.strokes = strokes
     this.shapes = shapes
     this.background = bg
+    this.strokeMap = new Map(strokes.map(s => [s.id, s]))
+    this.shapeMap = new Map(shapes.map(s => [s.id, s]))
     this.markBaseDirty()
   }
 
@@ -419,7 +424,14 @@ export class CanvasEngine {
   private startLiveLoop() {
     const loop = () => {
       this.liveRafId = requestAnimationFrame(loop)
-      if (this.baseDirty) this.drawBase()
+      if (this.baseDirty) {
+        const now = performance.now()
+        // Throttle drawBase a max 60fps; evita ridisegni multipli nello stesso frame
+        if (now - this.lastBaseDrawTs >= 14) {
+          this.drawBase()
+          this.lastBaseDrawTs = now
+        }
+      }
       // Salta drawLive se nulla è in movimento: risparmia CPU in idle
       if (this.liveStroke || this.liveShape || this.remoteCursors.length > 0 || this.baseDirty) {
         this.drawLive()
@@ -470,14 +482,14 @@ export class CanvasEngine {
       ctx.globalAlpha = 0.8
 
       for (const id of this.selectedStrokeIds) {
-        const s = this.strokes.find(x => x.id === id)
+        const s = this.strokeMap.get(id)
         if (!s?.bbox) continue
         const { minX, minY, maxX, maxY } = s.bbox
         const pad = (s.width / 2 + 4) / this.zoom
         ctx.strokeRect(minX - pad, minY - pad, maxX - minX + pad * 2, maxY - minY + pad * 2)
       }
       for (const id of this.selectedShapeIds) {
-        const s = this.shapes.find(x => x.id === id)
+        const s = this.shapeMap.get(id)
         if (!s) continue
         const bb = shapeBBox(s)
         const pad = 4 / this.zoom

@@ -55,7 +55,14 @@ export default function LavagnaCanvas({
   const containerRef = useRef<HTMLDivElement>(null)
 
   // ── Store ────────────────────────────────────────────────────────────────────
+  // Selettori granulari: il componente re-renderizza solo se cambia il valore specifico,
+  // non su ogni aggiornamento dello store (es. cursor moves da altri utenti)
   const store = useWhiteboardStore()
+  const strokes    = useWhiteboardStore(s => s.strokes)
+  const shapes     = useWhiteboardStore(s => s.shapes)
+  const background = useWhiteboardStore(s => s.background)
+  const selectedStrokeIds = useWhiteboardStore(s => s.selectedStrokeIds)
+  const selectedShapeIds  = useWhiteboardStore(s => s.selectedShapeIds)
 
   // ── Channel name — sempre basato sull'ID DB della lavagna (non attivitaId)
   // Così admin (apre via ?attivitaId) e studente (apre via ?lavagnaId) usano lo stesso canale
@@ -96,13 +103,13 @@ export default function LavagnaCanvas({
   useEffect(() => {
     const eng = engineRef.current
     if (!eng) return
-    eng.setData(store.strokes, store.shapes, store.background)
-  }, [store.strokes, store.shapes, store.background])
+    eng.setData(strokes, shapes, background)
+  }, [strokes, shapes, background])
 
   // ── Keep engine selection in sync ────────────────────────────────────────────
   useEffect(() => {
-    engineRef.current?.setSelection(store.selectedStrokeIds, store.selectedShapeIds)
-  }, [store.selectedStrokeIds, store.selectedShapeIds])
+    engineRef.current?.setSelection(selectedStrokeIds, selectedShapeIds)
+  }, [selectedStrokeIds, selectedShapeIds])
 
   // ── Keep engine remote cursors in sync ───────────────────────────────────────
   const remoteCursorsList = useMemo(

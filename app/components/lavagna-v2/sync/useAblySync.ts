@@ -43,7 +43,7 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
   const store = useWhiteboardStore()
   const channelRef = useRef<any>(null)
   const remoteStreams = useRef<Map<string, RemoteStream>>(new Map())
-  const cursorTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const cursorTs = useRef<Record<string, number>>({})
   const pendingMessages = useRef<Array<{ name: string; data: any }>>([])
 
   // ── publish helper ──────────────────────────────────────────────────────────
@@ -53,7 +53,8 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
     if (ch) {
       try { ch.publish(name, { ...data, senderId: userId }) } catch (_) {}
     } else {
-      pendingMessages.current.push({ name, data: { ...data, senderId: userId } })
+      const q = pendingMessages.current
+      if (q.length < 100) q.push({ name, data: { ...data, senderId: userId } })
     }
   }, [userId])
 
@@ -133,6 +134,17 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
     let ch: any = null
     let alive = true
 
+    // Single interval to expire all stale cursors (replaces per-cursor setTimeout)
+    const cursorExpiryInterval = setInterval(() => {
+      const now = Date.now()
+      for (const [uid, ts] of Object.entries(cursorTs.current)) {
+        if (now - ts > 3000) {
+          store.expireRemoteCursor(uid)
+          delete cursorTs.current[uid]
+        }
+      }
+    }, 1000)
+
     ;(async () => {
       try {
         ch = await getAblyChannelAsync(channelName)
@@ -191,10 +203,9 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         const onCursorMove = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
-          store.setRemoteCursor({ userId: d.senderId, role: d.role || 'unknown', x: d.x, y: d.y, ts: Date.now() })
           const uid = String(d.senderId)
-          clearTimeout(cursorTimeouts.current[uid])
-          cursorTimeouts.current[uid] = setTimeout(() => store.expireRemoteCursor(uid), 3000)
+          store.setRemoteCursor({ userId: d.senderId, role: d.role || 'unknown', x: d.x, y: d.y, ts: Date.now() })
+          cursorTs.current[uid] = Date.now()
         }
 
         const onForceSyncViewport = (msg: any) => {
@@ -294,11 +305,11 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
 
     return () => {
       alive = false
+      clearInterval(cursorExpiryInterval)
       channelRef.current = null
       if (ch) {
         try { ch.unsubscribe() } catch (_) {}
       }
-      Object.values(cursorTimeouts.current).forEach(t => clearTimeout(t))
     }
   }, [channelName, userId, isAdmin])
 
