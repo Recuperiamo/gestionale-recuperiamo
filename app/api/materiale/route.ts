@@ -4,7 +4,33 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/authOptions';
 import { prisma } from '../../../lib/prisma';
 import { uploadFile, deleteFile } from '../../lib/storage';
+import { v2 as cloudinary } from 'cloudinary';
 // Ably removed: realtime notifications are now handled client-side via Socket.IO
+
+function getCloudinaryRedirectUrl(blobUrl: string): string {
+  try {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+    })
+    // Estrai resource_type, delivery_type e public_id dall'URL
+    const m = blobUrl.match(/\/(image|raw|video)\/(upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
+    if (!m) return blobUrl
+    const [, resourceType, deliveryType, pubIdNoExt, ext] = m
+    const publicId = pubIdNoExt + (ext || '')
+    // URL firmato: valido 1 ora, funziona sia per 'upload' che 'authenticated'
+    return cloudinary.url(publicId, {
+      resource_type: resourceType as any,
+      type: deliveryType,
+      sign_url: true,
+      secure: true,
+    })
+  } catch {
+    return blobUrl // fallback: URL originale
+  }
+}
 
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB safeguard for uploads
 
@@ -47,8 +73,12 @@ export async function GET(req) {
       }
     }
 
-    // Redirect to the Blob URL for download/viewing
-    return NextResponse.redirect(materiale.blobUrl);
+    // Cloudinary: genera URL firmato per evitare 401 dal browser
+    // Vercel Blob: redirect diretto (già pubblico)
+    const redirectUrl = materiale.blobUrl.includes('cloudinary.com')
+      ? getCloudinaryRedirectUrl(materiale.blobUrl)
+      : materiale.blobUrl
+    return NextResponse.redirect(redirectUrl);
     
   } else {
     // Lista materiali filtrata per permessi

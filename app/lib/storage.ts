@@ -55,6 +55,8 @@ export async function uploadFile(
 
   const result = await cloudinary.uploader.upload(dataUri, {
     resource_type: 'auto',   // gestisce PDF, immagini, video, ecc.
+    type: 'upload',          // delivery type pubblico (non authenticated/private)
+    access_mode: 'public',   // esplicito: accessibile senza firma
     folder: 'recuperiamo',
     use_filename: true,
     unique_filename: true,
