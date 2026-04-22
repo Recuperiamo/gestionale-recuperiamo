@@ -16,39 +16,21 @@ function configureCloudinary() {
   })
 }
 
-async function proxyCloudinaryFile(blobUrl: string): Promise<Response | null> {
-  // Tentativo 1: URL originale senza firma (funciona se il file è public type:upload)
-  // Il server non manda Sec-Fetch/Referer del browser che triggera l'ACL Cloudinary
-  try {
-    const plain = await fetch(blobUrl)
-    if (plain.ok) return plain
-    console.warn(`[materiale] plain fetch ${plain.status} — provo signed URL`)
-  } catch (e) {
-    console.warn('[materiale] plain fetch error:', e)
-  }
-
-  // Tentativo 2: URL firmato con public_id corretto (estensione inclusa, nessun format transform)
-  try {
-    configureCloudinary()
-    const m = blobUrl.match(/\/(image|raw|video)\/(upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
-    if (!m) return null
-    const [, resourceType, deliveryType, pubIdNoExt, ext] = m
-    // Includi sempre l'estensione nel public_id — evita trasformazioni f_xxx a pagamento
-    const publicId = pubIdNoExt + (ext || '')
-    const signedUrl = cloudinary.url(publicId, {
-      resource_type: resourceType as any,
-      type: deliveryType,
-      sign_url: true,
-      secure: true,
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
-    })
-    const signed = await fetch(signedUrl)
-    if (signed.ok) return signed
-    console.error(`[materiale] signed fetch ${signed.status} url=${signedUrl}`)
-  } catch (err) {
-    console.error('[materiale] signed URL error:', err)
-  }
-  return null
+function buildCloudinaryDownloadUrl(blobUrl: string): string | null {
+  configureCloudinary()
+  const m = blobUrl.match(/\/(image|raw|video)\/(upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
+  if (!m) return null
+  const [, resourceType, deliveryType, pubIdNoExt, ext] = m
+  // image/video: public_id senza estensione; raw: con estensione
+  const publicId = resourceType === 'raw' ? (pubIdNoExt + (ext || '')) : pubIdNoExt
+  const format = ext ? ext.slice(1) : ''
+  // private_download_url: usa api.cloudinary.com (non CDN), bypassa ACL CDN
+  return cloudinary.utils.private_download_url(publicId, format, {
+    resource_type: resourceType,
+    type: deliveryType,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    attachment: false,
+  })
 }
 
 const MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB safeguard for uploads
@@ -92,18 +74,15 @@ export async function GET(req) {
       }
     }
 
-    // Cloudinary: proxy server-side (evita ACL/referer 401 del browser)
+    // Cloudinary: redirect a api.cloudinary.com (bypassa ACL del CDN)
     // Vercel Blob: redirect diretto (pubblico)
     if (materiale.blobUrl.includes('cloudinary.com')) {
-      const upstream = await proxyCloudinaryFile(materiale.blobUrl)
-      if (!upstream) return NextResponse.json({ error: 'Errore recupero file' }, { status: 502 })
-      return new NextResponse(upstream.body, {
-        headers: {
-          'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
-          'Content-Disposition': upstream.headers.get('content-disposition') || 'inline',
-          'Cache-Control': 'private, max-age=3600',
-        }
-      })
+      try {
+        const downloadUrl = buildCloudinaryDownloadUrl(materiale.blobUrl)
+        if (downloadUrl) return NextResponse.redirect(downloadUrl)
+      } catch (err) {
+        console.error('[materiale] buildCloudinaryDownloadUrl error:', err)
+      }
     }
     return NextResponse.redirect(materiale.blobUrl);
     
