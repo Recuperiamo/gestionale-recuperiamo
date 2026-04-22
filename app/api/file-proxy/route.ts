@@ -4,14 +4,10 @@ export const dynamic = 'force-dynamic'
 /**
  * Proxy per file Cloudinary.
  *
- * Il browser non può accedere direttamente a file Cloudinary che richiedono
- * autenticazione (401). Questo endpoint:
- *  1. Genera un URL firmato con la chiave API Cloudinary (valido 1 ora)
- *  2. Reindirizza il browser all'URL firmato
+ * Fetcha il file lato server (bypassando restrizioni ACL/referer del browser)
+ * e lo streamma al client. Per Vercel Blob fa redirect diretto (pubblico).
  *
  * Uso: /api/file-proxy?url=<encoded_cloudinary_url>
- *
- * Sicurezza: accetta solo URL cloudinary.com e vercel-storage.com
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
@@ -41,36 +37,44 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Cloudinary: genera URL firmato
+  // Cloudinary: proxy server-side per bypassare restrizioni ACL/referer del browser
   try {
     configureCloudinary()
 
-    // Estrai resource_type e public_id dall'URL
-    // formato: https://res.cloudinary.com/{cloud}/{resource_type}/upload/v{n}/{public_id}.{ext}
     const match = url.match(/\/(image|raw|video)\/(?:upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
-    if (!match) {
-      // URL non riconosciuto → prova redirect diretto
-      return NextResponse.redirect(url)
+    let fetchUrl = url
+
+    if (match) {
+      const resourceType = match[1] as 'image' | 'raw' | 'video'
+      const pubIdNoExt = match[2]
+      const ext = match[3] || ''
+      // image/video: public_id senza estensione; raw: con estensione (quirk Cloudinary)
+      const publicId = resourceType === 'raw' ? (pubIdNoExt + ext) : pubIdNoExt
+      const opts: any = {
+        resource_type: resourceType,
+        sign_url: true,
+        secure: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      }
+      if (resourceType !== 'raw' && ext) opts.format = ext.slice(1)
+      fetchUrl = cloudinary.url(publicId, opts)
     }
 
-    const resourceType = match[1] as 'image' | 'raw' | 'video'
-    const ext = match[3] || ''
-    const publicId = match[2] + ext  // include estensione per raw
+    const upstream = await fetch(fetchUrl)
+    if (!upstream.ok) {
+      console.error('[file-proxy] upstream error:', upstream.status, fetchUrl)
+      return NextResponse.json({ error: `Errore file: ${upstream.status}` }, { status: upstream.status })
+    }
 
-    // URL firmato, scade tra 1 ora
-    const expiresAt = Math.floor(Date.now() / 1000) + 3600
-    const signedUrl = cloudinary.url(publicId, {
-      resource_type: resourceType,
-      sign_url: true,
-      secure: true,
-      expires_at: expiresAt,
-      // type: 'upload' lavora sia per upload che authenticated
+    return new NextResponse(upstream.body, {
+      headers: {
+        'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
+        'Content-Disposition': upstream.headers.get('content-disposition') || 'inline',
+        'Cache-Control': 'private, max-age=3600',
+      }
     })
-
-    return NextResponse.redirect(signedUrl)
   } catch (err) {
-    console.error('[file-proxy] Errore generazione URL firmato:', err)
-    // Fallback: redirect all'URL originale
-    return NextResponse.redirect(url)
+    console.error('[file-proxy] errore:', err)
+    return NextResponse.json({ error: 'Errore proxy file' }, { status: 500 })
   }
 }

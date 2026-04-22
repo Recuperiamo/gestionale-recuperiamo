@@ -204,10 +204,28 @@ function FullPage({ children }) {
 
 function Spinner({ text }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, color: "#6b7280" }}>
-      <div style={{ width: 32, height: 32, border: "3px solid #e5e7eb", borderTopColor: "#0078d4", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <div style={{ fontSize: 14 }}>{text}</div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, color: "#6b7280" }}>
+      {/* Arc spinner with glow */}
+      <div style={{ position: 'relative', width: 52, height: 52 }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: '50%',
+          border: '4px solid #e5e7eb',
+          borderTopColor: '#1cb0f6',
+          borderRightColor: '#58cc02',
+          animation: 'lv2-spin 1s cubic-bezier(0.4,0,0.2,1) infinite',
+        }} />
+        {/* Mini pencil in center */}
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
+          style={{ position: 'absolute', top: 16, left: 16, animation: 'lv2-pulse 1s ease-in-out infinite' }}>
+          <rect x="7" y="2" width="6" height="11" rx="2" fill="#1cb0f6"/>
+          <polygon points="7,13 13,13 10,18" fill="#fbbf24"/>
+        </svg>
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', letterSpacing: '0.02em' }}>{text}</div>
+      <style>{`
+        @keyframes lv2-spin { to { transform: rotate(360deg) } }
+        @keyframes lv2-pulse { 0%,100%{opacity:0.6;transform:scale(0.9)} 50%{opacity:1;transform:scale(1.1)} }
+      `}</style>
     </div>
   );
 }

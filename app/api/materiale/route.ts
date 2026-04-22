@@ -7,28 +7,43 @@ import { uploadFile, deleteFile } from '../../lib/storage';
 import { v2 as cloudinary } from 'cloudinary';
 // Ably removed: realtime notifications are now handled client-side via Socket.IO
 
-function getCloudinaryRedirectUrl(blobUrl: string): string {
+function configureCloudinary() {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
+  })
+}
+
+async function proxyCloudinaryFile(blobUrl: string): Promise<Response | null> {
   try {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-      secure: true,
-    })
-    // Estrai resource_type, delivery_type e public_id dall'URL
+    configureCloudinary()
     const m = blobUrl.match(/\/(image|raw|video)\/(upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
-    if (!m) return blobUrl
-    const [, resourceType, deliveryType, pubIdNoExt, ext] = m
-    const publicId = pubIdNoExt + (ext || '')
-    // URL firmato: valido 1 ora, funziona sia per 'upload' che 'authenticated'
-    return cloudinary.url(publicId, {
-      resource_type: resourceType as any,
-      type: deliveryType,
-      sign_url: true,
-      secure: true,
-    })
-  } catch {
-    return blobUrl // fallback: URL originale
+    let fetchUrl = blobUrl
+    if (m) {
+      const [, resourceType, deliveryType, pubIdNoExt, ext] = m
+      // image/video: public_id senza estensione; raw: con estensione
+      const publicId = resourceType === 'raw' ? (pubIdNoExt + (ext || '')) : pubIdNoExt
+      const opts: any = {
+        resource_type: resourceType,
+        type: deliveryType,
+        sign_url: true,
+        secure: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      }
+      if (resourceType !== 'raw' && ext) opts.format = ext.slice(1)
+      fetchUrl = cloudinary.url(publicId, opts)
+    }
+    const upstream = await fetch(fetchUrl)
+    if (!upstream.ok) {
+      console.error(`[materiale] cloudinary proxy ${upstream.status} url=${fetchUrl}`)
+      return null
+    }
+    return upstream
+  } catch (err) {
+    console.error('[materiale] cloudinary proxy error:', err)
+    return null
   }
 }
 
@@ -73,12 +88,20 @@ export async function GET(req) {
       }
     }
 
-    // Cloudinary: genera URL firmato per evitare 401 dal browser
-    // Vercel Blob: redirect diretto (già pubblico)
-    const redirectUrl = materiale.blobUrl.includes('cloudinary.com')
-      ? getCloudinaryRedirectUrl(materiale.blobUrl)
-      : materiale.blobUrl
-    return NextResponse.redirect(redirectUrl);
+    // Cloudinary: proxy server-side (evita ACL/referer 401 del browser)
+    // Vercel Blob: redirect diretto (pubblico)
+    if (materiale.blobUrl.includes('cloudinary.com')) {
+      const upstream = await proxyCloudinaryFile(materiale.blobUrl)
+      if (!upstream) return NextResponse.json({ error: 'Errore recupero file' }, { status: 502 })
+      return new NextResponse(upstream.body, {
+        headers: {
+          'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
+          'Content-Disposition': upstream.headers.get('content-disposition') || 'inline',
+          'Cache-Control': 'private, max-age=3600',
+        }
+      })
+    }
+    return NextResponse.redirect(materiale.blobUrl);
     
   } else {
     // Lista materiali filtrata per permessi
