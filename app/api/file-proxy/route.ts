@@ -38,38 +38,49 @@ export async function GET(req: NextRequest) {
   }
 
   // Cloudinary: proxy server-side per bypassare restrizioni ACL/referer del browser
+  // Tentativo 1: URL originale (pubblico, il server non manda Sec-Fetch/Referer)
+  try {
+    const plain = await fetch(url)
+    if (plain.ok) {
+      return new NextResponse(plain.body, {
+        headers: {
+          'Content-Type': plain.headers.get('content-type') || 'application/octet-stream',
+          'Content-Disposition': plain.headers.get('content-disposition') || 'inline',
+          'Cache-Control': 'private, max-age=3600',
+        }
+      })
+    }
+    console.warn('[file-proxy] plain fetch', plain.status, '— provo signed URL')
+  } catch (e) {
+    console.warn('[file-proxy] plain fetch error:', e)
+  }
+
+  // Tentativo 2: signed URL
   try {
     configureCloudinary()
-
     const match = url.match(/\/(image|raw|video)\/(?:upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
-    let fetchUrl = url
+    if (!match) return NextResponse.json({ error: 'URL Cloudinary non riconosciuto' }, { status: 400 })
 
-    if (match) {
-      const resourceType = match[1] as 'image' | 'raw' | 'video'
-      const pubIdNoExt = match[2]
-      const ext = match[3] || ''
-      // image/video: public_id senza estensione; raw: con estensione (quirk Cloudinary)
-      const publicId = resourceType === 'raw' ? (pubIdNoExt + ext) : pubIdNoExt
-      const opts: any = {
-        resource_type: resourceType,
-        sign_url: true,
-        secure: true,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-      }
-      if (resourceType !== 'raw' && ext) opts.format = ext.slice(1)
-      fetchUrl = cloudinary.url(publicId, opts)
+    const resourceType = match[1] as 'image' | 'raw' | 'video'
+    const pubIdNoExt = match[2]
+    const ext = match[3] || ''
+    const publicId = pubIdNoExt + ext  // estensione inclusa, no trasformazioni f_xxx
+    const signedUrl = cloudinary.url(publicId, {
+      resource_type: resourceType,
+      sign_url: true,
+      secure: true,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+    })
+
+    const signed = await fetch(signedUrl)
+    if (!signed.ok) {
+      console.error('[file-proxy] signed fetch', signed.status, signedUrl)
+      return NextResponse.json({ error: `Errore file: ${signed.status}` }, { status: signed.status })
     }
-
-    const upstream = await fetch(fetchUrl)
-    if (!upstream.ok) {
-      console.error('[file-proxy] upstream error:', upstream.status, fetchUrl)
-      return NextResponse.json({ error: `Errore file: ${upstream.status}` }, { status: upstream.status })
-    }
-
-    return new NextResponse(upstream.body, {
+    return new NextResponse(signed.body, {
       headers: {
-        'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
-        'Content-Disposition': upstream.headers.get('content-disposition') || 'inline',
+        'Content-Type': signed.headers.get('content-type') || 'application/octet-stream',
+        'Content-Disposition': signed.headers.get('content-disposition') || 'inline',
         'Cache-Control': 'private, max-age=3600',
       }
     })
