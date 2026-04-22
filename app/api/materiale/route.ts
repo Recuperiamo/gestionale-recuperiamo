@@ -16,7 +16,7 @@ function configureCloudinary() {
   })
 }
 
-function buildCloudinaryDownloadUrl(blobUrl: string): string | null {
+function buildCloudinaryDownloadUrl(blobUrl: string, attachment = false): string | null {
   configureCloudinary()
   const m = blobUrl.match(/\/(image|raw|video)\/(upload|authenticated|private)\/(?:v\d+\/)?(.+?)(\.[^./]+)?$/)
   if (!m) return null
@@ -29,7 +29,7 @@ function buildCloudinaryDownloadUrl(blobUrl: string): string | null {
     resource_type: resourceType,
     type: deliveryType,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
-    attachment: false,
+    attachment,
   })
 }
 
@@ -78,7 +78,8 @@ export async function GET(req) {
     // Vercel Blob: redirect diretto (pubblico)
     if (materiale.blobUrl.includes('cloudinary.com')) {
       try {
-        const downloadUrl = buildCloudinaryDownloadUrl(materiale.blobUrl)
+        const isDownload = searchParams.get("download") === "1"
+        const downloadUrl = buildCloudinaryDownloadUrl(materiale.blobUrl, isDownload)
         if (downloadUrl) return NextResponse.redirect(downloadUrl)
       } catch (err) {
         console.error('[materiale] buildCloudinaryDownloadUrl error:', err)

@@ -1442,7 +1442,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                       <button type="button" style={{ background: `${coloreTema}15`, color: coloreTema, border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }} onClick={() => setPreviewItem(m)}>
                         {isImg ? "Ingrandisci" : "Anteprima"}
                       </button>
-                      <a href={`/api/materiale?fileId=${m.id}`} download={m.nomeOriginale} style={{ background: "#f1f5f9", color: "#475569", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                      <a href={`/api/materiale?fileId=${m.id}&download=1`} download={m.nomeOriginale} style={{ background: "#f1f5f9", color: "#475569", borderRadius: 8, padding: "7px 14px", fontWeight: 600, fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
                         Scarica
                       </a>
                       {isAdmin && (
@@ -1476,7 +1476,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
               <div style={{fontWeight:700,color: coloreTema}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
               <div>
-                <a href={`/api/materiale?fileId=${previewItem.id}`} style={{...btnGhost, marginRight:8}} download={previewItem.nomeOriginale}>Scarica</a>
+                <a href={`/api/materiale?fileId=${previewItem.id}&download=1`} style={{...btnGhost, marginRight:8}} download={previewItem.nomeOriginale}>Scarica</a>
                 <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewItem(null)}>Chiudi</button>
               </div>
             </div>
@@ -1495,7 +1495,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                     <div style={{fontSize:64,fontWeight:700,color: coloreTema,marginBottom:12}}>{previewItem.tipo ? previewItem.tipo.toUpperCase() : 'FILE'}</div>
                     <div style={{marginBottom:8,fontWeight:700}}>{previewItem.nomeOriginale || previewItem.titolo}</div>
                     <div style={{color:'#6b7b9a',marginBottom:12}}>{previewItem.materia}</div>
-                    <a href={`/api/materiale?fileId=${previewItem.id}`} download={previewItem.nomeOriginale} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>Scarica file</a>
+                    <a href={`/api/materiale?fileId=${previewItem.id}&download=1`} download={previewItem.nomeOriginale} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>Scarica file</a>
                   </div>
                 );
               })()}
@@ -1514,7 +1514,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               </div>
               <div>
                 {previewBatch[previewIndex] && (
-                  <a href={`/api/materiale?fileId=${previewBatch[previewIndex].id}`} style={{...btnGhost, marginRight:8}} download={previewBatch[previewIndex].nomeOriginale}>Scarica</a>
+                  <a href={`/api/materiale?fileId=${previewBatch[previewIndex].id}&download=1`} style={{...btnGhost, marginRight:8}} download={previewBatch[previewIndex].nomeOriginale}>Scarica</a>
                 )}
                 <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewBatch(null)}>Chiudi</button>
               </div>
@@ -1553,7 +1553,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                       <div style={{fontSize:64,fontWeight:700,color: coloreTema,marginBottom:12}}>{cur.tipo ? cur.tipo.toUpperCase() : 'FILE'}</div>
                       <div style={{marginBottom:8,fontWeight:700}}>{cur.nomeOriginale || cur.titolo}</div>
                       <div style={{color:'#6b7b9a',marginBottom:12}}>{cur.materia}</div>
-                      <a href={`/api/materiale?fileId=${cur.id}`} download={cur.nomeOriginale} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>Scarica file</a>
+                      <a href={`/api/materiale?fileId=${cur.id}&download=1`} download={cur.nomeOriginale} style={{...btnPrimary, background: coloreTema, boxShadow: `0 2px 6px ${coloreTema}55`}}>Scarica file</a>
                     </div>
                   );
                 })()}
