@@ -455,7 +455,13 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
             initialData={{
               clienteId: pacchetto.clienteId,
               pacchettoId: pacchetto.id,
-              defaultDescrizione: pacchetto.cliente?.nome || pacchetto.cliente?.nomeReferente?.split(' ')[0] || '',
+              defaultDescrizione: (() => {
+                const nome = pacchetto.cliente?.nome?.trim();
+                const cognome = pacchetto.cliente?.cognome?.trim();
+                if (nome && cognome) return `${nome} ${cognome[0]}.`;
+                if (nome) return nome;
+                return pacchetto.cliente?.nomeReferente?.split(' ')[0] || '';
+              })(),
             }}
             onClose={() => setShowCreate(false)}
             onSuccess={() => {
