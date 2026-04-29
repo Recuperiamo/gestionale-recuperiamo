@@ -89,6 +89,16 @@ export const authOptions: AuthOptions = {
         token.clienteId = user.clienteId ?? null;
         token.lavagnaV2Abilitata = user.lavagnaV2Abilitata ?? false;
         token.cursorLabel = user.cursorLabel ?? null;
+      } else if (token.cursorLabel == null && token.email) {
+        // Backfill for sessions created before cursorLabel feature
+        const cliente = await prisma.client.findFirst({
+          where: { email: token.email as string },
+          select: { nome: true, nomeReferente: true },
+        });
+        if (cliente) {
+          token.cursorLabel = cliente.nome?.trim() ||
+            (cliente.nomeReferente?.trim().split(' ')[0] ?? null);
+        }
       }
       return token;
     },
