@@ -149,6 +149,7 @@ export async function PATCH(req) {
 
   const data: any = {}
   if (typeof body.canStudentDraw === 'boolean') data.canStudentDraw = body.canStudentDraw
+  if (body.sfondo) data.sfondo = body.sfondo
 
   const lavagna = await prisma.lavagna.update({ where: { id }, data })
   return NextResponse.json({ lavagna })

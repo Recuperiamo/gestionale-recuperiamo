@@ -22,11 +22,23 @@ import { useTextTool } from './hooks/useTextTool'
 import { useSelectionTool } from './hooks/useSelectionTool'
 import { generateId, prepareStroke } from './engine/strokeUtils'
 
+const SFONDO_MAP: Record<string, string> = {
+  bianco: 'white', white: 'white',
+  nero: 'black', black: 'black',
+  griglia: 'grid', grid: 'grid',
+  righe: 'lines', lines: 'lines',
+  puntini: 'dots', dots: 'dots',
+}
+function mapSfondo(sfondo?: string | null): string {
+  return (sfondo && SFONDO_MAP[sfondo]) || 'white'
+}
+
 interface Props {
   lavagnaId: string
   attivitaId?: string
   trattiIniziali?: any[]
   formeIniziali?: any[]
+  sfondoIniziale?: string
   utenteId: string | number
   clienteId?: string | number
   ruolo: string
@@ -36,7 +48,7 @@ interface Props {
 }
 
 export default function LavagnaCanvas({
-  lavagnaId, attivitaId, trattiIniziali, formeIniziali,
+  lavagnaId, attivitaId, trattiIniziali, formeIniziali, sfondoIniziale,
   utenteId, ruolo, altezza = 600, canStudentDraw: canStudentDrawInitial = false,
   cursorLabel,
 }: Props) {
@@ -60,6 +72,8 @@ export default function LavagnaCanvas({
   const deletedShapeDbIds = useRef<Set<number>>(new Set())
   // Strokes undone before saveStroke completed — need post-save DB delete
   const cancelledStrokeLocalIds = useRef<Set<string>>(new Set())
+  // Prevents the initial sfondo load from triggering a DB save + broadcast
+  const skipBgBroadcastRef = useRef(true)
 
   // ── Store ────────────────────────────────────────────────────────────────────
   // Selettori granulari: il componente re-renderizza solo se cambia il valore specifico,
@@ -103,7 +117,10 @@ export default function LavagnaCanvas({
 
   // ── Load initial data ────────────────────────────────────────────────────────
   useEffect(() => {
+    skipBgBroadcastRef.current = true
     store.loadInitial(trattiIniziali || [], formeIniziali || [])
+    store.setBackground(mapSfondo(sfondoIniziale))
+    setTimeout(() => { skipBgBroadcastRef.current = false }, 200)
   }, [lavagnaId])
 
   // ── Keep engine data in sync with store ──────────────────────────────────────
@@ -225,7 +242,7 @@ export default function LavagnaCanvas({
   }, [])
 
   // ── Ably sync ────────────────────────────────────────────────────────────────
-  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate } = useAblySync({
+  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground } = useAblySync({
     channelName, engineRef, userId: utenteId, role: ruolo, cursorLabel,
     lavagnaId, attivitaId, isAdmin,
     onPermissionsUpdate: handlePermissionsUpdate,
@@ -637,11 +654,16 @@ export default function LavagnaCanvas({
     }
   }, [lavagnaId, attivitaId])
 
-  // ── Background change broadcast (admin only) ─────────────────────────────────
+  // ── Background change: persist to DB + broadcast to students (admin only) ────
   useEffect(() => {
-    if (!isAdmin) return
-    // background is now in store; Ably broadcast would go here if needed
-  }, [store.background, isAdmin])
+    if (!isAdmin || skipBgBroadcastRef.current) return
+    fetch('/api/lavagna-v2', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: Number(lavagnaId), sfondo: background }),
+    }).catch(() => {})
+    emitBackground(background)
+  }, [background, isAdmin])
 
   // ── Render ───────────────────────────────────────────────────────────────────
   const canvasStyle: React.CSSProperties = {

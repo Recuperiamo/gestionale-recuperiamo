@@ -105,7 +105,7 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         publish('cursor:move', { x: event.x, y: event.y, role, label: cursorLabel, lavagnaId })
         break
     }
-  }, [publish, lavagnaId, attivitaId, role])
+  }, [publish, lavagnaId, attivitaId, role, cursorLabel])
 
   const emitPermissionsUpdate = useCallback((data: { canStudentDraw: boolean }) => {
     publish('permissions:update', { ...data, lavagnaId })
@@ -294,6 +294,12 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
           if (isAdmin) onDrawRequest?.()
         }
 
+        const onBackgroundUpdate = (msg: any) => {
+          const d = msg.data || {}
+          if (d.senderId === userId) return
+          if (d.background) store.setBackground(d.background)
+        }
+
         ch.subscribe('stroke:start', onStrokeStart)
         ch.subscribe('stroke:points', onStrokePoints)
         ch.subscribe('stroke:done', onStrokeDone)
@@ -307,6 +313,7 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         ch.subscribe('shape:update', onShapeUpdate)
         ch.subscribe('permissions:update', onPermissionsUpdateMsg)
         ch.subscribe('draw:request', onDrawRequestMsg)
+        ch.subscribe('background:update', onBackgroundUpdate)
 
         // Flush pending messages
         for (const m of pendingMessages.current) {
@@ -342,5 +349,9 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
     })
   }, [publish, lavagnaId])
 
-  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, publish }
+  const emitBackground = useCallback((background: string) => {
+    publish('background:update', { background, lavagnaId })
+  }, [publish, lavagnaId])
+
+  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground, publish }
 }

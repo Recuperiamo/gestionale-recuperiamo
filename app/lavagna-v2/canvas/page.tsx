@@ -181,6 +181,7 @@ export default function LavagnaV2Page() {
           attivitaId={attivitaId}
           trattiIniziali={lavagna.tratti || []}
           formeIniziali={lavagna.forme || []}
+          sfondoIniziale={lavagna.sfondo || 'white'}
           utenteId={session.user?.id}
           clienteId={session.user?.clienteId}
           ruolo={session.user?.role || "cliente"}
