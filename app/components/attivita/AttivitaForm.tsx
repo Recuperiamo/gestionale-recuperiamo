@@ -32,6 +32,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
       ? new Date(initialData.createdAt)
       : null;
 
+  const defaultDescrizione = initialData?.defaultDescrizione || "";
   const [descrizione, setDescrizione] = useState(initialData?.descrizione || "");
   const [dataSingola, setDataSingola] = useState(
     initialOrarioDate ? toLocalDateStr(initialOrarioDate) : ""
@@ -129,9 +130,9 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
     }
   }, [clienteId, isEdit]);
 
-  // Auto-select if exactly one pacchetto is available
+  // Auto-select most recent package (first in list, ordered by id desc)
   useEffect(() => {
-    if (!isEdit && Array.isArray(pacchetti) && pacchetti.length === 1) {
+    if (!isEdit && Array.isArray(pacchetti) && pacchetti.length > 0 && !pacchettoId) {
       setPacchettoId(String(pacchetti[0].id));
     }
   }, [pacchetti, isEdit]);
@@ -213,7 +214,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
     // Validazione base
     if ((tipoLezione === "singola" || isEdit) && (!isRicorrente || modificaBatch !== null)) {
-      if (!descrizione || !dataSingola || !oraInizioSingola || !durataOreSingola || (!isEdit && (!pacchettoId || !clienteId))) {
+      if (!dataSingola || !oraInizioSingola || !durataOreSingola || (!isEdit && (!pacchettoId || !clienteId))) {
         setErrorForm("Compila tutti i campi obbligatori.");
         return;
       }
@@ -222,7 +223,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         return;
       }
     } else if (!isEdit && tipoLezione === "ricorrente") {
-      if (!descrizione || !pacchettoId || !clienteId || !orarioInizio || !durata || !dataInizioRic || !dataFineRic || selectedDays.length === 0) {
+      if (!pacchettoId || !clienteId || !orarioInizio || !durata || !dataInizioRic || !dataFineRic || selectedDays.length === 0) {
         setErrorForm("Compila tutti i campi per la ricorrenza.");
         return;
       }
@@ -258,7 +259,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         // Modifica singola
         const orarioISO = new Date(`${dataSingola}T${oraInizioSingola}:00`);
         const payload = {
-          descrizione,
+          descrizione: descrizione.trim() || defaultDescrizione || "",
           durataOre: Number(durataOreSingola),
           orario: orarioISO.toISOString(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -334,7 +335,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           method:"POST",
           headers:{ "Content-Type":"application/json" },
           body: JSON.stringify({
-            descrizione,
+            descrizione: descrizione.trim() || defaultDescrizione || "",
             clienteId: Number(clienteId),
             pacchettoId: Number(pacchettoId),
             // send client's timezone so server can interpret wall-clock times correctly
@@ -523,11 +524,12 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         )}
 
         <div style={{ marginBottom:16 }}>
-          <label style={{ fontWeight:500 }}>Descrizione *</label><br/>
+          <label style={{ fontWeight:500 }}>Descrizione</label><br/>
           <input
             type="text"
             value={descrizione}
             onChange={e => setDescrizione(e.target.value)}
+            placeholder={defaultDescrizione || "Descrizione lezione"}
             style={inputStyle}
             autoFocus
           />

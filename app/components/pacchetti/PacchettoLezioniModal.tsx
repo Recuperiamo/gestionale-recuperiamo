@@ -455,6 +455,7 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
             initialData={{
               clienteId: pacchetto.clienteId,
               pacchettoId: pacchetto.id,
+              defaultDescrizione: pacchetto.cliente?.nome || pacchetto.cliente?.nomeReferente?.split(' ')[0] || '',
             }}
             onClose={() => setShowCreate(false)}
             onSuccess={() => {

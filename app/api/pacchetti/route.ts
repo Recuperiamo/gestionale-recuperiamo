@@ -44,7 +44,7 @@ export async function GET(request) {
       where: clienteId ? { clienteId: Number(clienteId) } : undefined,
       orderBy: { id: "desc" },
       include: {
-        cliente: { select: { id: true, nomeReferente: true } },
+        cliente: { select: { id: true, nomeReferente: true, nome: true } },
         attivita: true,
       },
     });
