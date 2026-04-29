@@ -137,7 +137,7 @@ export default function LavagnaCanvas({
 
   // ── Keep engine remote cursors in sync ───────────────────────────────────────
   const remoteCursorsList = useMemo(
-    () => Object.values(store.remoteCursors).map(c => ({ userId: String(c.userId), role: c.role, x: c.x, y: c.y })),
+    () => Object.values(store.remoteCursors).map(c => ({ userId: String(c.userId), role: c.role, label: c.label, x: c.x, y: c.y })),
     [store.remoteCursors]
   )
   useEffect(() => {

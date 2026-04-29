@@ -26,6 +26,7 @@ export interface LiveStroke {
 export interface RemoteCursorRender {
   userId: string
   role: string
+  label?: string
   x: number; y: number
 }
 
@@ -641,7 +642,7 @@ export class CanvasEngine {
       ctx.font = `${11 / this.zoom}px Inter, sans-serif`
       ctx.fillStyle = fill
       ctx.textBaseline = 'bottom'
-      ctx.fillText(isAdmin ? 'Prof' : 'Stud', cur.x + 7 / this.zoom, cur.y - 2 / this.zoom)
+      ctx.fillText(isAdmin ? 'Prof' : (cur.label || 'Stud'), cur.x + 7 / this.zoom, cur.y - 2 / this.zoom)
       ctx.restore()
     }
 
