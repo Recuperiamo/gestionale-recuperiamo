@@ -128,6 +128,8 @@ export async function POST(req) {
     const nuovoCliente = await prisma.client.create({
       data: {
         nomeReferente: body.nomeReferente.trim(),
+        nome: tipo === 'STUDENTE' ? (body.nome?.trim() || null) : null,
+        cognome: tipo === 'STUDENTE' ? (body.cognome?.trim() || null) : null,
         email: emailForValidation,
         telefono: body.telefono?.trim() || null,
         indirizzo: body.indirizzo?.trim() || null,
@@ -336,6 +338,8 @@ export async function PUT(req) {
       where: { id: Number(id) },
       data: {
         nomeReferente: body.nomeReferente.trim(),
+        nome: tipo === 'STUDENTE' ? (body.nome?.trim() || null) : null,
+        cognome: tipo === 'STUDENTE' ? (body.cognome?.trim() || null) : null,
         email: emailForValidation,
         telefono: body.telefono?.trim() || null,
         indirizzo: body.indirizzo?.trim() || null,

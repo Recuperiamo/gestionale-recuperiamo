@@ -22,6 +22,7 @@ interface Options {
   engineRef: React.RefObject<CanvasEngine>
   userId: string | number
   role: string
+  cursorLabel?: string
   lavagnaId: string
   attivitaId?: string
   isAdmin: boolean
@@ -39,7 +40,7 @@ type RemoteStream = {
   points: any[]
 }
 
-export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, attivitaId, isAdmin, onPermissionsUpdate, onDrawRequest }: Options) {
+export function useAblySync({ channelName, engineRef, userId, role, cursorLabel, lavagnaId, attivitaId, isAdmin, onPermissionsUpdate, onDrawRequest }: Options) {
   const store = useWhiteboardStore()
   const channelRef = useRef<any>(null)
   const remoteStreams = useRef<Map<string, RemoteStream>>(new Map())
@@ -101,7 +102,7 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
         })
         break
       case 'cursor':
-        publish('cursor:move', { x: event.x, y: event.y, role, lavagnaId })
+        publish('cursor:move', { x: event.x, y: event.y, role, label: cursorLabel, lavagnaId })
         break
     }
   }, [publish, lavagnaId, attivitaId, role])
@@ -209,7 +210,7 @@ export function useAblySync({ channelName, engineRef, userId, role, lavagnaId, a
           const d = msg.data || {}
           if (d.senderId === userId) return
           const uid = String(d.senderId)
-          store.setRemoteCursor({ userId: d.senderId, role: d.role || 'unknown', x: d.x, y: d.y, ts: Date.now() })
+          store.setRemoteCursor({ userId: d.senderId, role: d.role || 'unknown', label: d.label, x: d.x, y: d.y, ts: Date.now() })
           cursorTs.current[uid] = Date.now()
         }
 

@@ -32,11 +32,13 @@ interface Props {
   ruolo: string
   altezza?: number
   canStudentDraw?: boolean
+  cursorLabel?: string
 }
 
 export default function LavagnaCanvas({
   lavagnaId, attivitaId, trattiIniziali, formeIniziali,
   utenteId, ruolo, altezza = 600, canStudentDraw: canStudentDrawInitial = false,
+  cursorLabel,
 }: Props) {
   const isAdmin = ruolo === 'admin' || ruolo === 'operatore'
 
@@ -214,7 +216,7 @@ export default function LavagnaCanvas({
 
   // ── Ably sync ────────────────────────────────────────────────────────────────
   const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate } = useAblySync({
-    channelName, engineRef, userId: utenteId, role: ruolo,
+    channelName, engineRef, userId: utenteId, role: ruolo, cursorLabel,
     lavagnaId, attivitaId, isAdmin,
     onPermissionsUpdate: handlePermissionsUpdate,
     onDrawRequest: handleDrawRequest,
@@ -1021,7 +1023,7 @@ function OffscreenCursors({ engineRef }: { engineRef: React.RefObject<CanvasEngi
         const inView = sc.x >= -10 && sc.x <= w + 10 && sc.y >= -10 && sc.y <= h + 10
         const isAdminCursor = cur.role === 'admin' || cur.role === 'operatore'
         const bg = isAdminCursor ? '#ef4444' : '#16a34a'
-        const label = isAdminCursor ? 'Prof' : 'Stud'
+        const label = isAdminCursor ? 'Prof' : (cur.label || 'Stud')
 
         if (inView) {
           // Cursore visibile in viewport: mostra un piccolo badge sul posto

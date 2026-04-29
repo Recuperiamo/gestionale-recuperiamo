@@ -71,6 +71,8 @@ model VerificationToken {
 model Client {
   id                Int                 @id @default(autoincrement())
   nomeReferente     String
+  nome              String?
+  cognome           String?
   email             String
   telefono          String?
   indirizzo         String?

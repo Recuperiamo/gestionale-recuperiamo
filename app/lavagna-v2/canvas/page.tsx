@@ -186,6 +186,7 @@ export default function LavagnaV2Page() {
           ruolo={session.user?.role || "cliente"}
           altezza={canvasHFinal}
           canStudentDraw={lavagna.canStudentDraw ?? false}
+          cursorLabel={session.user?.cursorLabel || undefined}
         />
       </div>
     </div>

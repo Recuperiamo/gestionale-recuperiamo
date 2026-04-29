@@ -117,6 +117,12 @@ export default function ClientiForm({ onAdd, form, setForm, editId, setEditId, l
       </div>
       {form.tipo === 'STUDENTE' && (
         <div>
+          <label className="block font-bold">Cognome</label>
+          <input name="cognome" value={form.cognome || ''} onChange={handleChange} className="border px-2 py-1 rounded w-full" disabled={loading} placeholder="Cognome (usato nel cursore lavagna)" />
+        </div>
+      )}
+      {form.tipo === 'STUDENTE' && (
+        <div>
           <label className="block font-bold">Referente (opzionale)</label>
           <select
             name="referenteId"

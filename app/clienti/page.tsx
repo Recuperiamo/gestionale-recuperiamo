@@ -129,7 +129,7 @@ const actionBtn = (color) => ({
 // ─── pagina ───────────────────────────────────────────────────────────────────
 
 const EMPTY_FORM = {
-  nome: '', email: '', telefono: '', indirizzo: '',
+  nome: '', cognome: '', email: '', telefono: '', indirizzo: '',
   cf: '', piva: '', note: '', tipo: 'REFERENTE',
   referenteId: '', materie: [], coloreTema: '', linkVideolezione: ''
 };
@@ -158,8 +158,14 @@ export default function ClientiPage() {
 
   const mapFormToApi = (formData) => {
     const tipo = (formData.tipo || 'REFERENTE').toUpperCase();
+    // Per studenti: nomeReferente = nome + cognome (nome completo per display)
+    const nomeReferente = tipo === 'STUDENTE' && formData.cognome?.trim()
+      ? `${formData.nome?.trim()} ${formData.cognome?.trim()}`.trim()
+      : formData.nome?.trim() || '';
     return {
-      nomeReferente: formData.nome,
+      nomeReferente,
+      nome: tipo === 'STUDENTE' ? (formData.nome?.trim() || null) : null,
+      cognome: tipo === 'STUDENTE' ? (formData.cognome?.trim() || null) : null,
       email: formData.email,
       telefono: formData.telefono,
       indirizzo: formData.indirizzo,
@@ -192,8 +198,10 @@ export default function ClientiPage() {
   };
 
   const handleEdit = (cliente) => {
+    const tipoCliente = (cliente.tipo || 'REFERENTE').toUpperCase();
     setForm({
-      nome: cliente.nomeReferente || cliente.nome || '',
+      nome: tipoCliente === 'STUDENTE' ? (cliente.nome || cliente.nomeReferente?.split(' ')[0] || '') : (cliente.nomeReferente || cliente.nome || ''),
+      cognome: tipoCliente === 'STUDENTE' ? (cliente.cognome || '') : '',
       email: cliente.email || '',
       telefono: cliente.telefono || '',
       indirizzo: cliente.indirizzo || '',

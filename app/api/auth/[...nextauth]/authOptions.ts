@@ -48,8 +48,12 @@ export const authOptions: AuthOptions = {
           // 5. Recupera clienteId e flag lavagna v2 (associazione per email)
           const cliente = await prisma.client.findFirst({
             where: { email: normEmail },
-            select: { id: true, lavagnaV2Abilitata: true }
+            select: { id: true, lavagnaV2Abilitata: true, nome: true, nomeReferente: true }
           });
+
+          // cursorLabel: nome se presente, altrimenti prima parola di nomeReferente
+          const cursorLabel = cliente?.nome?.trim() ||
+            (cliente?.nomeReferente?.trim().split(' ')[0] ?? null)
 
           // Login riuscito: azzera il contatore
           resetRateLimit(normEmail);
@@ -62,6 +66,7 @@ export const authOptions: AuthOptions = {
             role: user.role.name,
             clienteId: cliente?.id ?? null,
             lavagnaV2Abilitata: cliente?.lavagnaV2Abilitata ?? false,
+            cursorLabel,
           };
         } catch (err) {
           console.error("AUTHORIZE ERROR", err);
@@ -83,6 +88,7 @@ export const authOptions: AuthOptions = {
         token.name = user.name;
         token.clienteId = user.clienteId ?? null;
         token.lavagnaV2Abilitata = user.lavagnaV2Abilitata ?? false;
+        token.cursorLabel = user.cursorLabel ?? null;
       }
       return token;
     },
@@ -95,6 +101,7 @@ export const authOptions: AuthOptions = {
         session.user.name = token.name;
         session.user.clienteId = token.clienteId ?? null;
         session.user.lavagnaV2Abilitata = token.lavagnaV2Abilitata ?? false;
+        session.user.cursorLabel = token.cursorLabel ?? null;
       }
       return session;
     },

@@ -20,6 +20,7 @@ export type Background = 'white' | 'black' | 'grid' | 'lines' | 'dots'
 export interface RemoteCursor {
   userId: string | number
   role: string
+  label?: string
   x: number
   y: number
   ts: number
