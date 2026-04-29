@@ -290,6 +290,9 @@ export class CanvasEngine {
 
   // Internal
   private baseDirty = true
+  private baseDirtyMode: 'full' | 'additive' = 'full'
+  private pendingNewStrokes: Stroke[] = []
+  private contentCanvasReady = false
   private lastBaseDrawTs = 0
   private liveRafId: number | null = null
   private listeners: EngineListener[] = []
@@ -378,15 +381,38 @@ export class CanvasEngine {
     this.emit('viewport')
   }
 
-  markBaseDirty() { this.baseDirty = true }
+  markBaseDirty() {
+    this.baseDirty = true
+    this.baseDirtyMode = 'full'
+    this.pendingNewStrokes = []
+    this.contentCanvasReady = false
+  }
 
   setData(strokes: Stroke[], shapes: Shape[], bg: Background) {
+    const prevStrokes = this.strokes
+    const prevShapes = this.shapes
+    const prevBg = this.background
     this.strokes = strokes
     this.shapes = shapes
     this.background = bg
     this.strokeMap = new Map(strokes.map(s => [s.id, s]))
     this.shapeMap = new Map(shapes.map(s => [s.id, s]))
-    this.markBaseDirty()
+
+    const isAdditive = this.contentCanvasReady &&
+      bg === prevBg &&
+      shapes === prevShapes &&
+      strokes.length > prevStrokes.length &&
+      prevStrokes.every((s, i) => strokes[i] === s)
+
+    if (isAdditive) {
+      this.pendingNewStrokes.push(...strokes.slice(prevStrokes.length))
+      this.baseDirtyMode = 'additive'
+    } else {
+      this.pendingNewStrokes = []
+      this.baseDirtyMode = 'full'
+      this.contentCanvasReady = false
+    }
+    this.baseDirty = true
   }
 
   setSelection(strokeIds: string[], shapeIds: string[]) {
@@ -456,19 +482,28 @@ export class CanvasEngine {
     ctx.clearRect(0, 0, cssW, cssH)
     drawBackground(ctx, this.background, this.pan, this.zoom, cssW, cssH)
 
-    // 2. Draw all strokes and shapes on offscreen contentCanvas
+    // 2. Draw strokes/shapes on offscreen contentCanvas
     const cc = this.contentCtx
-    cc.setTransform(dpr, 0, 0, dpr, 0, 0)
-    cc.clearRect(0, 0, cssW, cssH)
 
-    applyTransform(cc, this.pan, this.zoom, dpr)
-
-    // Shapes (immagini, rettangoli, ecc.) prima — i tratti ci vanno sempre sopra
-    for (const s of this.shapes) {
-      drawShape(cc, s, this.imageCache, () => this.markBaseDirty())
-    }
-    for (const s of this.strokes) {
-      drawSingleStroke(cc, s, this.background)
+    if (this.baseDirtyMode === 'additive' && this.pendingNewStrokes.length > 0) {
+      // Incremental: contentCtx still has valid transform from last full draw —
+      // just draw new strokes on top without clearing.
+      for (const s of this.pendingNewStrokes) {
+        drawSingleStroke(cc, s, this.background)
+      }
+      this.pendingNewStrokes = []
+    } else {
+      // Full redraw
+      cc.setTransform(dpr, 0, 0, dpr, 0, 0)
+      cc.clearRect(0, 0, cssW, cssH)
+      applyTransform(cc, this.pan, this.zoom, dpr)
+      for (const s of this.shapes) {
+        drawShape(cc, s, this.imageCache, () => this.markBaseDirty())
+      }
+      for (const s of this.strokes) {
+        drawSingleStroke(cc, s, this.background)
+      }
+      this.contentCanvasReady = true
     }
 
     // 3. Composite contentCanvas onto baseCtx

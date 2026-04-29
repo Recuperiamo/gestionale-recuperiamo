@@ -58,6 +58,8 @@ export default function LavagnaCanvas({
 
   // Tracked locally to prevent polling from resurrecting recently-deleted shapes
   const deletedShapeDbIds = useRef<Set<number>>(new Set())
+  // Strokes undone before saveStroke completed — need post-save DB delete
+  const cancelledStrokeLocalIds = useRef<Set<string>>(new Set())
 
   // ── Store ────────────────────────────────────────────────────────────────────
   // Selettori granulari: il componente re-renderizza solo se cambia il valore specifico,
@@ -147,8 +149,16 @@ export default function LavagnaCanvas({
     const entry = store.undo()
     if (!entry) return
     if (entry.type === 'add-stroke' && entry.stroke) {
+      // Read current store state: saveStroke may have completed and set dbId after push
+      const current = useWhiteboardStore.getState().strokes.find(s => s.id === entry.stroke.id)
+      const dbId = current?.dbId ?? entry.stroke.dbId
       store.deleteStroke(entry.stroke.id)
-      if (entry.stroke.dbId) deleteStroke(entry.stroke.dbId)
+      if (dbId) {
+        deleteStroke(dbId)
+      } else {
+        // saveStroke still in flight — mark for deletion once it completes
+        cancelledStrokeLocalIds.current.add(entry.stroke.id)
+      }
     }
     if (entry.type === 'delete-stroke' && entry.stroke) {
       store.addStroke(entry.stroke)
@@ -273,9 +283,13 @@ export default function LavagnaCanvas({
   const onStrokeCommit = useCallback(async (event: any) => {
     emitStrokeEvent(event)
     if (event.type === 'commit' && event.stroke) {
-      // Add authorId before saving
       const stroke = { ...event.stroke, authorId: utenteId }
-      await saveStroke(stroke)
+      const dbId = await saveStroke(stroke)
+      // If undo was called before save completed, delete from DB immediately
+      if (dbId && cancelledStrokeLocalIds.current.has(stroke.id)) {
+        cancelledStrokeLocalIds.current.delete(stroke.id)
+        deleteStroke(dbId)
+      }
     }
     if (event.type === 'delete-stroke' && event.stroke?.dbId) {
       await deleteStroke(event.stroke.dbId)
@@ -558,6 +572,7 @@ export default function LavagnaCanvas({
         // Tratti mancanti
         for (const t of tratti) {
           if (syncedDbIds.has(t.id)) continue
+          if (t.streamId && cancelledStrokeLocalIds.current.has(t.streamId)) { syncedDbIds.add(t.id); continue }
           if (t.streamId && knownStreamIds.has(t.streamId)) { syncedDbIds.add(t.id); continue }
           const punti = Array.isArray(t.punti) ? t.punti : []
           if (punti.length === 0) continue
