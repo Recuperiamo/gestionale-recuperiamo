@@ -164,7 +164,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
     // Caso: converti singola in ricorrente
     if (isEdit && !isRicorrente && convertToRicorrente) {
-      if (!descrizione || !orarioInizio || !durata || !dataInizioRic || !dataFineRic || selectedDays.length === 0) {
+      if (!orarioInizio || !durata || !dataInizioRic || !dataFineRic || selectedDays.length === 0) {
         setErrorForm("Compila tutti i campi della ricorrenza.");
         return;
       }

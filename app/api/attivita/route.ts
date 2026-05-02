@@ -166,10 +166,10 @@ export async function POST(request) {
     null
 
   // Pacchetti / parametri obbligatori
-  if (!pacchettoId || !clienteId || !descrizione) {
+  if (!pacchettoId || !clienteId) {
     return NextResponse.json({
       error: 'Parametri obbligatori mancanti',
-      fields: { pacchettoId, clienteId, descrizione }
+      fields: { pacchettoId, clienteId }
     }, { status: 400 })
   }
 
