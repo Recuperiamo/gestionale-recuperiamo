@@ -801,7 +801,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
               )}
                 <button
                   type="button"
-                  onClick={() => window.open(`/lavagna-v2/canvas?attivitaId=${initialData.id}`, '_blank')}
+                  onClick={() => window.open(`/lavagna/canvas?attivitaId=${initialData.id}`, '_blank')}
                   style={{
                     flex: "1 1 calc(33.333% - 7px)",
                     minWidth: 100,

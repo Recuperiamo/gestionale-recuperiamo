@@ -26,7 +26,7 @@ export default function Navbar() {
     { href: "/attivita", label: "Attività" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
     { href: "/calendario", label: "Calendario" },
-    { href: "/lavagna-v2", label: "Lavagna" },
+    { href: "/lavagna", label: "Lavagna" },
     { href: "/aule", label: "Aule" },
     { href: "/lezioni", label: "Lezioni" },
     { href: "/richieste", label: "Richieste" }
@@ -40,7 +40,7 @@ export default function Navbar() {
   const navLinksCliente = [
     { href: "/profilo", label: "Profilo" },
     { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
-    { href: "/lavagna-v2", label: "Lavagna" },
+    { href: "/lavagna", label: "Lavagna" },
     { href: "/aula", label: "Aula" },
     { href: "/lezioni", label: "Lezioni" },
     { href: "/richieste", label: "Richieste" }
@@ -51,7 +51,7 @@ export default function Navbar() {
   const isActive = (href) => {
     if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
     if (href === "/aula") return pathname === "/aula" || pathname?.startsWith("/aula/");
-    if (href === "/lavagna-v2") return pathname === "/lavagna-v2" || pathname?.startsWith("/lavagna-v2/");
+    if (href === "/lavagna") return pathname === "/lavagna" || pathname?.startsWith("/lavagna/");
     return pathname === href;
   };
 

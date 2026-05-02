@@ -1,200 +1,472 @@
 // @ts-nocheck
 "use client";
-import React, { useEffect, useState } from "react";
-import { useSession } from "../lib/auth/hooks";
+import React, { useEffect, useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
-import LavagnaCanvas from "../components/lavagna/LavagnaCanvas";
-import LavagneList from "../components/lavagna/LavagneList";
+import AuthGuard from "../components/AuthGuard";
 
-export default function PaginaLavagna() {
+function formatDataOra(d) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
+export default function LavagnaListPage() {
   const { data: session, status } = useSession();
-  const [lavagna, setLavagna] = useState(null);
+  const [lavagne, setLavagne] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [attivitaId, setAttivitaId] = useState("");
+  const [creating, setCreating] = useState(false);
   const [clienti, setClienti] = useState([]);
-  const [clienteId, setClienteId] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [hoveredId, setHoveredId] = useState(null);
+  const [clienteFiltro, setClienteFiltro] = useState("");
+  const [mostraTutte, setMostraTutte] = useState(false);
+  const [cercaQuery, setCercaQuery] = useState("");
+
+  // Form crea
+  const [selectedClienteId, setSelectedClienteId] = useState("");
+  const [attivitaList, setAttivitaList] = useState([]);
+  const [attivitaLoading, setAttivitaLoading] = useState(false);
+  const [selectedAttivitaId, setSelectedAttivitaId] = useState(""); // "" | "ad-hoc" | "123"
+  const [newTitle, setNewTitle] = useState("");
 
   const isAdmin = /^(admin|operatore)$/i.test(session?.user?.role || "");
 
-  // Carica clienti solo per admin
+  // ── Carica studenti (solo admin) ──────────────────────────────────────────
   useEffect(() => {
-    if (status === "authenticated" && isAdmin) {
-      fetch("/api/clienti?tipo=STUDENTE")
-        .then(r => r.json())
-        .then(data => {
-          // DEBUG: logga la risposta dei clienti per capire cosa arriva
-
-          if (Array.isArray(data.clienti)) {
-            setClienti(data.clienti);
-          } else if (Array.isArray(data)) {
-            setClienti(data);
-          } else {
-            setClienti([]);
-          }
-        })
-        .catch(e => {
-          console.error("ERRORE fetch clienti:", e);
-          setClienti([]);
-        });
-    }
+    if (status !== "authenticated" || !isAdmin) return;
+    fetch("/api/clienti?tipo=STUDENTE")
+      .then(r => r.json())
+      .then(d => setClienti(Array.isArray(d) ? d : Array.isArray(d.clienti) ? d.clienti : []))
+      .catch(() => setClienti([]));
   }, [status, isAdmin]);
 
-  // Imposta clienteId automatico per clienti normali
+  // ── Carica attività quando cambia lo studente ─────────────────────────────
   useEffect(() => {
-    if (status === "authenticated" && !isAdmin) {
-      setClienteId(session?.user?.clienteId || "");
+    if (!selectedClienteId) { setAttivitaList([]); setSelectedAttivitaId(""); return; }
+    setAttivitaLoading(true);
+    setSelectedAttivitaId("");
+    setNewTitle("");
+    fetch(`/api/attivita/list?clienteId=${selectedClienteId}`)
+      .then(r => r.json())
+      .then(d => setAttivitaList(Array.isArray(d.attivita) ? d.attivita : []))
+      .catch(() => setAttivitaList([]))
+      .finally(() => setAttivitaLoading(false));
+  }, [selectedClienteId]);
+
+  // ── Pre-compila titolo quando si seleziona un'attività ────────────────────
+  useEffect(() => {
+    if (!selectedAttivitaId || selectedAttivitaId === "ad-hoc") {
+      setNewTitle("");
+      return;
     }
-  }, [status, isAdmin, session]);
+    const att = attivitaList.find(a => String(a.id) === selectedAttivitaId);
+    if (att?.orario) {
+      const nomeStudente = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
+      const base = formatDataOra(new Date(att.orario));
+      setNewTitle(nomeStudente ? `${base} – ${nomeStudente}` : base);
+    }
+  }, [selectedAttivitaId, attivitaList, clienti, selectedClienteId]);
 
-  async function carica(id) {
-    if (!id) return;
-
+  // ── Carica lista lavagne ───────────────────────────────────────────────────
+  const fetchLavagne = (filtroId = "", tutte = false) => {
     setLoading(true);
-    try {
-      const r = await fetch(`/api/lavagna?attivitaId=${id}`, { cache: "no-store" });
-      const js = await r.json();
-
-      if (r.ok) {
-
-        setLavagna(js.lavagna);
-      } else {
-        console.error('[LAVAGNA] Errore API:', js.error);
-      }
-    } catch (e) {
-      console.error('[LAVAGNA] Eccezione durante caricamento:', e);
-    } finally {
-      setLoading(false);
-    }
-  }
+    const params = new URLSearchParams();
+    if (filtroId) params.set("clienteId", filtroId);
+    if (!tutte) params.set("days", "1");
+    const qs = params.toString() ? `?${params}` : "";
+    fetch(`/api/lavagna-v2/list${qs}`)
+      .then(r => r.ok ? r.json() : { lavagne: [] })
+      .then(d => setLavagne(Array.isArray(d.lavagne) ? d.lavagne : []))
+      .catch(() => setLavagne([]))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    const qp = new URLSearchParams(window.location.search);
-    const id = qp.get("attivitaId");
-    if (id) {
-      setAttivitaId(id);
-      carica(id);
-    }
+    fetchLavagne();
   }, [status]);
 
-  function handleLavagnaSelect(lavagna) {
+  // ── Crea lavagna ───────────────────────────────────────────────────────────
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!selectedClienteId) { alert("Seleziona uno studente."); return; }
+    if (!selectedAttivitaId) { alert("Seleziona un'attività o scegli 'Crea ad-hoc'."); return; }
 
+    const nomeStudente = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
+    const titoloAuto = `${formatDataOra(new Date())}${nomeStudente ? ` – ${nomeStudente}` : ""}`;
 
-    // Apri in nuova finestra
-    window.open(`/lavagna/full?attivitaId=${lavagna.attivitaId}`, "_blank");
+    const titoloFinale = newTitle.trim() || titoloAuto;
+
+    setCreating(true);
+    try {
+      const res = await fetch("/api/lavagna-v2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titolo: titoloFinale,
+          clienteId: Number(selectedClienteId),
+        }),
+      });
+      const js = await res.json();
+      if (res.ok) {
+        setLavagne(prev => [js.lavagna, ...prev]);
+        closeCreate();
+        window.open(`/lavagna/canvas?lavagnaId=${js.lavagna.id}`, "_blank");
+      } else {
+        alert(js.error || "Errore nella creazione");
+      }
+    } catch {
+      alert("Errore di rete");
+    } finally {
+      setCreating(false);
+    }
   }
+
+  function closeCreate() {
+    setShowCreate(false);
+    setSelectedClienteId("");
+    setSelectedAttivitaId("");
+    setNewTitle("");
+    setAttivitaList([]);
+  }
+
+  // ── Elimina lavagna ────────────────────────────────────────────────────────
+  async function handleDelete(id) {
+    if (!window.confirm("Eliminare questa lavagna? L'azione è irreversibile.")) return;
+    try {
+      const res = await fetch(`/api/lavagna-v2?id=${id}`, { method: "DELETE" });
+      if (res.ok) setLavagne(prev => prev.filter(l => l.id !== id));
+      else alert("Errore nell'eliminazione");
+    } catch {
+      alert("Errore di rete");
+    }
+  }
+
+  // ── Filtra per ricerca ─────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return lavagne;
+    return lavagne.filter(l =>
+      (l.titolo || "").toLowerCase().includes(q) ||
+      (l.cliente?.nomeReferente || l.cliente?.email || "").toLowerCase().includes(q)
+    );
+  }, [lavagne, search]);
+
+  // ── Filtra lavagne precedenti per query ───────────────────────────────────
+  const filteredCerca = useMemo(() => {
+    const q = cercaQuery.trim().toLowerCase();
+    if (!q) return lavagne;
+    return lavagne.filter(l =>
+      (l.titolo || "").toLowerCase().includes(q) ||
+      (l.cliente?.nomeReferente || l.cliente?.email || "").toLowerCase().includes(q)
+    );
+  }, [lavagne, cercaQuery]);
 
   if (status === "loading") {
     return (
       <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
         <Navbar />
-        <div style={{ padding: 50 }}>Caricamento…</div>
+        <div style={{ padding: 50, color: "#6b7280" }}>Caricamento…</div>
       </div>
     );
   }
-  if (!session) return null;
 
-  // DEBUG: Mostra tutto l'oggetto session.user per capire dove trovare il clienteId corretto
-
-
-
-  const titoloBase = lavagna?.titolo || "";
-  let titoloAdmin = lavagna?.titoloVisuale || titoloBase;
-  if (
-    isAdmin &&
-    lavagna?.nomeStudente &&
-    !titoloAdmin.includes(" – ") &&
-    lavagna.titolo !== ` – ${lavagna.nomeStudente}`
-  ) {
-    titoloAdmin = `${titoloBase} – ${lavagna.nomeStudente}`;
-  }
-  const displayTitle = isAdmin ? titoloAdmin : titoloBase;
+  const nomeStudenteSelezionato = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
-      <Navbar />
-      <main style={mainStyle}>
-        <h1 style={titolo}>Lavagna Interattiva</h1>
-        {isAdmin && (
-          <div style={{ marginBottom: 20 }}>
-            <label>
-              <span style={{ fontWeight: 600, marginRight: 10 }}>Studente: </span>
-              <select
-                value={clienteId}
-                onChange={e => {
-                  setClienteId(e.target.value);
-                  setAttivitaId(""); // reset selezione lavagna
-                  setLavagna(null);
-                }}
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #ccc",
-                  fontSize: 15,
-                  minWidth: 190,
-                }}
+    <AuthGuard>
+      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
+        <Navbar />
+        <main style={{ maxWidth: 900, margin: "40px auto 60px", background: "#fff", borderRadius: 24, padding: "36px 40px 48px", boxShadow: "0 6px 34px rgba(32,72,154,0.13)", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#20489a" }}>
+                Lavagna
+              </h1>
+              <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+                {mostraTutte ? "Tutte le lavagne" : "Oggi"} · {filtered.length} lavagn{filtered.length === 1 ? "a" : "e"}
+              </div>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={() => showCreate ? closeCreate() : setShowCreate(true)}
+                style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 2px 8px rgba(28,176,246,0.3)" }}
               >
-                <option value="">Seleziona studente…</option>
+                {showCreate ? "Annulla" : "+ Nuova lavagna"}
+              </button>
+            )}
+          </div>
+
+          {/* ── Form crea ─────────────────────────────────────────────────── */}
+          {showCreate && (
+            <form onSubmit={handleCreate} style={{ background: "#f0f7ff", border: "1px solid #bfdbfe", borderRadius: 14, padding: "20px 22px", marginBottom: 28 }}>
+
+              {/* 1. Seleziona studente */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  1. Studente *
+                </label>
+                <select
+                  value={selectedClienteId}
+                  onChange={e => setSelectedClienteId(e.target.value)}
+                  required
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none", background: "#fff" }}
+                >
+                  <option value="">Seleziona studente…</option>
+                  {clienti.map(c => (
+                    <option key={c.id} value={c.id}>{c.nomeReferente || c.email}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Seleziona attività */}
+              {selectedClienteId && (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    2. Associa a lezione
+                  </label>
+                  {attivitaLoading ? (
+                    <div style={{ fontSize: 13, color: "#6b7280" }}>Caricamento lezioni…</div>
+                  ) : (
+                    <select
+                      value={selectedAttivitaId}
+                      onChange={e => setSelectedAttivitaId(e.target.value)}
+                      required
+                      style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none", background: "#fff" }}
+                    >
+                      <option value="">Seleziona lezione…</option>
+                      {attivitaList.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.orario ? formatDataOra(new Date(a.orario)) : "—"}{a.descrizione ? ` · ${a.descrizione}` : ""}
+                        </option>
+                      ))}
+                      <option value="ad-hoc">── Crea lavagna ad-hoc (senza lezione)</option>
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Titolo personalizzato */}
+              {selectedAttivitaId && (
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    3. Titolo (opzionale)
+                  </label>
+                  <input
+                    type="text"
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    placeholder={
+                      selectedAttivitaId === "ad-hoc"
+                        ? `${formatDataOra(new Date())}${nomeStudenteSelezionato ? ` – ${nomeStudenteSelezionato}` : ""}`
+                        : newTitle || `${formatDataOra(new Date())}${nomeStudenteSelezionato ? ` – ${nomeStudenteSelezionato}` : ""}`
+                    }
+                    style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 8, border: "1px solid #93c5fd", fontSize: 14, outline: "none" }}
+                  />
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                    Se vuoto verrà usato: <em>{newTitle || (selectedAttivitaId !== "ad-hoc" ? (attivitaList.find(a => String(a.id) === selectedAttivitaId)?.orario ? `${formatDataOra(new Date(attivitaList.find(a => String(a.id) === selectedAttivitaId).orario))} – ${nomeStudenteSelezionato}` : "") : `${formatDataOra(new Date())}${nomeStudenteSelezionato ? ` – ${nomeStudenteSelezionato}` : ""}`)}</em>
+                  </div>
+                </div>
+              )}
+
+              {selectedAttivitaId && (
+                <button
+                  type="submit"
+                  disabled={creating}
+                  style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 22px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                >
+                  {creating ? "Creazione…" : "Crea e apri"}
+                </button>
+              )}
+            </form>
+          )}
+
+          {/* Filtro + Ricerca */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+            {isAdmin && clienti.length > 0 && (
+              <select
+                value={clienteFiltro}
+                onChange={e => { setClienteFiltro(e.target.value); fetchLavagne(e.target.value, mostraTutte); }}
+                style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none" }}
+              >
+                <option value="">Tutti gli studenti</option>
                 {clienti.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.nomeReferente || c.email} (ID: {c.id})
-                    {c.referente ? ` – Ref. ${c.referente.nomeReferente || c.referente.email || c.referente.id}` : ""}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.nomeReferente || c.email}</option>
                 ))}
               </select>
-            </label>
+            )}
+            {lavagne.length > 4 && (
+              <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+                <input
+                  type="text"
+                  placeholder="Cerca…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "7px 12px 7px 32px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, outline: "none", background: "#f8fbff" }}
+                />
+                <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
+                  <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+            )}
           </div>
-        )}
-        <LavagneList clienteId={clienteId} onSelect={handleLavagnaSelect} sessionUser={session.user} />
 
-        {loading && (
-          <div style={{ fontSize: 14, marginTop: 10 }}>Caricamento lavagna…</div>
-        )}
+          {/* Lista (solo in modalità 7 giorni) */}
+          {!mostraTutte && loading ? (
+            <div style={{ color: "#9ab0d4", fontSize: 14, padding: "20px 0" }}>Caricamento lavagne…</div>
+          ) : !mostraTutte && filtered.length === 0 ? (
+            <div style={{ background: "#f0f5ff", border: "1px solid #d4dff6", color: "#20489a", padding: "16px 20px", borderRadius: 12, fontSize: 14, fontWeight: 500 }}>
+              {lavagne.length === 0
+                ? (isAdmin ? "Nessuna lavagna. Creane una nuova." : "Nessuna lavagna disponibile.")
+                : `Nessun risultato per "${search}".`}
+            </div>
+          ) : !mostraTutte ? (
+            <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+              {filtered.map(l => {
+                const nomeStudente = l.cliente?.nomeReferente || l.cliente?.email || null;
+                return (
+                  <li
+                    key={l.id}
+                    onMouseEnter={() => setHoveredId(l.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{
+                      background: hoveredId === l.id ? "#eef4ff" : "#f8fbff",
+                      border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5",
+                      borderRadius: 12, padding: "12px 16px",
+                      display: "flex", alignItems: "center", gap: 12,
+                      transition: "background 0.15s, border-color 0.15s",
+                      boxShadow: hoveredId === l.id ? "0 2px 8px rgba(20,53,120,0.09)" : "none",
+                    }}
+                  >
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <path d="M8 21h8M12 17v4"/>
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {l.titolo || "Lavagna"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {nomeStudente && isAdmin && (
+                          <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>
+                            {nomeStudente}
+                          </span>
+                        )}
+                        <span>Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => window.open(`/lavagna/canvas?lavagnaId=${l.id}`, "_blank")}
+                        style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                      >
+                        Apri
+                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(l.id)}
+                          style={{ background: "transparent", color: "#ef4444", border: "1px solid #fecaca", borderRadius: 8, padding: "6px 10px", fontWeight: 600, fontSize: 12, cursor: "pointer", opacity: hoveredId === l.id ? 1 : 0, transition: "opacity 0.15s" }}
+                        >
+                          Elimina
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
 
-        {lavagna && (
-          <div style={{ marginTop: 10 }}>
-            <div style={headerLine}>Lavagna lezione {displayTitle}</div>
-            <LavagnaCanvas
-              lavagnaId={lavagna.id}
-              attivitaId={lavagna.attivitaId}
-              clienteId={lavagna.clienteId}
-              trattiIniziali={lavagna.tratti}
-              formeIniziali={lavagna.forme}
-              sfondoIniziale={lavagna.sfondo || "bianco"}
-              utenteId={session.user.id}
-              ruolo={session.user.role}
-              altezza={600}
-              openInNewWindow={true}
-            />
-          </div>
-        )}
-      </main>
-    </div>
+          {/* ── Sezione lavagne precedenti ────────────────────────────────── */}
+          {!mostraTutte ? (
+            <div style={{ marginTop: 28, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
+              <button
+                onClick={() => {
+                  setMostraTutte(true);
+                  fetchLavagne(clienteFiltro, true);
+                }}
+                style={{ background: "none", border: "1px solid #b0c8f5", color: "#2563eb", borderRadius: 8, padding: "8px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/>
+                </svg>
+                Cerca lavagne precedenti
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginTop: 28, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+                  <input
+                    type="text"
+                    placeholder="Cerca per titolo o studente…"
+                    value={cercaQuery}
+                    onChange={e => setCercaQuery(e.target.value)}
+                    autoFocus
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px 8px 34px", borderRadius: 8, border: "1px solid #b0c8f5", fontSize: 13, outline: "none", background: "#f8fbff" }}
+                  />
+                  <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="#9ab0d4" strokeWidth="2"/>
+                    <path d="M16.5 16.5L21 21" stroke="#9ab0d4" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <button
+                  onClick={() => { setMostraTutte(false); setCercaQuery(""); fetchLavagne(clienteFiltro, false); }}
+                  style={{ background: "none", border: "1px solid #e2e8f0", color: "#6b7280", borderRadius: 8, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                >
+                  Torna alle lavagne di oggi
+                </button>
+              </div>
+              {loading ? (
+                <div style={{ color: "#9ab0d4", fontSize: 14 }}>Caricamento…</div>
+              ) : filteredCerca.length === 0 ? (
+                <div style={{ color: "#6b7280", fontSize: 13 }}>
+                  {cercaQuery ? `Nessun risultato per "${cercaQuery}".` : "Nessuna lavagna trovata."}
+                </div>
+              ) : (
+                <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {filteredCerca.map(l => {
+                    const nomeStudente = l.cliente?.nomeReferente || l.cliente?.email || null;
+                    return (
+                      <li key={l.id} onMouseEnter={() => setHoveredId(l.id)} onMouseLeave={() => setHoveredId(null)}
+                        style={{ background: hoveredId === l.id ? "#eef4ff" : "#f8fbff", border: hoveredId === l.id ? "1px solid #b0c8f5" : "1px solid #dbe6f5", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, transition: "background 0.15s, border-color 0.15s" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "#1e3a5f", fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.titolo || "Lavagna"}</div>
+                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {nomeStudente && isAdmin && <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>{nomeStudente}</span>}
+                            <span>Creata {new Date(l.createdAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => window.open(`/lavagna/canvas?lavagnaId=${l.id}`, "_blank")}
+                          style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer", flexShrink: 0 }}
+                        >
+                          Apri
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+    </AuthGuard>
   );
 }
-
-const mainStyle = {
-  maxWidth: 1200,
-  margin: "40px auto 60px",
-  background: "#fff",
-  borderRadius: 26,
-  padding: "38px 46px 54px",
-  boxShadow: "0 6px 34px rgba(32,72,154,0.15)",
-  fontFamily: "'Inter','Segoe UI',Arial,sans-serif",
-  color: "#20489a",
-};
-const titolo = { margin: "0 0 18px", fontSize: 34, fontWeight: 800 };
-const headerLine = {
-  fontSize: 14,
-  fontWeight: 600,
-  marginBottom: 12,
-};
-const infoBox = {
-  background: "#e3eefe",
-  border: "1px solid #4268b3",
-  color: "#20489a",
-  padding: "12px 16px",
-  borderRadius: 12,
-  fontSize: 13,
-  fontWeight: 600,
-};
