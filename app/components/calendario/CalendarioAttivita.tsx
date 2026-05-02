@@ -501,7 +501,7 @@ export default function CalendarioAttivita({
           // Scorciatoia ALT+click => apri lavagna
           if (info.jsEvent && info.jsEvent.altKey) {
             // Open the full lavagna page directly in full view
-            window.open(`https://recuperiamo.vercel.app/lavagna/full?attivitaId=${attIdNum}` , "_blank");
+            window.open(`/lavagna/canvas?attivitaId=${attIdNum}`, "_blank");
             return;
           }
 
@@ -537,7 +537,7 @@ export default function CalendarioAttivita({
           // Priorità: onEventClick, admin editing, admin requests handled above.
           if (!onEventClick && !(enableAdminRequests && isAdmin) && !(isAdmin)) {
             // Client or basic user: open lavagna full view for this activity
-            window.location.href = `/lavagna/full?attivitaId=${attIdNum}`;
+            window.location.href = `/lavagna/canvas?attivitaId=${attIdNum}`;
             return;
           }
           // Cliente → modale richiesta (legacy behavior)
