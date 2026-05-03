@@ -77,14 +77,15 @@ export function mapAttivita(attivitaArray = []) {
   const next = sorted.find(ev => ev.isoDate >= todayISO);
   const prossimaId = next?.raw?.id ?? null;
 
-  // Nomi che appaiono su clienti diversi → serve iniziale cognome
+  // Primi nomi che appaiono su clienti diversi → serve iniziale cognome
   const nomeToClienteIds = new Map<string, Set<number>>();
   for (const ev of enriched) {
-    const nome = ev.raw.pacchetto?.cliente?.nomeReferente?.trim();
+    const nomeCompleto = ev.raw.pacchetto?.cliente?.nomeReferente?.trim();
     const cid = ev.raw.pacchetto?.cliente?.id ?? ev.raw.clienteId;
-    if (nome && cid != null) {
-      if (!nomeToClienteIds.has(nome)) nomeToClienteIds.set(nome, new Set());
-      nomeToClienteIds.get(nome).add(cid);
+    if (nomeCompleto && cid != null) {
+      const primoNome = nomeCompleto.split(/\s+/)[0];
+      if (!nomeToClienteIds.has(primoNome)) nomeToClienteIds.set(primoNome, new Set());
+      nomeToClienteIds.get(primoNome).add(cid);
     }
   }
 
@@ -122,14 +123,15 @@ export function mapAttivita(attivitaArray = []) {
       ev.raw.descrizione?.trim() ||
       ev.raw.nome?.trim() ||
       (() => {
-        const nome = ev.raw.pacchetto?.cliente?.nomeReferente?.trim();
-        if (!nome) return null;
-        if ((nomeToClienteIds.get(nome)?.size ?? 0) > 1) {
-          const parole = nome.split(/\s+/);
+        const nomeCompleto = ev.raw.pacchetto?.cliente?.nomeReferente?.trim();
+        if (!nomeCompleto) return null;
+        const parole = nomeCompleto.split(/\s+/);
+        const primoNome = parole[0];
+        if ((nomeToClienteIds.get(primoNome)?.size ?? 0) > 1) {
           const inizialeCognome = parole.length > 1 ? ` ${parole[parole.length - 1][0]}.` : "";
-          return parole[0] + inizialeCognome;
+          return primoNome + inizialeCognome;
         }
-        return nome;
+        return primoNome;
       })() ||
       "Lezione";
 
