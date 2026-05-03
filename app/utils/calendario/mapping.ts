@@ -110,6 +110,7 @@ export function mapAttivita(attivitaArray = []) {
       ev.raw.titolo?.trim() ||
       ev.raw.descrizione?.trim() ||
       ev.raw.nome?.trim() ||
+      ev.raw.pacchetto?.cliente?.nomeReferente?.trim() ||
       "Lezione";
 
     return {
