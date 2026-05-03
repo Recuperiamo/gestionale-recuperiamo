@@ -110,7 +110,7 @@ export function mapAttivita(attivitaArray = []) {
       ev.raw.titolo?.trim() ||
       ev.raw.descrizione?.trim() ||
       ev.raw.nome?.trim() ||
-      `Attività #${ev.raw.id}`;
+      "Lezione";
 
     return {
       id: String(ev.raw.id),
