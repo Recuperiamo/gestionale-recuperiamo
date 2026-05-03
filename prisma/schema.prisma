@@ -105,7 +105,7 @@ model PacchettoOre {
   clienteId           Int
   descrizione         String
   oreAcquistate       Int
-  oreResidue          Int
+  oreResidue          Float
   dataAttivazione     DateTime
   dataScadenza        DateTime?
   stato               String
@@ -154,7 +154,7 @@ model Attivita {
   id                Int                   @id @default(autoincrement())
   createdAt         DateTime              @default(now())
   descrizione       String?
-  oreConsumate      Int
+  oreConsumate      Float
   extraPacchetto    Boolean               @default(false)
   pacchettoId       Int?
   clienteId         Int
