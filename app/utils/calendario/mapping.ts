@@ -77,6 +77,17 @@ export function mapAttivita(attivitaArray = []) {
   const next = sorted.find(ev => ev.isoDate >= todayISO);
   const prossimaId = next?.raw?.id ?? null;
 
+  // Nomi che appaiono su clienti diversi → serve iniziale cognome
+  const nomeToClienteIds = new Map<string, Set<number>>();
+  for (const ev of enriched) {
+    const nome = ev.raw.pacchetto?.cliente?.nomeReferente?.trim();
+    const cid = ev.raw.pacchetto?.cliente?.id ?? ev.raw.clienteId;
+    if (nome && cid != null) {
+      if (!nomeToClienteIds.has(nome)) nomeToClienteIds.set(nome, new Set());
+      nomeToClienteIds.get(nome).add(cid);
+    }
+  }
+
   const events = enriched.map(ev => {
     const rawDur =
       ev.raw.durataOre ??
@@ -110,7 +121,16 @@ export function mapAttivita(attivitaArray = []) {
       ev.raw.titolo?.trim() ||
       ev.raw.descrizione?.trim() ||
       ev.raw.nome?.trim() ||
-      ev.raw.pacchetto?.cliente?.nomeReferente?.trim() ||
+      (() => {
+        const nome = ev.raw.pacchetto?.cliente?.nomeReferente?.trim();
+        if (!nome) return null;
+        if ((nomeToClienteIds.get(nome)?.size ?? 0) > 1) {
+          const parole = nome.split(/\s+/);
+          const inizialeCognome = parole.length > 1 ? ` ${parole[parole.length - 1][0]}.` : "";
+          return parole[0] + inizialeCognome;
+        }
+        return nome;
+      })() ||
       "Lezione";
 
     return {
