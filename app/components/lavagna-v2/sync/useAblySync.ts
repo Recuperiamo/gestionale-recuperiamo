@@ -185,8 +185,13 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
           const stream = remoteStreams.current.get(d.streamId)
           remoteStreams.current.delete(d.streamId)
           engineRef.current?.endLiveStroke()
-          // Use accumulated stream if available; otherwise use fallback data sent with stroke:done
-          const src = (stream && stream.points.length >= 1) ? stream : (d.fallback ? { id: d.streamId, ...d.fallback } : null)
+          // Prefer fallback (canonical simplified points sent with stroke:done) over accumulated stream.
+          // For Shift straight-line strokes no stroke:points are emitted during drag, so the
+          // accumulated stream only has the single start point from stroke:start — using it would
+          // produce a degenerate stroke.  The fallback is always the authoritative final path.
+          const src = d.fallback
+            ? { id: d.streamId, ...d.fallback }
+            : (stream && stream.points.length >= 1 ? stream : null)
           if (!src || !src.points?.length) return
           const stroke = prepareStroke({
             id: src.id ?? d.streamId,
