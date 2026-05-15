@@ -474,6 +474,9 @@ export default function LavagnaCanvas({
 
         store.addShape(shape)
         store.pushUndo({ type: 'add-shape', shape })
+        // Attiva selezione sull'immagine incollata per ridimensionare/ruotare subito
+        store.setTool('select')
+        store.setSelection([], [shape.id])
         // Sync via Ably (l'immagine è già piccola, stare dentro i 64KB Ably)
         emitStrokeEvent({ type: 'commit-shape', shape })
 
@@ -534,6 +537,9 @@ export default function LavagnaCanvas({
         }
         store.addShape(shape)
         store.pushUndo({ type: 'add-shape', shape })
+        // Attiva selezione sull'immagine incollata per ridimensionare/ruotare subito
+        store.setTool('select')
+        store.setSelection([], [shape.id])
         emitStrokeEvent({ type: 'commit-shape', shape })
         try {
           const res = await fetch('/api/lavagna-v2/shape', {

@@ -455,6 +455,7 @@ export class CanvasEngine {
   private startLiveLoop() {
     const loop = () => {
       this.liveRafId = requestAnimationFrame(loop)
+      const wasDirty = this.baseDirty
       if (this.baseDirty) {
         const now = performance.now()
         // Throttle drawBase a max 60fps; evita ridisegni multipli nello stesso frame
@@ -463,8 +464,10 @@ export class CanvasEngine {
           this.lastBaseDrawTs = now
         }
       }
-      // Salta drawLive se nulla è in movimento: risparmia CPU in idle
-      if (this.liveStroke || this.liveShape || this.remoteCursors.length > 0 || this.baseDirty) {
+      // Salta drawLive se nulla è in movimento: risparmia CPU in idle.
+      // wasDirty garantisce che drawLive venga chiamato nel frame in cui drawBase ha ridisegnato,
+      // così il live canvas viene pulito (es. rettangolo selezione lazo rimasto visibile).
+      if (this.liveStroke || this.liveShape || this.remoteCursors.length > 0 || wasDirty) {
         this.drawLive()
       }
     }
