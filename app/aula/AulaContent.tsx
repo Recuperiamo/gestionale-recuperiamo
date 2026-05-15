@@ -54,6 +54,7 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
   };
 
   const handleMouseDown = (e) => {
+    if (e.button !== 0) return; // ignora tasto destro e centrale
     if (!isPannable()) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
@@ -249,7 +250,6 @@ function ImagePreviewWithZoom({ src, alt, coloreTema }) {
             transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
             transition: isDragging ? 'none' : 'transform 0.2s ease-out',
             userSelect: 'none',
-            pointerEvents: 'none'
           }}
           draggable={false}
         />
