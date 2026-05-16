@@ -1476,6 +1476,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:12,borderBottom:`2px solid ${coloreTema}`,flexShrink:0}}>
               <div style={{fontWeight:700,color: coloreTema}}>{previewItem.titolo || previewItem.nomeOriginale}</div>
               <div>
+                <a href={`/api/materiale?fileId=${previewItem.id}`} target="_blank" rel="noopener noreferrer" style={{...btnGhost, marginRight:8}}>↗ Apri</a>
                 <a href={`/api/materiale?fileId=${previewItem.id}&download=1`} style={{...btnGhost, marginRight:8}} download={previewItem.nomeOriginale}>Scarica</a>
                 <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewItem(null)}>Chiudi</button>
               </div>
@@ -1513,9 +1514,10 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                 <div style={{fontSize:13,color:'#5a6d90'}}>{previewIndex + 1} / {previewBatch.length}</div>
               </div>
               <div>
-                {previewBatch[previewIndex] && (
+                {previewBatch[previewIndex] && (<>
+                  <a href={`/api/materiale?fileId=${previewBatch[previewIndex].id}`} target="_blank" rel="noopener noreferrer" style={{...btnGhost, marginRight:8}}>↗ Apri</a>
                   <a href={`/api/materiale?fileId=${previewBatch[previewIndex].id}&download=1`} style={{...btnGhost, marginRight:8}} download={previewBatch[previewIndex].nomeOriginale}>Scarica</a>
-                )}
+                </>)}
                 <button type="button" style={{...btnOutline, borderColor: coloreTema, color: coloreTema}} onClick={() => setPreviewBatch(null)}>Chiudi</button>
               </div>
             </div>
