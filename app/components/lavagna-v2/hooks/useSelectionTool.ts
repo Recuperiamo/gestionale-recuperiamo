@@ -25,6 +25,9 @@ export function useSelectionTool(engineRef: React.RefObject<CanvasEngine>, onMov
   // Move state
   const moveStart = useRef<{ worldX: number; worldY: number } | null>(null)
 
+  // Pan state (tasto destro / centrale)
+  const panning = useRef({ active: false, lastX: 0, lastY: 0 })
+
   // ── Draw selection rectangle on live canvas ──────────────────────────────────
   const drawSelectionRect = useCallback(() => {
     const eng = engineRef.current
@@ -96,6 +99,14 @@ export function useSelectionTool(engineRef: React.RefObject<CanvasEngine>, onMov
   const onPointerDown = useCallback((e) => {
     const eng = engineRef.current
     if (!eng) return
+    const native = e.nativeEvent || e
+
+    // Tasto destro o centrale → pan (come negli altri strumenti)
+    if (native.button === 2 || native.button === 1) {
+      panning.current = { active: true, lastX: native.clientX, lastY: native.clientY }
+      return
+    }
+
     const rect = (e.target as HTMLElement).getBoundingClientRect?.() || { left: 0, top: 0 }
     const sx = (e.clientX ?? e.nativeEvent?.clientX) - rect.left
     const sy = (e.clientY ?? e.nativeEvent?.clientY) - rect.top
@@ -134,6 +145,17 @@ export function useSelectionTool(engineRef: React.RefObject<CanvasEngine>, onMov
   const onPointerMove = useCallback((e) => {
     const eng = engineRef.current
     if (!eng) return
+    const native = e.nativeEvent || e
+
+    if (panning.current.active) {
+      const dx = native.clientX - panning.current.lastX
+      const dy = native.clientY - panning.current.lastY
+      panning.current.lastX = native.clientX
+      panning.current.lastY = native.clientY
+      eng.setPan(eng.pan.x - dx / eng.zoom, eng.pan.y - dy / eng.zoom)
+      return
+    }
+
     const rect = (e.target as HTMLElement).getBoundingClientRect?.() || { left: 0, top: 0 }
     const sx = (e.clientX ?? e.nativeEvent?.clientX) - rect.left
     const sy = (e.clientY ?? e.nativeEvent?.clientY) - rect.top
@@ -175,6 +197,10 @@ export function useSelectionTool(engineRef: React.RefObject<CanvasEngine>, onMov
   }, [engineRef, store, drawSelectionRect])
 
   const onPointerUp = useCallback((e) => {
+    if (panning.current.active) {
+      panning.current.active = false
+      return
+    }
     if (state.current === 'drawing-rect') {
       rectSelect()
       selectRect.current = null
