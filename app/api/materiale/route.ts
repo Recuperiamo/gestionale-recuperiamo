@@ -160,7 +160,13 @@ export async function POST(req) {
   let titolo = formData.get("titolo");
   if (!titolo || !titolo.trim()) {
     const now = new Date();
-    titolo = now.toISOString().slice(0,19).replace(/[-:T]/g,"_");
+    const p = new Intl.DateTimeFormat('it-IT', {
+      timeZone: 'Europe/Rome',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    }).formatToParts(now).reduce((acc: Record<string,string>, x) => { acc[x.type] = x.value; return acc }, {});
+    titolo = `${p.year}_${p.month}_${p.day}_${p.hour}_${p.minute}_${p.second}`;
   }
   
   const materia = formData.get("materia") || "";
