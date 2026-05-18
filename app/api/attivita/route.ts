@@ -9,6 +9,14 @@ import { authOptions } from '../auth/[...nextauth]/authOptions'
 
 export const runtime = 'nodejs';
 
+function formatDataOra(d) {
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Europe/Rome',
+  }).format(new Date(d)).replace(/, /, ' ')
+}
+
 function toPositiveNumber(value) {
   if (value === null || value === undefined) return null
   const n = Number(value)
@@ -493,6 +501,13 @@ export async function PATCH(request) {
               where: { id: attivita.id },
               data: dataPerAttivita
             })
+            // Aggiorna titolo lavagna se l'orario è cambiato
+            if (dataPerAttivita.orario) {
+              await tx.lavagna.updateMany({
+                where: { attivitaId: attivita.id },
+                data: { titolo: formatDataOra(dataPerAttivita.orario) },
+              })
+            }
             updatedAttivita.push(updated)
           }
 
@@ -617,6 +632,13 @@ export async function PATCH(request) {
           where: { id: att.id },
           data: updateData
         })
+        // Aggiorna titolo lavagna se l'orario è cambiato
+        if (updateData.orario) {
+          await tx.lavagna.updateMany({
+            where: { attivitaId: att.id },
+            data: { titolo: formatDataOra(updateData.orario) },
+          })
+        }
 
         return { updated, pacchettoBefore, pacchettoAfter }
       })
