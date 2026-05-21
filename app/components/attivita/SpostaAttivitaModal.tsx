@@ -22,33 +22,32 @@ export default function SpostaAttivitaModal({ attivita, onClose, onSuccess }: Sp
   const [targetId, setTargetId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmForza, setConfirmForza] = useState(false);
 
   const ore = attivita.oreConsumate ?? attivita.durataOre ?? 0;
   const sorgente = attivita.pacchetto?.descrizione ?? `Pacchetto #${attivita.pacchettoId}` ?? "Nessun pacchetto";
 
   useEffect(() => {
     if (!attivita.clienteId) return;
-    fetch(`/api/pacchetti?clienteId=${attivita.clienteId}&stato=attivo`)
+    // Carica tutti i pacchetti (attivi e non) per permettere il force-move
+    fetch(`/api/pacchetti?clienteId=${attivita.clienteId}`)
       .then((r) => r.json())
       .then((data) => {
         const lista = Array.isArray(data) ? data : [];
-        // Esclude il pacchetto corrente
         setPacchetti(lista.filter((p) => p.id !== attivita.pacchettoId));
       })
       .catch(() => setPacchetti([]))
       .finally(() => setLoading(false));
   }, [attivita.clienteId, attivita.pacchettoId]);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!targetId) return;
+  async function doMove(forza: boolean) {
     setError("");
     setSaving(true);
     try {
       const res = await fetch("/api/attivita/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attivitaId: attivita.id, targetPacchettoId: Number(targetId) }),
+        body: JSON.stringify({ attivitaId: attivita.id, targetPacchettoId: Number(targetId), forza }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -63,7 +62,16 @@ export default function SpostaAttivitaModal({ attivita, onClose, onSuccess }: Sp
     }
   }
 
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!targetId) return;
+    await doMove(false);
+  }
+
   const targetPacchetto = pacchetti.find((p) => p.id === Number(targetId));
+  const oreInsufficienti = !attivita.extraPacchetto && targetPacchetto && (targetPacchetto.oreResidue ?? 0) < ore;
+  const nonAttivo = targetPacchetto && targetPacchetto.stato !== "attivo";
+  const puoForzare = !!targetId && (oreInsufficienti || nonAttivo || error.includes("insufficienti") || error.includes("attivo"));
 
   return (
     <div style={{
@@ -105,12 +113,12 @@ export default function SpostaAttivitaModal({ attivita, onClose, onSuccess }: Sp
               background: "#fff3cd", border: "1px solid #ffc107",
               borderRadius: 7, padding: "10px 12px", fontSize: 13, marginBottom: 16, color: "#856404",
             }}>
-              Nessun pacchetto attivo disponibile per questo cliente (escluso quello corrente).
+              Nessun pacchetto disponibile per questo cliente (escluso quello corrente).
             </div>
           ) : (
             <select
               value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
+              onChange={(e) => { setTargetId(e.target.value); setError(""); }}
               required
               style={{
                 width: "100%", padding: "8px 10px", borderRadius: 7,
@@ -121,38 +129,64 @@ export default function SpostaAttivitaModal({ attivita, onClose, onSuccess }: Sp
               <option value="">— Seleziona pacchetto —</option>
               {pacchetti.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.descrizione || `#${p.id}`} — {p.oreResidue ?? "?"} ore residue
+                  {p.descrizione || `#${p.id}`} — {p.oreResidue ?? "?"} ore residue{p.stato !== "attivo" ? ` (${p.stato})` : ""}
                 </option>
               ))}
             </select>
           )}
 
           {/* Avviso ore insufficienti */}
-          {targetPacchetto && !attivita.extraPacchetto && (targetPacchetto.oreResidue ?? 0) < ore && (
+          {oreInsufficienti && (
             <div style={{
               background: "#ffe6e6", border: "1px solid #f99", borderRadius: 7,
-              padding: "8px 12px", fontSize: 13, marginBottom: 12, color: "#a00",
+              padding: "8px 12px", fontSize: 13, marginBottom: 8, color: "#a00",
             }}>
               Ore insufficienti: il pacchetto ha {targetPacchetto.oreResidue} ore residue, la lezione ne richiede {ore}.
+            </div>
+          )}
+
+          {/* Avviso pacchetto non attivo */}
+          {nonAttivo && (
+            <div style={{
+              background: "#ffe6e6", border: "1px solid #f99", borderRadius: 7,
+              padding: "8px 12px", fontSize: 13, marginBottom: 8, color: "#a00",
+            }}>
+              Il pacchetto destinazione non è attivo.
             </div>
           )}
 
           {error && (
             <div style={{
               background: "#fdecea", border: "1px solid #f5c6c6",
-              borderRadius: 7, padding: "8px 12px", fontSize: 13, marginBottom: 12, color: "#c00",
+              borderRadius: 7, padding: "8px 12px", fontSize: 13, marginBottom: 8, color: "#c00",
             }}>
               {error}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18, flexWrap: "wrap" }}>
             <button type="button" onClick={onClose} disabled={saving} style={{
               background: "#e3eefe", color: "#20489a", border: "none",
               borderRadius: 8, padding: "8px 18px", fontWeight: 600, cursor: "pointer",
             }}>
               Annulla
             </button>
+
+            {puoForzare && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setConfirmForza(true)}
+                style={{
+                  background: saving ? "#ccc" : "#f59e0b",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  padding: "8px 18px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
+                }}
+              >
+                Forza spostamento
+              </button>
+            )}
+
             <button
               type="submit"
               disabled={saving || !targetId || pacchetti.length === 0}
@@ -167,6 +201,54 @@ export default function SpostaAttivitaModal({ attivita, onClose, onSuccess }: Sp
           </div>
         </form>
       </div>
+
+      {/* Dialog conferma saldo */}
+      {confirmForza && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 2300, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 14, padding: "28px 26px 22px",
+            maxWidth: 420, width: "90%", boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#b45309", marginBottom: 12 }}>
+              Conferma saldo ore
+            </div>
+            <div style={{ fontSize: 14, color: "#374151", marginBottom: 20, lineHeight: 1.6 }}>
+              Stai forzando lo spostamento verso <b>{targetPacchetto?.descrizione || `Pacchetto #${targetId}`}</b>
+              {oreInsufficienti && <> che ha <b>{targetPacchetto?.oreResidue ?? 0} ore residue</b> (la lezione ne richiede <b>{ore}</b>)</>}.
+              <br /><br />
+              Il pacchetto verrà aggiornato aggiungendo <b>{ore} ore acquistate</b> per registrare il pagamento extra.
+              <br /><br />
+              <b>Confermi che le {ore} ore aggiuntive sono già state saldate dal cliente?</b>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setConfirmForza(false)}
+                disabled={saving}
+                style={{
+                  background: "#e3eefe", color: "#20489a", border: "none",
+                  borderRadius: 8, padding: "8px 18px", fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={async () => { setConfirmForza(false); await doMove(true); }}
+                disabled={saving}
+                style={{
+                  background: saving ? "#ccc" : "#f59e0b",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  padding: "8px 20px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
+                }}
+              >
+                {saving ? "Spostamento…" : "Sì, ho ricevuto il saldo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

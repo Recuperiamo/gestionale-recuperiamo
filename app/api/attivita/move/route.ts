@@ -24,7 +24,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Body non valido" }, { status: 400 });
   }
 
-  const { attivitaId, targetPacchettoId } = body;
+  const { attivitaId, targetPacchettoId, forza = false } = body;
   if (!attivitaId || !targetPacchettoId) {
     return NextResponse.json({ error: "attivitaId e targetPacchettoId obbligatori" }, { status: 400 });
   }
@@ -49,15 +49,15 @@ export async function POST(req) {
   if (target.clienteId !== att.clienteId) {
     return NextResponse.json({ error: "Il pacchetto destinazione appartiene a un cliente diverso" }, { status: 400 });
   }
-  if (target.stato !== "attivo") {
+  if (!forza && target.stato !== "attivo") {
     return NextResponse.json({ error: "Il pacchetto destinazione non è attivo" }, { status: 400 });
   }
 
   const ore = att.oreConsumate ?? att.durataOre ?? 0;
   const isExtra = att.extraPacchetto === true;
 
-  // Verifica ore disponibili nel pacchetto destinazione (solo per lezioni non-extra)
-  if (!isExtra && target.oreResidue < ore) {
+  // Verifica ore disponibili nel pacchetto destinazione (solo per lezioni non-extra, non in modalità forza)
+  if (!forza && !isExtra && target.oreResidue < ore) {
     return NextResponse.json({
       error: `Ore insufficienti nel pacchetto destinazione (disponibili: ${target.oreResidue}, necessarie: ${ore})`,
     }, { status: 400 });
@@ -76,14 +76,23 @@ export async function POST(req) {
         });
       }
 
-      // 2. Scala ore dal pacchetto destinazione (solo per lezioni non-extra)
+      // 2. Aggiorna ore nel pacchetto destinazione (solo per lezioni non-extra)
       let targetBefore = await tx.pacchettoOre.findUnique({ where: { id: Number(targetPacchettoId) } });
       let targetAfter = null;
       if (!isExtra) {
-        targetAfter = await tx.pacchettoOre.update({
-          where: { id: Number(targetPacchettoId) },
-          data: { oreResidue: { decrement: ore } },
-        });
+        if (forza) {
+          // Modalità forza: le ore erano già state saldate ma non registrate.
+          // Aumenta oreAcquistate senza toccare oreResidue (che rimane invariato, tipicamente 0).
+          targetAfter = await tx.pacchettoOre.update({
+            where: { id: Number(targetPacchettoId) },
+            data: { oreAcquistate: { increment: ore } },
+          });
+        } else {
+          targetAfter = await tx.pacchettoOre.update({
+            where: { id: Number(targetPacchettoId) },
+            data: { oreResidue: { decrement: ore } },
+          });
+        }
       }
 
       // 3. Aggiorna attività
@@ -121,7 +130,7 @@ export async function POST(req) {
         oreDopo: result.targetAfter.oreResidue,
         attivitaId: Number(attivitaId),
         utente,
-        motivazione: `Lezione ricevuta da pacchetto #${sourcePacchettoId ?? "nessuno"} (${att.pacchetto?.descrizione ?? "—"})`,
+        motivazione: `Lezione ricevuta da pacchetto #${sourcePacchettoId ?? "nessuno"} (${att.pacchetto?.descrizione ?? "—"})${forza ? " — spostamento forzato, ore aggiuntive saldate" : ""}`,
         pacchettoDescrizione: result.targetBefore.descrizione,
       });
     }
