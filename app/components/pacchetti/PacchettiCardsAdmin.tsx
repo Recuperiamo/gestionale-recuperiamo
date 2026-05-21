@@ -54,6 +54,8 @@ export default function PacchettiCardsAdmin() {
   const [filtroSaldato, setFiltroSaldato] = useState<"tutti" | "saldato" | "non-saldato">("tutti");
   const [filtroEsauriti, setFiltroEsauriti] = useState(false);
   const [filtroInScadenza, setFiltroInScadenza] = useState(false);
+  const [selezioneMode, setSelezioneMode] = useState(false);
+  const [selezionatiIds, setSelezionatiIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -216,6 +218,99 @@ export default function PacchettiCardsAdmin() {
     setFiltroSaldato("tutti");
     setFiltroEsauriti(false);
     setFiltroInScadenza(false);
+  }
+
+  function toggleSelezioneMode() {
+    setSelezioneMode(v => !v);
+    setSelezionatiIds(new Set());
+  }
+
+  function toggleSeleziona(id: number) {
+    setSelezionatiIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function esportaRiepilogo() {
+    const GRACE_MS = 5 * 60 * 1000;
+    const now = Date.now();
+    const selected = pacchetti.filter(p => selezionatiIds.has(p.id));
+    let totAcquistate = 0, totSvolte = 0, totProgrammate = 0, totResidue = 0;
+
+    const righe = selected.map(p => {
+      const atts = attivitaMap[p.id] || [];
+      let oreSvolte = 0, oreProgrammate = 0;
+      atts.forEach(att => {
+        const ore = att.oreConsumate || att.durataOre || 0;
+        const orario = att.orario ? new Date(att.orario) : new Date(att.createdAt);
+        if ((att.stato || '').toLowerCase() === 'cancellata') return;
+        if (orario.getTime() < now - GRACE_MS) oreSvolte += ore;
+        else oreProgrammate += ore;
+      });
+      const oreAcquistate = p.oreAcquistate || 0;
+      const oreResidue = p.oreResidue ?? 0;
+      totAcquistate += oreAcquistate;
+      totSvolte += oreSvolte;
+      totProgrammate += oreProgrammate;
+      totResidue += oreResidue;
+      return { p, oreAcquistate, oreSvolte, oreProgrammate, oreResidue };
+    });
+
+    const data = new Date().toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
+    const fmtH = (h: number) => h % 1 === 0 ? `${h}h` : `${h.toFixed(2)}h`;
+
+    const html = `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8">
+<title>Riepilogo pacchetti — ${data}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 30px auto; color: #1e293b; }
+  h1 { color: #20489a; font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #20489a; color: #fff; padding: 10px 12px; text-align: left; }
+  td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .tfoot td { background: #1e3a6e; color: #fff; font-weight: 700; }
+  .saldato { color: #065f46; font-weight: 700; }
+  .non-saldato { color: #92400e; font-weight: 700; }
+  @media print { button { display: none; } }
+</style></head><body>
+<h1>Riepilogo pacchetti selezionati</h1>
+<div class="sub">Esportato il ${data} · ${righe.length} pacchett${righe.length === 1 ? 'o' : 'i'}</div>
+<table>
+  <thead><tr>
+    <th>Pacchetto</th><th>Cliente</th>
+    <th>Acquistate</th><th>Svolte</th><th>Programmate</th><th>Residue</th><th>Saldo</th>
+  </tr></thead>
+  <tbody>
+    ${righe.map(({ p, oreAcquistate, oreSvolte, oreProgrammate, oreResidue }) => `
+    <tr>
+      <td><b>${p.descrizione || `#${p.id}`}</b></td>
+      <td>${p.cliente?.nomeReferente || `ID ${p.clienteId}`}</td>
+      <td>${fmtH(oreAcquistate)}</td>
+      <td>${fmtH(oreSvolte)}</td>
+      <td>${fmtH(oreProgrammate)}</td>
+      <td>${fmtH(oreResidue)}</td>
+      <td class="${p.saldato ? 'saldato' : 'non-saldato'}">${p.saldato ? '✓ Saldato' : '✗ Da saldare'}</td>
+    </tr>`).join('')}
+  </tbody>
+  <tfoot><tr>
+    <td colspan="2">TOTALE</td>
+    <td>${fmtH(totAcquistate)}</td>
+    <td>${fmtH(totSvolte)}</td>
+    <td>${fmtH(totProgrammate)}</td>
+    <td>${fmtH(totResidue)}</td>
+    <td></td>
+  </tr></tfoot>
+</table>
+<br>
+<button onclick="window.print()" style="background:#20489a;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:10px">🖨️ Stampa / Salva PDF</button>
+<button onclick="window.close()" style="background:#e2e8f0;color:#1e293b;border:none;padding:10px 22px;border-radius:8px;font-size:14px;cursor:pointer">Chiudi</button>
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   }
 
   // Raggruppa pacchetti per stato (con filtri applicati)
@@ -386,6 +481,20 @@ export default function PacchettiCardsAdmin() {
           >
             ⚠️ In scadenza (≤5h)
           </button>
+          <button
+            onClick={toggleSelezioneMode}
+            style={{
+              padding: "5px 12px", borderRadius: 20,
+              border: "1.5px solid",
+              borderColor: selezioneMode ? "#20489a" : "#cbd5e1",
+              background: selezioneMode ? "#20489a" : "#fff",
+              color: selezioneMode ? "#fff" : "#64748b",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            {selezioneMode ? `✓ Selezione attiva (${selezionatiIds.size})` : "☑ Seleziona pacchetti"}
+          </button>
         </div>
       </div>
 
@@ -411,6 +520,9 @@ export default function PacchettiCardsAdmin() {
                 onToggleSaldato={handleToggleSaldato}
                 onLezioni={() => setLezioniPacchetto(p)}
                 onRettifica={() => setRettificaPacchetto(p)}
+                selezioneMode={selezioneMode}
+                isSelezionato={selezionatiIds.has(p.id)}
+                onToggleSeleziona={toggleSeleziona}
               />
             ))}
           </div>
@@ -443,6 +555,9 @@ export default function PacchettiCardsAdmin() {
                 onToggleSaldato={handleToggleSaldato}
                 onLezioni={() => setLezioniPacchetto(p)}
                 onRettifica={() => setRettificaPacchetto(p)}
+                selezioneMode={selezioneMode}
+                isSelezionato={selezionatiIds.has(p.id)}
+                onToggleSeleziona={toggleSeleziona}
               />
             ))}
           </div>
@@ -475,6 +590,9 @@ export default function PacchettiCardsAdmin() {
                 onToggleSaldato={handleToggleSaldato}
                 onLezioni={() => setLezioniPacchetto(p)}
                 onRettifica={() => setRettificaPacchetto(p)}
+                selezioneMode={selezioneMode}
+                isSelezionato={selezionatiIds.has(p.id)}
+                onToggleSeleziona={toggleSeleziona}
               />
             ))}
           </div>
@@ -484,6 +602,17 @@ export default function PacchettiCardsAdmin() {
           </div>
         )}
       </SezioneDropdown>
+
+      {selezioneMode && selezionatiIds.size > 0 && (
+        <BarraSelezione
+          selezionatiIds={selezionatiIds}
+          pacchetti={pacchetti}
+          attivitaMap={attivitaMap}
+          onEsporta={esportaRiepilogo}
+          onDeselezionaTutto={() => setSelezionatiIds(new Set())}
+          onChiudi={toggleSelezioneMode}
+        />
+      )}
 
       <button
         onClick={() => setEditPacchetto({})}
@@ -590,7 +719,7 @@ function SezioneDropdown({ titolo, count, countTotal, isOpen, onToggle, badgeCol
   );
 }
 
-function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato, onLezioni, onRettifica }) {
+function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, onToggleSaldato, onLezioni, onRettifica, selezioneMode = false, isSelezionato = false, onToggleSeleziona }) {
   const GRACE_MS = 5 * 60 * 1000;
   const now = Date.now();
   
@@ -640,13 +769,36 @@ function PacchettoCard({ pacchetto, attivita, onEdit, onDelete, onCambiaStato, o
   else if (isDisponibilitaLimitata) borderColor = '#D97706'; // arancione ocra
 
   return (
-    <div style={{
-      ...cardContainerStyle,
-      borderLeft: `4px solid ${borderColor}`,
-      boxShadow: (isEsaurito || isTuttePrenotate || isDisponibilitaLimitata) 
-        ? '0 4px 20px rgba(239, 68, 68, 0.15)' 
-        : '0 4px 12px rgba(0,0,0,0.08)',
-    }}>
+    <div
+      onClick={selezioneMode ? () => onToggleSeleziona(pacchetto.id) : undefined}
+      style={{
+        ...cardContainerStyle,
+        borderLeft: `4px solid ${isSelezionato ? '#20489a' : borderColor}`,
+        outline: isSelezionato ? '2.5px solid #20489a' : 'none',
+        boxShadow: isSelezionato
+          ? '0 0 0 3px rgba(32,72,154,0.18), 0 4px 20px rgba(32,72,154,0.12)'
+          : (isEsaurito || isTuttePrenotate || isDisponibilitaLimitata)
+            ? '0 4px 20px rgba(239, 68, 68, 0.15)'
+            : '0 4px 12px rgba(0,0,0,0.08)',
+        cursor: selezioneMode ? 'pointer' : 'default',
+        userSelect: selezioneMode ? 'none' : undefined,
+        position: 'relative',
+      }}
+    >
+      {selezioneMode && (
+        <div style={{
+          position: 'absolute', top: 12, right: 14,
+          width: 22, height: 22,
+          borderRadius: 6,
+          border: `2.5px solid ${isSelezionato ? '#20489a' : '#94a3b8'}`,
+          background: isSelezionato ? '#20489a' : '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2,
+          pointerEvents: 'none',
+        }}>
+          {isSelezionato && <span style={{ color: '#fff', fontSize: 13, fontWeight: 800, lineHeight: 1 }}>✓</span>}
+        </div>
+      )}
       <div style={cardHeaderStyle}>
         <div>
           <h3 style={cardTitleStyle}>{pacchetto.descrizione}</h3>
@@ -803,6 +955,83 @@ function StatMini({ label, value, color, highlighted }) {
         marginTop: 2,
       }}>
         {label}
+      </div>
+    </div>
+  );
+}
+
+function BarraSelezione({ selezionatiIds, pacchetti, attivitaMap, onEsporta, onDeselezionaTutto, onChiudi }) {
+  const GRACE_MS = 5 * 60 * 1000;
+  const now = Date.now();
+  const selected = pacchetti.filter(p => selezionatiIds.has(p.id));
+  let totAcquistate = 0, totSvolte = 0, totProgrammate = 0, totResidue = 0;
+  selected.forEach(p => {
+    const atts = attivitaMap[p.id] || [];
+    let oreSvolte = 0, oreProgrammate = 0;
+    atts.forEach(att => {
+      if ((att.stato || '').toLowerCase() === 'cancellata') return;
+      const ore = att.oreConsumate || att.durataOre || 0;
+      const orario = att.orario ? new Date(att.orario) : new Date(att.createdAt);
+      if (orario.getTime() < now - GRACE_MS) oreSvolte += ore;
+      else oreProgrammate += ore;
+    });
+    totAcquistate += p.oreAcquistate || 0;
+    totSvolte += oreSvolte;
+    totProgrammate += oreProgrammate;
+    totResidue += p.oreResidue ?? 0;
+  });
+  const fmtH = (h: number) => h % 1 === 0 ? `${h}h` : `${h.toFixed(1)}h`;
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 999,
+      background: '#20489a',
+      borderRadius: 16,
+      padding: '14px 24px',
+      boxShadow: '0 8px 32px rgba(32,72,154,0.35)',
+      display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+      maxWidth: '90vw',
+      minWidth: 320,
+    }}>
+      <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>
+        {selezionatiIds.size} pacchett{selezionatiIds.size === 1 ? 'o' : 'i'}
+      </span>
+      <div style={{ display: 'flex', gap: 14, color: '#bfd4ff', fontSize: 13, flexWrap: 'wrap' }}>
+        <span title="Ore acquistate totali">📦 {fmtH(totAcquistate)}</span>
+        <span title="Ore svolte totali">✅ {fmtH(totSvolte)}</span>
+        <span title="Ore programmate totali">📅 {fmtH(totProgrammate)}</span>
+        <span title="Ore residue totali">⏳ {fmtH(totResidue)}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+        <button
+          onClick={onDeselezionaTutto}
+          style={{
+            padding: '7px 14px', borderRadius: 8, border: '1.5px solid #7fa8e8',
+            background: 'transparent', color: '#bfd4ff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          Deseleziona tutto
+        </button>
+        <button
+          onClick={onEsporta}
+          style={{
+            padding: '7px 16px', borderRadius: 8, border: 'none',
+            background: '#fff', color: '#20489a', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          📄 Esporta riepilogo
+        </button>
+        <button
+          onClick={onChiudi}
+          style={{
+            padding: '7px 10px', borderRadius: 8, border: '1.5px solid #7fa8e8',
+            background: 'transparent', color: '#bfd4ff', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
       </div>
     </div>
   );
