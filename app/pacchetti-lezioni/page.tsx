@@ -541,7 +541,11 @@ export default function PacchettiLezioniPage() {
       };
       
       // Se categoria specifica, esporta solo quella
-      if (categoria === "prenotate") {
+      if (categoria === "selezionate") {
+        const sel = attivita.filter(a => selectedIds.has(a.id));
+        sel.sort((a, b) => parseStart(a) - parseStart(b));
+        createTable(sel, y, [80, 40, 160], `LEZIONI SELEZIONATE (${sel.length})`);
+      } else if (categoria === "prenotate") {
         createTable(prenotate, y, [32, 72, 154], "LEZIONI PRENOTATE");
       } else if (categoria === "svolte") {
         createTable(svolte, y, [18, 117, 58], "LEZIONI SVOLTE");
@@ -649,7 +653,11 @@ export default function PacchettiLezioniPage() {
       text += `Totale ore sezione: ${totOre}\n`;
     };
 
-    if (categoria === 'prenotate') {
+    if (categoria === 'selezionate') {
+      const sel = attivita.filter(a => selectedIds.has(a.id));
+      sel.sort((a, b) => parseStart(a) - parseStart(b));
+      renderSezioneTxt(`LEZIONI SELEZIONATE (${sel.length})`, sel);
+    } else if (categoria === 'prenotate') {
       renderSezioneTxt('LEZIONI PRENOTATE', prenotate);
     } else if (categoria === 'svolte') {
       renderSezioneTxt('LEZIONI SVOLTE', svolte);
@@ -1066,6 +1074,19 @@ export default function PacchettiLezioniPage() {
                   title="Esporta in PNG"
                 >
                   🖼️ PNG
+                </button>
+                <button
+                  onClick={() => setMultiSelect(v => !v)}
+                  style={{
+                    ...btnStyle,
+                    background: multiSelect ? "#20489a" : "#e3eefe",
+                    color: multiSelect ? "#fff" : "#20489a",
+                    border: "1.5px solid #4268b3",
+                    flex: "0 0 auto",
+                  }}
+                  title="Seleziona lezioni per esportarle"
+                >
+                  {multiSelect ? `☑ Selezione (${selectedIds.size})` : "☑ Seleziona"}
                 </button>
               </div>
             ) : (
@@ -1590,6 +1611,56 @@ export default function PacchettiLezioniPage() {
           </>
         )}
       </main>
+
+      {isAdmin && multiSelect && selectedIds.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 999,
+          background: '#20489a',
+          borderRadius: 16,
+          padding: '14px 24px',
+          boxShadow: '0 8px 32px rgba(32,72,154,0.35)',
+          display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          maxWidth: '90vw', minWidth: 320,
+        }}>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>
+            {selectedIds.size} lezioni selezionate
+          </span>
+          <span style={{ color: '#bfd4ff', fontSize: 13, whiteSpace: 'nowrap' }}>
+            {(() => {
+              const sel = attivita.filter(a => selectedIds.has(a.id));
+              const tot = sommaOre(sel);
+              return `${tot % 1 === 0 ? tot : tot.toFixed(1)}h totali`;
+            })()}
+          </span>
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => exportToPDF("selezionate")}
+              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#28a745', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >
+              📄 PDF
+            </button>
+            <button
+              onClick={() => exportToTXT("selezionate")}
+              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#17a2b8', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >
+              📝 TXT
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #7fa8e8', background: 'transparent', color: '#bfd4ff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Deseleziona tutto
+            </button>
+            <button
+              onClick={() => setMultiSelect(false)}
+              style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #7fa8e8', background: 'transparent', color: '#bfd4ff', fontSize: 16, fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {attivitaSelezionata && (
         <AttivitaDettaglioModal
