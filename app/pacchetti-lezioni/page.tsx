@@ -353,6 +353,41 @@ export default function PacchettiLezioniPage() {
     return { prenotate: future, svolte: past, cancellate: canc };
   }, [attivita, filtroCliente, filtroPacchettiIds, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, filtroOreExtra, filtroSaldato, ordinamento, isAdmin, isCliente]);
 
+  function slugify(str: string) {
+    return (str || "")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function buildExportFileName(ext: string) {
+    const da = filtroAdminDa || filtroDataDa || "";
+    const a  = filtroAdminA  || filtroDataA  || "";
+
+    const cognome = (() => {
+      if (!filtroCliente) return "";
+      const c = clienti.find(x => String(x.id) === String(filtroCliente));
+      const nome = c?.nomeReferente || c?.email || "";
+      const parts = nome.trim().split(/\s+/);
+      return slugify(parts[parts.length - 1] || nome);
+    })();
+
+    if (da || a) {
+      const parts = [cognome, da, a].filter(Boolean);
+      return `${parts.join("_")}.${ext}`;
+    }
+
+    if (filtroPacchettiIds.length > 0) {
+      const names = filtroPacchettiIds.map(id => {
+        const p = pacchetti.find(x => String(x.id) === id);
+        return p ? slugify(p.descrizione || `pacchetto_${p.id}`) : `pacchetto_${id}`;
+      });
+      return `${names.join("-")}.${ext}`;
+    }
+
+    return `lezioni_${new Date().toISOString().split("T")[0]}.${ext}`;
+  }
+
   // Helpers per il calcolo ore
   function oreFromAttivita(a) {
     const v = a?.oreConsumate ?? a?.durataOre ?? 0;
@@ -610,8 +645,7 @@ export default function PacchettiLezioniPage() {
         );
       }
     
-    const fileName = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.pdf` : `lezioni_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
+    doc.save(buildExportFileName("pdf"));
     } catch (err) {
       console.error("Errore export PDF:", err);
       alert("Errore durante l'export PDF: " + err.message);
@@ -690,7 +724,7 @@ export default function PacchettiLezioniPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.txt` : `lezioni_${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = buildExportFileName("txt");
     a.click();
     URL.revokeObjectURL(url);
     } catch (err) {
@@ -757,7 +791,7 @@ export default function PacchettiLezioniPage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = categoria ? `${categoria}_${new Date().toISOString().split('T')[0]}.png` : `lezioni_${new Date().toISOString().split('T')[0]}.png`;
+        a.download = buildExportFileName("png");
         a.click();
         URL.revokeObjectURL(url);
         // Pulisci i nodi iniettati
