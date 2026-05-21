@@ -104,6 +104,8 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
 
   const totOre = attivita.reduce((s, a) => s + (a.oreConsumate ?? a.durataOre ?? 0), 0);
   const clienteLabel = pacchetto.cliente?.nomeReferente || `Cliente #${pacchetto.clienteId}`;
+  // Primo nome del cliente: usato come fallback quando descrizione è vuota
+  const clientePrimoNome = pacchetto.cliente?.nomeReferente?.trim().split(/\s+/)[0] || null;
 
   const filteredSorted = sorted.filter(a => {
     if (filtroStato === "tutte") return true;
@@ -379,7 +381,7 @@ export default function PacchettoLezioniModal({ pacchetto, onClose, onRefreshPac
                         </td>
                       )}
                       <td style={{ padding: "10px 16px", fontWeight: 600, color: "#1e293b", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {att.descrizione || `Lezione #${att.id}`}
+                        {att.descrizione || clientePrimoNome || `Lezione #${att.id}`}
                         {att.ricorrenzaId && (
                           <span title="Parte di una ricorrenza" style={{ marginLeft: 6, fontSize: 11, color: "#8b5cf6", fontWeight: 700 }}>↻</span>
                         )}
