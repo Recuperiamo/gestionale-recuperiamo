@@ -43,7 +43,8 @@ export default function PacchettiLezioniPage() {
   const [clienti, setClienti] = useState([]);
   const [pacchetti, setPacchetti] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
-  const [filtroPacchetto, setFiltroPacchetto] = useState("");
+  const [filtroPacchettiIds, setFiltroPacchettiIds] = useState<string[]>([]);
+  const [pacchettoDropdownOpen, setPacchettoDropdownOpen] = useState(false);
   const [filtroStatoPacchetto, setFiltroStatoPacchetto] = useState(""); // attivo | sospeso | archiviato
   const [filtroAdminDa, setFiltroAdminDa] = useState("");
   const [filtroAdminA, setFiltroAdminA] = useState("");
@@ -56,6 +57,17 @@ export default function PacchettiLezioniPage() {
   const [filtroTipologia, setFiltroTipologia] = useState(""); // svolta | programmata | cancellata
   const [filtroDataDa, setFiltroDataDa] = useState("");
   const [filtroDataA, setFiltroDataA] = useState("");
+
+  // Chiudi dropdown pacchetto al click fuori
+  useEffect(() => {
+    if (!pacchettoDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      const el = document.getElementById('pacchetto-multi-dropdown');
+      if (el && !el.contains(e.target as Node)) setPacchettoDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pacchettoDropdownOpen]);
 
   // Dropdown export per sezioni
   const [exportMenuPrenotate, setExportMenuPrenotate] = useState(false);
@@ -82,10 +94,11 @@ export default function PacchettiLezioniPage() {
   })();
 
   const selectedPacchettoTitle = (() => {
-    // Mostra SOLO se c'è un filtro pacchetto attivo
-    if (filtroPacchetto) {
-      const p = pacchetti.find(x => String(x.id) === String(filtroPacchetto));
+    if (filtroPacchettiIds.length === 1) {
+      const p = pacchetti.find(x => String(x.id) === filtroPacchettiIds[0]);
       if (p) return p.descrizione && p.descrizione.trim() ? p.descrizione : `Pacchetto #${p.id}`;
+    } else if (filtroPacchettiIds.length > 1) {
+      return `${filtroPacchettiIds.length} pacchetti selezionati`;
     }
     return null;
   })();
@@ -161,7 +174,7 @@ export default function PacchettiLezioniPage() {
   // Reset filtro pacchetto quando cambia cliente
   useEffect(() => {
     if (filtroCliente) {
-      setFiltroPacchetto("");
+      setFiltroPacchettiIds([]);
     }
   }, [filtroCliente]);
 
@@ -255,8 +268,8 @@ export default function PacchettiLezioniPage() {
       if (filtroCliente) {
         filtered = filtered.filter(a => String(a.clienteId) === String(filtroCliente));
       }
-      if (filtroPacchetto) {
-        filtered = filtered.filter(a => String(a.pacchettoId) === String(filtroPacchetto));
+      if (filtroPacchettiIds.length > 0) {
+        filtered = filtered.filter(a => filtroPacchettiIds.includes(String(a.pacchettoId)));
       }
       if (filtroAdminDa) {
         const da = new Date(filtroAdminDa);
@@ -338,7 +351,7 @@ export default function PacchettiLezioniPage() {
     }
     
     return { prenotate: future, svolte: past, cancellate: canc };
-  }, [attivita, filtroCliente, filtroPacchetto, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, filtroOreExtra, filtroSaldato, ordinamento, isAdmin, isCliente]);
+  }, [attivita, filtroCliente, filtroPacchettiIds, filtroAdminDa, filtroAdminA, filtroTipologia, filtroMese, filtroDataDa, filtroDataA, filtroOreExtra, filtroSaldato, ordinamento, isAdmin, isCliente]);
 
   // Helpers per il calcolo ore
   function oreFromAttivita(a) {
@@ -392,19 +405,19 @@ export default function PacchettiLezioniPage() {
           doc.text(selectedClienteLabel, 14 + labelWidth, y);
           y += 6;
         }
-        if (filtroPacchetto) {
-          const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
-          if (pac) {
-            doc.setFont(undefined, 'bold');
-            const pacchettoLabel = `Pacchetto: `;
-            doc.text(pacchettoLabel, 14, y);
-            const labelWidth = doc.getTextWidth(pacchettoLabel);
-            doc.setFont(undefined, 'normal');
-            doc.text(pac.descrizione && pac.descrizione.trim() ? pac.descrizione : `Pacchetto #${pac.id}`, 14 + labelWidth, y);
-            y += 6;
-          }
+        if (filtroPacchettiIds.length > 0) {
+          const names = filtroPacchettiIds.map(id => {
+            const pac = pacchetti.find(p => String(p.id) === id);
+            return pac ? (pac.descrizione && pac.descrizione.trim() ? pac.descrizione : `Pacchetto #${pac.id}`) : `#${id}`;
+          }).join(", ");
+          doc.setFont(undefined, 'bold');
+          const label = filtroPacchettiIds.length === 1 ? `Pacchetto: ` : `Pacchetti: `;
+          doc.text(label, 14, y);
+          const labelWidth = doc.getTextWidth(label);
+          doc.setFont(undefined, 'normal');
+          doc.text(names, 14 + labelWidth, y);
+          y += 6;
         } else if (selectedPacchettoTitle) {
-          // Se non c'è filtroPacchetto esplicito, mostra il pacchetto selezionato nella UI
           doc.setFont(undefined, 'bold');
           const pacchettoLabel = `Pacchetto: `;
           doc.text(pacchettoLabel, 14, y);
@@ -618,9 +631,12 @@ export default function PacchettiLezioniPage() {
       } else if (selectedClienteLabel) {
         text += `Cliente: ${selectedClienteLabel}\n`;
       }
-      if (filtroPacchetto) {
-        const pac = pacchetti.find(p => p.id === parseInt(filtroPacchetto));
-        if (pac) text += `Pacchetto: ${pac.descrizione && pac.descrizione.trim() ? pac.descrizione : `Pacchetto #${pac.id}`}\n`;
+      if (filtroPacchettiIds.length > 0) {
+        const names = filtroPacchettiIds.map(id => {
+          const pac = pacchetti.find(p => String(p.id) === id);
+          return pac ? (pac.descrizione && pac.descrizione.trim() ? pac.descrizione : `Pacchetto #${pac.id}`) : `#${id}`;
+        }).join(", ");
+        text += `${filtroPacchettiIds.length === 1 ? 'Pacchetto' : 'Pacchetti'}: ${names}\n`;
       } else if (selectedPacchettoTitle) {
         text += `Pacchetto: ${selectedPacchettoTitle}\n`;
       }
@@ -939,28 +955,83 @@ export default function PacchettiLezioniPage() {
                     ))}
                   </select>
                 </div>
-                <div style={{ flex: "1 1 200px" }}>
+                <div id="pacchetto-multi-dropdown" style={{ flex: "1 1 200px", position: "relative" }}>
                   <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
                     Pacchetto
                   </label>
-                  <select
-                    value={filtroPacchetto}
-                    onChange={(e) => setFiltroPacchetto(e.target.value)}
-                    style={selectStyle}
+                  <button
+                    type="button"
+                    onClick={() => setPacchettoDropdownOpen(v => !v)}
+                    style={{
+                      ...selectStyle,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      cursor: "pointer", userSelect: "none", textAlign: "left",
+                    }}
                   >
-                    <option value="">Tutti i pacchetti</option>
-                    {pacchetti
-                      .filter(p => {
-                        if (filtroCliente && String(p.clienteId) !== String(filtroCliente)) return false;
-                        if (filtroStatoPacchetto && p.stato !== filtroStatoPacchetto) return false;
-                        return true;
-                      })
-                      .map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.descrizione || `Pacchetto #${p.id}`} ({p.oreAcquistate}h) - {p.stato || 'N/A'}
-                        </option>
-                      ))}
-                  </select>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {filtroPacchettiIds.length === 0
+                        ? "Tutti i pacchetti"
+                        : filtroPacchettiIds.length === 1
+                          ? (() => { const p = pacchetti.find(x => String(x.id) === filtroPacchettiIds[0]); return p ? (p.descrizione || `Pacchetto #${p.id}`) : "1 selezionato"; })()
+                          : `${filtroPacchettiIds.length} pacchetti selezionati`}
+                    </span>
+                    <span style={{ fontSize: 10, marginLeft: 6, flexShrink: 0 }}>▼</span>
+                  </button>
+                  {pacchettoDropdownOpen && (
+                    <div
+                      style={{
+                        position: "absolute", top: "100%", left: 0, right: 0, zIndex: 500,
+                        background: "#fff", border: "1px solid #4268b3", borderRadius: 10,
+                        boxShadow: "0 6px 20px rgba(32,72,154,0.18)", marginTop: 4,
+                        maxHeight: 280, overflowY: "auto",
+                      }}
+                    >
+                      <div
+                        style={{ padding: "8px 12px", cursor: "pointer", fontWeight: 600, fontSize: 13, borderBottom: "1px solid #e2e8f0", color: filtroPacchettiIds.length === 0 ? "#20489a" : "#64748b" }}
+                        onClick={() => { setFiltroPacchettiIds([]); setPacchettoDropdownOpen(false); }}
+                      >
+                        ✕ Tutti i pacchetti
+                      </div>
+                      {pacchetti
+                        .filter(p => {
+                          if (filtroCliente && String(p.clienteId) !== String(filtroCliente)) return false;
+                          if (filtroStatoPacchetto && p.stato !== filtroStatoPacchetto) return false;
+                          return true;
+                        })
+                        .map(p => {
+                          const isChecked = filtroPacchettiIds.includes(String(p.id));
+                          return (
+                            <div
+                              key={p.id}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                padding: "8px 12px", cursor: "pointer", fontSize: 13,
+                                background: isChecked ? "#e8f0fe" : "transparent",
+                                color: "#20489a",
+                              }}
+                              onClick={() => {
+                                setFiltroPacchettiIds(prev =>
+                                  isChecked ? prev.filter(id => id !== String(p.id)) : [...prev, String(p.id)]
+                                );
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                readOnly
+                                style={{ accentColor: "#20489a", width: 15, height: 15, flexShrink: 0 }}
+                              />
+                              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {p.descrizione || `Pacchetto #${p.id}`}
+                              </span>
+                              <span style={{ fontSize: 11, color: "#64748b", flexShrink: 0 }}>
+                                {p.oreAcquistate}h · {p.stato}
+                              </span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
                 <div style={{ flex: "1 1 150px" }}>
                   <label style={{ display: "block", fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
@@ -1043,7 +1114,8 @@ export default function PacchettiLezioniPage() {
                 <button
                   onClick={() => {
                     setFiltroCliente("");
-                    setFiltroPacchetto("");
+                    setFiltroPacchettiIds([]);
+                    setPacchettoDropdownOpen(false);
                     setFiltroStatoPacchetto("");
                     setFiltroOreExtra("");
                     setFiltroSaldato("");
@@ -1074,19 +1146,6 @@ export default function PacchettiLezioniPage() {
                   title="Esporta in PNG"
                 >
                   🖼️ PNG
-                </button>
-                <button
-                  onClick={() => setMultiSelect(v => !v)}
-                  style={{
-                    ...btnStyle,
-                    background: multiSelect ? "#20489a" : "#e3eefe",
-                    color: multiSelect ? "#fff" : "#20489a",
-                    border: "1.5px solid #4268b3",
-                    flex: "0 0 auto",
-                  }}
-                  title="Seleziona lezioni per esportarle"
-                >
-                  {multiSelect ? `☑ Selezione (${selectedIds.size})` : "☑ Seleziona"}
                 </button>
               </div>
             ) : (
@@ -1611,56 +1670,6 @@ export default function PacchettiLezioniPage() {
           </>
         )}
       </main>
-
-      {isAdmin && multiSelect && selectedIds.size > 0 && (
-        <div style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 999,
-          background: '#20489a',
-          borderRadius: 16,
-          padding: '14px 24px',
-          boxShadow: '0 8px 32px rgba(32,72,154,0.35)',
-          display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-          maxWidth: '90vw', minWidth: 320,
-        }}>
-          <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>
-            {selectedIds.size} lezioni selezionate
-          </span>
-          <span style={{ color: '#bfd4ff', fontSize: 13, whiteSpace: 'nowrap' }}>
-            {(() => {
-              const sel = attivita.filter(a => selectedIds.has(a.id));
-              const tot = sommaOre(sel);
-              return `${tot % 1 === 0 ? tot : tot.toFixed(1)}h totali`;
-            })()}
-          </span>
-          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => exportToPDF("selezionate")}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#28a745', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-            >
-              📄 PDF
-            </button>
-            <button
-              onClick={() => exportToTXT("selezionate")}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#17a2b8', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-            >
-              📝 TXT
-            </button>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #7fa8e8', background: 'transparent', color: '#bfd4ff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-            >
-              Deseleziona tutto
-            </button>
-            <button
-              onClick={() => setMultiSelect(false)}
-              style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #7fa8e8', background: 'transparent', color: '#bfd4ff', fontSize: 16, fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
 
       {attivitaSelezionata && (
         <AttivitaDettaglioModal
