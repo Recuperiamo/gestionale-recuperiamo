@@ -21,6 +21,8 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const [modificaBatch, setModificaBatch] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingData, setPendingData] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [loadingDelete, setLoadingDelete] = useState(false);
   // conversione singola ↔ ricorrente
   const [scollegaRicorrenza, setScollegaRicorrenza] = useState(false);
   const [convertToRicorrente, setConvertToRicorrente] = useState(false);
@@ -371,6 +373,29 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
 
   function handleDayToggle(day) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  }
+
+  async function handleDelete(eliminaBatch: boolean) {
+    setLoadingDelete(true);
+    setErrorForm(null);
+    try {
+      const res = await fetch("/api/attivita", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(eliminaBatch
+          ? { id: initialData.id, eliminaBatch: true }
+          : { id: initialData.id }
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErrorForm(data.error || "Errore eliminazione"); setShowDeleteConfirm(false); return; }
+      onSuccess && onSuccess(data);
+    } catch {
+      setErrorForm("Errore di rete");
+      setShowDeleteConfirm(false);
+    } finally {
+      setLoadingDelete(false);
+    }
   }
 
   return (
@@ -830,24 +855,120 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           </div>
         )}
 
-        <div style={{ textAlign:"right" }}>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loadingSubmit}
-            style={btnSecondary}
-          >
-            Annulla
-          </button>
-          <button
-            type="submit"
-            disabled={loadingSubmit}
-            style={btnPrimary(loadingSubmit)}
-          >
-            {loadingSubmit ? "Salvataggio..." : "Salva"}
-          </button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          {isEdit && initialData?.id && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={loadingSubmit || loadingDelete}
+              style={{
+                background: "#fee2e2", color: "#991b1b", border: "1.5px solid #fca5a5",
+                padding: "7px 16px", borderRadius: 5, fontWeight: 600, fontSize: "0.95rem", cursor: "pointer",
+              }}
+            >
+              🗑️ Elimina lezione
+            </button>
+          )}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loadingSubmit || loadingDelete}
+              style={btnSecondary}
+            >
+              Annulla
+            </button>
+            <button
+              type="submit"
+              disabled={loadingSubmit || loadingDelete}
+              style={btnPrimary(loadingSubmit)}
+            >
+              {loadingSubmit ? "Salvataggio..." : "Salva"}
+            </button>
+          </div>
         </div>
       </form>
+
+      {/* Modale conferma eliminazione */}
+      {showDeleteConfirm && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          zIndex: 2200, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 12, padding: "28px 32px",
+            maxWidth: 440, width: "90%", boxShadow: "0 12px 48px rgba(0,0,0,0.3)",
+          }}>
+            <h3 style={{ margin: "0 0 8px 0", color: "#991b1b", fontWeight: 700, fontSize: 18 }}>
+              Elimina lezione
+            </h3>
+            {isRicorrente ? (
+              <>
+                <p style={{ margin: "0 0 20px 0", lineHeight: 1.6, color: "#333", fontSize: 14 }}>
+                  Questa lezione fa parte di una serie ricorrente.<br />
+                  Vuoi eliminare solo questa lezione o tutta la serie?
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                  <button
+                    onClick={() => handleDelete(false)}
+                    disabled={loadingDelete}
+                    style={{
+                      background: loadingDelete ? "#ccc" : "#fee2e2", color: "#991b1b",
+                      border: "1.5px solid #fca5a5", borderRadius: 7, padding: "11px 20px",
+                      fontWeight: 700, fontSize: 14, cursor: loadingDelete ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {loadingDelete ? "Eliminazione…" : "🗑️ Solo questa lezione"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(true)}
+                    disabled={loadingDelete}
+                    style={{
+                      background: loadingDelete ? "#ccc" : "#991b1b", color: "#fff",
+                      border: "none", borderRadius: 7, padding: "11px 20px",
+                      fontWeight: 700, fontSize: 14, cursor: loadingDelete ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {loadingDelete ? "Eliminazione…" : "🗑️ Elimina tutta la serie ricorrente"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 20px 0", lineHeight: 1.6, color: "#333", fontSize: 14 }}>
+                  Confermi l'eliminazione di questa lezione?<br />
+                  <span style={{ fontSize: 13, color: "#666" }}>
+                    Le ore verranno reintegrate nel pacchetto.
+                  </span>
+                </p>
+                <button
+                  onClick={() => handleDelete(false)}
+                  disabled={loadingDelete}
+                  style={{
+                    width: "100%", background: loadingDelete ? "#ccc" : "#991b1b", color: "#fff",
+                    border: "none", borderRadius: 7, padding: "11px 20px",
+                    fontWeight: 700, fontSize: 14, cursor: loadingDelete ? "not-allowed" : "pointer",
+                    marginBottom: 10,
+                  }}
+                >
+                  {loadingDelete ? "Eliminazione…" : "Sì, elimina la lezione"}
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={loadingDelete}
+              style={{
+                width: "100%", background: "transparent", color: "#666",
+                border: "1px solid #ddd", borderRadius: 7, padding: "8px 16px",
+                fontWeight: 500, fontSize: 14, cursor: "pointer",
+              }}
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modale conferma modifica ricorrenza */}
       {showConfirmModal && (

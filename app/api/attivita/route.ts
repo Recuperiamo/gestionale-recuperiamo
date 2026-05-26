@@ -683,10 +683,49 @@ export async function DELETE(request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
-    
+    if (!['admin', 'operatore'].includes(session.user?.role)) {
+      return NextResponse.json({ error: 'Solo admin/operatori' }, { status: 403 })
+    }
+
     const body = await request.json()
-    const { id } = body
+    const { id, eliminaBatch } = body
     if (!id) return NextResponse.json({ error: 'ID obbligatorio' }, { status: 400 })
+
+    // --- ELIMINAZIONE BATCH (tutta la serie ricorrente) ---
+    if (eliminaBatch) {
+      const attRef = await prisma.attivita.findUnique({ where: { id: Number(id) } })
+      if (!attRef) return NextResponse.json({ error: 'Attività non trovata' }, { status: 404 })
+      if (!attRef.ricorrenzaId) return NextResponse.json({ error: 'Attività non appartiene a una ricorrenza' }, { status: 400 })
+
+      const serie = await prisma.attivita.findMany({
+        where: { ricorrenzaId: attRef.ricorrenzaId },
+        include: { lavagna: { select: { id: true } } }
+      })
+
+      await prisma.$transaction(async (tx) => {
+        for (const att of serie) {
+          await tx.richiestaModifica.deleteMany({ where: { attivitaId: att.id } })
+          if (att.lavagna) {
+            await tx.lavagnaTratto.deleteMany({ where: { lavagnaId: att.lavagna.id } })
+            await tx.lavagnaShape.deleteMany({ where: { lavagnaId: att.lavagna.id } }).catch(() => {})
+            await tx.lavagna.delete({ where: { id: att.lavagna.id } })
+          }
+          if (att.pacchettoId && !att.extraPacchetto) {
+            const ore = Number(att.oreConsumate ?? att.durataOre ?? 0)
+            if (ore > 0) {
+              await tx.pacchettoOre.update({
+                where: { id: att.pacchettoId },
+                data: { oreResidue: { increment: ore } }
+              })
+            }
+          }
+          await tx.attivita.delete({ where: { id: att.id } })
+        }
+      })
+
+      return NextResponse.json({ ok: true, deleted: serie.length })
+    }
+    // --- FINE BATCH ---
 
     const att = await prisma.attivita.findUnique({ where: { id: Number(id) } })
     if (!att) {
