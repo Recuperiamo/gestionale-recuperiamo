@@ -61,12 +61,6 @@ export async function POST(req: Request) {
       prisma.lavagnaShape.deleteMany({ where: { lavagnaId: { in: ids } } }),
     ]);
 
-    // Scollega attività dalle lavagne prima di eliminare (FK nullable)
-    await prisma.attivita.updateMany({
-      where: { lavagnaId: { in: ids } },
-      data: { lavagnaId: null },
-    });
-
     const { count: lavagneEliminate } = await prisma.lavagna.deleteMany({
       where: { id: { in: ids } },
     });
