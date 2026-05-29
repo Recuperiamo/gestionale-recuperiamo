@@ -26,6 +26,9 @@ export default function LavagnaListPage() {
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [mostraTutte, setMostraTutte] = useState(false);
   const [cercaQuery, setCercaQuery] = useState("");
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<null | { lavagne: number; tratti: number; forme: number }>(null);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
 
   // Form crea
   const [selectedClienteId, setSelectedClienteId] = useState("");
@@ -124,6 +127,23 @@ export default function LavagnaListPage() {
       alert("Errore di rete");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleCleanup() {
+    if (!window.confirm("Eliminare tratti e forme di tutte le lavagne collegate a lezioni svolte più di 6 mesi fa?\n\nLe lavagne rimarranno visibili ma i loro contenuti verranno cancellati per liberare spazio.")) return;
+    setCleaning(true);
+    setCleanupResult(null);
+    setCleanupError(null);
+    try {
+      const res = await fetch("/api/lavagna/cleanup", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setCleanupError(data.error || "Errore durante la pulizia"); return; }
+      setCleanupResult(data);
+    } catch {
+      setCleanupError("Errore di rete");
+    } finally {
+      setCleaning(false);
     }
   }
 
@@ -462,6 +482,46 @@ export default function LavagnaListPage() {
                     );
                   })}
                 </ul>
+              )}
+            </div>
+          )}
+          {/* ── Pulizia spazio (solo admin) ──────────────────────────────── */}
+          {isAdmin && (
+            <div style={{ marginTop: 36, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+                Manutenzione
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <button
+                  onClick={handleCleanup}
+                  disabled={cleaning}
+                  style={{
+                    background: cleaning ? "#f1f5f9" : "#fee2e2",
+                    color: cleaning ? "#94a3b8" : "#991b1b",
+                    border: "1.5px solid",
+                    borderColor: cleaning ? "#e2e8f0" : "#fca5a5",
+                    borderRadius: 8, padding: "8px 18px",
+                    fontWeight: 700, fontSize: 13, cursor: cleaning ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {cleaning ? "Pulizia in corso…" : "🗑️ Pulisci lavagne > 6 mesi"}
+                </button>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                  Elimina tratti e forme delle lavagne collegate a lezioni di oltre 6 mesi fa
+                </span>
+              </div>
+
+              {cleanupResult && (
+                <div style={{ marginTop: 12, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: "#166534" }}>
+                  ✓ Pulizia completata: <b>{cleanupResult.lavagne}</b> lavagn{cleanupResult.lavagne === 1 ? "a" : "e"} pulite,{" "}
+                  <b>{cleanupResult.tratti}</b> tratti eliminati,{" "}
+                  <b>{cleanupResult.forme}</b> forme eliminate.
+                </div>
+              )}
+              {cleanupError && (
+                <div style={{ marginTop: 12, background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: "#991b1b" }}>
+                  Errore: {cleanupError}
+                </div>
               )}
             </div>
           )}
