@@ -61,17 +61,21 @@ export async function POST(req: Request) {
       prisma.lavagnaShape.deleteMany({ where: { lavagnaId: { in: ids } } }),
     ]);
 
-    // Svuota anche snapshot (JSON potenzialmente grande)
-    await prisma.lavagna.updateMany({
-      where: { id: { in: ids } },
-      data: { snapshot: null },
+    // Scollega attività dalle lavagne prima di eliminare (FK nullable)
+    await prisma.attivita.updateMany({
+      where: { lavagnaId: { in: ids } },
+      data: { lavagnaId: null },
     });
 
-    console.log(`[cleanup lavagne] ${new Date().toISOString()} — pulite ${ids.length} lavagne: ${tratti.count} tratti, ${forme.count} forme`);
+    const { count: lavagneEliminate } = await prisma.lavagna.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    console.log(`[cleanup lavagne] ${new Date().toISOString()} — eliminate ${lavagneEliminate} lavagne: ${tratti.count} tratti, ${forme.count} forme`);
 
     return NextResponse.json({
       ok: true,
-      lavagne: ids.length,
+      lavagne: lavagneEliminate,
       tratti: tratti.count,
       forme: forme.count,
       soglia: soglia.toISOString(),

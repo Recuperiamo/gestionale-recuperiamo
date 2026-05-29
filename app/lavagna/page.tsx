@@ -131,7 +131,7 @@ export default function LavagnaListPage() {
   }
 
   async function handleCleanup() {
-    if (!window.confirm("Eliminare tratti e forme di tutte le lavagne collegate a lezioni svolte più di 6 mesi fa?\n\nLe lavagne rimarranno visibili ma i loro contenuti verranno cancellati per liberare spazio.")) return;
+    if (!window.confirm("Eliminare definitivamente tutte le lavagne collegate a lezioni svolte più di 6 mesi fa?\n\nQuesta operazione è irreversibile.")) return;
     setCleaning(true);
     setCleanupResult(null);
     setCleanupError(null);
@@ -513,9 +513,9 @@ export default function LavagnaListPage() {
 
               {cleanupResult && (
                 <div style={{ marginTop: 12, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: "#166534" }}>
-                  ✓ Pulizia completata: <b>{cleanupResult.lavagne}</b> lavagn{cleanupResult.lavagne === 1 ? "a" : "e"} pulite,{" "}
-                  <b>{cleanupResult.tratti}</b> tratti eliminati,{" "}
-                  <b>{cleanupResult.forme}</b> forme eliminate.
+                  ✓ Operazione completata: <b>{cleanupResult.lavagne}</b> lavagn{cleanupResult.lavagne === 1 ? "a" : "e"} eliminat{cleanupResult.lavagne === 1 ? "a" : "e"},{" "}
+                  <b>{cleanupResult.tratti}</b> tratti e{" "}
+                  <b>{cleanupResult.forme}</b> forme rimoss{cleanupResult.forme === 1 ? "a" : "e"}.
                 </div>
               )}
               {cleanupError && (
