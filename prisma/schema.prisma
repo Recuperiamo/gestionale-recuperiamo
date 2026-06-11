@@ -256,7 +256,6 @@ model Lavagna {
 
   @@index([createdAt])
   @@index([clienteId])
-  @@index([archivedAt])
 }
 
 model LavagnaTratto {
