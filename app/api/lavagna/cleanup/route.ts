@@ -17,7 +17,7 @@ import { authOptions } from "../../auth/[...nextauth]/authOptions";
 
 export const runtime = "nodejs";
 
-const SOGLIA_MESI = 1; // abbassato da 6 a 1 mese
+const SOGLIA_MESI = 6;
 
 export async function POST(req: Request) {
   const authHeader = req.headers.get("authorization");
