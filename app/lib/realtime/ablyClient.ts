@@ -101,6 +101,12 @@ function createChannelWrapper(channel) {
       channel.subscribe(event, wrap);
     },
     unsubscribe: (event, handler) => {
+      if (event === undefined && handler === undefined) {
+        // Remove all subscriptions — channel.unsubscribe() with no args clears everything
+        try { channel.unsubscribe(); } catch (_) {}
+        listeners.clear();
+        return;
+      }
       const wrap = listeners.get(handler);
       try { channel.unsubscribe(event, wrap || handler); } catch (_) {}
       listeners.delete(handler);

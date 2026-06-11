@@ -241,6 +241,8 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         const onClear = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
+          // Reject stale messages from other boards or without a matching lavagnaId
+          if (d.lavagnaId && String(d.lavagnaId) !== String(lavagnaId)) return
           store.clearAll()
         }
 
@@ -358,5 +360,9 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
     publish('background:update', { background, lavagnaId })
   }, [publish, lavagnaId])
 
-  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground, publish }
+  const emitClear = useCallback(() => {
+    publish('clear', { lavagnaId })
+  }, [publish, lavagnaId])
+
+  return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground, emitClear, publish }
 }

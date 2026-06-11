@@ -1,9 +1,14 @@
 // @ts-nocheck
 /**
  * POST /api/lavagna/cleanup
- * Elimina tratti e forme delle lavagne collegate a lezioni svolte più di 6 mesi fa.
- * Svuota anche il campo snapshot per quelle lavagne.
- * Chiamato automaticamente dal cron Vercel (vercel.json) ogni mese.
+ * Libera spazio DB in tre passaggi:
+ *  1. Hard-delete di tutti i tratti/forme soft-deleted (deletedAt IS NOT NULL)
+ *  2. Null dei campi src/srcPreview sulle shape di lavagne "vecchie" (default 1 mese)
+ *  3. Eliminazione completa delle lavagne (tratti + forme + record) legate a lezioni
+ *     svolte più di SOGLIA_MESI fa o lavagne libere più vecchie della stessa soglia
+ *
+ * Chiamato automaticamente dal cron Vercel (vercel.json) ogni mese, o manualmente
+ * da un admin autenticato.
  */
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
@@ -12,10 +17,9 @@ import { authOptions } from "../../auth/[...nextauth]/authOptions";
 
 export const runtime = "nodejs";
 
-const SOGLIA_MESI = 6;
+const SOGLIA_MESI = 1; // abbassato da 6 a 1 mese
 
 export async function POST(req: Request) {
-  // Accetta sia chiamate admin autenticate sia il cron Vercel (CRON_SECRET)
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
@@ -31,48 +35,72 @@ export async function POST(req: Request) {
   soglia.setMonth(soglia.getMonth() - SOGLIA_MESI);
 
   try {
-    // Trova le lavagne collegate a lezioni svolte prima della soglia
-    // (oppure lavagne senza attività create prima della soglia)
-    const lavagneDaKulire = await prisma.lavagna.findMany({
+    // ── 1. Hard-delete tratti soft-deleted (qualunque lavagna, qualunque età) ──
+    const trattSoftDel = await prisma.lavagnaTratto.deleteMany({
+      where: { deletedAt: { not: null } },
+    });
+
+    // ── 2. Hard-delete forme soft-deleted ─────────────────────────────────────
+    const formeSoftDel = await prisma.lavagnaShape.deleteMany({
+      where: { deletedAt: { not: null } },
+    });
+
+    // ── 3. Null src/srcPreview su forme di lavagne più vecchie della soglia ───
+    // Libera spazio dalle immagini base64 (~15-45 KB ognuna) senza perdere il
+    // record della forma (posizione, tipo, ecc.)
+    const lavagneVecchie = await prisma.lavagna.findMany({
       where: {
         OR: [
-          {
-            attivita: {
-              orario: { lt: soglia },
-            },
-          },
-          {
-            attivitaId: null,
-            createdAt: { lt: soglia },
-          },
+          { attivita: { orario: { lt: soglia } } },
+          { attivitaId: null, createdAt: { lt: soglia } },
         ],
       },
       select: { id: true },
     });
+    const idsVecchie = lavagneVecchie.map((l) => l.id);
 
-    const ids = lavagneDaKulire.map((l) => l.id);
-
-    if (ids.length === 0) {
-      return NextResponse.json({ ok: true, message: "Nessuna lavagna da pulire", tratti: 0, forme: 0, lavagne: 0 });
+    let srcsNullati = { count: 0 };
+    if (idsVecchie.length > 0) {
+      srcsNullati = await prisma.lavagnaShape.updateMany({
+        where: {
+          lavagnaId: { in: idsVecchie },
+          OR: [{ src: { not: null } }, { srcPreview: { not: null } }],
+        },
+        data: { src: null, srcPreview: null },
+      });
     }
 
-    const [tratti, forme] = await Promise.all([
-      prisma.lavagnaTratto.deleteMany({ where: { lavagnaId: { in: ids } } }),
-      prisma.lavagnaShape.deleteMany({ where: { lavagnaId: { in: ids } } }),
-    ]);
+    // ── 4. Elimina completamente le lavagne vecchie (tratti + forme + record) ─
+    let trattEliminati = { count: 0 };
+    let formeEliminate = { count: 0 };
+    let lavagneEliminate = 0;
 
-    const { count: lavagneEliminate } = await prisma.lavagna.deleteMany({
-      where: { id: { in: ids } },
-    });
+    if (idsVecchie.length > 0) {
+      [trattEliminati, formeEliminate] = await Promise.all([
+        prisma.lavagnaTratto.deleteMany({ where: { lavagnaId: { in: idsVecchie } } }),
+        prisma.lavagnaShape.deleteMany({ where: { lavagnaId: { in: idsVecchie } } }),
+      ]);
+      const res = await prisma.lavagna.deleteMany({ where: { id: { in: idsVecchie } } });
+      lavagneEliminate = res.count;
+    }
 
-    console.log(`[cleanup lavagne] ${new Date().toISOString()} — eliminate ${lavagneEliminate} lavagne: ${tratti.count} tratti, ${forme.count} forme`);
+    console.log(
+      `[cleanup lavagne] ${new Date().toISOString()} — ` +
+      `soft-del rimossi: ${trattSoftDel.count} tratti, ${formeSoftDel.count} forme | ` +
+      `src nullati: ${srcsNullati.count} | ` +
+      `lavagne vecchie eliminate: ${lavagneEliminate} (${trattEliminati.count} tratti, ${formeEliminate.count} forme)`
+    );
 
     return NextResponse.json({
       ok: true,
-      lavagne: lavagneEliminate,
-      tratti: tratti.count,
-      forme: forme.count,
-      soglia: soglia.toISOString(),
+      softDeletedRemoved: { tratti: trattSoftDel.count, forme: formeSoftDel.count },
+      srcNullati: srcsNullati.count,
+      lavagneVecchie: {
+        count: lavagneEliminate,
+        tratti: trattEliminati.count,
+        forme: formeEliminate.count,
+        soglia: soglia.toISOString(),
+      },
     });
   } catch (err) {
     console.error("[cleanup lavagne] errore:", err);

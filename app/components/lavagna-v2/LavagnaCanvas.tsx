@@ -242,7 +242,7 @@ export default function LavagnaCanvas({
   }, [])
 
   // ── Ably sync ────────────────────────────────────────────────────────────────
-  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground } = useAblySync({
+  const { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground, emitClear } = useAblySync({
     channelName, engineRef, userId: utenteId, role: ruolo, cursorLabel,
     lavagnaId, attivitaId, isAdmin,
     onPermissionsUpdate: handlePermissionsUpdate,
@@ -787,7 +787,7 @@ export default function LavagnaCanvas({
         isAdmin={isAdmin}
         readOnly={readOnly}
         canStudentDraw={canDraw}
-        onClear={clearBoard}
+        onClear={() => { clearBoard(); emitClear() }}
         onForceSyncViewport={isAdmin ? emitForceSyncViewport : undefined}
         onExportPNG={exportPNG}
         onExportPDF={exportPDF}
