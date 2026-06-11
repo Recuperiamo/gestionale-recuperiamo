@@ -27,8 +27,21 @@ export default function LavagnaListPage() {
   const [mostraTutte, setMostraTutte] = useState(false);
   const [cercaQuery, setCercaQuery] = useState("");
   const [cleaning, setCleaning] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<null | { lavagne: number; tratti: number; forme: number }>(null);
+  const [cleanupResult, setCleanupResult] = useState<null | {
+    softDeletedRemoved: { tratti: number; forme: number };
+    srcNullati: number;
+    lavagneVecchie: { count: number; tratti: number; forme: number; soglia: string };
+  }>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [dbStats, setDbStats] = useState<null | {
+    dbBytes: number;
+    tables: {
+      tratti: { bytes: number; rows: number; softDeleted: number };
+      forme: { bytes: number; rows: number; softDeleted: number };
+      lavagne: { bytes: number; rows: number };
+    };
+  }>(null);
+  const [dbStatsLoading, setDbStatsLoading] = useState(false);
 
   // Form crea
   const [selectedClienteId, setSelectedClienteId] = useState("");
@@ -92,7 +105,8 @@ export default function LavagnaListPage() {
   useEffect(() => {
     if (status !== "authenticated") return;
     fetchLavagne();
-  }, [status]);
+    if (isAdmin) fetchDbStats();
+  }, [status, isAdmin]);
 
   // ── Crea lavagna ───────────────────────────────────────────────────────────
   async function handleCreate(e) {
@@ -130,6 +144,16 @@ export default function LavagnaListPage() {
     }
   }
 
+  async function fetchDbStats() {
+    if (!isAdmin) return;
+    setDbStatsLoading(true);
+    try {
+      const res = await fetch("/api/db-stats");
+      if (res.ok) setDbStats(await res.json());
+    } catch {}
+    finally { setDbStatsLoading(false); }
+  }
+
   async function handleCleanup() {
     if (!window.confirm("Eliminare definitivamente tutte le lavagne collegate a lezioni svolte più di 6 mesi fa?\n\nQuesta operazione è irreversibile.")) return;
     setCleaning(true);
@@ -140,6 +164,7 @@ export default function LavagnaListPage() {
       const data = await res.json();
       if (!res.ok) { setCleanupError(data.error || "Errore durante la pulizia"); return; }
       setCleanupResult(data);
+      fetchDbStats();
     } catch {
       setCleanupError("Errore di rete");
     } finally {
@@ -485,12 +510,70 @@ export default function LavagnaListPage() {
               )}
             </div>
           )}
-          {/* ── Pulizia spazio (solo admin) ──────────────────────────────── */}
+          {/* ── Manutenzione (solo admin) ─────────────────────────────────── */}
           {isAdmin && (
             <div style={{ marginTop: 36, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 16 }}>
                 Manutenzione
               </div>
+
+              {/* ── Stato storage DB ── */}
+              <div style={{ background: "#f8fbff", border: "1px solid #dbe6f5", borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f" }}>Storage database (Neon free tier)</div>
+                  <button
+                    onClick={fetchDbStats}
+                    disabled={dbStatsLoading}
+                    title="Aggiorna statistiche"
+                    style={{ background: "none", border: "1px solid #b0c8f5", color: "#2563eb", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: dbStatsLoading ? "not-allowed" : "pointer", fontWeight: 600 }}
+                  >
+                    {dbStatsLoading ? "…" : "↻ Aggiorna"}
+                  </button>
+                </div>
+
+                {dbStats ? (() => {
+                  const LIMIT_BYTES = 512 * 1024 * 1024;
+                  const used = dbStats.dbBytes;
+                  const pct = Math.min(100, Math.round((used / LIMIT_BYTES) * 100));
+                  const usedMB = (used / (1024 * 1024)).toFixed(1);
+                  const barColor = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : "#22c55e";
+
+                  const fmtMB = (b: number) => b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / (1024 * 1024)).toFixed(1)} MB`;
+
+                  return (
+                    <div>
+                      {/* progress bar */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        <div style={{ flex: 1, height: 12, background: "#e2e8f0", borderRadius: 6, overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 6, transition: "width 0.4s" }} />
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: pct >= 90 ? "#ef4444" : "#334155", whiteSpace: "nowrap" }}>
+                          {usedMB} MB / 512 MB ({pct}%)
+                        </div>
+                      </div>
+
+                      {/* per-table breakdown */}
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                        {[
+                          { label: "Tratti", data: dbStats.tables.tratti, icon: "✏️" },
+                          { label: "Forme", data: dbStats.tables.forme, icon: "⬜" },
+                          { label: "Lavagne", data: dbStats.tables.lavagne, icon: "🖼️" },
+                        ].map(({ label, data, icon }) => (
+                          <div key={label} style={{ flex: 1, minWidth: 120, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px" }}>
+                            <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 3 }}>{icon} {label}</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#1e3a5f" }}>{fmtMB(data.bytes)}</div>
+                            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{data.rows} righe{data.softDeleted ? ` · ${data.softDeleted} cancellati` : ""}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div style={{ fontSize: 13, color: "#94a3b8" }}>{dbStatsLoading ? "Caricamento statistiche…" : "Statistiche non disponibili"}</div>
+                )}
+              </div>
+
+              {/* ── Bottone pulizia ── */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <button
                   onClick={handleCleanup}
@@ -507,15 +590,17 @@ export default function LavagnaListPage() {
                   {cleaning ? "Pulizia in corso…" : "🗑️ Pulisci lavagne > 6 mesi"}
                 </button>
                 <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                  Elimina tratti e forme delle lavagne collegate a lezioni di oltre 6 mesi fa
+                  Rimuove tratti/forme eliminati e cancella le lavagne di lezioni risalenti a oltre 6 mesi fa
                 </span>
               </div>
 
               {cleanupResult && (
-                <div style={{ marginTop: 12, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "10px 16px", fontSize: 13, color: "#166534" }}>
-                  ✓ Operazione completata: <b>{cleanupResult.lavagne}</b> lavagn{cleanupResult.lavagne === 1 ? "a" : "e"} eliminat{cleanupResult.lavagne === 1 ? "a" : "e"},{" "}
-                  <b>{cleanupResult.tratti}</b> tratti e{" "}
-                  <b>{cleanupResult.forme}</b> forme rimoss{cleanupResult.forme === 1 ? "a" : "e"}.
+                <div style={{ marginTop: 12, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#166534", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>✓ Pulizia completata</div>
+                  <div>· Tratti/forme soft-deleted rimossi: <b>{cleanupResult.softDeletedRemoved.tratti}</b> tratti, <b>{cleanupResult.softDeletedRemoved.forme}</b> forme</div>
+                  <div>· Immagini (src) svuotate: <b>{cleanupResult.srcNullati}</b></div>
+                  <div>· Lavagne vecchie eliminate: <b>{cleanupResult.lavagneVecchie.count}</b> ({cleanupResult.lavagneVecchie.tratti} tratti, {cleanupResult.lavagneVecchie.forme} forme)</div>
+                  <div style={{ fontSize: 11, color: "#4ade80", marginTop: 2 }}>Soglia: lezioni precedenti al {new Date(cleanupResult.lavagneVecchie.soglia).toLocaleDateString("it-IT")}</div>
                 </div>
               )}
               {cleanupError && (
