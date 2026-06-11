@@ -241,8 +241,10 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         const onClear = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
-          // Reject stale messages from other boards or without a matching lavagnaId
-          if (d.lavagnaId && String(d.lavagnaId) !== String(lavagnaId)) return
+          // Require lavagnaId to match — absent lavagnaId (old stale messages) is also rejected
+          if (String(d.lavagnaId) !== String(lavagnaId)) return
+          // Reject replayed history: clear must be < 10 seconds old
+          if (!d.ts || Date.now() - d.ts > 10_000) return
           store.clearAll()
         }
 
@@ -361,7 +363,7 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
   }, [publish, lavagnaId])
 
   const emitClear = useCallback(() => {
-    publish('clear', { lavagnaId })
+    publish('clear', { lavagnaId, ts: Date.now() })
   }, [publish, lavagnaId])
 
   return { emitStrokeEvent, emitForceSyncViewport, emitPermissionsUpdate, emitDrawRequest, emitShapeUpdate, emitBackground, emitClear, publish }
