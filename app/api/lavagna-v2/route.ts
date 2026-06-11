@@ -10,9 +10,22 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/[...nextauth]/authOptions'
 import { PrismaClient } from '@prisma/client'
+import { gunzipSync } from 'zlib'
 
 const prisma = global.prisma || new PrismaClient()
 if (process.env.NODE_ENV !== 'production') global.prisma = prisma
+
+function decompressTratti(tratti: any[]) {
+  return tratti.map(t => {
+    if (t.puntiCompresso && !t.punti) {
+      try {
+        t.punti = JSON.parse(gunzipSync(t.puntiCompresso).toString('utf8'))
+      } catch (_) {}
+    }
+    const { puntiCompresso, ...rest } = t
+    return rest
+  })
+}
 
 function formatDataOra(d: Date) {
   return new Intl.DateTimeFormat('it-IT', {
@@ -25,7 +38,7 @@ function formatDataOra(d: Date) {
 // ── Leggi lavagna (tratti + forme) ────────────────────────────────────────────
 async function getLavagnaData(lavagnaId: number, since?: Date) {
   const sinceFilter = since ? { createdAt: { gt: since } } : {}
-  const tratti = await prisma.lavagnaTratto.findMany({
+  const rawTratti = await prisma.lavagnaTratto.findMany({
     where: { lavagnaId, deletedAt: null, ...sinceFilter },
     orderBy: { createdAt: 'asc' },
   })
@@ -33,7 +46,7 @@ async function getLavagnaData(lavagnaId: number, since?: Date) {
     where: { lavagnaId, deletedAt: null, ...sinceFilter },
     orderBy: { createdAt: 'asc' },
   })
-  return { tratti, forme }
+  return { tratti: decompressTratti(rawTratti), forme }
 }
 
 export async function GET(req) {

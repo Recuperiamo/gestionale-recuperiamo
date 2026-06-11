@@ -29,7 +29,7 @@ export default function LavagnaListPage() {
   const [cleaning, setCleaning] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<null | {
     softDeletedRemoved: { tratti: number; forme: number };
-    srcNullati: number;
+    archiviate: { count: number; trattiCompressi: number; srcNullati: number; soglia: string };
     lavagneVecchie: { count: number; tratti: number; forme: number; soglia: string };
   }>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
@@ -513,8 +513,19 @@ export default function LavagnaListPage() {
           {/* ── Manutenzione (solo admin) ─────────────────────────────────── */}
           {isAdmin && (
             <div style={{ marginTop: 36, borderTop: "1px solid #e9f0fb", paddingTop: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 16 }}>
-                Manutenzione
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Manutenzione
+                </div>
+                <button
+                  onClick={() => window.location.href = "/lavagna/archivio"}
+                  style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 13px", fontWeight: 600, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                  </svg>
+                  Archivio lavagne
+                </button>
               </div>
 
               {/* ── Stato storage DB ── */}
@@ -597,10 +608,11 @@ export default function LavagnaListPage() {
               {cleanupResult && (
                 <div style={{ marginTop: 12, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#166534", display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>✓ Pulizia completata</div>
-                  <div>· Tratti/forme soft-deleted rimossi: <b>{cleanupResult.softDeletedRemoved.tratti}</b> tratti, <b>{cleanupResult.softDeletedRemoved.forme}</b> forme</div>
-                  <div>· Immagini (src) svuotate: <b>{cleanupResult.srcNullati}</b></div>
-                  <div>· Lavagne vecchie eliminate: <b>{cleanupResult.lavagneVecchie.count}</b> ({cleanupResult.lavagneVecchie.tratti} tratti, {cleanupResult.lavagneVecchie.forme} forme)</div>
-                  <div style={{ fontSize: 11, color: "#4ade80", marginTop: 2 }}>Soglia: lezioni precedenti al {new Date(cleanupResult.lavagneVecchie.soglia).toLocaleDateString("it-IT")}</div>
+                  <div>· Soft-deleted rimossi: <b>{cleanupResult.softDeletedRemoved.tratti}</b> tratti, <b>{cleanupResult.softDeletedRemoved.forme}</b> forme</div>
+                  {cleanupResult.archiviate && <>
+                    <div>· Archiviate ({">"} 30 gg): <b>{cleanupResult.archiviate.count}</b> lavagne — <b>{cleanupResult.archiviate.trattiCompressi}</b> tratti compressi, <b>{cleanupResult.archiviate.srcNullati}</b> immagini svuotate</div>
+                  </>}
+                  <div>· Eliminate ({">"} 6 mesi): <b>{cleanupResult.lavagneVecchie.count}</b> lavagne ({cleanupResult.lavagneVecchie.tratti} tratti, {cleanupResult.lavagneVecchie.forme} forme)</div>
                 </div>
               )}
               {cleanupError && (
