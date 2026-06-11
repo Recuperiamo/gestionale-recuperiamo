@@ -155,7 +155,7 @@ export default function LavagnaListPage() {
   }
 
   async function handleCleanup() {
-    if (!window.confirm("Eliminare definitivamente tutte le lavagne collegate a lezioni svolte più di 6 mesi fa?\n\nQuesta operazione è irreversibile.")) return;
+    if (!window.confirm("Operazione in due passaggi:\n\n• Lavagne > 30 giorni → archiviate e compresse (tratti gzip, immagini rimosse)\n• Lavagne > 6 mesi → eliminate definitivamente\n\nContinuare?")) return;
     setCleaning(true);
     setCleanupResult(null);
     setCleanupError(null);
@@ -598,10 +598,10 @@ export default function LavagnaListPage() {
                     fontWeight: 700, fontSize: 13, cursor: cleaning ? "not-allowed" : "pointer",
                   }}
                 >
-                  {cleaning ? "Pulizia in corso…" : "🗑️ Pulisci lavagne > 6 mesi"}
+                  {cleaning ? "Pulizia in corso…" : "🗑️ Archivia e pulisci"}
                 </button>
                 <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                  Rimuove tratti/forme eliminati e cancella le lavagne di lezioni risalenti a oltre 6 mesi fa
+                  {">"} 30 giorni → archivia + comprimi tratti · {">"} 6 mesi → elimina completamente
                 </span>
               </div>
 
