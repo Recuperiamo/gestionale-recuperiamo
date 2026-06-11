@@ -263,7 +263,7 @@ export async function POST(request) {
             data: {
               pacchettoId: Number(pacchettoId),
               clienteId: Number(clienteId),
-              descrizione,
+              descrizione: descrizione || formatDataOra(dt),
               oreConsumate: durataNormalizzata,
               durataOre: durataNormalizzata,
               orario: dt,
@@ -319,18 +319,16 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Ore residue insufficienti' }, { status: 400 })
   }
 
+  const orarioDate = orario ? (() => { const d = new Date(orario); return isNaN(d.getTime()) ? null : d })() : null
   const dataCreate = {
     pacchettoId: Number(pacchettoId),
     clienteId: Number(clienteId),
     oreConsumate: durataNormalizzata,
-    descrizione,
+    descrizione: descrizione || (orarioDate ? formatDataOra(orarioDate) : ''),
     durataOre: durataNormalizzata,
     extraPacchetto: isExtraPacchetto,
-    stato: isExtraPacchetto ? 'EXTRA' : undefined
-  }
-  if (orario) {
-    const d = new Date(orario)
-    if (!isNaN(d.getTime())) dataCreate.orario = d
+    stato: isExtraPacchetto ? 'EXTRA' : undefined,
+    ...(orarioDate ? { orario: orarioDate } : {}),
   }
 
   try {
