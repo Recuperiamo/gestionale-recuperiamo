@@ -101,7 +101,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       color: tool === 'eraser' ? '#ffffff' : color,
       width: strokeWidth,
       opacity,
-      points: [pt],
+      points: allPoints.current, // ref condivisa: i push successivi sono visibili all'engine senza copie
     })
 
     // Notify Ably immediately (stroke:start) — skip for laser
@@ -141,7 +141,9 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
     if (tool === 'eraser' && eraserMode === 'stroke') {
       const pt = getPoint(e)
       if (pt) {
-        eng.updateLiveStroke([pt]) // cursor circle only
+        // Aggiorna cursore eraser in-place (ref condivisa con engine)
+        allPoints.current.length = 0
+        allPoints.current.push(pt)
 
         const canEraseItem = (authorId: any) => {
           if (isAdmin) return true
@@ -203,9 +205,9 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       const startPt = allPoints.current[0]
       const pt = getPoint(e)
       if (startPt && pt) {
-        // Keep only [start, current] so pointerUp sees raw.length >= 2 and commits correctly
-        allPoints.current = [startPt, pt]
-        eng.updateLiveStroke([startPt, pt])
+        // Muta in-place per mantenere la ref condivisa con engine valida
+        allPoints.current.length = 0
+        allPoints.current.push(startPt, pt)
       }
       return
     }
@@ -226,9 +228,6 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       }
       allPoints.current.push(pt)
     }
-
-    // Update live display (unsimplified = responsive feel)
-    eng.updateLiveStroke([...allPoints.current])
 
     // Stream only NEW points to Ably — throttled a ~60fps per ridurre carico di rete
     if (!isLaser.current) {
