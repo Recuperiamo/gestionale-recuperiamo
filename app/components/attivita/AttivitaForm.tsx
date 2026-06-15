@@ -21,7 +21,13 @@ function nomeClienteLabel(clienteId: any, tutti: any[]): string {
   const nome = c.nomeReferente || c.nome || c.email;
   const omonimi = tutti.filter(x => x.nomeReferente === c.nomeReferente && x.id !== c.id);
   if (omonimi.length === 0) return nome;
-  if (c.cognome) return `${nome} ${c.cognome}`;
+  if (c.cognome) {
+    const altriCognomi = omonimi.map(o => (o.cognome || "").toUpperCase());
+    const mio = c.cognome.toUpperCase();
+    let len = 1;
+    while (len < mio.length && altriCognomi.some(a => a.slice(0, len) === mio.slice(0, len))) len++;
+    return `${nome} ${c.cognome.slice(0, len).toUpperCase()}.`;
+  }
   return `${nome} (${(c.email || "").split("@")[0]})`;
 }
 
