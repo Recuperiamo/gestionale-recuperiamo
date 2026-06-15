@@ -212,11 +212,18 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
 
     // Coalesced events for smoother strokes
     const evts = native.getCoalescedEvents ? native.getCoalescedEvents() : [native]
+    // 1 screen pixel in world coords (squared, to avoid sqrt)
+    const minDistSq = 1 / (eng.zoom * eng.zoom)
     for (const ev of evts) {
       const rect = (e.target as HTMLElement).getBoundingClientRect?.() || { left: 0, top: 0 }
       const sx = ev.clientX - rect.left
       const sy = ev.clientY - rect.top
       const pt = eng.screenToWorld(sx, sy)
+      const last = allPoints.current[allPoints.current.length - 1]
+      if (last) {
+        const dx = pt.x - last.x, dy = pt.y - last.y
+        if (dx * dx + dy * dy < minDistSq) continue
+      }
       allPoints.current.push(pt)
     }
 
