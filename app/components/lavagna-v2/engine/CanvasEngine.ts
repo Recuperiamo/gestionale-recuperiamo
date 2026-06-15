@@ -301,6 +301,11 @@ export class CanvasEngine {
   private strokeMap: Map<string, Stroke> = new Map()
   private shapeMap: Map<string, Shape> = new Map()
 
+  // Accumulo incrementale del tratto live (evita ridisegno O(n) ogni frame)
+  private liveAccum: HTMLCanvasElement | null = null
+  private liveAccumCtx: CanvasRenderingContext2D | null = null
+  private liveAccumPt = 0  // quanti punti sono già nel canvas di accumulo
+
   // Selection highlight
   selectedStrokeIds: string[] = []
   selectedShapeIds: string[] = []
@@ -387,6 +392,8 @@ export class CanvasEngine {
     this.baseDirtyMode = 'full'
     this.pendingNewStrokes = []
     this.contentCanvasReady = false
+    // Viewport cambiato: il canvas di accumulo è stale, riparte da zero al prossimo flush
+    this.liveAccumPt = 0
   }
 
   setData(strokes: Stroke[], shapes: Shape[], bg: Background) {
@@ -422,9 +429,22 @@ export class CanvasEngine {
     this.markBaseDirty()
   }
 
-  startLiveStroke(stroke: LiveStroke) { this.liveStroke = stroke }
+  startLiveStroke(stroke: LiveStroke) {
+    this.liveStroke = stroke
+    const acc = document.createElement('canvas')
+    acc.width = this.liveCanvas.width
+    acc.height = this.liveCanvas.height
+    this.liveAccum = acc
+    this.liveAccumCtx = acc.getContext('2d')!
+    this.liveAccumPt = 0
+  }
   updateLiveStroke(pts: Point[]) { if (this.liveStroke) this.liveStroke.points = pts }
-  endLiveStroke() { this.liveStroke = null }
+  endLiveStroke() {
+    this.liveStroke = null
+    this.liveAccum = null
+    this.liveAccumCtx = null
+    this.liveAccumPt = 0
+  }
 
   startLiveShape(s: { type: string; x: number; y: number; x2: number; y2: number; color: string; strokeWidth: number }) { this.liveShape = s }
   updateLiveShape(x2: number, y2: number) { if (this.liveShape) { this.liveShape.x2 = x2; this.liveShape.y2 = y2 } }
@@ -451,6 +471,52 @@ export class CanvasEngine {
   }
 
   // ── Rendering ───────────────────────────────────────────────────────────────
+
+  /** Disegna sul canvas di accumulo i punti già "stabili" del tratto live.
+   *  Solo per tool opachi (pen): evita artefatti di doppia-trasparenza con highlighter. */
+  private flushLiveAccum() {
+    const ls = this.liveStroke
+    if (!ls || !this.liveAccumCtx || !this.liveAccum || ls.points.length < 4) return
+    const pts = ls.points
+    const targetPt = pts.length - 2  // l'ultimo punto stabile (n-1 e n cambiano ancora)
+    if (targetPt <= this.liveAccumPt) return
+
+    // Ricrea il canvas di accumulo se il viewport è stato ridimensionato
+    if (this.liveAccum.width !== this.liveCanvas.width || this.liveAccum.height !== this.liveCanvas.height) {
+      this.liveAccum.width = this.liveCanvas.width
+      this.liveAccum.height = this.liveCanvas.height
+      this.liveAccumCtx = this.liveAccum.getContext('2d')!
+      this.liveAccumPt = 0
+      if (targetPt <= this.liveAccumPt) return
+    }
+
+    const ctx = this.liveAccumCtx
+    applyTransform(ctx, this.pan, this.zoom, this.dpr)
+    ctx.strokeStyle = ls.color
+    ctx.fillStyle = ls.color
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.lineWidth = ls.width
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    ctx.beginPath()
+    if (this.liveAccumPt === 0) {
+      ctx.moveTo(pts[0].x, pts[0].y)
+    } else {
+      // Riprendi dall'esatto punto in cui ci siamo fermati: mid(accumPt-1, accumPt)
+      const mx = (pts[this.liveAccumPt - 1].x + pts[this.liveAccumPt].x) / 2
+      const my = (pts[this.liveAccumPt - 1].y + pts[this.liveAccumPt].y) / 2
+      ctx.moveTo(mx, my)
+    }
+    for (let i = this.liveAccumPt; i < targetPt; i++) {
+      const mx = (pts[i].x + pts[i + 1].x) / 2
+      const my = (pts[i].y + pts[i + 1].y) / 2
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my)
+    }
+    ctx.stroke()
+    this.liveAccumPt = targetPt
+  }
 
   private startLiveLoop() {
     const loop = () => {
@@ -594,11 +660,30 @@ export class CanvasEngine {
           ctx.stroke()
         }
       } else {
-        ctx.globalCompositeOperation = 'source-over'
-        ctx.globalAlpha = ls.opacity ?? 1
-        ctx.strokeStyle = ls.color
-        ctx.fillStyle = ls.color
-        drawStrokePath(ctx, ls.points, ls.width)
+        const opacity = ls.opacity ?? 1
+        // Accumulo incrementale: solo per tratti completamente opachi (pen).
+        // Per highlighter (opacity < 1) il ridisegno completo evita doppia-trasparenza.
+        const useAccum = opacity >= 1 && ls.points.length >= 8 && this.liveAccum && this.liveAccumCtx
+        if (useAccum) {
+          if (ls.points.length - this.liveAccumPt >= 8) this.flushLiveAccum()
+          // 1. Composita la parte accumulata (pixel già corretti nel canvas di accumulo)
+          ctx.setTransform(1, 0, 0, 1, 0, 0)
+          ctx.drawImage(this.liveAccum!, 0, 0)
+          // 2. Disegna la "coda viva" (gli ultimi punti non ancora nel accumulo)
+          applyTransform(ctx, this.pan, this.zoom, dpr)
+          ctx.globalCompositeOperation = 'source-over'
+          ctx.globalAlpha = opacity
+          ctx.strokeStyle = ls.color
+          ctx.fillStyle = ls.color
+          const tailStart = Math.max(0, this.liveAccumPt - 1)
+          drawStrokePath(ctx, ls.points.slice(tailStart), ls.width)
+        } else {
+          ctx.globalCompositeOperation = 'source-over'
+          ctx.globalAlpha = opacity
+          ctx.strokeStyle = ls.color
+          ctx.fillStyle = ls.color
+          drawStrokePath(ctx, ls.points, ls.width)
+        }
       }
       ctx.restore()
     }
