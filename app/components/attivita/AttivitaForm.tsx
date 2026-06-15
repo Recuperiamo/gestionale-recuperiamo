@@ -15,6 +15,16 @@ function toLocalDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function nomeClienteLabel(clienteId: any, tutti: any[]): string {
+  const c = tutti.find(x => String(x.id) === String(clienteId));
+  if (!c) return "";
+  const nome = c.nomeReferente || c.nome || c.email;
+  const omonimi = tutti.filter(x => x.nomeReferente === c.nomeReferente && x.id !== c.id);
+  if (omonimi.length === 0) return nome;
+  if (c.cognome) return `${nome} ${c.cognome}`;
+  return `${nome} (${(c.email || "").split("@")[0]})`;
+}
+
 export default function AttivitaForm({ initialData, onSuccess, onClose }) {
   const isEdit = !!initialData?.id;
   const isRicorrente = !!initialData?.ricorrenzaId;
@@ -261,7 +271,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
         // Modifica singola
         const orarioISO = new Date(`${dataSingola}T${oraInizioSingola}:00`);
         const payload = {
-          descrizione: descrizione.trim() || defaultDescrizione || "",
+          descrizione: descrizione.trim() || defaultDescrizione || nomeClienteLabel(clienteId, clienti) || "",
           durataOre: Number(durataOreSingola),
           orario: orarioISO.toISOString(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -337,7 +347,7 @@ export default function AttivitaForm({ initialData, onSuccess, onClose }) {
           method:"POST",
           headers:{ "Content-Type":"application/json" },
           body: JSON.stringify({
-            descrizione: descrizione.trim() || defaultDescrizione || "",
+            descrizione: descrizione.trim() || defaultDescrizione || nomeClienteLabel(clienteId, clienti) || "",
             clienteId: Number(clienteId),
             pacchettoId: Number(pacchettoId),
             // send client's timezone so server can interpret wall-clock times correctly
