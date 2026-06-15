@@ -308,7 +308,7 @@ export class CanvasEngine {
   constructor(base: HTMLCanvasElement, live: HTMLCanvasElement) {
     this.baseCanvas = base
     this.liveCanvas = live
-    this.dpr = window.devicePixelRatio || 1
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2)
     this.baseCtx = base.getContext('2d')!
     this.liveCtx = live.getContext('2d')!
     this.contentCanvas = document.createElement('canvas')
@@ -319,7 +319,7 @@ export class CanvasEngine {
   // ── Public API ──────────────────────────────────────────────────────────────
 
   resize(cssW: number, cssH: number) {
-    const dpr = window.devicePixelRatio || 1
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
     this.dpr = dpr
     for (const c of [this.baseCanvas, this.liveCanvas]) {
       c.width = cssW * dpr
