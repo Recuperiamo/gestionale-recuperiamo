@@ -46,6 +46,8 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
   const remoteStreams = useRef<Map<string, RemoteStream>>(new Map())
   const cursorTs = useRef<Record<string, number>>({})
   const pendingMessages = useRef<Array<{ name: string; data: any }>>([])
+  // Track IDs of strokes deleted locally so that late/replayed stroke:done don't re-add them
+  const deletedStrokeIds = useRef<Set<string>>(new Set())
 
   // ── publish helper ──────────────────────────────────────────────────────────
 
@@ -89,7 +91,10 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         })
         break
       case 'delete-stroke':
-        if (event.stroke) publish('stroke:delete', { strokeId: event.stroke.id, lavagnaId })
+        if (event.stroke) {
+          deletedStrokeIds.current.add(String(event.stroke.id))
+          publish('stroke:delete', { strokeId: event.stroke.id, lavagnaId })
+        }
         break
       case 'commit-shape':
         if (event.shape) publish('shape:add', { shape: event.shape, lavagnaId })
@@ -136,7 +141,7 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
   // ── channel setup ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!channelName) return
+    if (!channelName || !userId) return
     let ch: any = null
     let alive = true
 
@@ -182,6 +187,8 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         const onStrokeDone = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
+          // Skip strokes that were deleted locally (race: stroke:done arrives after local erase)
+          if (d.streamId && deletedStrokeIds.current.has(String(d.streamId))) return
           const stream = remoteStreams.current.get(d.streamId)
           remoteStreams.current.delete(d.streamId)
           engineRef.current?.endLiveStroke()
@@ -251,7 +258,10 @@ export function useAblySync({ channelName, engineRef, userId, role, cursorLabel,
         const onStrokeDelete = (msg: any) => {
           const d = msg.data || {}
           if (d.senderId === userId) return
-          if (d.strokeId) store.deleteStroke(d.strokeId)
+          if (d.strokeId) {
+            deletedStrokeIds.current.add(String(d.strokeId))
+            store.deleteStroke(d.strokeId)
+          }
         }
 
         const onShapeAdd = (msg: any) => {

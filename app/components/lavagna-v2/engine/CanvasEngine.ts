@@ -392,7 +392,10 @@ export class CanvasEngine {
     this.baseDirtyMode = 'full'
     this.pendingNewStrokes = []
     this.contentCanvasReady = false
-    // Viewport cambiato: il canvas di accumulo è stale, riparte da zero al prossimo flush
+    // Canvas di accumulo invalido: clear + reset puntatore per evitare artefatti
+    if (this.liveAccumCtx && this.liveAccum) {
+      this.liveAccumCtx.clearRect(0, 0, this.liveAccum.width, this.liveAccum.height)
+    }
     this.liveAccumPt = 0
   }
 
