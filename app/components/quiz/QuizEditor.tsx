@@ -591,20 +591,8 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
         )}
       </div>
 
-      {/* Overlay anteprima quiz (modalità studente) */}
       {previewQuizId !== null && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-          onClick={e => { if (e.target === e.currentTarget) setPreviewQuizId(null); }}>
-          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,.25)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #dbe4f1" }}>
-              <span style={{ fontWeight: 800, fontSize: 14, color: "#20489a" }}>Anteprima quiz — vista studente</span>
-              <button onClick={() => setPreviewQuizId(null)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}>✕</button>
-            </div>
-            <div style={{ padding: "16px 20px" }}>
-              <QuizPlayer quizId={previewQuizId} onClose={() => setPreviewQuizId(null)} previewMode={true} />
-            </div>
-          </div>
-        </div>
+        <QuizPlayer quizId={previewQuizId} onClose={() => setPreviewQuizId(null)} previewMode={true} fullScreen={true} />
       )}
     </div>
   );

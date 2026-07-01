@@ -43,7 +43,7 @@ export default function QuizPanelAula({ clienteId, coloreTema = "#1cb0f6" }: {
   if (quizAperto !== null) {
     return (
       <div style={{ padding: "16px 0" }}>
-        <QuizPlayer quizId={quizAperto} onClose={() => { setQuizAperto(null); load(); }} />
+        <QuizPlayer quizId={quizAperto} onClose={() => { setQuizAperto(null); load(); }} fullScreen />
       </div>
     );
   }
