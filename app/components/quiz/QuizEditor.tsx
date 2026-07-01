@@ -10,6 +10,7 @@ interface Domanda {
   testo: string;
   opzioni?: string[];
   rispostaCorretta?: string;
+  rispostaAttesa?: string;   // solo per completamento: riferimento docente, non usata per auto-grading
 }
 
 interface Quiz {
@@ -140,9 +141,12 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
 
       {d.tipo === "completamento" && (
         <label style={{ ...s.label, marginBottom: 10 }}>
-          Risposta attesa <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11 }}>(confronto case-insensitive)</span>
-          <input value={d.rispostaCorretta || ""} onChange={e => set({ rispostaCorretta: e.target.value })}
-            style={s.input} placeholder="Parola o frase attesa..." />
+          Risposta di riferimento
+          <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11, marginLeft: 4 }}>
+            (visibile al docente in fase di correzione — non usata per auto-grading)
+          </span>
+          <input value={d.rispostaAttesa || ""} onChange={e => set({ rispostaAttesa: e.target.value })}
+            style={s.input} placeholder="Es. covalente, ibridati, adiacente..." />
         </label>
       )}
 
@@ -168,8 +172,9 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
   const nomeStu = [tentativo.cliente.nomeReferente, tentativo.cliente.nome, tentativo.cliente.cognome]
     .filter(Boolean).join(" ");
 
-  const hasManuali = domande.some(d => d.tipo === "testo_libero");
-  const tutteCorrete = !hasManuali || domande.every((d, i) => d.tipo !== "testo_libero" || corr[String(i)] !== undefined);
+  const isManualeFn = (d: Domanda) => d.tipo === "testo_libero" || (d.tipo === "completamento" && !d.rispostaCorretta?.trim());
+  const hasManuali = domande.some(isManualeFn);
+  const tutteCorrete = !hasManuali || domande.every((d, i) => !isManualeFn(d) || corr[String(i)] !== undefined);
 
   async function salvaCorrezione() {
     setSaving(true);
@@ -209,16 +214,12 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {domande.map((d, i) => {
           const risposta = risposte[String(i)];
-          const isManuale = d.tipo === "testo_libero";
+          const isManuale = isManualeFn(d);
           const corrInfo = corr[String(i)];
           let autoCorretta: boolean | null = null;
           if (!isManuale) {
             if (!risposta) { autoCorretta = false; }
-            else if (d.tipo === "completamento") {
-              autoCorretta = String(risposta).trim().toLowerCase() === String(d.rispostaCorretta).trim().toLowerCase();
-            } else {
-              autoCorretta = String(risposta).trim() === String(d.rispostaCorretta).trim();
-            }
+            else { autoCorretta = String(risposta).trim() === String(d.rispostaCorretta).trim(); }
           }
           return (
             <div key={i} style={{ background: "#fff", border: "1px solid #e8edf5", borderRadius: 8, padding: "10px 12px" }}>
@@ -243,6 +244,11 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
               {isManuale && (
                 <div style={{ marginTop: 8, padding: "8px 10px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>Correzione manuale</div>
+                  {d.rispostaAttesa && (
+                    <div style={{ fontSize: 12, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "4px 10px", marginBottom: 8, fontWeight: 600 }}>
+                      Risposta di riferimento: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     {["corretto", "errato"].map(v => (
                       <label key={v} style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 13 }}>
@@ -383,7 +389,10 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
     const out: Domanda = { tipo: d.tipo, testo: d.testo.trim() };
     if (d.tipo === "mcq") { out.opzioni = d.opzioni.map(String); out.rispostaCorretta = d.rispostaCorretta; }
     if (d.tipo === "vero_falso") out.rispostaCorretta = d.rispostaCorretta;
-    if (d.tipo === "completamento" && d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim();
+    if (d.tipo === "completamento") {
+      if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
+      if (d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim(); // retrocompatibilità
+    }
     return out;
   });
   return { titolo: obj.titolo.trim(), domande };

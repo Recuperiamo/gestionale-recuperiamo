@@ -63,23 +63,25 @@ function GroupDropdown({ group, isAdmin, isActiveFn, open, onToggle }) {
           background: active || open ? "rgba(28,176,246,0.3)" : "transparent",
           border: "none",
           color: active || open ? "#fff" : "#c8d8f0",
-          borderRadius: 6,
-          padding: "6px 12px",
-          fontWeight: 600,
-          fontSize: 12,
+          borderRadius: 8,
+          padding: "10px 22px",
+          fontWeight: 700,
+          fontSize: 15,
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          gap: 5,
+          gap: 7,
           whiteSpace: "nowrap",
           transition: "all 0.15s",
+          letterSpacing: "0.1px",
         }}
       >
         {group.label}
         <span style={{
-          fontSize: 8, display: "inline-block",
+          fontSize: 9, display: "inline-block",
           transition: "transform 0.2s",
           transform: open ? "rotate(180deg)" : "none",
+          opacity: 0.8,
         }}>▼</span>
       </button>
 
@@ -201,12 +203,13 @@ export default function Navbar() {
     color: active ? "#fff" : "#c8d8f0",
     background: active ? "rgba(28,176,246,0.35)" : "transparent",
     border: "none",
-    borderRadius: 6,
-    padding: "6px 12px",
-    fontWeight: 600,
-    fontSize: 12,
+    borderRadius: 8,
+    padding: "10px 22px",
+    fontWeight: 700,
+    fontSize: 15,
     transition: "all 0.15s",
     whiteSpace: "nowrap",
+    letterSpacing: "0.1px",
   });
 
   const mobileLinkStyle = (active) => ({
@@ -241,7 +244,7 @@ export default function Navbar() {
         justifyContent: "space-between",
         alignItems: "center",
         borderBottom: "1.5px solid #1a3a7a",
-        minHeight: 56,
+        minHeight: 64,
         position: "sticky",
         top: 0,
         zIndex: 200,
