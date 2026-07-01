@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// GET /api/quiz/[id]  — quiz + tentativi (admin) o quiz solo (studente)
+// GET /api/quiz/[id]
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
@@ -18,7 +18,7 @@ export async function GET(req, { params }) {
   const quiz = await prisma.quiz.findUnique({
     where: { id },
     include: {
-      lezione: { select: { id: true, titolo: true } },
+      lezioni: { select: { lezione: { select: { id: true, titolo: true } } } },
       tentativi: isAdmin ? {
         include: { cliente: { select: { id: true, nomeReferente: true, nome: true, cognome: true } } },
         orderBy: { completatoAt: 'desc' },
@@ -29,11 +29,11 @@ export async function GET(req, { params }) {
 
   if (!isAdmin) {
     const clienteId = Number(session.user?.clienteId)
-    const assegnato = await prisma.assegnazioneLezione.findUnique({
-      where: { lezioneId_clienteId: { lezioneId: quiz.lezioneId, clienteId } },
+    const lezioneIds = quiz.lezioni.map(l => l.lezione.id)
+    const assegnato = await prisma.assegnazioneLezione.findFirst({
+      where: { lezioneId: { in: lezioneIds }, clienteId },
     })
     if (!assegnato) return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 })
-    // Allega solo il tentativo dello studente corrente
     const mioTentativo = await prisma.tentativoQuiz.findUnique({
       where: { quizId_clienteId: { quizId: id, clienteId } },
     })
@@ -43,7 +43,8 @@ export async function GET(req, { params }) {
   return NextResponse.json(quiz)
 }
 
-// PATCH /api/quiz/[id]  — modifica quiz (admin only)
+// PATCH /api/quiz/[id]
+// Body: { titolo?, domande?, lezioneIds? }
 export async function PATCH(req, { params }) {
   const session = await getServerSession(authOptions)
   if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
@@ -56,7 +57,21 @@ export async function PATCH(req, { params }) {
   if (body.titolo !== undefined) data.titolo = body.titolo.trim()
   if (body.domande !== undefined) data.domande = body.domande
 
-  const updated = await prisma.quiz.update({ where: { id }, data })
+  // Aggiorna lezioni collegate se fornite
+  if (Array.isArray(body.lezioneIds)) {
+    data.lezioni = {
+      deleteMany: {},
+      create: body.lezioneIds.map(lid => ({ lezioneId: Number(lid) })),
+    }
+  }
+
+  const updated = await prisma.quiz.update({
+    where: { id },
+    data,
+    include: {
+      lezioni: { select: { lezione: { select: { id: true, titolo: true, materia: true } } } },
+    },
+  })
   return NextResponse.json(updated)
 }
 
@@ -66,8 +81,6 @@ export async function DELETE(req, { params }) {
   if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
-
-  const id = Number(params.id)
-  await prisma.quiz.delete({ where: { id } })
+  await prisma.quiz.delete({ where: { id: Number(params.id) } })
   return NextResponse.json({ ok: true })
 }

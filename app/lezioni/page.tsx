@@ -20,10 +20,8 @@ const MATERIE_CONFIG: Record<string,{colore:string;bg:string;icona:string}> = {
   Chimica:    { colore:"#059669", bg:"#d1fae5", icona:"⚗️" },
 };
 
-// ── Anni ─────────────────────────────────────────────────────────────────────
 const ANNI = ["I","II","III","IV","V"];
 
-// ── Macro-argomenti predefiniti per materia ───────────────────────────────────
 const MACRO_PREDEFINITI = {
   Matematica: [
     "Il linguaggio della Matematica","Logica","Insiemistica","Gli Insiemi Numerici",
@@ -32,7 +30,6 @@ const MACRO_PREDEFINITI = {
   ],
 };
 
-// ── Colori ───────────────────────────────────────────────────────────────────
 const C = {
   bg:"#f0f4ff", card:"#fff", primary:"#4f46e5", light:"#e0e7ff",
   text:"#1e1b4b", sub:"#6b7280", border:"#e5e7eb",
@@ -68,7 +65,7 @@ function LezioneModal({ lezione, argomenti, macroArgomenti, onClose, onSaved }) 
         body: JSON.stringify({ nome, materia })
       });
     }
-    onSaved(); // ricarica lista
+    onSaved();
     setCreatingPredefiniti(false);
   }
 
@@ -122,7 +119,7 @@ function LezioneModal({ lezione, argomenti, macroArgomenti, onClose, onSaved }) 
           {filteredMacro.map(m=><option key={m.id} value={m.id}>{m.nome}</option>)}
         </select>
 
-        <label style={lbl}>Argomento <span style={{ fontWeight:400,color:C.sub }}>(opzionale — se assente la lezione è già l'argomento)</span></label>
+        <label style={lbl}>Argomento <span style={{ fontWeight:400,color:C.sub }}>(opzionale)</span></label>
         <select value={argomentoId} onChange={e=>setArgomentoId(e.target.value)} style={inp}>
           <option value="">— nessuno —</option>
           {filteredArg.map(a=><option key={a.id} value={a.id}>{a.nome}{a.macroArgomento?` (${a.macroArgomento.nome})`:""}</option>)}
@@ -268,16 +265,34 @@ function AssegnaModal({ lezione, clienti, onClose, onSaved }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // RIGA LEZIONE
 // ═══════════════════════════════════════════════════════════════════════════════
-function LezioneRow({ l, isAdmin, onEdit, onAssegna, onDelete }) {
+function LezioneRow({ l, isAdmin, onEdit, onAssegna, onDelete, organizza, onDragStart, onDragOver, onDrop, isDragTarget }) {
   const sezioni = [l.mappaHtml&&"Mappa",l.teoriaHtml&&"Teoria",l.eserciziHtml&&"Esercizi"].filter(Boolean);
   return (
-    <div style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,background:C.card,marginBottom:4,border:`1px solid ${C.border}` }}>
-      <Link href={`/lezioni/${l.id}`} style={{ flex:1,textDecoration:"none",color:C.text,fontSize:14,fontWeight:500 }}>
+    <div
+      draggable={!!organizza}
+      onDragStart={organizza ? onDragStart : undefined}
+      onDragOver={organizza ? (e=>{e.preventDefault();onDragOver();}) : undefined}
+      onDrop={organizza ? onDrop : undefined}
+      style={{
+        display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,
+        background:isDragTarget?"#dde3ff":C.card,
+        marginBottom:4,
+        border:`1.5px solid ${isDragTarget?C.primary:C.border}`,
+        cursor:organizza?"grab":"default",
+        transition:"background .12s,border .12s",
+      }}>
+      {organizza && (
+        <span style={{ color:"#9ca3af",fontSize:18,lineHeight:1,userSelect:"none",flexShrink:0,cursor:"grab" }}>⠿</span>
+      )}
+      <Link
+        href={`/lezioni/${l.id}`}
+        style={{ flex:1,textDecoration:"none",color:C.text,fontSize:14,fontWeight:500 }}
+        onClick={organizza?(e=>e.preventDefault()):undefined}>
         {l.titolo}
         {l.anno && <span style={{ marginLeft:8,fontSize:11,background:C.light,color:C.primary,borderRadius:4,padding:"1px 6px" }}>{l.anno}</span>}
       </Link>
       {sezioni.map(s=><span key={s} style={{ fontSize:11,background:"#f0fdf4",color:C.green,borderRadius:4,padding:"1px 6px" }}>{s}</span>)}
-      {isAdmin && (
+      {isAdmin && !organizza && (
         <div style={{ display:"flex",gap:4 }}>
           <button onClick={onAssegna} style={btnXS} title="Assegna studenti">👥</button>
           <button onClick={onEdit} style={btnXS}>✏️</button>
@@ -310,6 +325,11 @@ function LezioniPageInner() {
   const [openMacro, setOpenMacro] = useState(new Set());
   const [openArg, setOpenArg] = useState(new Set());
   const [openMaterie, setOpenMaterie] = useState<Set<string>>(new Set());
+
+  // ── Organizza (drag-and-drop) ─────────────────────────────────────────────
+  const [organizza, setOrganizza] = useState(false);
+  const [drag, setDrag] = useState<{ type:string; id:number; groupKey:string }|null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string|null>(null);
 
   const isAdmin = session?.user?.role==="admin"||session?.user?.role==="operatore";
 
@@ -385,6 +405,74 @@ function LezioniPageInner() {
     loadAll();
   }
 
+  // ── Drag-and-drop helpers ─────────────────────────────────────────────────
+  async function persistOrder(type: string, orderedIds: number[]) {
+    const base = type==='macro' ? '/api/macro-argomenti' : type==='arg' ? '/api/argomenti' : '/api/lezioni';
+    await Promise.all(
+      orderedIds.map((id, ordine) =>
+        fetch(`${base}/${id}`, {
+          method:'PATCH',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ ordine }),
+        })
+      )
+    );
+  }
+
+  async function handleDrop(type: string, targetId: number, groupKey: string) {
+    if (!drag || drag.type!==type || drag.groupKey!==groupKey || drag.id===targetId) {
+      setDragOverKey(null);
+      return;
+    }
+
+    let list: any[];
+    if (type==='macro') {
+      list = macroArgomenti
+        .filter(m=>m.materia===groupKey)
+        .sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
+    } else if (type==='arg') {
+      list = argomenti
+        .filter(a=>a.macroArgomentoId===Number(groupKey))
+        .sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
+    } else {
+      const [scope,scopeId] = groupKey.split(':');
+      if (scope==='arg') {
+        list = lezioni
+          .filter(l=>l.argomentoId===Number(scopeId))
+          .sort((a,b)=>(a.ordine||0)-(b.ordine||0)||a.titolo.localeCompare(b.titolo));
+      } else {
+        list = lezioni
+          .filter(l=>l.macroArgomentoId===Number(scopeId)&&!l.argomentoId)
+          .sort((a,b)=>(a.ordine||0)-(b.ordine||0));
+      }
+    }
+
+    const srcIdx = list.findIndex(i=>i.id===drag.id);
+    const tgtIdx = list.findIndex(i=>i.id===targetId);
+    if (srcIdx===-1||tgtIdx===-1){ setDragOverKey(null); return; }
+
+    const reordered = [...list];
+    const [moved] = reordered.splice(srcIdx, 1);
+    reordered.splice(tgtIdx, 0, moved);
+
+    const updates = Object.fromEntries(reordered.map((i,idx)=>[i.id,idx]));
+
+    // optimistic update
+    if (type==='macro') {
+      setMacroArgomenti(prev=>prev.map(m=>updates[m.id]!=null?{...m,ordine:updates[m.id]}:m));
+    } else if (type==='arg') {
+      setArgomenti(prev=>prev.map(a=>updates[a.id]!=null?{...a,ordine:updates[a.id]}:a));
+    } else {
+      setLezioni(prev=>prev.map(l=>updates[l.id]!=null?{...l,ordine:updates[l.id]}:l));
+    }
+
+    setDrag(null);
+    setDragOverKey(null);
+    await persistOrder(type, reordered.map(i=>i.id));
+  }
+
+  function stopDrag() { setDrag(null); setDragOverKey(null); }
+
   const materieVisibili = [
     ...MATERIE_PINNED,
     ...MATERIE.filter(m=>!MATERIE_PINNED.includes(m)&&macroArgomenti.some(ma=>ma.materia===m)),
@@ -410,12 +498,31 @@ function LezioniPageInner() {
               📚 Indice
             </Link>
             {isAdmin && <>
-              <button onClick={()=>setModalMacro({})} style={btnSec}>+ Macro-arg.</button>
-              <button onClick={()=>setModalArgomento({})} style={btnSec}>+ Argomento</button>
-              <button onClick={()=>setModalLezione({})} style={btnPri}>+ Nuova lezione</button>
+              {!organizza && <>
+                <button onClick={()=>setModalMacro({})} style={btnSec}>+ Macro-arg.</button>
+                <button onClick={()=>setModalArgomento({})} style={btnSec}>+ Argomento</button>
+                <button onClick={()=>setModalLezione({})} style={btnPri}>+ Nuova lezione</button>
+              </>}
+              <button
+                onClick={()=>{setOrganizza(o=>!o);setDrag(null);setDragOverKey(null);}}
+                style={{
+                  ...btnSec,
+                  background:organizza?"#e0e7ff":"#fff",
+                  color:organizza?C.primary:"#374151",
+                  fontWeight:organizza?700:400,
+                  borderColor:organizza?C.primary:"#d1d5db",
+                }}>
+                {organizza ? "✓ Fatto" : "⠿ Organizza"}
+              </button>
             </>}
           </div>
         </div>
+
+        {organizza && (
+          <div style={{ marginBottom:16,padding:"10px 16px",background:"#e0e7ff",borderRadius:9,fontSize:13,color:C.primary,fontWeight:500,border:`1px solid ${C.primary}33` }}>
+            Modalità organizzazione attiva — trascina ⠿ per riordinare macro-argomenti, argomenti e lezioni. Clicca <strong>✓ Fatto</strong> per uscire.
+          </div>
+        )}
 
         {/* Card materie principali */}
         <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12,marginBottom:openMaterie.size<materieVisibili.length?12:28 }}>
@@ -456,7 +563,7 @@ function LezioniPageInner() {
             <div key={materia} id={`materia-${materia}`} style={{ marginBottom:isMateriaOpen?28:8 }}>
               <div
                 onClick={()=>toggleMateria(materia)}
-                style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 12px 8px 12px",borderRadius:isMateriaOpen?10:10,borderLeft:`4px solid ${borderColor}`,background:isMateriaOpen?`${borderColor}08`:"#fff",border:`1px solid ${borderColor}22`,marginBottom:isMateriaOpen?10:0,userSelect:"none" }}>
+                style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 12px 8px 12px",borderRadius:10,borderLeft:`4px solid ${borderColor}`,background:isMateriaOpen?`${borderColor}08`:"#fff",border:`1px solid ${borderColor}22`,marginBottom:isMateriaOpen?10:0,userSelect:"none" }}>
                 <span style={{ fontSize:15,color:borderColor,width:18,textAlign:"center",flexShrink:0 }}>{isMateriaOpen?"▾":"▸"}</span>
                 {cfg && <span style={{ fontSize:18 }}>{cfg.icona}</span>}
                 <span style={{ fontWeight:700,fontSize:17,color:borderColor,flex:1 }}>{materia}</span>
@@ -474,18 +581,33 @@ function LezioniPageInner() {
                 </div>
               )}
               {isMateriaOpen && macroList.map(macro=>{
-                const isOpen=openMacro.has(macro.id);
-                const argFigli=argomenti.filter(a=>a.macroArgomentoId===macro.id).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
-                const lezDirette=lezioni.filter(l=>l.macroArgomentoId===macro.id&&!l.argomentoId);
-                const totLezioni=lezDirette.length+argFigli.reduce((s,a)=>s+lezioni.filter(l=>l.argomentoId===a.id).length,0);
+                const isOpen = openMacro.has(macro.id);
+                const argFigli = argomenti.filter(a=>a.macroArgomentoId===macro.id).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
+                const lezDirette = lezioni.filter(l=>l.macroArgomentoId===macro.id&&!l.argomentoId).sort((a,b)=>(a.ordine||0)-(b.ordine||0));
+                const totLezioni = lezDirette.length+argFigli.reduce((s,a)=>s+lezioni.filter(l=>l.argomentoId===a.id).length,0);
+                const isDMacro = dragOverKey===`macro:${macro.id}` && drag?.groupKey===materia;
                 return (
-                  <div key={macro.id} style={{ marginBottom:8,border:`1px solid ${C.border}`,borderRadius:10,overflow:"hidden" }}>
-                    <div style={{ display:"flex",alignItems:"center",gap:8,padding:"12px 16px",background:C.macroRow,cursor:"pointer" }}
+                  <div key={macro.id}
+                    draggable={organizza}
+                    onDragStart={organizza ? ()=>setDrag({type:'macro',id:macro.id,groupKey:materia}) : undefined}
+                    onDragOver={organizza ? (e=>{e.preventDefault();setDragOverKey(`macro:${macro.id}`);}) : undefined}
+                    onDrop={organizza ? ()=>handleDrop('macro',macro.id,materia) : undefined}
+                    onDragEnd={stopDrag}
+                    style={{
+                      marginBottom:8,
+                      border:`1.5px solid ${isDMacro?C.primary:C.border}`,
+                      borderRadius:10,overflow:"hidden",
+                      background:isDMacro?"#dde3ff":undefined,
+                      transition:"background .12s,border .12s",
+                    }}>
+                    <div
+                      style={{ display:"flex",alignItems:"center",gap:8,padding:"12px 16px",background:isDMacro?"#dde3ff":C.macroRow,cursor:organizza?"grab":"pointer" }}
                       onClick={()=>toggleMacro(macro.id)}>
+                      {organizza && <span style={{ color:"#9ca3af",fontSize:18,lineHeight:1,userSelect:"none",cursor:"grab",flexShrink:0 }}>⠿</span>}
                       <span style={{ fontSize:15,color:C.primary }}>{isOpen?"▼":"▶"}</span>
                       <span style={{ fontWeight:600,color:C.text,flex:1 }}>{macro.nome}</span>
                       <span style={{ fontSize:12,color:C.sub }}>{argFigli.length} arg · {totLezioni} lez</span>
-                      {isAdmin && (
+                      {isAdmin && !organizza && (
                         <div style={{ display:"flex",gap:4 }} onClick={e=>e.stopPropagation()}>
                           <button onClick={()=>setModalMacro(macro)} style={btnXS}>✏️</button>
                           <button onClick={()=>deleteMacro(macro.id)} style={{...btnXS,color:C.red}}>🗑</button>
@@ -496,16 +618,31 @@ function LezioniPageInner() {
                     {isOpen && (
                       <div style={{ padding:"8px 12px 12px" }}>
                         {argFigli.map(arg=>{
-                          const isArgOpen=openArg.has(arg.id);
-                          const lezArg=lezioni.filter(l=>l.argomentoId===arg.id).sort((a,b)=>a.titolo.localeCompare(b.titolo));
+                          const isArgOpen = openArg.has(arg.id);
+                          const lezArg = lezioni.filter(l=>l.argomentoId===arg.id).sort((a,b)=>(a.ordine||0)-(b.ordine||0)||a.titolo.localeCompare(b.titolo));
+                          const isDArg = dragOverKey===`arg:${arg.id}` && drag?.groupKey===String(macro.id);
                           return (
-                            <div key={arg.id} style={{ marginBottom:6,border:`1px solid ${C.border}`,borderRadius:8,overflow:"hidden" }}>
-                              <div style={{ display:"flex",alignItems:"center",gap:8,padding:"9px 14px",background:C.argRow,cursor:"pointer" }}
+                            <div key={arg.id}
+                              draggable={organizza}
+                              onDragStart={organizza ? ()=>setDrag({type:'arg',id:arg.id,groupKey:String(macro.id)}) : undefined}
+                              onDragOver={organizza ? (e=>{e.preventDefault();setDragOverKey(`arg:${arg.id}`);}) : undefined}
+                              onDrop={organizza ? ()=>handleDrop('arg',arg.id,String(macro.id)) : undefined}
+                              onDragEnd={stopDrag}
+                              style={{
+                                marginBottom:6,
+                                border:`1.5px solid ${isDArg?C.primary:C.border}`,
+                                borderRadius:8,overflow:"hidden",
+                                background:isDArg?"#dde3ff":undefined,
+                                transition:"background .12s,border .12s",
+                              }}>
+                              <div
+                                style={{ display:"flex",alignItems:"center",gap:8,padding:"9px 14px",background:isDArg?"#dde3ff":C.argRow,cursor:organizza?"grab":"pointer" }}
                                 onClick={()=>toggleArg(arg.id)}>
+                                {organizza && <span style={{ color:"#9ca3af",fontSize:16,lineHeight:1,userSelect:"none",cursor:"grab",flexShrink:0 }}>⠿</span>}
                                 <span style={{ fontSize:12,color:C.sub }}>{isArgOpen?"▼":"▶"}</span>
                                 <span style={{ fontWeight:500,color:C.text,flex:1,fontSize:14 }}>{arg.nome}</span>
                                 <span style={{ fontSize:11,color:C.sub }}>{lezArg.length} lezioni</span>
-                                {isAdmin && (
+                                {isAdmin && !organizza && (
                                   <div style={{ display:"flex",gap:4 }} onClick={e=>e.stopPropagation()}>
                                     <button title="Promuovi a macro-argomento" onClick={()=>promuoviArgomento(arg)} style={btnXS}>⬆️</button>
                                     <button onClick={()=>setModalArgomento(arg)} style={btnXS}>✏️</button>
@@ -521,10 +658,15 @@ function LezioniPageInner() {
                                       <LezioneRow key={l.id} l={l} isAdmin={isAdmin}
                                         onEdit={()=>setModalLezione(l)}
                                         onAssegna={()=>setModalAssegna(l)}
-                                        onDelete={()=>deleteLezione(l.id)}/>
+                                        onDelete={()=>deleteLezione(l.id)}
+                                        organizza={organizza}
+                                        onDragStart={()=>setDrag({type:'lezione',id:l.id,groupKey:`arg:${arg.id}`})}
+                                        onDragOver={()=>setDragOverKey(`lezione:${l.id}`)}
+                                        onDrop={()=>handleDrop('lezione',l.id,`arg:${arg.id}`)}
+                                        isDragTarget={dragOverKey===`lezione:${l.id}`&&drag?.groupKey===`arg:${arg.id}`}/>
                                     ))
                                   }
-                                  {isAdmin && (
+                                  {isAdmin && !organizza && (
                                     <button onClick={()=>setModalLezione({argomentoId:arg.id,macroArgomentoId:macro.id,materia})}
                                       style={{marginTop:6,...btnXS,color:C.primary}}>+ lezione</button>
                                   )}
@@ -538,10 +680,15 @@ function LezioniPageInner() {
                           <LezioneRow key={l.id} l={l} isAdmin={isAdmin}
                             onEdit={()=>setModalLezione(l)}
                             onAssegna={()=>setModalAssegna(l)}
-                            onDelete={()=>deleteLezione(l.id)}/>
+                            onDelete={()=>deleteLezione(l.id)}
+                            organizza={organizza}
+                            onDragStart={()=>setDrag({type:'lezione',id:l.id,groupKey:`macro:${macro.id}`})}
+                            onDragOver={()=>setDragOverKey(`lezione:${l.id}`)}
+                            onDrop={()=>handleDrop('lezione',l.id,`macro:${macro.id}`)}
+                            isDragTarget={dragOverKey===`lezione:${l.id}`&&drag?.groupKey===`macro:${macro.id}`}/>
                         ))}
 
-                        {isAdmin && (
+                        {isAdmin && !organizza && (
                           <div style={{ display:"flex",gap:8,marginTop:8 }}>
                             <button onClick={()=>setModalArgomento({macroArgomentoId:macro.id})} style={{...btnXS,color:C.primary}}>+ argomento</button>
                             <button onClick={()=>setModalLezione({macroArgomentoId:macro.id,materia})} style={{...btnXS,color:C.primary}}>+ lezione diretta</button>
@@ -556,7 +703,7 @@ function LezioniPageInner() {
           );
         })}
 
-        {/* Lezioni non classificate — admin vede warning, studente vede semplicemente le sue lezioni */}
+        {/* Lezioni non classificate */}
         {lezioniNonClass.length>0 && (
           <div style={{ marginBottom:24 }}>
             {isAdmin

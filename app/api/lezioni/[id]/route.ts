@@ -48,6 +48,7 @@ export async function PATCH(req, { params }) {
   if (body.anno !== undefined) data.anno = body.anno?.trim() || null;
   if (body.argomentoId !== undefined) data.argomentoId = body.argomentoId ? Number(body.argomentoId) : null;
   if (body.macroArgomentoId !== undefined) data.macroArgomentoId = body.macroArgomentoId ? Number(body.macroArgomentoId) : null;
+  if (body.ordine !== undefined) data.ordine = Number(body.ordine);
   if (body.mappaHtml !== undefined) data.mappaHtml = body.mappaHtml || null;
   if (body.teoriaHtml !== undefined) data.teoriaHtml = body.teoriaHtml || null;
   if (body.eserciziHtml !== undefined) data.eserciziHtml = body.eserciziHtml || null;

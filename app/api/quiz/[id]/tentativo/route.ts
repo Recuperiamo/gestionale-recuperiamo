@@ -40,14 +40,18 @@ export async function POST(req, { params }) {
   const clienteId = Number(session.user?.clienteId)
   if (!clienteId) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
-  // Verifica assegnazione lezione
-  const quiz = await prisma.quiz.findUnique({ where: { id: quizId } })
+  // Verifica assegnazione lezione (almeno una delle lezioni collegate)
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    include: { lezioni: { select: { lezioneId: true } } },
+  })
   if (!quiz) return NextResponse.json({ error: 'Quiz non trovato' }, { status: 404 })
 
   const isAdmin = session.user?.role === 'admin' || session.user?.role === 'operatore'
   if (!isAdmin) {
-    const assegnato = await prisma.assegnazioneLezione.findUnique({
-      where: { lezioneId_clienteId: { lezioneId: quiz.lezioneId, clienteId } },
+    const lezioneIds = quiz.lezioni.map(l => l.lezioneId)
+    const assegnato = await prisma.assegnazioneLezione.findFirst({
+      where: { lezioneId: { in: lezioneIds }, clienteId },
     })
     if (!assegnato) return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 })
   }

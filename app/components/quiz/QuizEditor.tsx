@@ -10,19 +10,27 @@ interface Domanda {
   testo: string;
   opzioni?: string[];
   rispostaCorretta?: string;
-  rispostaAttesa?: string;   // solo per completamento: riferimento docente, non usata per auto-grading
+  rispostaAttesa?: string;
 }
 
-interface Quiz {
+interface LezioneRef {
+  id: number;
+  titolo: string;
+  materia: string;
+}
+
+interface QuizItem {
   id: number;
   titolo: string;
   domande: Domanda[];
   createdAt: string;
+  lezioni: { lezione: LezioneRef }[];
   _count?: { tentativi: number };
 }
 
 interface Tentativo {
   id: number;
+  quizId: number;
   clienteId: number;
   risposte: Record<string, string>;
   punteggio: number | null;
@@ -38,6 +46,15 @@ const TIPI: { value: TipoDomanda; label: string }[] = [
   { value: "completamento", label: "Completamento" },
   { value: "testo_libero", label: "Testo libero (manuale)" },
 ];
+
+const MATERIE_ORDER = ["Matematica","Fisica","Chimica","Biologia","Informatica","Italiano","Latino","Storia","Filosofia","Inglese","Scienze","Generale"];
+const MATERIE_COLORI: Record<string, string> = {
+  Matematica:"#4f46e5", Fisica:"#7c3aed", Chimica:"#059669",
+  Biologia:"#0891b2", Informatica:"#0369a1", Italiano:"#b45309",
+  Latino:"#78350f", Storia:"#92400e", Filosofia:"#6d28d9",
+  Inglese:"#be185d", Scienze:"#065f46", Generale:"#374151",
+};
+function colore(materia: string) { return MATERIE_COLORI[materia] || "#4f46e5"; }
 
 const s = {
   btn: (color = "#1cb0f6") => ({
@@ -59,6 +76,7 @@ function domandaVuota(): Domanda {
   return { tipo: "mcq", testo: "", opzioni: ["", "", "", ""], rispostaCorretta: "" };
 }
 
+// ── Editor singola domanda ────────────────────────────────────────────────────
 function DomandaEditor({ d, idx, onChange, onRemove }: {
   d: Domanda; idx: number;
   onChange: (updated: Domanda) => void;
@@ -157,7 +175,7 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
   );
 }
 
-// ── Vista risultati di un singolo tentativo ────────────────────────────────────
+// ── Correzione tentativo ──────────────────────────────────────────────────────
 function TentativoDetail({ tentativo, domande, onCorrezione }: {
   tentativo: Tentativo;
   domande: Domanda[];
@@ -179,13 +197,11 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
   async function salvaCorrezione() {
     setSaving(true);
     try {
-      const res = await fetch(`/api/quiz/${tentativo.quizId}/tentativo/${tentativo.id}`, {
+      await fetch(`/api/quiz/${tentativo.quizId}/tentativo/${tentativo.id}`, {
         method: "PATCH", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ correzioneManuale: corr }),
       });
-      if (!res.ok) throw new Error("Errore");
-      const updated = await res.json();
       onCorrezione(tentativo.id, corr);
     } finally {
       setSaving(false);
@@ -218,8 +234,9 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
           const corrInfo = corr[String(i)];
           let autoCorretta: boolean | null = null;
           if (!isManuale) {
-            if (!risposta) { autoCorretta = false; }
-            else { autoCorretta = String(risposta).trim() === String(d.rispostaCorretta).trim(); }
+            autoCorretta = risposta
+              ? String(risposta).trim() === String(d.rispostaCorretta).trim()
+              : false;
           }
           return (
             <div key={i} style={{ background: "#fff", border: "1px solid #e8edf5", borderRadius: 8, padding: "10px 12px" }}>
@@ -235,10 +252,9 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
                 <div style={{ fontSize: 12, marginTop: 4 }}>
                   <span style={{ color: "#6b7280" }}>Corretta: </span>
                   <span style={{ fontWeight: 700 }}>{d.rispostaCorretta}</span>
-                  <span style={{
-                    marginLeft: 8, fontWeight: 700,
-                    color: autoCorretta ? "#12753a" : "#c62828",
-                  }}>{autoCorretta ? "✓" : "✗"}</span>
+                  <span style={{ marginLeft: 8, fontWeight: 700, color: autoCorretta ? "#12753a" : "#c62828" }}>
+                    {autoCorretta ? "✓" : "✗"}
+                  </span>
                 </div>
               )}
               {isManuale && (
@@ -280,32 +296,89 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
   );
 }
 
-// ── Form creazione/modifica quiz ───────────────────────────────────────────────
-function QuizForm({ lezioneId, initial, draft, onSaved, onCancel }: {
-  lezioneId: number;
-  initial?: Quiz;
+// ── Selezione lezioni (multi-select) ─────────────────────────────────────────
+function LezioniSelect({ lezioni, selected, onChange }: {
+  lezioni: LezioneRef[];
+  selected: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const perMateria = MATERIE_ORDER.reduce((acc, m) => {
+    const l = lezioni.filter(l => l.materia === m);
+    if (l.length) acc[m] = l;
+    return acc;
+  }, {} as Record<string, LezioneRef[]>);
+
+  function toggle(id: number) {
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>
+        Lezioni collegate
+        {selected.length > 0 && (
+          <span style={{ marginLeft: 8, background: "#e0e7ff", color: "#4f46e5", borderRadius: 10, padding: "1px 8px", fontWeight: 700 }}>
+            {selected.length} selezionate
+          </span>
+        )}
+      </div>
+      <div style={{
+        border: "1.5px solid #dbe4f1", borderRadius: 8, maxHeight: 220, overflowY: "auto", background: "#fafcff",
+      }}>
+        {Object.entries(perMateria).map(([materia, list]) => (
+          <div key={materia}>
+            <div style={{ padding: "6px 12px 4px", fontSize: 11, fontWeight: 700, color: colore(materia), background: "#f3f4f6", borderBottom: "1px solid #e5e7eb", position: "sticky", top: 0 }}>
+              {materia}
+            </div>
+            {list.map(l => (
+              <label key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", background: selected.includes(l.id) ? "#eff6ff" : "transparent" }}>
+                <input type="checkbox" checked={selected.includes(l.id)} onChange={() => toggle(l.id)}
+                  style={{ accentColor: "#4f46e5", width: 14, height: 14, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: "#1e1b4b" }}>{l.titolo}</span>
+              </label>
+            ))}
+          </div>
+        ))}
+        {lezioni.length === 0 && (
+          <div style={{ padding: 16, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Nessuna lezione disponibile</div>
+        )}
+      </div>
+      {selected.length === 0 && (
+        <p style={{ fontSize: 11, color: "#e07000", margin: "4px 0 0" }}>Seleziona almeno una lezione.</p>
+      )}
+    </div>
+  );
+}
+
+// ── Form creazione/modifica quiz ──────────────────────────────────────────────
+function QuizForm({ lezioni, defaultLezioneIds, initial, draft, onSaved, onCancel }: {
+  lezioni: LezioneRef[];
+  defaultLezioneIds?: number[];
+  initial?: QuizItem;
   draft?: { titolo: string; domande: Domanda[] };
-  onSaved: (q: Quiz) => void;
+  onSaved: (q: QuizItem) => void;
   onCancel: () => void;
 }) {
   const [titolo, setTitolo] = useState(initial?.titolo ?? draft?.titolo ?? "");
   const [domande, setDomande] = useState<Domanda[]>(
     initial?.domande?.length ? initial.domande : draft?.domande?.length ? draft.domande : [domandaVuota()]
   );
+  const [selectedLezioneIds, setSelectedLezioneIds] = useState<number[]>(
+    initial ? initial.lezioni.map(l => l.lezione.id) : defaultLezioneIds ?? []
+  );
   const [saving, setSaving] = useState(false);
 
   const aggiornaDomanda = (i: number, d: Domanda) => setDomande(prev => prev.map((x, j) => j === i ? d : x));
   const rimuoviDomanda = (i: number) => setDomande(prev => prev.filter((_, j) => j !== i));
 
-  const canSave = titolo.trim() && domande.length > 0 && domande.every(d => {
+  const canSave = selectedLezioneIds.length > 0 && titolo.trim() && domande.length > 0 && domande.every(d => {
     if (!d.testo.trim()) return false;
     if (d.tipo === "mcq") {
       const valide = (d.opzioni || []).filter(o => o.trim());
       return valide.length >= 2 && d.rispostaCorretta && (d.opzioni || []).includes(d.rispostaCorretta);
     }
     if (d.tipo === "vero_falso") return !!d.rispostaCorretta;
-    if (d.tipo === "completamento") return true;
-    return true; // testo_libero
+    return true;
   });
 
   async function handleSave() {
@@ -314,9 +387,7 @@ function QuizForm({ lezioneId, initial, draft, onSaved, onCancel }: {
     try {
       const url = initial ? `/api/quiz/${initial.id}` : "/api/quiz";
       const method = initial ? "PATCH" : "POST";
-      const body = initial
-        ? { titolo: titolo.trim(), domande }
-        : { lezioneId, titolo: titolo.trim(), domande };
+      const body = { lezioneIds: selectedLezioneIds, titolo: titolo.trim(), domande };
       const res = await fetch(url, {
         method, credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -337,10 +408,15 @@ function QuizForm({ lezioneId, initial, draft, onSaved, onCancel }: {
       <h3 style={{ margin: "0 0 14px", color: "#20489a", fontSize: 15, fontWeight: 800 }}>
         {initial ? "Modifica quiz" : "Nuovo quiz"}
       </h3>
+
       <label style={{ ...s.label, marginBottom: 14 }}>
         Titolo del quiz
         <input value={titolo} onChange={e => setTitolo(e.target.value)} style={s.input} placeholder="Es. Verifica capitolo 3" />
       </label>
+
+      <div style={{ marginBottom: 14 }}>
+        <LezioniSelect lezioni={lezioni} selected={selectedLezioneIds} onChange={setSelectedLezioneIds} />
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
         {domande.map((d, i) => (
@@ -366,6 +442,7 @@ function QuizForm({ lezioneId, initial, draft, onSaved, onCancel }: {
   );
 }
 
+// ── Parse JSON ────────────────────────────────────────────────────────────────
 function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | string {
   let obj: any;
   try { obj = JSON.parse(text); } catch { return "JSON non valido: controlla virgole e parentesi."; }
@@ -391,19 +468,27 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
     if (d.tipo === "vero_falso") out.rispostaCorretta = d.rispostaCorretta;
     if (d.tipo === "completamento") {
       if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
-      if (d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim(); // retrocompatibilità
+      if (d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim();
     }
     return out;
   });
   return { titolo: obj.titolo.trim(), domande };
 }
 
-// ── Componente principale QuizEditor ──────────────────────────────────────────
-export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: number; onQuizChange?: () => void }) {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+// ── Componente principale QuizEditor ─────────────────────────────────────────
+export default function QuizEditor({
+  lezioni,
+  defaultLezioneId,
+  onQuizChange,
+}: {
+  lezioni: LezioneRef[];
+  defaultLezioneId?: number;
+  onQuizChange?: () => void;
+}) {
+  const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
+  const [editingQuiz, setEditingQuiz] = useState<QuizItem | null>(null);
   const [expandedQuiz, setExpandedQuiz] = useState<number | null>(null);
   const [tentativi, setTentativi] = useState<Record<number, Tentativo[]>>({});
   const [loadingTentativi, setLoadingTentativi] = useState<number | null>(null);
@@ -423,11 +508,11 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
   }
 
   useEffect(() => {
-    fetch(`/api/quiz?lezioneId=${lezioneId}`, { credentials: "include" })
+    fetch("/api/quiz", { credentials: "include" })
       .then(r => r.json())
       .then(d => setQuizzes(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
-  }, [lezioneId]);
+  }, []);
 
   async function loadTentativi(quizId: number) {
     if (tentativi[quizId]) { setExpandedQuiz(quizId); return; }
@@ -450,33 +535,40 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
     onQuizChange?.();
   }
 
-  function handleSaved(quiz: Quiz) {
+  function handleSaved(quiz: QuizItem) {
     if (editingQuiz) {
       setQuizzes(prev => prev.map(q => q.id === quiz.id ? { ...q, ...quiz } : q));
       setEditingQuiz(null);
     } else {
-      setQuizzes(prev => [...prev, { ...quiz, _count: { tentativi: 0 } }]);
+      setQuizzes(prev => [{ ...quiz, _count: { tentativi: 0 } }, ...prev]);
       setShowForm(false);
     }
+    setImportDraft(null);
     onQuizChange?.();
   }
+
+  // Raggruppa quiz per materia (prima lezione collegata)
+  const perMateria = MATERIE_ORDER.reduce((acc, m) => {
+    const q = quizzes.filter(qz => qz.lezioni?.[0]?.lezione?.materia === m);
+    if (q.length) acc[m] = q;
+    return acc;
+  }, {} as Record<string, QuizItem[]>);
+  const senzaMateria = quizzes.filter(qz => !qz.lezioni?.length);
 
   if (loading) return <div style={{ padding: 20, color: "#20489a" }}>Caricamento...</div>;
 
   return (
     <div style={{ padding: "16px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <span style={{ fontWeight: 700, fontSize: 14, color: "#20489a" }}>
-          {quizzes.length} quiz {quizzes.length === 1 ? "associato" : "associati"} a questa lezione
-        </span>
-        {!showForm && !editingQuiz && !showImport && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setShowImport(true)} style={s.btnOutline}>Importa JSON</button>
-            <button onClick={() => setShowForm(true)} style={s.btn()}>+ Nuovo quiz</button>
-          </div>
-        )}
-      </div>
 
+      {/* Toolbar */}
+      {!showForm && !editingQuiz && !showImport && (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 16 }}>
+          <button onClick={() => setShowImport(true)} style={s.btnOutline}>Importa JSON</button>
+          <button onClick={() => { setShowForm(true); }} style={s.btn()}>+ Nuovo quiz</button>
+        </div>
+      )}
+
+      {/* Import JSON */}
       {showImport && !showForm && !editingQuiz && (
         <div style={{ background: "#f8faff", border: "1.5px solid #4268b3", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -491,8 +583,7 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
             onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFileDrop(f); }}
-            style={{ position: "relative", borderRadius: 8, border: isDragging ? "2px dashed #4268b3" : "2px dashed transparent", background: isDragging ? "#e8f0fe" : "transparent", transition: "all .15s" }}
-          >
+            style={{ position: "relative", borderRadius: 8, border: isDragging ? "2px dashed #4268b3" : "2px dashed transparent", background: isDragging ? "#e8f0fe" : "transparent", transition: "all .15s" }}>
             {isDragging && (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#4268b3", fontWeight: 700, borderRadius: 8, pointerEvents: "none" }}>
                 Rilascia il file .json qui
@@ -519,84 +610,52 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
                 setImportError("");
                 setShowForm(true);
               }}
-              style={s.btn()}
-            >
+              style={s.btn()}>
               Carica nel form
             </button>
           </div>
         </div>
       )}
 
-      {(showForm && !editingQuiz) && (
-        <div style={{ marginBottom: 16 }}>
+      {/* Form nuovo quiz */}
+      {showForm && !editingQuiz && (
+        <div style={{ marginBottom: 20 }}>
           <QuizForm
-            lezioneId={lezioneId}
+            lezioni={lezioni}
+            defaultLezioneIds={defaultLezioneId ? [defaultLezioneId] : []}
             draft={importDraft || undefined}
-            onSaved={q => { setImportDraft(null); handleSaved(q); }}
+            onSaved={handleSaved}
             onCancel={() => { setShowForm(false); setImportDraft(null); }}
           />
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {quizzes.map(q => (
-          <div key={q.id} style={{ background: "#fff", border: "1.5px solid #dbe4f1", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a" }}>{q.titolo}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                  {(q.domande as Domanda[]).length} domande · {q._count?.tentativi ?? "?"} tentativi
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={() => setPreviewQuizId(q.id)}
-                  style={{ ...s.btnOutline, fontSize: 12, padding: "5px 12px" }}>👁 Testa</button>
-                <button onClick={() => { setEditingQuiz(q); setShowForm(false); }}
-                  style={{ ...s.btnOutline, fontSize: 12, padding: "5px 12px" }}>Modifica</button>
-                <button onClick={() => expandedQuiz === q.id ? setExpandedQuiz(null) : loadTentativi(q.id)}
-                  style={{ ...s.btn("#4268b3"), fontSize: 12, padding: "5px 12px" }}>
-                  {loadingTentativi === q.id ? "..." : expandedQuiz === q.id ? "Chiudi risultati" : "Vedi risultati"}
-                </button>
-                <button onClick={() => handleDelete(q.id)}
-                  style={{ ...s.btn("#c62828"), fontSize: 12, padding: "5px 12px" }}>Elimina</button>
-              </div>
-            </div>
-
-            {editingQuiz?.id === q.id && (
-              <div style={{ borderTop: "1px solid #dbe4f1", padding: "12px 16px" }}>
-                <QuizForm lezioneId={lezioneId} initial={editingQuiz}
-                  onSaved={handleSaved} onCancel={() => setEditingQuiz(null)} />
-              </div>
-            )}
-
-            {expandedQuiz === q.id && (
-              <div style={{ borderTop: "1px solid #dbe4f1", padding: "12px 16px" }}>
-                {!tentativi[q.id]?.length ? (
-                  <p style={{ color: "#aaa", fontSize: 13, margin: 0 }}>Nessun tentativo ancora.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {tentativi[q.id].map(t => (
-                      <TentativoDetail key={t.id} tentativo={t} domande={q.domande as Domanda[]}
-                        onCorrezione={(tid, corr) => {
-                          setTentativi(prev => ({
-                            ...prev,
-                            [q.id]: prev[q.id].map(x => x.id === tid ? { ...x, correzioneManuale: corr } : x),
-                          }));
-                        }} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+      {/* Lista quiz per materia */}
+      {Object.entries(perMateria).map(([materia, qList]) => (
+        <div key={materia} style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, padding: "6px 0 6px 12px", borderLeft: `4px solid ${colore(materia)}` }}>
+            <span style={{ fontWeight: 700, fontSize: 15, color: colore(materia) }}>{materia}</span>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>{qList.length} quiz</span>
           </div>
-        ))}
-
-        {quizzes.length === 0 && !showForm && (
-          <div style={{ textAlign: "center", padding: "30px 20px", color: "#aaa", fontSize: 13 }}>
-            Nessun quiz associato a questa lezione.
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {qList.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
           </div>
-        )}
-      </div>
+        </div>
+      ))}
+
+      {/* Quiz senza lezione */}
+      {senzaMateria.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#9ca3af", marginBottom: 10 }}>Senza lezione collegata</div>
+          {senzaMateria.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
+        </div>
+      )}
+
+      {quizzes.length === 0 && !showForm && (
+        <div style={{ textAlign: "center", padding: "48px 20px", color: "#9ca3af", fontSize: 13 }}>
+          Nessun quiz ancora. Crea il primo!
+        </div>
+      )}
 
       {previewQuizId !== null && (
         <QuizPlayer quizId={previewQuizId} onClose={() => setPreviewQuizId(null)} previewMode={true} fullScreen={true} />
@@ -604,3 +663,64 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
     </div>
   );
 }
+
+// ── Card singolo quiz ─────────────────────────────────────────────────────────
+function QuizCard({ q, lezioni, expandedQuiz, tentativi, loadingTentativi, editingQuiz, onEdit, onSaved, onDelete, onLoadTentativi, onPreview, onSetTentativi, setExpandedQuiz }) {
+  return (
+    <div style={{ background: "#fff", border: "1.5px solid #dbe4f1", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 16px", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a", marginBottom: 3 }}>{q.titolo}</div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>
+            {(q.domande as Domanda[]).length} domande · {q._count?.tentativi ?? "?"} tentativi
+          </div>
+          {q.lezioni?.length > 0 && (
+            <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {q.lezioni.map(({ lezione }) => (
+                <span key={lezione.id} style={{ fontSize: 11, background: "#e0e7ff", color: "#4f46e5", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
+                  {lezione.titolo}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
+          <button onClick={() => onPreview(q.id)} style={{ ...s.btnOutline, fontSize: 12, padding: "5px 12px" }}>👁 Testa</button>
+          <button onClick={() => { onEdit(q); }} style={{ ...s.btnOutline, fontSize: 12, padding: "5px 12px" }}>Modifica</button>
+          <button onClick={() => expandedQuiz === q.id ? setExpandedQuiz(null) : onLoadTentativi(q.id)}
+            style={{ ...s.btn("#4268b3"), fontSize: 12, padding: "5px 12px" }}>
+            {loadingTentativi === q.id ? "..." : expandedQuiz === q.id ? "Chiudi" : "Risultati"}
+          </button>
+          <button onClick={() => onDelete(q.id)} style={{ ...s.btn("#c62828"), fontSize: 12, padding: "5px 12px" }}>Elimina</button>
+        </div>
+      </div>
+
+      {editingQuiz?.id === q.id && (
+        <div style={{ borderTop: "1px solid #dbe4f1", padding: "12px 16px" }}>
+          <QuizForm lezioni={lezioni} initial={editingQuiz} onSaved={onSaved} onCancel={() => onEdit(null)} />
+        </div>
+      )}
+
+      {expandedQuiz === q.id && (
+        <div style={{ borderTop: "1px solid #dbe4f1", padding: "12px 16px" }}>
+          {!tentativi[q.id]?.length ? (
+            <p style={{ color: "#aaa", fontSize: 13, margin: 0 }}>Nessun tentativo ancora.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {tentativi[q.id].map(t => (
+                <TentativoDetail key={t.id} tentativo={t} domande={q.domande as Domanda[]}
+                  onCorrezione={(tid, corr) => {
+                    onSetTentativi(prev => ({
+                      ...prev,
+                      [q.id]: prev[q.id].map(x => x.id === tid ? { ...x, correzioneManuale: corr } : x),
+                    }));
+                  }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+

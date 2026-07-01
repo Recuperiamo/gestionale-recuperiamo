@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
-import QuizEditor from "../../components/quiz/QuizEditor";
 import QuizPlayer, { QuizListLezione } from "../../components/quiz/QuizPlayer";
 
 const MATERIE = [
@@ -551,10 +550,14 @@ function LezioneDetailPageInner() {
           <div style={{ border: "1px solid #dbe4f1", borderTop: "none", borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
             {tab === "quiz" ? (
               <div style={{ padding: "16px 20px" }}>
-                {isAdmin
-                  ? <QuizEditor lezioneId={Number(id)} />
-                  : <QuizListLezione lezioneId={Number(id)} />
-                }
+                {isAdmin && (
+                  <div style={{ marginBottom: 12, display: "flex", justifyContent: "flex-end" }}>
+                    <a href="/quiz" style={{ fontSize: 12, color: "#4268b3", fontWeight: 600, textDecoration: "none", border: "1px solid #dbe4f1", borderRadius: 7, padding: "5px 14px", background: "#f8faff" }}>
+                      ✏️ Gestisci quiz →
+                    </a>
+                  </div>
+                )}
+                <QuizListLezione lezioneId={Number(id)} />
               </div>
             ) : currentHtml ? (
               <iframe key={tab} srcDoc={currentHtml} style={{ width: "100%", minHeight: 620, border: "none", display: "block" }} sandbox="allow-scripts allow-same-origin allow-forms" />

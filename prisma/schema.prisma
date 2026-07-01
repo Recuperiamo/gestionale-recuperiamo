@@ -467,6 +467,7 @@ model Lezione {
   titolo           String
   materia          String                @default("Generale")
   anno             String?
+  ordine           Int                   @default(0)
   argomentoId      Int?                  // FK al nuovo Argomento (livello 2)
   macroArgomentoId Int?                  // FK diretto a MacroArgomento (se senza livello 2)
   mappaHtml        String?
@@ -477,7 +478,7 @@ model Lezione {
   argomento        Argomento?            @relation(fields: [argomentoId], references: [id], onDelete: SetNull)
   macroArgomento   MacroArgomento?       @relation(fields: [macroArgomentoId], references: [id], onDelete: SetNull)
   assegnazioni     AssegnazioneLezione[]
-  quizzes          Quiz[]
+  quizzes          QuizLezione[]
 
   @@index([argomentoId])
   @@index([macroArgomentoId])
@@ -504,14 +505,21 @@ model AssegnazioneLezione {
 
 model Quiz {
   id          Int             @id @default(autoincrement())
-  lezioneId   Int
-  lezione     Lezione         @relation(fields: [lezioneId], references: [id], onDelete: Cascade)
   titolo      String
   domande     Json            // DomandaQuiz[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+  lezioni     QuizLezione[]
   tentativi   TentativoQuiz[]
+}
 
+model QuizLezione {
+  quizId    Int
+  lezioneId Int
+  quiz      Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  lezione   Lezione @relation(fields: [lezioneId], references: [id], onDelete: Cascade)
+
+  @@id([quizId, lezioneId])
   @@index([lezioneId])
 }
 
