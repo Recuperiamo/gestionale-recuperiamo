@@ -309,6 +309,7 @@ function LezioniPageInner() {
 
   const [openMacro, setOpenMacro] = useState(new Set());
   const [openArg, setOpenArg] = useState(new Set());
+  const [openMaterie, setOpenMaterie] = useState<Set<string>>(new Set(MATERIE_PINNED));
 
   const isAdmin = session?.user?.role==="admin"||session?.user?.role==="operatore";
 
@@ -321,6 +322,7 @@ function LezioniPageInner() {
   useEffect(()=>{
     const macroNome = searchParams.get("macro");
     const argNome = searchParams.get("arg");
+    const materiaParam = searchParams.get("materia");
     if (macroNome && macroArgomenti.length) {
       const m = macroArgomenti.find(m=>m.nome===macroNome);
       if (m) setOpenMacro(s=>new Set([...s,m.id]));
@@ -328,6 +330,10 @@ function LezioniPageInner() {
     if (argNome && argomenti.length) {
       const a = argomenti.find(a=>a.nome===argNome);
       if (a) setOpenArg(s=>new Set([...s,a.id]));
+    }
+    if (materiaParam) {
+      const trovata = MATERIE.find(m=>m.toLowerCase()===materiaParam.toLowerCase());
+      if (trovata) setOpenMaterie(new Set([trovata]));
     }
   },[searchParams,macroArgomenti,argomenti]);
 
@@ -350,6 +356,13 @@ function LezioniPageInner() {
 
   function toggleMacro(id){setOpenMacro(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
   function toggleArg(id){setOpenArg(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+  function toggleMateria(nome:string){setOpenMaterie(s=>{const n=new Set(s);n.has(nome)?n.delete(nome):n.add(nome);return n;});}
+  function focusMateria(nome:string){
+    setOpenMaterie(new Set([nome]));
+    router.push(`/lezioni?materia=${nome.toLowerCase()}`);
+    setTimeout(()=>document.getElementById(`materia-${nome}`)?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+  }
+  function mostraTutte(){setOpenMaterie(new Set(materieVisibili));router.push("/lezioni");}
 
   async function deleteMacro(id){
     if(!confirm("Eliminare questo macro-argomento?")) return;
@@ -405,37 +418,51 @@ function LezioniPageInner() {
         </div>
 
         {/* Card materie principali */}
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12,marginBottom:28 }}>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12,marginBottom:openMaterie.size<materieVisibili.length?12:28 }}>
           {MATERIE_PINNED.map(materia=>{
             const cfg = MATERIE_CONFIG[materia];
             const nMacro = macroArgomenti.filter(m=>m.materia===materia).length;
             const macroIds = new Set(macroArgomenti.filter(m=>m.materia===materia).map(m=>m.id));
             const argIds = new Set(argomenti.filter(a=>macroIds.has(a.macroArgomentoId)).map(a=>a.id));
             const nLez = lezioni.filter(l=>macroIds.has(l.macroArgomentoId)||argIds.has(l.argomentoId)).length;
+            const isFocused = openMaterie.size===1 && openMaterie.has(materia);
             return (
-              <div key={materia} style={{ background:cfg.bg,border:`2px solid ${cfg.colore}22`,borderRadius:14,padding:"18px 16px",cursor:"pointer" }}
-                onClick={()=>document.getElementById(`materia-${materia}`)?.scrollIntoView({behavior:"smooth",block:"start"})}>
+              <div key={materia}
+                style={{ background:isFocused?cfg.bg:"#fff",border:`2px solid ${isFocused?cfg.colore:cfg.colore+"33"}`,borderRadius:14,padding:"18px 16px",cursor:"pointer",transition:"all .15s" }}
+                onClick={()=>isFocused?mostraTutte():focusMateria(materia)}>
                 <div style={{ fontSize:28,marginBottom:8 }}>{cfg.icona}</div>
                 <div style={{ fontWeight:800,fontSize:16,color:cfg.colore,marginBottom:4 }}>{materia}</div>
                 <div style={{ fontSize:12,color:"#6b7280" }}>
                   {nMacro ? `${nMacro} argomenti · ${nLez} lezioni` : "Nessun contenuto ancora"}
                 </div>
+                {isFocused && <div style={{ fontSize:11,color:cfg.colore,marginTop:6,fontWeight:700 }}>↩ Mostra tutte</div>}
               </div>
             );
           })}
         </div>
+        {openMaterie.size<materieVisibili.length && openMaterie.size>0 && (
+          <div style={{ textAlign:"right",marginBottom:20 }}>
+            <button onClick={mostraTutte} style={{ ...btnSec,fontSize:12,padding:"5px 14px" }}>↩ Mostra tutte le materie</button>
+          </div>
+        )}
 
         {/* Gerarchia per materia */}
         {materieVisibili.map(materia=>{
           const cfg = MATERIE_CONFIG[materia];
           const borderColor = cfg ? cfg.colore : C.primary;
           const macroList = macroArgomenti.filter(m=>m.materia===materia).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
+          const isMateriaOpen = openMaterie.has(materia);
           return (
-            <div key={materia} id={`materia-${materia}`} style={{ marginBottom:28 }}>
-              <h2 style={{ fontSize:17,color:borderColor,fontWeight:700,margin:"0 0 10px",padding:"6px 0 6px 12px",borderBottom:`2px solid ${borderColor}22`,borderLeft:`4px solid ${borderColor}` }}>
-                {cfg && <span style={{ marginRight:8 }}>{cfg.icona}</span>}{materia}
-              </h2>
-              {macroList.length===0 && (
+            <div key={materia} id={`materia-${materia}`} style={{ marginBottom:isMateriaOpen?28:8 }}>
+              <div
+                onClick={()=>toggleMateria(materia)}
+                style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"8px 12px 8px 12px",borderRadius:isMateriaOpen?10:10,borderLeft:`4px solid ${borderColor}`,background:isMateriaOpen?`${borderColor}08`:"#fff",border:`1px solid ${borderColor}22`,marginBottom:isMateriaOpen?10:0,userSelect:"none" }}>
+                <span style={{ fontSize:15,color:borderColor,width:18,textAlign:"center",flexShrink:0 }}>{isMateriaOpen?"▾":"▸"}</span>
+                {cfg && <span style={{ fontSize:18 }}>{cfg.icona}</span>}
+                <span style={{ fontWeight:700,fontSize:17,color:borderColor,flex:1 }}>{materia}</span>
+                <span style={{ fontSize:12,color:"#9ca3af" }}>{macroList.length} argomenti</span>
+              </div>
+              {isMateriaOpen && macroList.length===0 && (
                 <div style={{ padding:"20px 16px",background:"#f9fafb",border:`1px dashed ${borderColor}44`,borderRadius:10,textAlign:"center",color:"#9ca3af",fontSize:13 }}>
                   Nessun macro-argomento ancora
                   {isAdmin && (
@@ -446,7 +473,7 @@ function LezioniPageInner() {
                   )}
                 </div>
               )}
-              {macroList.map(macro=>{
+              {isMateriaOpen && macroList.map(macro=>{
                 const isOpen=openMacro.has(macro.id);
                 const argFigli=argomenti.filter(a=>a.macroArgomentoId===macro.id).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
                 const lezDirette=lezioni.filter(l=>l.macroArgomentoId===macro.id&&!l.argomentoId);
