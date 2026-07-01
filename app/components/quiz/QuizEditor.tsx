@@ -274,15 +274,16 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
 }
 
 // ── Form creazione/modifica quiz ───────────────────────────────────────────────
-function QuizForm({ lezioneId, initial, onSaved, onCancel }: {
+function QuizForm({ lezioneId, initial, draft, onSaved, onCancel }: {
   lezioneId: number;
   initial?: Quiz;
+  draft?: { titolo: string; domande: Domanda[] };
   onSaved: (q: Quiz) => void;
   onCancel: () => void;
 }) {
-  const [titolo, setTitolo] = useState(initial?.titolo || "");
+  const [titolo, setTitolo] = useState(initial?.titolo ?? draft?.titolo ?? "");
   const [domande, setDomande] = useState<Domanda[]>(
-    initial?.domande?.length ? initial.domande : [domandaVuota()]
+    initial?.domande?.length ? initial.domande : draft?.domande?.length ? draft.domande : [domandaVuota()]
   );
   const [saving, setSaving] = useState(false);
 
@@ -358,6 +359,37 @@ function QuizForm({ lezioneId, initial, onSaved, onCancel }: {
   );
 }
 
+function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | string {
+  let obj: any;
+  try { obj = JSON.parse(text); } catch { return "JSON non valido: controlla virgole e parentesi."; }
+  if (!obj || typeof obj !== "object") return "Il JSON deve essere un oggetto.";
+  if (!obj.titolo || typeof obj.titolo !== "string" || !obj.titolo.trim()) return 'Campo "titolo" mancante o vuoto.';
+  if (!Array.isArray(obj.domande) || obj.domande.length === 0) return 'Campo "domande" mancante o array vuoto.';
+  const tipiValidi = new Set(["mcq", "vero_falso", "completamento", "testo_libero"]);
+  for (let i = 0; i < obj.domande.length; i++) {
+    const d = obj.domande[i];
+    if (!d || typeof d !== "object") return `Domanda ${i + 1}: non è un oggetto.`;
+    if (!tipiValidi.has(d.tipo)) return `Domanda ${i + 1}: "tipo" deve essere mcq, vero_falso, completamento o testo_libero.`;
+    if (!d.testo || !d.testo.trim()) return `Domanda ${i + 1}: "testo" mancante.`;
+    if (d.tipo === "mcq") {
+      if (!Array.isArray(d.opzioni) || d.opzioni.length < 2) return `Domanda ${i + 1}: "opzioni" deve avere almeno 2 elementi.`;
+      if (!d.rispostaCorretta || !d.opzioni.includes(d.rispostaCorretta)) return `Domanda ${i + 1}: "rispostaCorretta" deve essere identica a una delle opzioni.`;
+    }
+    if (d.tipo === "vero_falso" && d.rispostaCorretta !== "vero" && d.rispostaCorretta !== "falso")
+      return `Domanda ${i + 1}: "rispostaCorretta" deve essere "vero" o "falso".`;
+    if (d.tipo === "completamento" && (!d.rispostaCorretta || !d.rispostaCorretta.trim()))
+      return `Domanda ${i + 1}: "rispostaCorretta" mancante per il completamento.`;
+  }
+  const domande: Domanda[] = obj.domande.map((d: any) => {
+    const out: Domanda = { tipo: d.tipo, testo: d.testo.trim() };
+    if (d.tipo === "mcq") { out.opzioni = d.opzioni.map(String); out.rispostaCorretta = d.rispostaCorretta; }
+    if (d.tipo === "vero_falso") out.rispostaCorretta = d.rispostaCorretta;
+    if (d.tipo === "completamento") out.rispostaCorretta = d.rispostaCorretta.trim();
+    return out;
+  });
+  return { titolo: obj.titolo.trim(), domande };
+}
+
 // ── Componente principale QuizEditor ──────────────────────────────────────────
 export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -367,6 +399,10 @@ export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
   const [expandedQuiz, setExpandedQuiz] = useState<number | null>(null);
   const [tentativi, setTentativi] = useState<Record<number, Tentativo[]>>({});
   const [loadingTentativi, setLoadingTentativi] = useState<number | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState("");
+  const [importDraft, setImportDraft] = useState<{ titolo: string; domande: Domanda[] } | null>(null);
 
   useEffect(() => {
     fetch(`/api/quiz?lezioneId=${lezioneId}`, { credentials: "include" })
@@ -413,14 +449,58 @@ export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
         <span style={{ fontWeight: 700, fontSize: 14, color: "#20489a" }}>
           {quizzes.length} quiz {quizzes.length === 1 ? "associato" : "associati"} a questa lezione
         </span>
-        {!showForm && !editingQuiz && (
-          <button onClick={() => setShowForm(true)} style={s.btn()}>+ Nuovo quiz</button>
+        {!showForm && !editingQuiz && !showImport && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setShowImport(true)} style={s.btnOutline}>Importa JSON</button>
+            <button onClick={() => setShowForm(true)} style={s.btn()}>+ Nuovo quiz</button>
+          </div>
         )}
       </div>
 
+      {showImport && !showForm && !editingQuiz && (
+        <div style={{ background: "#f8faff", border: "1.5px solid #4268b3", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#20489a", marginBottom: 8 }}>
+            Importa quiz da JSON
+          </div>
+          <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
+            Incolla il JSON generato da Claude o scritto manualmente seguendo la guida in <code>docs/guida-creazione-quiz.md</code>.
+          </p>
+          <textarea
+            value={importText}
+            onChange={e => { setImportText(e.target.value); setImportError(""); }}
+            rows={8}
+            style={{ ...s.input, fontFamily: "monospace", fontSize: 12, resize: "vertical" }}
+            placeholder={'{\n  "titolo": "Matematica — Eq. 2° grado — Ripasso",\n  "domande": [...]\n}'}
+          />
+          {importError && <p style={{ fontSize: 12, color: "#c62828", margin: "6px 0 0", fontWeight: 600 }}>{importError}</p>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+            <button onClick={() => { setShowImport(false); setImportText(""); setImportError(""); }} style={s.btnOutline}>Annulla</button>
+            <button
+              onClick={() => {
+                const result = parseQuizJson(importText);
+                if (typeof result === "string") { setImportError(result); return; }
+                setImportDraft(result);
+                setShowImport(false);
+                setImportText("");
+                setImportError("");
+                setShowForm(true);
+              }}
+              style={s.btn()}
+            >
+              Carica nel form
+            </button>
+          </div>
+        </div>
+      )}
+
       {(showForm && !editingQuiz) && (
         <div style={{ marginBottom: 16 }}>
-          <QuizForm lezioneId={lezioneId} onSaved={handleSaved} onCancel={() => setShowForm(false)} />
+          <QuizForm
+            lezioneId={lezioneId}
+            draft={importDraft || undefined}
+            onSaved={q => { setImportDraft(null); handleSaved(q); }}
+            onCancel={() => { setShowForm(false); setImportDraft(null); }}
+          />
         </div>
       )}
 

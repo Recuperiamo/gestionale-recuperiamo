@@ -1222,7 +1222,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      {tab === "quiz" ? "Test" : tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                   );
                 })}

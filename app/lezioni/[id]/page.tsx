@@ -384,7 +384,7 @@ function LezioneDetailPageInner() {
   ];
   const sezioniConContenuto = allSezioni.filter(s => argomento[s.htmlKey]);
   // Il tab "quiz" è sempre visibile (admin: editor; studente: player)
-  const tuttiTab = [...sezioniConContenuto, { key: "quiz", htmlKey: null, label: "Quiz" }];
+  const tuttiTab = [...sezioniConContenuto, { key: "quiz", htmlKey: null, label: "Mettiti alla prova" }];
   const htmlContent = { mappa: argomento.mappaHtml, teoria: argomento.teoriaHtml, esercizi: argomento.eserciziHtml };
   const currentHtml = htmlContent[tab] || "";
 

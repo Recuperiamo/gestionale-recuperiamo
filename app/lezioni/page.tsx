@@ -12,6 +12,14 @@ const MATERIE = [
   "Italiano","Latino","Storia","Filosofia","Inglese","Scienze","Generale"
 ];
 
+const MATERIE_PINNED = ["Matematica","Fisica","Chimica"];
+
+const MATERIE_CONFIG: Record<string,{colore:string;bg:string;icona:string}> = {
+  Matematica: { colore:"#4f46e5", bg:"#e0e7ff", icona:"∑" },
+  Fisica:     { colore:"#7c3aed", bg:"#ede9fe", icona:"⚡" },
+  Chimica:    { colore:"#059669", bg:"#d1fae5", icona:"⚗️" },
+};
+
 // ── Anni ─────────────────────────────────────────────────────────────────────
 const ANNI = ["I","II","III","IV","V"];
 
@@ -364,7 +372,10 @@ function LezioniPageInner() {
     loadAll();
   }
 
-  const materieConMacro = MATERIE.filter(m=>macroArgomenti.some(ma=>ma.materia===m));
+  const materieVisibili = [
+    ...MATERIE_PINNED,
+    ...MATERIE.filter(m=>!MATERIE_PINNED.includes(m)&&macroArgomenti.some(ma=>ma.materia===m)),
+  ];
   const lezioniNonClass = lezioni.filter(l=>!l.argomentoId&&!l.macroArgomentoId);
 
   if (status==="loading"||loading) return <div style={{padding:40,color:C.sub}}>Carico...</div>;
@@ -393,12 +404,48 @@ function LezioniPageInner() {
           </div>
         </div>
 
+        {/* Card materie principali */}
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12,marginBottom:28 }}>
+          {MATERIE_PINNED.map(materia=>{
+            const cfg = MATERIE_CONFIG[materia];
+            const nMacro = macroArgomenti.filter(m=>m.materia===materia).length;
+            const macroIds = new Set(macroArgomenti.filter(m=>m.materia===materia).map(m=>m.id));
+            const argIds = new Set(argomenti.filter(a=>macroIds.has(a.macroArgomentoId)).map(a=>a.id));
+            const nLez = lezioni.filter(l=>macroIds.has(l.macroArgomentoId)||argIds.has(l.argomentoId)).length;
+            return (
+              <div key={materia} style={{ background:cfg.bg,border:`2px solid ${cfg.colore}22`,borderRadius:14,padding:"18px 16px",cursor:"pointer" }}
+                onClick={()=>document.getElementById(`materia-${materia}`)?.scrollIntoView({behavior:"smooth",block:"start"})}>
+                <div style={{ fontSize:28,marginBottom:8 }}>{cfg.icona}</div>
+                <div style={{ fontWeight:800,fontSize:16,color:cfg.colore,marginBottom:4 }}>{materia}</div>
+                <div style={{ fontSize:12,color:"#6b7280" }}>
+                  {nMacro ? `${nMacro} argomenti · ${nLez} lezioni` : "Nessun contenuto ancora"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         {/* Gerarchia per materia */}
-        {materieConMacro.map(materia=>{
+        {materieVisibili.map(materia=>{
+          const cfg = MATERIE_CONFIG[materia];
+          const borderColor = cfg ? cfg.colore : C.primary;
           const macroList = macroArgomenti.filter(m=>m.materia===materia).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
           return (
-            <div key={materia} style={{ marginBottom:28 }}>
-              <h2 style={{ fontSize:17,color:C.primary,fontWeight:700,margin:"0 0 10px",padding:"6px 0",borderBottom:`2px solid ${C.light}` }}>{materia}</h2>
+            <div key={materia} id={`materia-${materia}`} style={{ marginBottom:28 }}>
+              <h2 style={{ fontSize:17,color:borderColor,fontWeight:700,margin:"0 0 10px",padding:"6px 0 6px 12px",borderBottom:`2px solid ${borderColor}22`,borderLeft:`4px solid ${borderColor}` }}>
+                {cfg && <span style={{ marginRight:8 }}>{cfg.icona}</span>}{materia}
+              </h2>
+              {macroList.length===0 && (
+                <div style={{ padding:"20px 16px",background:"#f9fafb",border:`1px dashed ${borderColor}44`,borderRadius:10,textAlign:"center",color:"#9ca3af",fontSize:13 }}>
+                  Nessun macro-argomento ancora
+                  {isAdmin && (
+                    <button onClick={()=>setModalMacro({materia})}
+                      style={{ display:"block",margin:"10px auto 0",background:borderColor,color:"#fff",border:"none",borderRadius:7,padding:"6px 16px",fontSize:13,fontWeight:700,cursor:"pointer" }}>
+                      + Crea primo macro-argomento
+                    </button>
+                  )}
+                </div>
+              )}
               {macroList.map(macro=>{
                 const isOpen=openMacro.has(macro.id);
                 const argFigli=argomenti.filter(a=>a.macroArgomentoId===macro.id).sort((a,b)=>a.ordine-b.ordine||a.nome.localeCompare(b.nome));
