@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 type TipoDomanda = "mcq" | "vero_falso" | "testo_libero" | "completamento";
-interface Domanda { tipo: TipoDomanda; testo: string; opzioni?: string[]; rispostaCorretta?: string; }
+interface Domanda { tipo: TipoDomanda; testo: string; opzioni?: string[]; rispostaCorretta?: string; rispostaAttesa?: string; }
 interface Quiz { id: number; titolo: string; domande: Domanda[]; mioTentativo?: Tentativo | null; }
 interface Tentativo {
   id: number; quizId: number; risposte: Record<string, string>;
@@ -126,6 +126,11 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
                 {!isManu && esito === "errata" && d.rispostaCorretta && (
                   <div style={{ fontSize: F.sm, color: "#12753a", fontWeight: 700, background: "#d1fae5", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1vw,16px)", display: "inline-block", marginTop: "clamp(4px,0.5vw,8px)" }}>
                     Risposta corretta: {d.rispostaCorretta}
+                  </div>
+                )}
+                {isManu && d.rispostaAttesa && (
+                  <div style={{ fontSize: F.sm, color: "#059669", fontWeight: 700, background: "#d1fae5", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1vw,16px)", display: "inline-block", marginTop: "clamp(4px,0.5vw,8px)" }}>
+                    Risposta attesa: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
                   </div>
                 )}
                 {isManu && corrInfo?.nota && (
