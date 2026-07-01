@@ -186,11 +186,11 @@ function QuizPageInner() {
             )}
           </div>
 
-          </div>{/* /inner padding */}
+          </div>
           </PageCard>
-        </div>{/* /maxWidth */}
-      </div>{/* /outer padding */}
-    </div>{/* /page */}
+        </div>
+      </div>
+    </div>
   );
 }
 
