@@ -95,6 +95,7 @@ model Client {
   lezioniAssegnate   AssegnazioneLezione[]
   lavagnaV2Abilitata Boolean              @default(false)
   lavagneV2          Lavagna[]
+  tentativiQuiz      TentativoQuiz[]
 
   @@index([email])
   @@index([referenteId])
@@ -476,6 +477,7 @@ model Lezione {
   argomento        Argomento?            @relation(fields: [argomentoId], references: [id], onDelete: SetNull)
   macroArgomento   MacroArgomento?       @relation(fields: [macroArgomentoId], references: [id], onDelete: SetNull)
   assegnazioni     AssegnazioneLezione[]
+  quizzes          Quiz[]
 
   @@index([argomentoId])
   @@index([macroArgomentoId])
@@ -495,6 +497,39 @@ model AssegnazioneLezione {
   @@unique([lezioneId, clienteId])
   @@index([clienteId])
   @@map("AssegnazioneArgomento")
+}
+
+/// *
+///  * ====================== QUIZ INTERATTIVI ======================
+
+model Quiz {
+  id          Int             @id @default(autoincrement())
+  lezioneId   Int
+  lezione     Lezione         @relation(fields: [lezioneId], references: [id], onDelete: Cascade)
+  titolo      String
+  domande     Json            // DomandaQuiz[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  tentativi   TentativoQuiz[]
+
+  @@index([lezioneId])
+}
+
+model TentativoQuiz {
+  id                 Int       @id @default(autoincrement())
+  quizId             Int
+  quiz               Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  clienteId          Int
+  cliente            Client    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  risposte           Json      // { [idx]: risposta_data }
+  punteggio          Float?    // null = ha domande manuali non ancora corrette
+  totaleAutomatico   Int?      // n. domande auto-gradabili
+  correzioneManuale  Json?     // { [idx]: { corretto: bool, nota?: string } }
+  completatoAt       DateTime  @default(now())
+
+  @@unique([quizId, clienteId])
+  @@index([quizId])
+  @@index([clienteId])
 }
 
 model Config {

@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
+import QuizEditor from "../../components/quiz/QuizEditor";
+import QuizPlayer, { QuizListLezione } from "../../components/quiz/QuizPlayer";
 
 const MATERIE = [
   "Matematica","Fisica","Chimica","Biologia","Informatica",
@@ -381,6 +383,8 @@ function LezioneDetailPageInner() {
     { key: "esercizi", htmlKey: "eserciziHtml", label: "Esercizi" },
   ];
   const sezioniConContenuto = allSezioni.filter(s => argomento[s.htmlKey]);
+  // Il tab "quiz" è sempre visibile (admin: editor; studente: player)
+  const tuttiTab = [...sezioniConContenuto, { key: "quiz", htmlKey: null, label: "Quiz" }];
   const htmlContent = { mappa: argomento.mappaHtml, teoria: argomento.teoriaHtml, esercizi: argomento.eserciziHtml };
   const currentHtml = htmlContent[tab] || "";
 
@@ -517,19 +521,19 @@ function LezioneDetailPageInner() {
       )}
 
       {/* Contenuto */}
-      {sezioniConContenuto.length === 0 ? (
+      {sezioniConContenuto.length === 0 && !isAdmin ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#4268b3" }}>
-          <p style={{ fontWeight: 600 }}>{isAdmin ? "Carica i file HTML qui sopra per aggiungere contenuto." : "Nessun contenuto disponibile per questo argomento."}</p>
+          <p style={{ fontWeight: 600 }}>Nessun contenuto disponibile per questo argomento.</p>
         </div>
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", borderBottom: "2px solid #dbe4f1" }}>
-            {sezioniConContenuto.map(s => (
+            {tuttiTab.map(s => (
               <button key={s.key} onClick={() => setTab(s.key)} style={{ border: "none", borderBottom: tab === s.key ? "3px solid #1cb0f6" : "3px solid transparent", borderRadius: 0, padding: "10px 22px", fontWeight: 600, fontSize: 14, cursor: "pointer", background: "transparent", color: tab === s.key ? "#1cb0f6" : "#4268b3", marginBottom: -2 }}>
                 {s.label}
               </button>
             ))}
-            {currentHtml && (
+            {currentHtml && tab !== "quiz" && (
               <div style={{ marginLeft: "auto", display: "flex", gap: 6, paddingRight: 8 }}>
                 <button
                   onClick={() => {
@@ -545,10 +549,19 @@ function LezioneDetailPageInner() {
             )}
           </div>
           <div style={{ border: "1px solid #dbe4f1", borderTop: "none", borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
-            {currentHtml ? (
+            {tab === "quiz" ? (
+              <div style={{ padding: "16px 20px" }}>
+                {isAdmin
+                  ? <QuizEditor lezioneId={Number(id)} />
+                  : <QuizListLezione lezioneId={Number(id)} />
+                }
+              </div>
+            ) : currentHtml ? (
               <iframe key={tab} srcDoc={currentHtml} style={{ width: "100%", minHeight: 620, border: "none", display: "block" }} sandbox="allow-scripts allow-same-origin allow-forms" />
             ) : (
-              <div style={{ padding: 40, textAlign: "center", color: "#aaa" }}>Nessun contenuto per questa sezione.</div>
+              <div style={{ padding: 40, textAlign: "center", color: "#aaa" }}>
+                {isAdmin ? "Carica i file HTML qui sopra per aggiungere contenuto." : "Nessun contenuto per questa sezione."}
+              </div>
             )}
           </div>
         </>

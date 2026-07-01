@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import ProgrammaPreview from './ProgrammaPreview';
 import CalendarioAttivita from '../components/calendario/CalendarioAttivita';
 import ProgrammaPanel from './ProgrammaPanel';
+import QuizPanelAula from '../components/quiz/QuizPanelAula';
 import { MATERIE_AULA as materieLiceo } from "../../lib/materie";
 import { getAblyChannelAsync } from "../lib/realtime/ablyClient";
 
@@ -1198,7 +1199,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               marginBottom: "0",
               borderBottom: "2px solid #e0e4f0",
             }}>
-                {["bacheca", "compiti", "materiale", "programma", "voti"].map((tab) => {
+                {["bacheca", "compiti", "materiale", "programma", "voti", "quiz"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
                     <button
@@ -1293,7 +1294,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           {/* ProgrammaPreview will be rendered as a right-side aside in Bacheca */}
 
           {activeTab === 'programma' && targetClienteId && (
-            <div style={{ 
+            <div style={{
               marginTop: 14,
               display: 'flex',
               justifyContent: 'center',
@@ -1302,12 +1303,17 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               <ProgrammaPanel clienteId={targetClienteId} coloreTema={coloreTema} isAdmin={isAdmin} materie={materieStudente} hideAside={true} asideTop={asideTop} />
             </div>
           )}
-          {visible.length === 0 && !loading && activeTab !== 'programma' && (
+          {activeTab === 'quiz' && targetClienteId && (
+            <div style={{ marginTop: 14, width: '100%' }}>
+              <QuizPanelAula clienteId={targetClienteId} coloreTema={coloreTema} />
+            </div>
+          )}
+          {visible.length === 0 && !loading && activeTab !== 'programma' && activeTab !== 'quiz' && (
             <div style={emptyBox}>Nessun materiale trovato.</div>
           )}
 
           {/* STREAM stile classroom con giorni e batch */}
-          <div style={streamWrap}>
+          <div style={{ ...streamWrap, display: activeTab === 'quiz' || activeTab === 'programma' ? 'none' : 'flex' }}>
             {grouped.map(([giorno, items]) => (
               <React.Fragment key={giorno}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "28px 0 10px" }}>
