@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import QuizPlayer from "./QuizPlayer";
 
 type TipoDomanda = "mcq" | "vero_falso" | "testo_libero" | "completamento";
 
@@ -403,6 +404,16 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
   const [importDraft, setImportDraft] = useState<{ titolo: string; domande: Domanda[] } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewQuizId, setPreviewQuizId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileDrop(file: File) {
+    if (!file.name.endsWith(".json")) { setImportError("Il file deve avere estensione .json"); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => { setImportText(String(e.target?.result || "")); setImportError(""); };
+    reader.readAsText(file);
+  }
 
   useEffect(() => {
     fetch(`/api/quiz?lezioneId=${lezioneId}`, { credentials: "include" })
@@ -461,16 +472,33 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
 
       {showImport && !showForm && !editingQuiz && (
         <div style={{ background: "#f8faff", border: "1.5px solid #4268b3", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#20489a", marginBottom: 8 }}>
-            Importa quiz da JSON
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: "#20489a" }}>Importa quiz da JSON</span>
+            <button onClick={() => fileInputRef.current?.click()} style={{ ...s.btnOutline, fontSize: 11, padding: "4px 12px" }}>
+              📂 Carica file
+            </button>
           </div>
-          <textarea
-            value={importText}
-            onChange={e => { setImportText(e.target.value); setImportError(""); }}
-            rows={8}
-            style={{ ...s.input, fontFamily: "monospace", fontSize: 12, resize: "vertical" }}
-            placeholder={'{\n  "titolo": "Matematica — Eq. 2° grado — Ripasso",\n  "domande": [...]\n}'}
-          />
+          <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileDrop(f); e.target.value = ""; }} />
+          <div
+            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={e => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFileDrop(f); }}
+            style={{ position: "relative", borderRadius: 8, border: isDragging ? "2px dashed #4268b3" : "2px dashed transparent", background: isDragging ? "#e8f0fe" : "transparent", transition: "all .15s" }}
+          >
+            {isDragging && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#4268b3", fontWeight: 700, borderRadius: 8, pointerEvents: "none" }}>
+                Rilascia il file .json qui
+              </div>
+            )}
+            <textarea
+              value={importText}
+              onChange={e => { setImportText(e.target.value); setImportError(""); }}
+              rows={8}
+              style={{ ...s.input, fontFamily: "monospace", fontSize: 12, resize: "vertical", opacity: isDragging ? 0.3 : 1 }}
+              placeholder={'{\n  "titolo": "Matematica — Eq. 2° grado — Ripasso",\n  "domande": [...]\n}'}
+            />
+          </div>
           {importError && <p style={{ fontSize: 12, color: "#c62828", margin: "6px 0 0", fontWeight: 600 }}>{importError}</p>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
             <button onClick={() => { setShowImport(false); setImportText(""); setImportError(""); }} style={s.btnOutline}>Annulla</button>
@@ -513,7 +541,9 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
                   {(q.domande as Domanda[]).length} domande · {q._count?.tentativi ?? "?"} tentativi
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={() => setPreviewQuizId(q.id)}
+                  style={{ ...s.btnOutline, fontSize: 12, padding: "5px 12px" }}>👁 Testa</button>
                 <button onClick={() => { setEditingQuiz(q); setShowForm(false); }}
                   style={{ ...s.btnOutline, fontSize: 12, padding: "5px 12px" }}>Modifica</button>
                 <button onClick={() => expandedQuiz === q.id ? setExpandedQuiz(null) : loadTentativi(q.id)}
@@ -560,6 +590,22 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
           </div>
         )}
       </div>
+
+      {/* Overlay anteprima quiz (modalità studente) */}
+      {previewQuizId !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setPreviewQuizId(null); }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #dbe4f1" }}>
+              <span style={{ fontWeight: 800, fontSize: 14, color: "#20489a" }}>Anteprima quiz — vista studente</span>
+              <button onClick={() => setPreviewQuizId(null)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ padding: "16px 20px" }}>
+              <QuizPlayer quizId={previewQuizId} onClose={() => setPreviewQuizId(null)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
