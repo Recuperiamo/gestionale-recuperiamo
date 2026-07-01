@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import { PageCard, PageAction } from "../components/PageHeader";
 import QuizEditor from "../components/quiz/QuizEditor";
 
 interface QuizOverview {
@@ -89,24 +90,24 @@ function QuizPageInner() {
   return (
     <div style={{ minHeight: "100vh", background: "#f0f4ff" }}>
       <Navbar />
-      <div style={{ padding: "28px 16px" }}>
-        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div style={{ padding: "clamp(20px,3vw,40px) clamp(12px,3vw,28px)" }}>
+        <div style={{ maxWidth: "min(1400px, 96vw)", margin: "0 auto" }}>
 
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 28 }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 24, color: "#1e1b4b", fontWeight: 800 }}>Quiz</h1>
-              <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
-                {quizzes.length} quiz totali · {lezioni.length} lezioni disponibili
-              </p>
-            </div>
-            <button
-              onClick={() => { setShowEditor(true); setSelectedLezioneId(null); setTimeout(() => document.getElementById("editor-section")?.scrollIntoView({ behavior: "smooth" }), 50); }}
-              style={s.btnPri}
-            >
-              + Nuovo quiz
-            </button>
-          </div>
+          <PageCard
+            icon="📝"
+            title="Quiz"
+            subtitle={`${quizzes.length} quiz totali · ${lezioni.length} lezioni disponibili`}
+            action={
+              <PageAction onClick={() => {
+                setShowEditor(true);
+                setSelectedLezioneId(null);
+                setTimeout(() => document.getElementById("editor-section")?.scrollIntoView({ behavior: "smooth" }), 50);
+              }}>
+                + Nuovo quiz
+              </PageAction>
+            }
+          >
+          <div style={{ padding: "clamp(16px,2vw,28px) clamp(20px,2.5vw,36px)" }}>
 
           {/* Panoramica tutti i quiz */}
           {Object.keys(perMateria).length === 0 ? (
@@ -185,9 +186,11 @@ function QuizPageInner() {
             )}
           </div>
 
-        </div>
-      </div>
-    </div>
+          </div>{/* /inner padding */}
+          </PageCard>
+        </div>{/* /maxWidth */}
+      </div>{/* /outer padding */}
+    </div>{/* /page */}
   );
 }
 
