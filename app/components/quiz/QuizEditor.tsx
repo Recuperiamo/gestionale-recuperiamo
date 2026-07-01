@@ -378,14 +378,12 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
     }
     if (d.tipo === "vero_falso" && d.rispostaCorretta !== "vero" && d.rispostaCorretta !== "falso")
       return `Domanda ${i + 1}: "rispostaCorretta" deve essere "vero" o "falso".`;
-    if (d.tipo === "completamento" && (!d.rispostaCorretta || !d.rispostaCorretta.trim()))
-      return `Domanda ${i + 1}: "rispostaCorretta" mancante per il completamento.`;
   }
   const domande: Domanda[] = obj.domande.map((d: any) => {
     const out: Domanda = { tipo: d.tipo, testo: d.testo.trim() };
     if (d.tipo === "mcq") { out.opzioni = d.opzioni.map(String); out.rispostaCorretta = d.rispostaCorretta; }
     if (d.tipo === "vero_falso") out.rispostaCorretta = d.rispostaCorretta;
-    if (d.tipo === "completamento") out.rispostaCorretta = d.rispostaCorretta.trim();
+    if (d.tipo === "completamento" && d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim();
     return out;
   });
   return { titolo: obj.titolo.trim(), domande };

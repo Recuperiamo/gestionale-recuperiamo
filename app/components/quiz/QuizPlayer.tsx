@@ -46,7 +46,8 @@ function buildPreviewTentativo(domande, risposte) {
   let corrette = 0; let totAuto = 0;
   const correzioneManuale = {};
   domande.forEach((d, i) => {
-    if (d.tipo === "testo_libero") { correzioneManuale[String(i)] = { corretto: true }; return; }
+    const isManu = d.tipo === "testo_libero" || (d.tipo === "completamento" && !d.rispostaCorretta?.trim());
+    if (isManu) { correzioneManuale[String(i)] = { corretto: true }; return; }
     totAuto++;
     const r = risposte[String(i)] || "";
     const ok = d.tipo === "completamento"
@@ -54,7 +55,7 @@ function buildPreviewTentativo(domande, risposte) {
       : r.trim() === (d.rispostaCorretta || "").trim();
     if (ok) corrette++;
   });
-  const hasManuali = domande.some(d => d.tipo === "testo_libero");
+  const hasManuali = domande.some(d => d.tipo === "testo_libero" || (d.tipo === "completamento" && !d.rispostaCorretta?.trim()));
   const punteggio = hasManuali ? null : totAuto > 0 ? Math.round((corrette / totAuto) * 100) : 0;
   return { id: -1, quizId: -1, risposte, punteggio, totaleAutomatico: punteggio, correzioneManuale: hasManuali ? correzioneManuale : null, completatoAt: new Date().toISOString() };
 }
@@ -94,7 +95,7 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px,1.2vw,16px)" }}>
         {domande.map((d, i) => {
           const risposta = risposte[String(i)];
-          const isManu = d.tipo === "testo_libero";
+          const isManu = d.tipo === "testo_libero" || (d.tipo === "completamento" && !d.rispostaCorretta?.trim());
           const corrInfo = corr?.[String(i)];
           let esito = "attesa";
           if (!isManu) {

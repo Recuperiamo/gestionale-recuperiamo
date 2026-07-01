@@ -68,17 +68,18 @@ export async function POST(req, { params }) {
   for (let i = 0; i < domande.length; i++) {
     const d = domande[i]
     const risposta = risposte[String(i)]
-    if (d.tipo === 'testo_libero') continue
+    const isManuale = d.tipo === 'testo_libero' || (d.tipo === 'completamento' && !d.rispostaCorretta?.trim())
+    if (isManuale) continue
     totaleAuto++
     if (risposta === undefined || risposta === null || risposta === '') continue
     if (d.tipo === 'mcq' || d.tipo === 'vero_falso') {
       if (String(risposta).trim() === String(d.rispostaCorretta).trim()) corrette++
     } else if (d.tipo === 'completamento') {
-      if (String(risposta).trim().toLowerCase() === String(d.rispostaCorretta).trim().toLowerCase()) corrette++
+      if (String(risposta).trim().toLowerCase() === String(d.rispostaCorretta || '').trim().toLowerCase()) corrette++
     }
   }
 
-  const hasManual = domande.some(d => d.tipo === 'testo_libero')
+  const hasManual = domande.some(d => d.tipo === 'testo_libero' || (d.tipo === 'completamento' && !d.rispostaCorretta?.trim()))
   const punteggio = totaleAuto > 0 ? (corrette / totaleAuto) * 100 : (hasManual ? null : 100)
 
   const tentativo = await prisma.tentativoQuiz.create({
