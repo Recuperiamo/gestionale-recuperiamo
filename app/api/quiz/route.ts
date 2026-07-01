@@ -6,17 +6,31 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// GET /api/quiz?lezioneId=X
+// GET /api/quiz?lezioneId=X  oppure  GET /api/quiz  (admin: tutti i quiz con info lezione)
 export async function GET(req) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const lezioneId = Number(searchParams.get('lezioneId'))
-  if (!lezioneId) return NextResponse.json({ error: 'lezioneId richiesto' }, { status: 400 })
+  const lezioneIdRaw = searchParams.get('lezioneId')
+  const lezioneId = lezioneIdRaw ? Number(lezioneIdRaw) : null
 
   const role = session.user?.role
   const isAdmin = role === 'admin' || role === 'operatore'
+
+  // Nessuna lezione specificata → admin ottiene tutti i quiz con info lezione
+  if (!lezioneId) {
+    if (!isAdmin) return NextResponse.json({ error: 'lezioneId richiesto' }, { status: 400 })
+    const tutti = await prisma.quiz.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, titolo: true, createdAt: true, domande: true, lezioneId: true,
+        lezione: { select: { id: true, titolo: true, materia: true } },
+        _count: { select: { tentativi: true } },
+      },
+    })
+    return NextResponse.json(tutti)
+  }
 
   if (!isAdmin) {
     const clienteId = Number(session.user?.clienteId)

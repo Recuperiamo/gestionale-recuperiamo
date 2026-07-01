@@ -391,7 +391,7 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
 }
 
 // ── Componente principale QuizEditor ──────────────────────────────────────────
-export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
+export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: number; onQuizChange?: () => void }) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -429,6 +429,7 @@ export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
     await fetch(`/api/quiz/${quizId}`, { method: "DELETE", credentials: "include" });
     setQuizzes(prev => prev.filter(q => q.id !== quizId));
     if (expandedQuiz === quizId) setExpandedQuiz(null);
+    onQuizChange?.();
   }
 
   function handleSaved(quiz: Quiz) {
@@ -439,6 +440,7 @@ export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
       setQuizzes(prev => [...prev, { ...quiz, _count: { tentativi: 0 } }]);
       setShowForm(false);
     }
+    onQuizChange?.();
   }
 
   if (loading) return <div style={{ padding: 20, color: "#20489a" }}>Caricamento...</div>;
@@ -462,9 +464,6 @@ export default function QuizEditor({ lezioneId }: { lezioneId: number }) {
           <div style={{ fontWeight: 700, fontSize: 13, color: "#20489a", marginBottom: 8 }}>
             Importa quiz da JSON
           </div>
-          <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
-            Incolla il JSON generato da Claude o scritto manualmente seguendo la guida in <code>docs/guida-creazione-quiz.md</code>.
-          </p>
           <textarea
             value={importText}
             onChange={e => { setImportText(e.target.value); setImportError(""); }}

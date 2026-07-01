@@ -29,6 +29,7 @@ export default function Navbar() {
     { href: "/lavagna", label: "Lavagna" },
     { href: "/aule", label: "Aule" },
     { href: "/lezioni", label: "Lezioni" },
+    { href: "/quiz", label: "Quiz" },
     { href: "/richieste", label: "Richieste" }
   ];
 
