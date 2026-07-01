@@ -35,55 +35,93 @@ const TIPI_LABEL: Record<TipoDomanda, string> = {
   testo_libero: "Risposta aperta",
 };
 
-const s = {
-  btn: (color = "#1cb0f6", disabled = false) => ({
-    background: disabled ? "#ddd" : color,
-    color: disabled ? "#aaa" : "#fff",
-    border: "none", borderRadius: 7,
-    padding: "9px 20px", fontWeight: 700, fontSize: 14,
-    cursor: disabled ? "not-allowed" : "pointer",
-  }),
+const TIPI_COLOR: Record<TipoDomanda, string> = {
+  mcq: "#4f46e5", vero_falso: "#059669", completamento: "#d97706", testo_libero: "#7c3aed",
 };
 
+function scoreColor(p: number | null) {
+  if (p === null) return "#92400e";
+  if (p >= 60) return "#12753a";
+  if (p >= 40) return "#b45309";
+  return "#c62828";
+}
+function scoreBg(p: number | null) {
+  if (p === null) return "#fef3c7";
+  if (p >= 60) return "#d1fae5";
+  if (p >= 40) return "#fef3c7";
+  return "#fee2e2";
+}
+function scoreEmoji(p: number | null) {
+  if (p === null) return "⏳";
+  if (p >= 80) return "🎉";
+  if (p >= 60) return "👏";
+  if (p >= 40) return "📖";
+  return "💪";
+}
+function scoreMsg(p: number | null) {
+  if (p === null) return "In attesa di correzione";
+  if (p >= 80) return "Eccellente! Ottima preparazione.";
+  if (p >= 60) return "Buon lavoro! Qualche piccola lacuna.";
+  if (p >= 40) return "Quasi! Ripassate gli argomenti in rosso.";
+  return "Da rivedere. Ripassate la lezione e chiedete aiuto.";
+}
+
+// Calcola risultato localmente per la modalità anteprima admin
+function buildPreviewTentativo(domande: Domanda[], risposte: Record<string, string>): Tentativo {
+  let corrette = 0; let totAuto = 0;
+  const correzioneManuale: Record<string, { corretto: boolean }> = {};
+  domande.forEach((d, i) => {
+    if (d.tipo === "testo_libero") { correzioneManuale[String(i)] = { corretto: true }; return; }
+    totAuto++;
+    const r = risposte[String(i)] || "";
+    const ok = d.tipo === "completamento"
+      ? r.trim().toLowerCase() === (d.rispostaCorretta || "").trim().toLowerCase()
+      : r.trim() === (d.rispostaCorretta || "").trim();
+    if (ok) corrette++;
+  });
+  const hasManuali = domande.some(d => d.tipo === "testo_libero");
+  const punteggio = hasManuali ? null : totAuto > 0 ? Math.round((corrette / totAuto) * 100) : 0;
+  return { id: -1, quizId: -1, risposte, punteggio, totaleAutomatico: punteggio, correzioneManuale: hasManuali ? correzioneManuale : null, completatoAt: new Date().toISOString() };
+}
+
 // ── Schermata risultati ────────────────────────────────────────────────────────
-function RisultatiView({ quiz, tentativo }: { quiz: Quiz; tentativo: Tentativo }) {
+function RisultatiView({ quiz, tentativo, previewMode }: { quiz: Quiz; tentativo: Tentativo; previewMode?: boolean }) {
   const domande = quiz.domande;
   const risposte = tentativo.risposte as Record<string, string>;
   const corr = tentativo.correzioneManuale as Record<string, { corretto: boolean; nota?: string }> | null;
-
-  const inAttesa = tentativo.punteggio === null;
+  const p = tentativo.punteggio;
 
   return (
     <div>
-      <div style={{ textAlign: "center", padding: "20px 0 24px", borderBottom: "1px solid #dbe4f1", marginBottom: 20 }}>
-        {inAttesa ? (
+      {previewMode && (
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#92400e", fontWeight: 600, marginBottom: 16, textAlign: "center" }}>
+          Modalità anteprima admin — risultati non salvati
+        </div>
+      )}
+
+      {/* Score card */}
+      <div style={{ background: scoreBg(p), border: `2px solid ${scoreColor(p)}22`, borderRadius: 16, padding: "28px 20px", textAlign: "center", marginBottom: 24 }}>
+        <div style={{ fontSize: 48, marginBottom: 6 }}>{scoreEmoji(p)}</div>
+        {p !== null ? (
           <>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>⏳</div>
-            <div style={{ fontWeight: 800, fontSize: 18, color: "#20489a", marginBottom: 6 }}>Quiz inviato!</div>
-            <div style={{ fontSize: 13, color: "#6b7280" }}>Le risposte aperte sono in attesa di correzione.<br />Il punteggio finale sarà disponibile dopo la revisione.</div>
+            <div style={{ fontSize: 42, fontWeight: 900, color: scoreColor(p), lineHeight: 1, marginBottom: 8 }}>{p}%</div>
+            <div style={{ width: "100%", maxWidth: 240, margin: "0 auto 12px", background: "#e5e7eb", borderRadius: 99, height: 8, overflow: "hidden" }}>
+              <div style={{ width: `${p}%`, height: "100%", background: scoreColor(p), borderRadius: 99, transition: "width 0.6s ease" }} />
+            </div>
           </>
         ) : (
-          <>
-            <div style={{ fontSize: 48, marginBottom: 8 }}>
-              {tentativo.punteggio >= 60 ? "🎉" : tentativo.punteggio >= 40 ? "👍" : "📚"}
-            </div>
-            <div style={{ fontWeight: 800, fontSize: 22, color: "#20489a", marginBottom: 6 }}>
-              {tentativo.punteggio.toFixed(0)}%
-            </div>
-            <div style={{ fontSize: 13, color: "#6b7280" }}>
-              {tentativo.punteggio >= 60 ? "Ottimo lavoro!" : tentativo.punteggio >= 40 ? "Quasi! Ripassate gli argomenti indicati." : "Ripassate la lezione e riparlate con il vostro docente."}
-            </div>
-          </>
+          <div style={{ fontSize: 20, fontWeight: 800, color: scoreColor(p), marginBottom: 8 }}>In correzione</div>
         )}
+        <div style={{ fontSize: 14, color: scoreColor(p), fontWeight: 600 }}>{scoreMsg(p)}</div>
       </div>
 
+      {/* Riepilogo domande */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {domande.map((d, i) => {
           const risposta = risposte[String(i)];
           const isManu = d.tipo === "testo_libero";
           const corrInfo = corr?.[String(i)];
-
-          let esito: "corretta" | "errata" | "attesa" | null = null;
+          let esito: "corretta" | "errata" | "attesa" = "attesa";
           if (isManu) {
             esito = corrInfo === undefined ? "attesa" : corrInfo.corretto ? "corretta" : "errata";
           } else {
@@ -94,35 +132,33 @@ function RisultatiView({ quiz, tentativo }: { quiz: Quiz; tentativo: Tentativo }
               esito = risposta.trim() === (d.rispostaCorretta || "").trim() ? "corretta" : "errata";
             }
           }
-
-          const color = esito === "corretta" ? "#12753a" : esito === "attesa" ? "#92400e" : "#c62828";
-          const bg = esito === "corretta" ? "#c7f7d7" : esito === "attesa" ? "#fef3c7" : "#ffebee";
-          const icon = esito === "corretta" ? "✓" : esito === "attesa" ? "⏳" : "✗";
+          const esitoColor = esito === "corretta" ? "#12753a" : esito === "attesa" ? "#92400e" : "#c62828";
+          const esitoBg = esito === "corretta" ? "#d1fae5" : esito === "attesa" ? "#fef3c7" : "#fee2e2";
+          const esitoIcon = esito === "corretta" ? "✓" : esito === "attesa" ? "⏳" : "✗";
 
           return (
-            <div key={i} style={{ background: "#fff", border: "1px solid #e8edf5", borderRadius: 10, padding: "12px 14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>Domanda {i + 1} · {TIPI_LABEL[d.tipo]}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#20489a", marginBottom: 6 }}>{d.testo}</div>
-                  <div style={{ fontSize: 13 }}>
-                    <span style={{ color: "#6b7280" }}>La tua risposta: </span>
-                    <span style={{ fontWeight: 600 }}>{risposta || <em style={{ color: "#aaa" }}>non risposto</em>}</span>
-                  </div>
-                  {!isManu && esito === "errata" && d.rispostaCorretta && (
-                    <div style={{ fontSize: 12, color: "#12753a", marginTop: 4 }}>
-                      Risposta corretta: <strong>{d.rispostaCorretta}</strong>
-                    </div>
-                  )}
-                  {isManu && corrInfo?.nota && (
-                    <div style={{ fontSize: 12, color: "#20489a", marginTop: 4, fontStyle: "italic" }}>
-                      Nota del docente: {corrInfo.nota}
-                    </div>
-                  )}
+            <div key={i} style={{ background: "#fff", border: `1.5px solid ${esitoBg === "#d1fae5" ? "#a7f3d0" : esitoBg === "#fef3c7" ? "#fde68a" : "#fca5a5"}`, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: esitoBg }}>
+                <span style={{ width: 26, height: 26, borderRadius: "50%", background: esitoColor, color: "#fff", fontWeight: 900, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{esitoIcon}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: esitoColor, flex: 1 }}>Domanda {i + 1}</span>
+                <span style={{ fontSize: 11, background: `${TIPI_COLOR[d.tipo]}18`, color: TIPI_COLOR[d.tipo], borderRadius: 20, padding: "2px 10px", fontWeight: 700 }}>{TIPI_LABEL[d.tipo]}</span>
+              </div>
+              <div style={{ padding: "12px 14px" }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#20489a", marginBottom: 8 }}>{d.testo}</div>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: risposta && !isManu && esito === "errata" ? 4 : 0 }}>
+                  <span style={{ fontWeight: 600 }}>Risposta: </span>
+                  {risposta ? <span style={{ color: "#20489a" }}>{risposta}</span> : <em style={{ color: "#aaa" }}>non risposto</em>}
                 </div>
-                <span style={{ background: bg, color, borderRadius: 20, padding: "3px 10px", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
-                  {icon}
-                </span>
+                {!isManu && esito === "errata" && d.rispostaCorretta && (
+                  <div style={{ fontSize: 12, color: "#12753a", fontWeight: 700, background: "#d1fae5", borderRadius: 6, padding: "4px 10px", display: "inline-block", marginTop: 4 }}>
+                    Corretta: {d.rispostaCorretta}
+                  </div>
+                )}
+                {isManu && corrInfo?.nota && (
+                  <div style={{ fontSize: 12, color: "#4f46e5", marginTop: 6, fontStyle: "italic", background: "#ede9fe", borderRadius: 6, padding: "4px 10px" }}>
+                    Nota del docente: {corrInfo.nota}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -138,48 +174,30 @@ export function QuizListLezione({ lezioneId }: { lezioneId: number }) {
   const [loading, setLoading] = useState(true);
   const [aperto, setAperto] = useState<number | null>(null);
 
-  useEffect(() => {
+  function loadQuizzes() {
+    setLoading(true);
     fetch(`/api/quiz?lezioneId=${lezioneId}`, { credentials: "include" })
       .then(r => r.json())
       .then(async data => {
         if (!Array.isArray(data)) { setQuizzes([]); return; }
-        // Carica i tentativi di ognuno
-        const withTentativi = await Promise.all(
+        const withT = await Promise.all(
           data.map(async q => {
             const r = await fetch(`/api/quiz/${q.id}/tentativo`, { credentials: "include" });
             const t = await r.json();
             return { ...q, mioTentativo: t };
           })
         );
-        setQuizzes(withTentativi);
+        setQuizzes(withT);
       })
       .finally(() => setLoading(false));
-  }, [lezioneId]);
+  }
+
+  useEffect(() => { loadQuizzes(); }, [lezioneId]);
 
   if (loading) return <div style={{ padding: 20, color: "#20489a" }}>Caricamento quiz...</div>;
 
   if (aperto !== null) {
-    return (
-      <QuizPlayer quizId={aperto} onClose={() => {
-        setAperto(null);
-        // Aggiorna lo stato dei tentativi ricaricando
-        setLoading(true);
-        fetch(`/api/quiz?lezioneId=${lezioneId}`, { credentials: "include" })
-          .then(r => r.json())
-          .then(async data => {
-            if (!Array.isArray(data)) { setQuizzes([]); return; }
-            const withT = await Promise.all(
-              data.map(async q => {
-                const r = await fetch(`/api/quiz/${q.id}/tentativo`, { credentials: "include" });
-                const t = await r.json();
-                return { ...q, mioTentativo: t };
-              })
-            );
-            setQuizzes(withT);
-          })
-          .finally(() => setLoading(false));
-      }} />
-    );
+    return <QuizPlayer quizId={aperto} onClose={() => { setAperto(null); loadQuizzes(); }} />;
   }
 
   if (quizzes.length === 0) {
@@ -193,31 +211,27 @@ export function QuizListLezione({ lezioneId }: { lezioneId: number }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a", marginBottom: 4 }}>
-        Quiz disponibili ({quizzes.length})
+        Mettiti alla prova ({quizzes.length})
       </div>
       {quizzes.map(q => {
         const fatto = !!q.mioTentativo;
-        const punteggio = q.mioTentativo?.punteggio;
+        const p = q.mioTentativo?.punteggio;
         return (
           <div key={q.id} style={{ background: "#fff", border: "1.5px solid #dbe4f1", borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a" }}>{q.titolo}</div>
               <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
                 {(q.domande as Domanda[]).length} domand{(q.domande as Domanda[]).length === 1 ? "a" : "e"}
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               {fatto && (
-                <span style={{
-                  background: punteggio === null ? "#fef3c7" : punteggio >= 60 ? "#c7f7d7" : "#ffebee",
-                  color: punteggio === null ? "#92400e" : punteggio >= 60 ? "#12753a" : "#c62828",
-                  borderRadius: 20, padding: "3px 12px", fontWeight: 700, fontSize: 12,
-                }}>
-                  {punteggio === null ? "In correzione" : `${punteggio.toFixed(0)}%`}
+                <span style={{ background: scoreBg(p), color: scoreColor(p), borderRadius: 20, padding: "3px 12px", fontWeight: 800, fontSize: 12 }}>
+                  {p === null ? "In correzione" : `${p.toFixed(0)}%`}
                 </span>
               )}
               <button onClick={() => setAperto(q.id)}
-                style={{ background: fatto ? "#e3eefe" : "#1cb0f6", color: fatto ? "#20489a" : "#fff", border: "none", borderRadius: 7, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                style={{ background: fatto ? "#e3eefe" : "#1cb0f6", color: fatto ? "#20489a" : "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                 {fatto ? "Rivedi" : "Inizia"}
               </button>
             </div>
@@ -229,7 +243,11 @@ export function QuizListLezione({ lezioneId }: { lezioneId: number }) {
 }
 
 // ── Componente principale QuizPlayer ──────────────────────────────────────────
-export default function QuizPlayer({ quizId, onClose }: { quizId: number; onClose?: () => void }) {
+export default function QuizPlayer({ quizId, onClose, previewMode = false }: {
+  quizId: number;
+  onClose?: () => void;
+  previewMode?: boolean;
+}) {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [risposte, setRisposte] = useState<Record<string, string>>({});
@@ -242,7 +260,7 @@ export default function QuizPlayer({ quizId, onClose }: { quizId: number; onClos
       .then(r => r.json())
       .then(data => {
         setQuiz(data);
-        if (data.mioTentativo) {
+        if (!previewMode && data.mioTentativo) {
           setTentativo(data.mioTentativo);
           setInviato(true);
         }
@@ -254,6 +272,13 @@ export default function QuizPlayer({ quizId, onClose }: { quizId: number; onClos
     if (!quiz) return;
     const nonRisposto = quiz.domande.some((_, i) => !risposte[String(i)]);
     if (nonRisposto && !confirm("Hai lasciato alcune risposte vuote. Inviare comunque?")) return;
+
+    if (previewMode) {
+      setTentativo(buildPreviewTentativo(quiz.domande, risposte));
+      setInviato(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch(`/api/quiz/${quizId}/tentativo`, {
@@ -266,121 +291,128 @@ export default function QuizPlayer({ quizId, onClose }: { quizId: number; onClos
         alert(err.error || "Errore invio");
         return;
       }
-      const t = await res.json();
-      setTentativo(t);
+      setTentativo(await res.json());
       setInviato(true);
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) return <div style={{ padding: 24, color: "#20489a" }}>Caricamento quiz...</div>;
+  if (loading) return <div style={{ padding: 24, color: "#20489a", textAlign: "center" }}>Caricamento...</div>;
   if (!quiz) return <div style={{ padding: 24, color: "#c62828" }}>Quiz non trovato.</div>;
 
   const domande = quiz.domande;
+  const risposteCount = Object.values(risposte).filter(Boolean).length;
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#20489a" }}>{quiz.titolo}</h2>
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-            {domande.length} domand{domande.length === 1 ? "a" : "e"}
-            {inviato && tentativo && (
-              <span style={{ marginLeft: 10, background: "#c7f7d7", color: "#12753a", borderRadius: 20, padding: "1px 10px", fontWeight: 700 }}>
-                Completato
-              </span>
-            )}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: "#20489a", lineHeight: 1.2 }}>{quiz.titolo}</h2>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6, display: "flex", alignItems: "center", gap: 10 }}>
+              <span>{domande.length} domande</span>
+              {!inviato && <span style={{ color: "#1cb0f6", fontWeight: 700 }}>{risposteCount}/{domande.length} risposte</span>}
+              {inviato && <span style={{ background: "#d1fae5", color: "#12753a", borderRadius: 20, padding: "1px 10px", fontWeight: 700 }}>Completato</span>}
+            </div>
           </div>
+          {onClose && (
+            <button onClick={onClose} style={{ background: "transparent", border: "1px solid #dbe4f1", borderRadius: 8, padding: "7px 14px", color: "#6b7280", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
+              ✕ Chiudi
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button onClick={onClose} style={{ background: "transparent", border: "1px solid #dbe4f1", borderRadius: 7, padding: "6px 14px", color: "#6b7280", cursor: "pointer", fontSize: 13 }}>
-            ✕ Chiudi
-          </button>
+
+        {/* Barra avanzamento */}
+        {!inviato && (
+          <div style={{ background: "#e5e7eb", borderRadius: 99, height: 6, overflow: "hidden" }}>
+            <div style={{ width: `${(risposteCount / domande.length) * 100}%`, height: "100%", background: "#1cb0f6", borderRadius: 99, transition: "width 0.3s ease" }} />
+          </div>
         )}
       </div>
 
       {inviato && tentativo ? (
-        <RisultatiView quiz={quiz} tentativo={tentativo} />
+        <RisultatiView quiz={quiz} tentativo={tentativo} previewMode={previewMode} />
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 28 }}>
             {domande.map((d, i) => {
               const risposta = risposte[String(i)] || "";
               const set = (v: string) => setRisposte(prev => ({ ...prev, [String(i)]: v }));
+              const answered = !!risposta;
 
               return (
-                <div key={i} style={{ background: "#fff", border: "1.5px solid #dbe4f1", borderRadius: 12, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
-                    Domanda {i + 1} di {domande.length} · {TIPI_LABEL[d.tipo]}
+                <div key={i} style={{ background: "#fff", border: `2px solid ${answered ? "#bfdbfe" : "#e5e7eb"}`, borderRadius: 14, overflow: "hidden", transition: "border-color 0.2s" }}>
+                  {/* Question header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: answered ? "#eff6ff" : "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                    <span style={{ width: 28, height: 28, borderRadius: "50%", background: answered ? "#1cb0f6" : "#d1d5db", color: "#fff", fontWeight: 900, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.2s" }}>
+                      {answered ? "✓" : i + 1}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#6b7280", flex: 1, fontWeight: 600 }}>Domanda {i + 1} di {domande.length}</span>
+                    <span style={{ fontSize: 11, background: `${TIPI_COLOR[d.tipo]}15`, color: TIPI_COLOR[d.tipo], borderRadius: 20, padding: "2px 10px", fontWeight: 700 }}>{TIPI_LABEL[d.tipo]}</span>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#20489a", marginBottom: 14, lineHeight: 1.4 }}>{d.testo}</div>
 
-                  {d.tipo === "mcq" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {(d.opzioni || []).filter(o => o.trim()).map((op, oi) => (
-                        <label key={oi} onClick={() => set(op)}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 10,
-                            cursor: "pointer", padding: "10px 14px", borderRadius: 8,
-                            border: "1.5px solid " + (risposta === op ? "#1cb0f6" : "#dbe4f1"),
-                            background: risposta === op ? "#e8f7ff" : "#f8faff",
-                            transition: "all 0.15s",
-                          }}>
-                          <input type="radio" name={`q-${i}`} value={op} checked={risposta === op}
-                            onChange={() => set(op)} style={{ accentColor: "#1cb0f6" }} />
-                          <span style={{ fontSize: 14, color: "#20489a", fontWeight: risposta === op ? 700 : 400 }}>{op}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                  {/* Question body */}
+                  <div style={{ padding: "16px 18px" }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "#1e1b4b", marginBottom: 16, lineHeight: 1.5 }}>{d.testo}</div>
 
-                  {d.tipo === "vero_falso" && (
-                    <div style={{ display: "flex", gap: 12 }}>
-                      {["vero", "falso"].map(v => (
-                        <label key={v} onClick={() => set(v)}
-                          style={{
-                            flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                            gap: 8, cursor: "pointer", padding: "12px", borderRadius: 8,
-                            border: "1.5px solid " + (risposta === v ? "#1cb0f6" : "#dbe4f1"),
-                            background: risposta === v ? "#e8f7ff" : "#f8faff",
-                            fontWeight: risposta === v ? 700 : 400, color: "#20489a", fontSize: 15,
-                          }}>
-                          <input type="radio" name={`q-${i}`} value={v} checked={risposta === v}
-                            onChange={() => set(v)} style={{ accentColor: "#1cb0f6" }} />
-                          {v.charAt(0).toUpperCase() + v.slice(1)}
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                    {d.tipo === "mcq" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {(d.opzioni || []).filter(o => o.trim()).map((op, oi) => {
+                          const sel = risposta === op;
+                          return (
+                            <label key={oi} onClick={() => set(op)} style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", padding: "11px 14px", borderRadius: 10, border: `2px solid ${sel ? "#1cb0f6" : "#e5e7eb"}`, background: sel ? "#eff6ff" : "#fff", transition: "all 0.15s", userSelect: "none" }}>
+                              <span style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${sel ? "#1cb0f6" : "#d1d5db"}`, background: sel ? "#1cb0f6" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                                {sel && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
+                              </span>
+                              <span style={{ fontSize: 14, color: sel ? "#1e40af" : "#374151", fontWeight: sel ? 700 : 400 }}>{op}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                  {d.tipo === "completamento" && (
-                    <div>
-                      <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>Completa con la parola o frase mancante:</p>
+                    {d.tipo === "vero_falso" && (
+                      <div style={{ display: "flex", gap: 12 }}>
+                        {[{ v: "vero", label: "✓ Vero", color: "#059669" }, { v: "falso", label: "✗ Falso", color: "#dc2626" }].map(({ v, label, color }) => {
+                          const sel = risposta === v;
+                          return (
+                            <label key={v} onClick={() => set(v)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", padding: "14px", borderRadius: 10, border: `2px solid ${sel ? color : "#e5e7eb"}`, background: sel ? `${color}10` : "#fff", color: sel ? color : "#6b7280", fontWeight: sel ? 800 : 500, fontSize: 15, transition: "all 0.15s", userSelect: "none" }}>
+                              {label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {d.tipo === "completamento" && (
                       <input value={risposta} onChange={e => set(e.target.value)}
-                        style={{ display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "10px 14px", fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" }}
+                        style={{ display: "block", width: "100%", border: `2px solid ${risposta ? "#1cb0f6" : "#e5e7eb"}`, borderRadius: 10, padding: "11px 14px", fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" }}
                         placeholder="Scrivi la tua risposta..." />
-                    </div>
-                  )}
+                    )}
 
-                  {d.tipo === "testo_libero" && (
-                    <div>
-                      <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>Scrivi la tua risposta (verrà corretta dal docente):</p>
-                      <textarea value={risposta} onChange={e => set(e.target.value)}
-                        rows={4} style={{ display: "block", width: "100%", border: "1.5px solid #dbe4f1", borderRadius: 8, padding: "10px 14px", fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }}
-                        placeholder="Scrivi la tua risposta..." />
-                    </div>
-                  )}
+                    {d.tipo === "testo_libero" && (
+                      <div>
+                        <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px", background: "#f3f0ff", borderRadius: 6, padding: "5px 10px", display: "inline-block" }}>✍️ La risposta sarà corretta dal docente</p>
+                        <textarea value={risposta} onChange={e => set(e.target.value)} rows={4}
+                          style={{ display: "block", width: "100%", border: `2px solid ${risposta ? "#7c3aed" : "#e5e7eb"}`, borderRadius: 10, padding: "11px 14px", fontSize: 14, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", outline: "none", transition: "border-color 0.2s" }}
+                          placeholder="Scrivi qui la tua risposta..." />
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 13, color: risposteCount === domande.length ? "#12753a" : "#6b7280", fontWeight: 600 }}>
+              {risposteCount === domande.length ? "✓ Tutto risposto" : `${domande.length - risposteCount} senza risposta`}
+            </span>
             <button onClick={handleSubmit} disabled={submitting}
-              style={s.btn("#1cb0f6", submitting)}>
-              {submitting ? "Invio in corso..." : "Invia quiz"}
+              style={{ background: submitting ? "#d1d5db" : "#1cb0f6", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontWeight: 800, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", transition: "background 0.2s" }}>
+              {submitting ? "Invio..." : previewMode ? "Vedi risultati" : "Invia quiz"}
             </button>
           </div>
         </>

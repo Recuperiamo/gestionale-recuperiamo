@@ -601,7 +601,7 @@ export default function QuizEditor({ lezioneId, onQuizChange }: { lezioneId: num
               <button onClick={() => setPreviewQuizId(null)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}>✕</button>
             </div>
             <div style={{ padding: "16px 20px" }}>
-              <QuizPlayer quizId={previewQuizId} onClose={() => setPreviewQuizId(null)} />
+              <QuizPlayer quizId={previewQuizId} onClose={() => setPreviewQuizId(null)} previewMode={true} />
             </div>
           </div>
         </div>
