@@ -309,7 +309,7 @@ function LezioniPageInner() {
 
   const [openMacro, setOpenMacro] = useState(new Set());
   const [openArg, setOpenArg] = useState(new Set());
-  const [openMaterie, setOpenMaterie] = useState<Set<string>>(new Set(MATERIE_PINNED));
+  const [openMaterie, setOpenMaterie] = useState<Set<string>>(new Set());
 
   const isAdmin = session?.user?.role==="admin"||session?.user?.role==="operatore";
 
