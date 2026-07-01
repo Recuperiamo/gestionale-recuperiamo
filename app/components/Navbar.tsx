@@ -56,20 +56,20 @@ function GroupDropdown({ group, isAdmin, isActiveFn, open, onToggle }) {
   const active = allLinks.some(l => isActiveFn(l.href));
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", flex: 1, display: "flex" }}>
       <button
         onClick={onToggle}
         style={{
           background: active || open ? "rgba(28,176,246,0.3)" : "transparent",
           border: "none",
           color: active || open ? "#fff" : "#c8d8f0",
-          borderRadius: 8,
-          padding: "10px 22px",
           fontWeight: 700,
-          fontSize: 15,
+          fontSize: "clamp(14px, 1.4vw, 19px)",
           cursor: "pointer",
           display: "flex",
+          flex: 1,
           alignItems: "center",
+          justifyContent: "center",
           gap: 7,
           whiteSpace: "nowrap",
           transition: "all 0.15s",
@@ -203,10 +203,12 @@ export default function Navbar() {
     color: active ? "#fff" : "#c8d8f0",
     background: active ? "rgba(28,176,246,0.35)" : "transparent",
     border: "none",
-    borderRadius: 8,
-    padding: "10px 22px",
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     fontWeight: 700,
-    fontSize: 15,
+    fontSize: "clamp(14px, 1.4vw, 19px)",
     transition: "all 0.15s",
     whiteSpace: "nowrap",
     letterSpacing: "0.1px",
@@ -227,7 +229,7 @@ export default function Navbar() {
   return (
     <>
       <style>{`
-        .nb-staff { display: flex; flex: 1; gap: 3px; align-items: center; justify-content: center; }
+        .nb-staff { display: flex; flex: 1; align-items: stretch; }
         .nb-cliente { display: flex; flex: 1; gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; align-items: center; justify-content: space-evenly; }
         .nb-cliente::-webkit-scrollbar { display: none; }
         .nb-hamburger { display: none !important; }
