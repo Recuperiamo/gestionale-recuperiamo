@@ -298,7 +298,7 @@ function QuizForm({ lezioneId, initial, draft, onSaved, onCancel }: {
       return valide.length >= 2 && d.rispostaCorretta && (d.opzioni || []).includes(d.rispostaCorretta);
     }
     if (d.tipo === "vero_falso") return !!d.rispostaCorretta;
-    if (d.tipo === "completamento") return !!d.rispostaCorretta?.trim();
+    if (d.tipo === "completamento") return true;
     return true; // testo_libero
   });
 
