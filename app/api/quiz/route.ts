@@ -49,7 +49,6 @@ export async function GET(req) {
     orderBy: { createdAt: 'asc' },
     select: {
       id: true, titolo: true, createdAt: true, domande: true,
-      _count: { select: { tentativi: true } },
     },
   })
   return NextResponse.json(quizzes)
