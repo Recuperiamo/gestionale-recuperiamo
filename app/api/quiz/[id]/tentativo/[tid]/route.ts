@@ -6,6 +6,13 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+const LIVELLO_PCT: Record<string, number> = {
+  completo: 1,
+  incompleto: 0.7,
+  parziale: 0.35,
+  insufficiente: 0,
+}
+
 // PATCH /api/quiz/[id]/tentativo/[tid]  — correzione manuale (admin)
 export async function PATCH(req, { params }) {
   const session = await getServerSession(authOptions)
@@ -21,16 +28,15 @@ export async function PATCH(req, { params }) {
   if (!tentativo) return NextResponse.json({ error: 'Non trovato' }, { status: 404 })
 
   const domande = tentativo.quiz.domande as any[]
-  const manuali = domande.filter(d => d.tipo === 'testo_libero')
-  const corrcteManuali = Object.values(correzioneManuale as Record<string, { corretto: boolean }>)
-    .filter(v => v.corretto).length
-
-  const totaleAuto = tentativo.totaleAutomatico ?? 0
   const risposte = tentativo.risposte as Record<string, any>
+
+  // Auto-graded questions: count correct (each worth 1 point)
   let corretteAuto = 0
+  let totaleAuto = 0
   for (let i = 0; i < domande.length; i++) {
     const d = domande[i]
     if (d.tipo === 'testo_libero') continue
+    totaleAuto++
     const r = risposte[String(i)]
     if (!r) continue
     if (d.tipo === 'mcq' || d.tipo === 'vero_falso') {
@@ -40,8 +46,28 @@ export async function PATCH(req, { params }) {
     }
   }
 
-  const totaleDomande = totaleAuto + manuali.length
-  const punteggio = totaleDomande > 0 ? ((corretteAuto + corrcteManuali) / totaleDomande) * 100 : 100
+  // Manual questions: weighted by peso (default 1), scored by livello pct
+  // Backward-compat: if corr has `corretto: boolean` (old format), treat true=1 false=0
+  let punteggiManuali = 0
+  let pesoTotaleManuali = 0
+  for (let i = 0; i < domande.length; i++) {
+    const d = domande[i]
+    if (d.tipo !== 'testo_libero') continue
+    const peso = Number(d.peso) >= 1 ? Math.round(Number(d.peso)) : 1
+    pesoTotaleManuali += peso
+    const corr = (correzioneManuale as Record<string, any>)[String(i)]
+    if (!corr) continue
+    if (typeof corr.livello === 'string' && LIVELLO_PCT[corr.livello] !== undefined) {
+      punteggiManuali += LIVELLO_PCT[corr.livello] * peso
+    } else if (typeof corr.corretto === 'boolean') {
+      // legacy binary format
+      punteggiManuali += corr.corretto ? peso : 0
+    }
+  }
+
+  // Total score: (auto_correct + weighted_manual_score) / (auto_count + manual_weight) * 100
+  const denominatore = totaleAuto + pesoTotaleManuali
+  const punteggio = denominatore > 0 ? ((corretteAuto + punteggiManuali) / denominatore) * 100 : 100
 
   const updated = await prisma.tentativoQuiz.update({
     where: { id: tid },

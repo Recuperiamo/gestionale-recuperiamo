@@ -12,6 +12,8 @@ interface Domanda {
   opzioni?: string[];
   rispostaCorretta?: string;
   rispostaAttesa?: string;
+  peso?: number;
+  griglia?: Partial<Record<'completo' | 'incompleto' | 'parziale' | 'insufficiente', string>>;
 }
 
 interface LezioneRef {
@@ -36,7 +38,7 @@ interface Tentativo {
   risposte: Record<string, string>;
   punteggio: number | null;
   totaleAutomatico: number | null;
-  correzioneManuale: Record<string, { corretto: boolean; nota?: string }> | null;
+  correzioneManuale: Record<string, { livello?: string; corretto?: boolean; nota?: string }> | null;
   allegati?: string[] | null;
   completatoAt: string;
   cliente: { id: number; nomeReferente: string; nome?: string; cognome?: string };
@@ -57,6 +59,15 @@ const MATERIE_COLORI: Record<string, string> = {
   Inglese:"#be185d", Scienze:"#065f46", Generale:"#374151",
 };
 function colore(materia: string) { return MATERIE_COLORI[materia] || "#4f46e5"; }
+
+const LIVELLI_ORDER = ['completo', 'incompleto', 'parziale', 'insufficiente'] as const;
+type Livello = typeof LIVELLI_ORDER[number];
+const LIVELLI: Record<Livello, { label: string; pct: number; color: string; desc: string }> = {
+  completo:      { label: 'Completo',      pct: 100, color: '#12753a', desc: 'Risposta esaustiva, corretta e ben strutturata' },
+  incompleto:    { label: 'Incompleto',    pct: 70,  color: '#0369a1', desc: 'Corretta ma manca qualcosa (passaggio, esempio, approfondimento)' },
+  parziale:      { label: 'Parziale',      pct: 35,  color: '#d97706', desc: 'Parzialmente corretta o con lacune significative' },
+  insufficiente: { label: 'Insufficiente', pct: 0,   color: '#c62828', desc: 'Assente, errata o non pertinente' },
+};
 
 const s = {
   btn: (color = "#1cb0f6") => ({
@@ -171,7 +182,32 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
       )}
 
       {d.tipo === "testo_libero" && (
-        <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>La risposta sarà corretta manualmente dall'admin.</p>
+        <div>
+          <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 10px" }}>La risposta sarà corretta con la griglia di valutazione.</p>
+          <label style={{ ...s.label, marginBottom: 12 }}>
+            Peso domanda
+            <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11, marginLeft: 4 }}>(default 1 — aumenta per domande più complesse)</span>
+            <input type="number" min={1} max={10} value={d.peso ?? 1}
+              onChange={e => set({ peso: Math.max(1, Math.min(10, Number(e.target.value) || 1)) })}
+              style={{ ...s.input, width: 72 }} />
+          </label>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>
+              Griglia di valutazione <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11 }}>(opzionale — criteri specifici per questa domanda)</span>
+            </div>
+            {LIVELLI_ORDER.map(livello => (
+              <div key={livello} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 5 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: LIVELLI[livello].color, minWidth: 90, textAlign: "right", flexShrink: 0 }}>
+                  {LIVELLI[livello].label}
+                </span>
+                <input value={d.griglia?.[livello] ?? ""}
+                  onChange={e => set({ griglia: { ...d.griglia, [livello]: e.target.value } })}
+                  style={{ ...s.input, fontSize: 11 }}
+                  placeholder={LIVELLI[livello].desc} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -181,14 +217,15 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
 function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
   tentativo: Tentativo;
   domande: Domanda[];
-  onCorrezione: (tid: number, correzione: Record<string, { corretto: boolean; nota?: string }>) => void;
+  onCorrezione: (tid: number, correzione: Record<string, { livello?: string; nota?: string }>) => void;
   onAzzerato: (tid: number) => void;
 }) {
-  const [corr, setCorr] = useState<Record<string, { corretto: boolean; nota?: string }>>(
+  const [corr, setCorr] = useState<Record<string, { livello?: string; corretto?: boolean; nota?: string }>>(
     tentativo.correzioneManuale || {}
   );
   const [saving, setSaving] = useState(false);
   const [azzerando, setAzzerando] = useState(false);
+  const [notaPopupIdx, setNotaPopupIdx] = useState<number | null>(null);
   const risposte = tentativo.risposte as Record<string, string>;
 
   const nomeStu = [tentativo.cliente.nomeReferente, tentativo.cliente.nome, tentativo.cliente.cognome]
@@ -196,9 +233,18 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
 
   const isManualeFn = (d: Domanda) => d.tipo === "testo_libero" || (d.tipo === "completamento" && !d.rispostaCorretta?.trim());
   const hasManuali = domande.some(isManualeFn);
-  const tutteCorrete = !hasManuali || domande.every((d, i) => !isManualeFn(d) || corr[String(i)] !== undefined);
+  const nManuali = domande.filter(isManualeFn).length;
+  const nCorretteManuali = domande.filter((d, i) => isManualeFn(d) && (corr[String(i)]?.livello !== undefined || typeof corr[String(i)]?.corretto === "boolean")).length;
+  const correzioneParziale = nCorretteManuali < nManuali;
 
   async function salvaCorrezione() {
+    if (correzioneParziale) {
+      const mancanti = nManuali - nCorretteManuali;
+      const ok = confirm(
+        `Stai salvando una correzione incompleta: ${mancanti} domanda${mancanti > 1 ? " aperta non è ancora stata valutata" : " aperte non sono ancora state valutate"}.\n\nIl punteggio finale sarà provvisorio e potrà cambiare quando completerai la correzione.\n\nVuoi salvare comunque?`
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       await fetch(`/api/quiz/${tentativo.quizId}/tentativo/${tentativo.id}`, {
@@ -282,24 +328,48 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
               )}
               {isManuale && (
                 <div style={{ marginTop: 8, padding: "8px 10px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>Correzione manuale</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    Griglia di valutazione
+                    {(d as any).peso > 1 && (
+                      <span style={{ background: "#e0e7ff", color: "#4f46e5", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700 }}>
+                        peso ×{(d as any).peso}
+                      </span>
+                    )}
+                  </div>
                   {d.rispostaAttesa && (
                     <div style={{ fontSize: 12, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "4px 10px", marginBottom: 8, fontWeight: 600 }}>
-                      Risposta di riferimento: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
+                      Riferimento: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    {["corretto", "errato"].map(v => (
-                      <label key={v} style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 13 }}>
-                        <input type="radio" name={`corrm-${tentativo.id}-${i}`}
-                          checked={corrInfo?.corretto === (v === "corretto")}
-                          onChange={() => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], corretto: v === "corretto" } }))}
-                          style={{ accentColor: v === "corretto" ? "#12753a" : "#c62828" }} />
-                        {v.charAt(0).toUpperCase() + v.slice(1)}
-                      </label>
-                    ))}
-                    <input value={corrInfo?.nota || ""} onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)] || { corretto: false }, nota: e.target.value } }))}
-                      style={{ ...s.input, flex: 1, minWidth: 120 }} placeholder="Nota (opzionale)" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
+                    {LIVELLI_ORDER.map(livello => {
+                      const info = LIVELLI[livello];
+                      const criteri = (d as any).griglia?.[livello];
+                      const sel = corrInfo?.livello === livello;
+                      return (
+                        <label key={livello} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", padding: "6px 8px", borderRadius: 6, border: `1.5px solid ${sel ? info.color : "#e5e7eb"}`, background: sel ? `${info.color}12` : "#fff", userSelect: "none" }}>
+                          <input type="radio" name={`corrm-${tentativo.id}-${i}`} checked={sel}
+                            onChange={() => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], livello } }))}
+                            style={{ accentColor: info.color, marginTop: 2, flexShrink: 0 }} />
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.label}</span>
+                            <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 6 }}>{info.pct}%</span>
+                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>
+                              {criteri || info.desc}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input value={corrInfo?.nota || ""} onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
+                      style={{ ...s.input, fontSize: 11, flex: 1 }} placeholder="Nota al docente (opzionale)" />
+                    <button type="button" onClick={() => setNotaPopupIdx(i)}
+                      title="Espandi nota"
+                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 10px", height: 34, cursor: "pointer", fontSize: 15, color: "#4f46e5", lineHeight: 1 }}>
+                      ⛶
+                    </button>
                   </div>
                 </div>
               )}
@@ -320,13 +390,49 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
         </div>
       )}
       {hasManuali && (
-        <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-          <button onClick={salvaCorrezione} disabled={saving || !tutteCorrete}
-            style={{ ...s.btn(), opacity: saving || !tutteCorrete ? 0.6 : 1 }}>
-            {saving ? "Salvataggio..." : "Salva correzione"}
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+          {correzioneParziale && (
+            <div style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 7, padding: "5px 12px", fontWeight: 600 }}>
+              ⚠️ {nCorretteManuali}/{nManuali} domande aperte valutate — il punteggio sarà provvisorio
+            </div>
+          )}
+          <button onClick={salvaCorrezione} disabled={saving}
+            style={{ ...s.btn(), opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Salvataggio..." : correzioneParziale ? "Salva correzione parziale" : "Salva correzione"}
           </button>
         </div>
       )}
+
+      {/* Popup nota espansa */}
+      {notaPopupIdx !== null && (() => {
+        const d = domande[notaPopupIdx];
+        const i = notaPopupIdx;
+        const corrInfo = corr[String(i)];
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+            onClick={() => setNotaPopupIdx(null)}>
+            <div style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 560, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#20489a", marginBottom: 6 }}>
+                Nota — Domanda {i + 1}
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 14, fontStyle: "italic", lineHeight: 1.5 }}>
+                {d.testo}
+              </div>
+              <textarea
+                value={corrInfo?.nota || ""}
+                onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
+                rows={7}
+                autoFocus
+                style={{ display: "block", width: "100%", border: "1.5px solid #c7d2fe", borderRadius: 10, padding: "12px 14px", fontSize: 13, fontFamily: "inherit", resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }}
+                placeholder="Scrivi qui la nota per lo studente..." />
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+                <button onClick={() => setNotaPopupIdx(null)} style={{ ...s.btn(), padding: "8px 22px" }}>Chiudi</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -497,6 +603,24 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
     if (d.tipo === "vero_falso" && d.rispostaCorretta !== "vero" && d.rispostaCorretta !== "falso")
       return `Domanda ${i + 1}: "rispostaCorretta" deve essere "vero" o "falso".`;
   }
+  // Validate peso/griglia for testo_libero
+  const LIVELLI_VALIDI = new Set(["completo", "incompleto", "parziale", "insufficiente"]);
+  for (let i = 0; i < obj.domande.length; i++) {
+    const d = obj.domande[i];
+    if (d.tipo !== "testo_libero") continue;
+    if (d.peso !== undefined) {
+      const p = Number(d.peso);
+      if (!Number.isInteger(p) || p < 1 || p > 10) return `Domanda ${i + 1}: "peso" deve essere un intero da 1 a 10.`;
+    }
+    if (d.griglia !== undefined) {
+      if (typeof d.griglia !== "object" || Array.isArray(d.griglia)) return `Domanda ${i + 1}: "griglia" deve essere un oggetto.`;
+      for (const k of Object.keys(d.griglia)) {
+        if (!LIVELLI_VALIDI.has(k)) return `Domanda ${i + 1}: chiave griglia non valida "${k}". Valori: completo, incompleto, parziale, insufficiente.`;
+        if (typeof d.griglia[k] !== "string") return `Domanda ${i + 1}: griglia["${k}"] deve essere una stringa.`;
+      }
+    }
+  }
+
   const domande: Domanda[] = obj.domande.map((d: any) => {
     const out: Domanda = { tipo: d.tipo, testo: d.testo.trim() };
     if (d.tipo === "mcq") { out.opzioni = d.opzioni.map(String); out.rispostaCorretta = d.rispostaCorretta; }
@@ -504,6 +628,17 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
     if (d.tipo === "completamento") {
       if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
       if (d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim();
+    }
+    if (d.tipo === "testo_libero") {
+      if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
+      if (d.peso !== undefined) (out as any).peso = Math.round(Number(d.peso));
+      if (d.griglia && typeof d.griglia === "object") {
+        const g: Record<string, string> = {};
+        for (const k of ["completo", "incompleto", "parziale", "insufficiente"]) {
+          if (typeof d.griglia[k] === "string" && d.griglia[k].trim()) g[k] = d.griglia[k].trim();
+        }
+        if (Object.keys(g).length > 0) (out as any).griglia = g;
+      }
     }
     return out;
   });

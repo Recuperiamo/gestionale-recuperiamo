@@ -65,11 +65,20 @@ Esempi validi:
       "testo": "string — testo della domanda",
       "opzioni": ["string", "..."],
       "rispostaCorretta": "string",
-      "rispostaAttesa": "string"
+      "rispostaAttesa": "string",
+      "peso": 1,
+      "griglia": {
+        "completo": "string — criterio per risposta completa",
+        "incompleto": "string — criterio per risposta incompleta",
+        "parziale": "string — criterio per risposta parziale",
+        "insufficiente": "string — criterio per risposta insufficiente"
+      }
     }
   ]
 }
 ```
+
+> `peso` e `griglia` sono campi **esclusivi di `testo_libero`** e facoltativi — non includerli per altri tipi.
 
 ### Campo `opzioni`
 - **Obbligatorio** solo per `mcq`
@@ -83,9 +92,32 @@ Esempi validi:
 
 ### Campo `rispostaAttesa`
 - **Obbligatorio** solo per `completamento`
-- **Non includere** per `mcq`, `vero_falso`, `testo_libero`
+- Per `testo_libero` è **facoltativo** — usare se si vuole fornire al docente una risposta di riferimento sintetica
+- **Non includere** per `mcq`, `vero_falso`
 - È una risposta di riferimento a uso del docente in fase di correzione manuale — **non** viene usata dalla piattaforma per correggere automaticamente (a differenza di `rispostaCorretta`)
 - Se si accettano sinonimi o formulazioni alternative, indicarlo qui (es. "F=ma (accettato anche 'forza = massa per accelerazione')")
+
+### Campo `peso` *(facoltativo, solo `testo_libero`)*
+- Intero da **1 a 10** (default: 1 se omesso)
+- Permette di assegnare più peso alle domande aperte più complesse nel calcolo del punteggio finale
+- Esempio: una domanda che chiede di descrivere 8 passaggi di un processo vale `"peso": 4`, mentre una domanda di spiegazione semplice vale `"peso": 1`
+- La piattaforma usa `peso` per ponderare il contributo di ogni domanda aperta al punteggio: una domanda con `peso: 3` vale tre volte una con `peso: 1`
+
+### Campo `griglia` *(facoltativo, solo `testo_libero`)*
+- Oggetto con una o più delle quattro chiavi: `"completo"`, `"incompleto"`, `"parziale"`, `"insufficiente"`
+- Il valore di ogni chiave è una stringa che descrive i **criteri specifici** per quel livello di valutazione
+- Se omesso, il docente usa i criteri universali predefiniti della piattaforma
+- Includere `griglia` quando i criteri cambiano a seconda della domanda (es. "Completo: elenca tutti e 6 i passaggi", "Parziale: almeno 3 passaggi corretti")
+- Non è necessario includere tutte e quattro le chiavi: si possono specificare solo i livelli per cui si vogliono criteri personalizzati
+
+**Livelli della griglia di valutazione (fissi nella piattaforma):**
+
+| Livello | Punteggio | Criterio universale |
+|---|---|---|
+| `completo` | 100% del peso | Risposta esaustiva, corretta e ben strutturata |
+| `incompleto` | 70% del peso | Corretta ma manca qualcosa (passaggio, esempio, approfondimento) |
+| `parziale` | 35% del peso | Parzialmente corretta o con lacune significative |
+| `insufficiente` | 0% del peso | Assente, errata o non pertinente |
 
 ---
 
@@ -113,6 +145,10 @@ Esempi validi:
 - Usare per ragionamento e argomentazione, non per memoria semplice
 - Indicare nel testo la lunghezza attesa (es. "in 2–3 righe", "elenca almeno 3 esempi")
 - Non aggiungere `rispostaCorretta` — la correzione avviene manualmente nella piattaforma
+- Aggiungere `rispostaAttesa` (facoltativo) se si vuole fornire al docente un testo di riferimento sintetico
+- **Peso:** usare il campo `peso` (intero 1–10) quando la domanda è più articolata e deve incidere di più sul voto finale. Una domanda complessa che richiede 5-6 elementi vale `"peso": 3`; una semplice 1-2 frasi vale `"peso": 1`. Se non specificato, vale 1.
+- **Griglia di valutazione:** aggiungere il campo `griglia` (facoltativo) con criteri personalizzati per livello, quando i criteri standard non bastano — es. "Completo: descrive tutti e 6 i passaggi della fotosintesi". Se omesso, il docente usa i criteri universali.
+- **Risposta su foglio fisico + foto:** la piattaforma permette allo studente di rispondere su un foglio fisico, fotografarlo e caricare l'immagine nel form (funzione disponibile per le domande `testo_libero`). Usa questa modalità quando l'argomento richiede una rappresentazione grafica o spaziale che sarebbe innaturale o poco chiara da descrivere solo a parole — es. strutture di Lewis, geometrie/modelli VSEPR, diagrammi di corpo libero, grafici, mappe concettuali, costruzioni geometriche, schemi di circuiti. In questi casi la domanda deve dirlo esplicitamente, con una frase del tipo: *"Disegna [cosa] su un foglio, poi fotografalo e carica l'immagine nel form."* Non usare questa modalità per domande a cui si può rispondere altrettanto bene in testo (non è un modo per essere pigri nella formulazione).
 
 ---
 
@@ -195,7 +231,14 @@ Se per un caso specifico non esiste un carattere Unicode adeguato, scrivi la not
     },
     {
       "tipo": "testo_libero",
-      "testo": "Spiega in 2–3 righe come si determina il numero di soluzioni di un'equazione di 2° grado prima di risolverla, e perché è utile farlo."
+      "testo": "Spiega in 2–3 righe come si determina il numero di soluzioni di un'equazione di 2° grado prima di risolverla, e perché è utile farlo.",
+      "peso": 2,
+      "griglia": {
+        "completo": "Cita il discriminante, spiega i tre casi (Δ>0, Δ=0, Δ<0) e motiva l'utilità",
+        "incompleto": "Cita il discriminante e almeno due casi, ma manca la motivazione",
+        "parziale": "Menziona il discriminante ma descrive un solo caso o in modo impreciso",
+        "insufficiente": "Assente, errato o non pertinente"
+      }
     }
   ]
 }
@@ -222,11 +265,13 @@ Quando l'utente chiede di generare un quiz, Claude deve seguire questi passi, in
 
 4. **Note aggiuntive** (facoltative): focus su un sotto-argomento, cosa evitare, difficoltà desiderata — vanno usate se fornite, ma non richieste attivamente.
 
-5. **Genera il JSON** rispettando esattamente lo schema e le regole di questa guida.
+5. **Valuta se qualche domanda richiede una rappresentazione grafica.** Per ogni concetto dell'argomento, chiediti se è naturalmente visivo/spaziale (strutture di Lewis, geometrie VSEPR, diagrammi di corpo libero, grafici, mappe concettuali, costruzioni geometriche, schemi...). Se sì, formula quella domanda come `testo_libero` e scrivi esplicitamente nel testo di disegnare la risposta su un foglio, fotografarla e caricarla nel form (vedi regola dedicata in "Regole per tipo di domanda").
 
-6. **Autoconteggio obbligatorio — ultimo passaggio prima di rispondere.** Conta manualmente quanti elementi ci sono nell'array `domande` che hai appena scritto. Confronta il numero con il minimo assoluto della fascia scelta al punto 3 (4 / 8 / 14). Se il totale è inferiore, **non rispondere ancora**: aggiungi altre domande — rispettando tipo, ordine e regole — finché non raggiungi almeno quel minimo, poi riconta. Solo dopo aver verificato il conteggio, controlla anche che il JSON sia sintatticamente valido (parentesi, virgole, virgolette).
+6. **Genera il JSON** rispettando esattamente lo schema e le regole di questa guida.
 
-7. **Crea un file scaricabile, non incollare il JSON in chat.** Genera un file `.json` con il contenuto del quiz (nome file: `quiz-[materia]-[argomento breve].json`, senza spazi, es. `quiz-chimica-legami-di-valenza.json`) e condividilo come allegato. Il messaggio di chat deve restare breve (una riga di conferma tipo "Quiz pronto, X domande"): il JSON non va mai ripetuto come testo o blocco di codice nella risposta, va solo nel file.
+7. **Autoconteggio obbligatorio — ultimo passaggio prima di rispondere.** Conta manualmente quanti elementi ci sono nell'array `domande` che hai appena scritto. Confronta il numero con il minimo assoluto della fascia scelta al punto 3 (4 / 8 / 14). Se il totale è inferiore, **non rispondere ancora**: aggiungi altre domande — rispettando tipo, ordine e regole — finché non raggiungi almeno quel minimo, poi riconta. Solo dopo aver verificato il conteggio, controlla anche che il JSON sia sintatticamente valido (parentesi, virgole, virgolette).
+
+8. **Crea un file scaricabile, non incollare il JSON in chat.** Genera un file `.json` con il contenuto del quiz (nome file: `quiz-[materia]-[argomento breve].json`, senza spazi, es. `quiz-chimica-legami-di-valenza.json`) e condividilo come allegato. Il messaggio di chat deve restare breve (una riga di conferma tipo "Quiz pronto, X domande"): il JSON non va mai ripetuto come testo o blocco di codice nella risposta, va solo nel file.
 
 Se l'utente preferisce fornire tutto subito senza attendere le domande di Claude, può scrivere direttamente:
 
@@ -245,6 +290,9 @@ Note aggiuntive (opzionale): [...]
 - Non aggiungere `rispostaCorretta` nelle domande `completamento` o `testo_libero` (correzione manuale)
 - Ogni domanda `completamento` deve avere `rispostaAttesa` (risposta di riferimento per il docente, non usata per correggere automaticamente)
 - Non aggiungere `opzioni` nelle domande che non sono `mcq`
+- Non aggiungere `peso` o `griglia` nelle domande che non sono `testo_libero`
+- `peso` deve essere un intero da 1 a 10; se omesso vale 1
+- Le chiavi di `griglia` devono essere esattamente tra: `completo`, `incompleto`, `parziale`, `insufficiente`
 - Rispettare l'ordine: prima `vero_falso`, poi `mcq`, poi `completamento`, infine `testo_libero`
 - Il titolo deve seguire il formato: `[Materia] — [Argomento]`
 - Non generare il quiz finché argomento (specifico), classe e materia non sono noti
@@ -264,7 +312,10 @@ Note aggiuntive (opzionale): [...]
 - [ ] Nessuna domanda `completamento` o `testo_libero` ha il campo `rispostaCorretta`
 - [ ] Ogni domanda `completamento` ha il campo `rispostaAttesa`
 - [ ] Nessuna domanda non-`mcq` ha il campo `opzioni`
+- [ ] `peso` e `griglia` compaiono solo in domande `testo_libero` (se usati)
+- [ ] `peso` è un intero da 1 a 10; le chiavi di `griglia` sono tra: completo, incompleto, parziale, insufficiente
 - [ ] Le domande sono ordinate: vero_falso → mcq → completamento → testo_libero
 - [ ] Il quiz include almeno vero_falso, mcq e completamento (non un solo tipo)
 - [ ] Il numero totale di domande rispetta il minimo assoluto della fascia scelta (Ristretto ≥4 / Medio ≥8 / Ampio ≥14)
 - [ ] Apici e pedici (formule, esponenti) usano caratteri Unicode e non `^` o numeri in linea
+- [ ] Le domande che richiedono una rappresentazione grafica (Lewis, VSEPR, diagrammi...) chiedono esplicitamente foglio + foto

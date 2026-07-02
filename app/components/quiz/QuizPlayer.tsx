@@ -9,7 +9,7 @@ interface Quiz { id: number; titolo: string; domande: Domanda[]; mioTentativo?: 
 interface Tentativo {
   id: number; quizId: number; risposte: Record<string, string>;
   punteggio: number | null; totaleAutomatico: number | null;
-  correzioneManuale: Record<string, { corretto: boolean; nota?: string }> | null;
+  correzioneManuale: Record<string, { livello?: string; corretto?: boolean; nota?: string }> | null;
   allegati?: string[] | null;
   completatoAt: string;
 }
@@ -68,6 +68,7 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
   const risposte = tentativo.risposte;
   const corr = tentativo.correzioneManuale;
   const p = tentativo.punteggio;
+  const [notaPopup, setNotaPopup] = useState<{ testo: string; nota: string; numero: number } | null>(null);
 
   return (
     <div>
@@ -121,7 +122,15 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
             else if (d.tipo === "completamento") esito = risposta.trim().toLowerCase() === (d.rispostaCorretta || "").trim().toLowerCase() ? "corretta" : "errata";
             else esito = risposta.trim() === (d.rispostaCorretta || "").trim() ? "corretta" : "errata";
           } else {
-            esito = corrInfo === undefined ? "attesa" : corrInfo.corretto ? "corretta" : "errata";
+            if (corrInfo === undefined || corrInfo === null) {
+              esito = "attesa";
+            } else if (typeof corrInfo.livello === "string") {
+              // griglia di valutazione: solo "insufficiente" è errata, gli altri sono varianti di corretta
+              esito = corrInfo.livello === "insufficiente" ? "errata" : "corretta";
+            } else {
+              // backward compat: vecchio formato { corretto: boolean }
+              esito = corrInfo.corretto ? "corretta" : "errata";
+            }
           }
           const ec = esito === "corretta" ? "#12753a" : esito === "attesa" ? "#92400e" : "#c62828";
           const eb = esito === "corretta" ? "#d1fae5" : esito === "attesa" ? "#fef3c7" : "#fee2e2";
@@ -152,15 +161,41 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
                   </div>
                 )}
                 {isManu && corrInfo?.nota && (
-                  <div style={{ fontSize: F.sm, color: "#4f46e5", marginTop: "clamp(6px,0.8vw,12px)", fontStyle: "italic", background: "#ede9fe", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1vw,16px)" }}>
-                    Nota del docente: {corrInfo.nota}
-                  </div>
+                  <button onClick={() => setNotaPopup({ testo: d.testo, nota: corrInfo.nota, numero: i + 1 })}
+                    style={{ marginTop: "clamp(6px,0.8vw,12px)", display: "inline-flex", alignItems: "center", gap: 6, background: "#ede9fe", border: "1.5px solid #c4b5fd", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1vw,16px)", cursor: "pointer", fontSize: F.sm, color: "#4f46e5", fontWeight: 600, fontStyle: "italic" }}>
+                    💬 Nota del docente
+                    <span style={{ fontSize: F.xs, fontWeight: 400, fontStyle: "normal", color: "#7c3aed" }}>Leggi →</span>
+                  </button>
                 )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Popup nota docente */}
+      {notaPopup && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={() => setNotaPopup(null)}>
+          <div style={{ background: "#fff", borderRadius: 20, padding: "clamp(24px,3vw,40px)", maxWidth: 560, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: F.xs, fontWeight: 700, color: "#7c3aed", background: "#f3f0ff", borderRadius: 8, padding: "4px 12px", display: "inline-block", marginBottom: 10 }}>
+              💬 Nota del docente — Domanda {notaPopup.numero}
+            </div>
+            <div style={{ fontSize: F.sm, color: "#6b7280", fontStyle: "italic", marginBottom: 16, lineHeight: 1.5, borderLeft: "3px solid #c4b5fd", paddingLeft: 12 }}>
+              {notaPopup.testo}
+            </div>
+            <div style={{ fontSize: F.base, color: "#1e1b4b", lineHeight: 1.7, background: "#faf5ff", borderRadius: 12, padding: "clamp(14px,1.5vw,20px)", whiteSpace: "pre-wrap" }}>
+              {notaPopup.nota}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setNotaPopup(null)} style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 10, padding: "10px 28px", fontWeight: 700, fontSize: F.sm, cursor: "pointer" }}>
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
