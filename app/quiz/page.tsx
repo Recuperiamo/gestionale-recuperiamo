@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import { PageCard, PageAction } from "../components/PageHeader";
 import QuizEditor from "../components/quiz/QuizEditor";
+import { FullPageSpinner } from "../components/Spinner";
 
 interface Lezione {
   id: number;
@@ -40,7 +41,7 @@ function QuizPageInner() {
     }
   }
 
-  if (status === "loading" || loading) return <div style={{ padding: 40, color: "#6b7280" }}>Caricamento...</div>;
+  if (status === "loading" || loading) return <FullPageSpinner text="Carico i quiz..." />;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f0f4ff" }}>
@@ -64,7 +65,7 @@ function QuizPageInner() {
 
 export default function QuizPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40 }}>Caricamento...</div>}>
+    <Suspense fallback={<FullPageSpinner />}>
       <QuizPageInner />
     </Suspense>
   );

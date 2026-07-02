@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
+import { FullPageSpinner } from "../components/Spinner";
 
 // ── Materie con ordine fisso ──────────────────────────────────────────────────
 const MATERIE = [
@@ -484,7 +485,7 @@ function LezioniPageInner() {
   ];
   const lezioniNonClass = lezioni.filter(l=>!l.argomentoId&&!l.macroArgomentoId);
 
-  if (status==="loading"||loading) return <div style={{padding:40,color:C.sub}}>Carico...</div>;
+  if (status==="loading"||loading) return <FullPageSpinner text="Carico le lezioni..." />;
 
   return (
     <div style={{ minHeight:"100vh",background:C.bg }}>
@@ -761,7 +762,7 @@ const btnXS  = { background:"transparent",border:"none",cursor:"pointer",fontSiz
 
 export default function LezioniPage() {
   return (
-    <Suspense fallback={<div style={{ padding:40 }}>Carico...</div>}>
+    <Suspense fallback={<FullPageSpinner />}>
       <LezioniPageInner />
     </Suspense>
   );

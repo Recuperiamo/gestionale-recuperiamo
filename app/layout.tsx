@@ -12,6 +12,8 @@ export const viewport = {
 
 export const metadata = {
   title: 'Recuperiamo',
+  description: 'Gestionale Recuperiamo — lezioni, quiz e pacchetti ore',
+  icons: { icon: '/icon.svg' },
 };
 
 export default function RootLayout({ children }) {

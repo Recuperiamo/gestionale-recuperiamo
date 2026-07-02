@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 import { useState, useEffect } from "react";
+import Spinner from "../Spinner";
 
 type TipoDomanda = "mcq" | "vero_falso" | "testo_libero" | "completamento";
 interface Domanda { tipo: TipoDomanda; testo: string; opzioni?: string[]; rispostaCorretta?: string; rispostaAttesa?: string; }
@@ -170,7 +171,7 @@ export function QuizListLezione({ lezioneId }: { lezioneId: number }) {
 
   useEffect(() => { loadQuizzes(); }, [lezioneId]);
 
-  if (loading) return <div style={{ padding: 20, color: "#20489a" }}>Caricamento quiz...</div>;
+  if (loading) return <Spinner text="Carico il quiz..." />;
   if (aperto !== null) return <QuizPlayer quizId={aperto} onClose={() => { setAperto(null); loadQuizzes(); }} fullScreen />;
   if (quizzes.length === 0) return <div style={{ textAlign: "center", padding: "40px 20px", color: "#aaa", fontSize: 13 }}>Nessun quiz disponibile.</div>;
 

@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
+import { FullPageSpinner } from "../../components/Spinner";
 
 const C = {
   bg:"#f0f4ff", card:"#fff", primary:"#4f46e5", light:"#e0e7ff",
@@ -51,7 +52,7 @@ export default function IndiceLezioniPage() {
     });
   },[status]);
 
-  if (status==="loading"||loading) return <div style={{padding:40,color:C.sub}}>Carico...</div>;
+  if (status==="loading"||loading) return <FullPageSpinner text="Carico l'indice..." />;
 
   const q = search.trim().toLowerCase();
   const lezFiltrate = q ? lezioni.filter(l=>l.titolo.toLowerCase().includes(q)) : lezioni;

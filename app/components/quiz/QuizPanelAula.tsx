@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import QuizPlayer from "./QuizPlayer";
+import Spinner from "../Spinner";
 
 interface QuizItem {
   id: number;
@@ -38,7 +39,7 @@ export default function QuizPanelAula({ clienteId, coloreTema = "#1cb0f6" }: {
 
   useEffect(() => { load(); }, [clienteId]);
 
-  if (loading) return <div style={{ padding: 24, color: "#20489a" }}>Caricamento quiz...</div>;
+  if (loading) return <Spinner text="Carico il quiz..." />;
 
   if (quizAperto !== null) {
     return (

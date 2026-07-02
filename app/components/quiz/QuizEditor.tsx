@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import QuizPlayer from "./QuizPlayer";
+import Spinner from "../Spinner";
 
 type TipoDomanda = "mcq" | "vero_falso" | "testo_libero" | "completamento";
 
@@ -555,7 +556,7 @@ export default function QuizEditor({
   }, {} as Record<string, QuizItem[]>);
   const senzaMateria = quizzes.filter(qz => !qz.lezioni?.length);
 
-  if (loading) return <div style={{ padding: 20, color: "#20489a" }}>Caricamento...</div>;
+  if (loading) return <Spinner text="Carico i quiz..." />;
 
   return (
     <div style={{ padding: "16px 0" }}>

@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
 import QuizPlayer, { QuizListLezione } from "../../components/quiz/QuizPlayer";
+import { FullPageSpinner } from "../../components/Spinner";
 
 const MATERIE = [
   "Matematica","Fisica","Chimica","Biologia","Informatica",
@@ -364,7 +365,7 @@ function LezioneDetailPageInner() {
   const pageStyle = { maxWidth: 1100, margin: "0 auto", padding: "28px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" };
   const wrapStyle = { minHeight: "100vh", background: "#f0f4ff" };
 
-  if (loading) return <div style={wrapStyle}><Navbar /><div style={pageStyle}><p style={{ color: "#20489a" }}>Caricamento...</p></div></div>;
+  if (loading) return <FullPageSpinner text="Carico la lezione..." />;
 
   if (error) return (
     <div style={wrapStyle}>
@@ -577,7 +578,7 @@ function LezioneDetailPageInner() {
 // ── Export con Suspense (richiesto da useSearchParams in Next.js 15) ───────────
 export default function LezioneDetailPage() {
   return (
-    <Suspense fallback={<div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px", fontFamily: "'Inter','Segoe UI',Arial,sans-serif" }}><p style={{ color: "#20489a" }}>Caricamento...</p></div>}>
+    <Suspense fallback={<FullPageSpinner />}>
       <LezioneDetailPageInner />
     </Suspense>
   );
