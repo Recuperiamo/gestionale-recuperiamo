@@ -1,7 +1,6 @@
 // @ts-nocheck
 // GET /api/quiz/overview?clienteId=X
 // Ritorna tutti i quiz delle lezioni assegnate allo studente, con stato tentativo.
-// Se chiamato da admin con clienteId: stessa vista lato studente (preview).
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../auth/[...nextauth]/authOptions'
@@ -27,18 +26,21 @@ export async function GET(req) {
     if (!clienteId) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
 
-  // Tutte le lezioni assegnate allo studente che hanno almeno un quiz
+  // Lezioni assegnate allo studente → quiz collegati via QuizLezione
   const assegnazioni = await prisma.assegnazioneLezione.findMany({
     where: { clienteId },
     include: {
       lezione: {
         include: {
           quizzes: {
-            orderBy: { createdAt: 'asc' },
             include: {
-              tentativi: {
-                where: { clienteId },
-                select: { id: true, punteggio: true, completatoAt: true, correzioneManuale: true },
+              quiz: {
+                include: {
+                  tentativi: {
+                    where: { clienteId },
+                    select: { id: true, punteggio: true, completatoAt: true, correzioneManuale: true },
+                  },
+                },
               },
             },
           },
@@ -47,16 +49,17 @@ export async function GET(req) {
     },
   })
 
-  // Appiattisco: lezione → quiz → tentativo
   const result = assegnazioni
     .map(a => ({
       lezione: { id: a.lezione.id, titolo: a.lezione.titolo, materia: a.lezione.materia },
-      quizzes: a.lezione.quizzes.map(q => ({
-        id: q.id,
-        titolo: q.titolo,
-        numeroDomande: (q.domande as any[]).length,
-        tentativo: q.tentativi[0] || null,
-      })),
+      quizzes: a.lezione.quizzes
+        .map(({ quiz: q }) => ({
+          id: q.id,
+          titolo: q.titolo,
+          numeroDomande: (q.domande as any[]).length,
+          tentativo: q.tentativi[0] || null,
+        }))
+        .sort((a, b) => a.id - b.id),
     }))
     .filter(g => g.quizzes.length > 0)
 

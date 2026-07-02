@@ -32,9 +32,12 @@ function QuizPageInner() {
 
   async function loadLezioni() {
     setLoading(true);
-    const r = await fetch("/api/lezioni", { credentials: "include" }).then(r => r.json());
-    setLezioni(Array.isArray(r) ? r : []);
-    setLoading(false);
+    try {
+      const r = await fetch("/api/lezioni", { credentials: "include" }).then(r => r.json());
+      setLezioni(Array.isArray(r) ? r : []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (status === "loading" || loading) return <div style={{ padding: 40, color: "#6b7280" }}>Caricamento...</div>;
