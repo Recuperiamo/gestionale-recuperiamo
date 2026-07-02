@@ -359,19 +359,24 @@ function LezioniPageInner() {
 
   async function loadAll() {
     setLoading(true);
-    const [rMacro, rArg, rLezioni] = await Promise.all([
-      fetch("/api/macro-argomenti").then(r=>r.json()),
-      fetch("/api/argomenti").then(r=>r.json()),
-      fetch("/api/lezioni").then(r=>r.json()),
-    ]);
-    setMacroArgomenti(Array.isArray(rMacro)?rMacro:[]);
-    setArgomenti(Array.isArray(rArg)?rArg:[]);
-    setLezioni(Array.isArray(rLezioni)?rLezioni:[]);
-    if (isAdmin) {
-      const rC = await fetch("/api/clienti").then(r=>r.json()).catch(()=>[]);
-      setClienti(Array.isArray(rC)?rC:[]);
+    try {
+      const [rMacro, rArg, rLezioni] = await Promise.all([
+        fetch("/api/macro-argomenti").then(r=>r.json()),
+        fetch("/api/argomenti").then(r=>r.json()),
+        fetch("/api/lezioni").then(r=>r.json()),
+      ]);
+      setMacroArgomenti(Array.isArray(rMacro)?rMacro:[]);
+      setArgomenti(Array.isArray(rArg)?rArg:[]);
+      setLezioni(Array.isArray(rLezioni)?rLezioni:[]);
+      if (isAdmin) {
+        const rC = await fetch("/api/clienti").then(r=>r.json()).catch(()=>[]);
+        setClienti(Array.isArray(rC)?rC:[]);
+      }
+    } catch(e) {
+      console.error("loadAll error:", e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function toggleMacro(id){setOpenMacro(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
