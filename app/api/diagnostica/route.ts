@@ -12,27 +12,24 @@ export async function GET() {
     return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
   }
 
-  try {
-    const [nMacro, nArg, nLezioni, nQuiz, nQuizLezione] = await Promise.all([
-      prisma.macroArgomento.count(),
-      prisma.argomento.count(),
-      prisma.lezione.count(),
-      prisma.quiz.count(),
-      prisma.quizLezione.count(),
-    ])
-
-    const [macro, argomenti, lezioni, quiz] = await Promise.all([
-      prisma.macroArgomento.findMany({ select: { id: true, nome: true, materia: true } }),
-      prisma.argomento.findMany({ select: { id: true, nome: true } }),
-      prisma.lezione.findMany({ select: { id: true, titolo: true, materia: true } }),
-      prisma.quiz.findMany({ select: { id: true, titolo: true } }),
-    ])
-
-    return NextResponse.json({
-      conteggi: { macroArgomenti: nMacro, argomenti: nArg, lezioni: nLezioni, quiz: nQuiz, quizLezione: nQuizLezione },
-      dati: { macro, argomenti, lezioni, quiz }
-    })
-  } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  async function safe(label: string, fn: () => Promise<any>) {
+    try { return { ok: true, value: await fn() } }
+    catch (e) { return { ok: false, error: e.message } }
   }
+
+  const [rMacro, rArg, rLezioni, rQuiz, rQuizLez] = await Promise.all([
+    safe('macroArgomenti', () => prisma.macroArgomento.findMany({ select: { id: true, nome: true, materia: true } })),
+    safe('argomenti',      () => prisma.argomento.findMany({ select: { id: true, nome: true } })),
+    safe('lezioni',        () => prisma.lezione.findMany({ select: { id: true, titolo: true, materia: true } })),
+    safe('quiz',           () => prisma.quiz.findMany({ select: { id: true, titolo: true } })),
+    safe('quizLezione',    () => prisma.quizLezione.count()),
+  ])
+
+  return NextResponse.json({
+    macroArgomenti: rMacro,
+    argomenti: rArg,
+    lezioni: rLezioni,
+    quiz: rQuiz,
+    quizLezione: rQuizLez,
+  })
 }
