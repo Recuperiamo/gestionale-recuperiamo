@@ -17,6 +17,7 @@ import { mapAttivita, colorsForStato } from "../../utils/calendario/mapping";
 import { useRichiesteModifica } from "../modifiche/useRichiesteModifica";
 import dynamic from 'next/dynamic';
 import RichiestaModificaModal from "../modifiche/RichiestaModificaModal";
+import Spinner from "../Spinner";
 const AttivitaForm = dynamic(() => import('../attivita/AttivitaForm'), { ssr: false });
 
 export default function CalendarioAttivita({
@@ -423,7 +424,7 @@ export default function CalendarioAttivita({
     refetchRichieste && refetchRichieste();
   };
 
-  if (loading) return <div style={styles.loadingBox}>Caricamento calendario…</div>;
+  if (loading) return <Spinner text="Carico il calendario…" />;
   if (errore) return <div style={styles.errorBox}>Errore calendario: {errore}</div>;
 
   const weekView = mode === "week";

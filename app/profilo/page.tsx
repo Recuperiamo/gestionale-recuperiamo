@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useSession } from "../lib/auth/hooks";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import { FullPageSpinner } from "../components/Spinner";
 import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
 import Link from "next/link";
 import AttivitaForm from "../components/attivita/AttivitaForm";
@@ -396,14 +397,7 @@ export default function ProfiloPage() {
     setNote(prev => prev.filter(n => n.id !== id));
   }
 
-  if (status === "loading" || !session) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
-        <Navbar />
-        <div style={{ textAlign: "center", padding: 50 }}>Caricamento…</div>
-      </div>
-    );
-  }
+  if (status === "loading" || !session) return <FullPageSpinner text="Carico il profilo..." />;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f8ff", fontFamily: "'Segoe UI','Arial','Helvetica',sans-serif" }}>

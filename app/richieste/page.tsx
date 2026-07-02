@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import { FullPageSpinner } from "../components/Spinner";
 import ApprovaRichiestaModal from "../admin/modifiche/ApprovaRichiestaModal";
 
 export default function RichiestePage() {
@@ -121,14 +122,7 @@ export default function RichiestePage() {
     }
   }
 
-  if (status === "loading" || loading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
-        <Navbar />
-        <div style={{ padding: 50, textAlign: "center" }}>Caricamento…</div>
-      </div>
-    );
-  }
+  if (status === "loading" || loading) return <FullPageSpinner text="Carico le richieste..." />;
 
   const richiesteModificaPending = richiesteModifica.filter(r => ["pending", "in_review"].includes(r.stato));
   const richiesteLavagnaPending = richiesteLavagna.filter(r => ["pending", "in_review"].includes(r.stato));

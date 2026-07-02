@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import Navbar from "../components/Navbar";
 import ChangelogTable from "../components/ChangelogTable";
+import Spinner from "../components/Spinner";
 import StoricoRichiesteModificaTable from "../components/modifiche/StoricoRichiesteModificaTable";
 import { useSession } from "next-auth/react";
 
@@ -70,7 +71,7 @@ function StoricoRichiesteWrapper({ isCliente }) {
     return () => { abort = true; };
   }, []);
 
-  if (loading) return <div>Caricamento richieste...</div>;
+  if (loading) return <Spinner text="Carico le richieste..." />;
   if (errore) return <div className="text-red-600">Errore: {errore}</div>;
 
   return (

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
+import { FullPageSpinner } from "../components/Spinner";
 import AuthGuard from "../components/AuthGuard";
 
 function formatDataOra(d) {
@@ -212,14 +213,7 @@ export default function LavagnaListPage() {
     );
   }, [lavagne, cercaQuery]);
 
-  if (status === "loading") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
-        <Navbar />
-        <div style={{ padding: 50, color: "#6b7280" }}>Caricamento…</div>
-      </div>
-    );
-  }
+  if (status === "loading") return <FullPageSpinner text="Carico le lavagne..." />;
 
   const nomeStudenteSelezionato = clienti.find(c => String(c.id) === selectedClienteId)?.nomeReferente || "";
 

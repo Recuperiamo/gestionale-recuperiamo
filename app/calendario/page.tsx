@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
+import { FullPageSpinner } from "../components/Spinner";
 import CalendarioAttivita from "../components/calendario/CalendarioAttivita";
 import ApprovaRichiestaModal from "../admin/modifiche/ApprovaRichiestaModal";
 
@@ -15,16 +16,7 @@ export default function CalendarioAdminPage() {
   const [richiestaSelezionata, setRichiestaSelezionata] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  if (status === "loading") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f5f8ff" }}>
-        <Navbar />
-        <div style={{ padding: 50, textAlign: "center", fontWeight: 600 }}>
-          Caricamento…
-        </div>
-      </div>
-    );
-  }
+  if (status === "loading") return <FullPageSpinner text="Carico il calendario..." />;
 
   if (!session) {
     return (

@@ -5,6 +5,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
+import Spinner from "../components/Spinner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -1262,7 +1263,7 @@ export default function PacchettiLezioniPage() {
         )}
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40 }}>Caricamento…</div>
+          <Spinner text="Carico le attività..." />
         ) : errore ? (
           <div style={errBox}>Errore: {errore}</div>
         ) : (

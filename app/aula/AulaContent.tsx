@@ -4,6 +4,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Navbar from "../components/Navbar";
+import { FullPageSpinner } from "../components/Spinner";
 import ProgrammaPreview from './ProgrammaPreview';
 import CalendarioAttivita from '../components/calendario/CalendarioAttivita';
 import ProgrammaPanel from './ProgrammaPanel';
@@ -899,9 +900,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
     }
   }
 
-  if (status === "loading") {
-    return <div><Navbar /><div style={{ padding: 40 }}>Caricamento…</div></div>;
-  }
+  if (status === "loading") return <FullPageSpinner text="Carico l'aula..." />;
   if (!session) return null;
 
   // Materie da mostrare nella sidebar: usa quelle dello studente se disponibili, altrimenti quelle nei materiali
