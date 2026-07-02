@@ -97,25 +97,9 @@ export function BrandSpinner() {
           <AtomIcon size={34} />
         </div>
       </div>
-      {/* Pallini rimbalzanti */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{
-            width: 9, height: 9, borderRadius: "50%",
-            background: ["#4f46e5", "#818cf8", "#c7d2fe"][i],
-            animation: `rc-bounce 1.2s ease-in-out ${i * 0.18}s infinite`,
-          }} />
-        ))}
-      </div>
       <div style={{ color: "#1e1b4b", fontWeight: 700, fontSize: 15, letterSpacing: "0.06em" }}>
         Recuperiamo
       </div>
-      <style>{`
-        @keyframes rc-bounce {
-          0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-          40% { transform: translateY(-12px); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
