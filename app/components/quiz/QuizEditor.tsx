@@ -37,6 +37,7 @@ interface Tentativo {
   punteggio: number | null;
   totaleAutomatico: number | null;
   correzioneManuale: Record<string, { corretto: boolean; nota?: string }> | null;
+  allegati?: string[] | null;
   completatoAt: string;
   cliente: { id: number; nomeReferente: string; nome?: string; cognome?: string };
 }
@@ -285,6 +286,18 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
           );
         })}
       </div>
+      {(tentativo.allegati as string[])?.length > 0 && (
+        <div style={{ marginTop: 12, padding: "10px 12px", background: "#f0f7ff", border: "1px solid #c3d9f0", borderRadius: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#4f46e5", marginBottom: 8 }}>📎 Foto allegate ({(tentativo.allegati as string[]).length})</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {(tentativo.allegati as string[]).map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                <img src={url} alt={`Foto ${i + 1}`} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "2px solid #dbe4f1", cursor: "pointer" }} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       {hasManuali && (
         <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
           <button onClick={salvaCorrezione} disabled={saving || !tutteCorrete}
@@ -407,11 +420,11 @@ function QuizForm({ lezioni, defaultLezioneIds, initial, draft, onSaved, onCance
   return (
     <div style={{ background: "#fff", border: "1.5px solid #1cb0f6", borderRadius: 12, padding: "18px 20px" }}>
       <h3 style={{ margin: "0 0 14px", color: "#20489a", fontSize: 15, fontWeight: 800 }}>
-        {initial ? "Modifica quiz" : "Nuovo quiz"}
+        {initial ? "Modifica test" : "Nuovo test"}
       </h3>
 
       <label style={{ ...s.label, marginBottom: 14 }}>
-        Titolo del quiz
+        Titolo del test
         <input value={titolo} onChange={e => setTitolo(e.target.value)} style={s.input} placeholder="Es. Verifica capitolo 3" />
       </label>
 
@@ -436,7 +449,7 @@ function QuizForm({ lezioni, defaultLezioneIds, initial, draft, onSaved, onCance
         <button onClick={onCancel} style={s.btnOutline}>Annulla</button>
         <button onClick={handleSave} disabled={saving || !canSave}
           style={{ ...s.btn(), opacity: saving || !canSave ? 0.6 : 1 }}>
-          {saving ? "Salvataggio..." : initial ? "Salva modifiche" : "Crea quiz"}
+          {saving ? "Salvataggio..." : initial ? "Salva modifiche" : "Crea test"}
         </button>
       </div>
     </div>
@@ -529,7 +542,7 @@ export default function QuizEditor({
   }
 
   async function handleDelete(quizId: number) {
-    if (!confirm("Eliminare il quiz e tutti i tentativi associati?")) return;
+    if (!confirm("Eliminare il test e tutti i tentativi associati?")) return;
     await fetch(`/api/quiz/${quizId}`, { method: "DELETE", credentials: "include" });
     setQuizzes(prev => prev.filter(q => q.id !== quizId));
     if (expandedQuiz === quizId) setExpandedQuiz(null);
@@ -556,7 +569,7 @@ export default function QuizEditor({
   }, {} as Record<string, QuizItem[]>);
   const senzaMateria = quizzes.filter(qz => !qz.lezioni?.length);
 
-  if (loading) return <Spinner text="Carico i quiz..." />;
+  if (loading) return <Spinner text="Carico i test..." />;
 
   return (
     <div style={{ padding: "16px 0" }}>
@@ -565,7 +578,7 @@ export default function QuizEditor({
       {!showForm && !editingQuiz && !showImport && (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 16 }}>
           <button onClick={() => setShowImport(true)} style={s.btnOutline}>Importa JSON</button>
-          <button onClick={() => { setShowForm(true); }} style={s.btn()}>+ Nuovo quiz</button>
+          <button onClick={() => { setShowForm(true); }} style={s.btn()}>+ Nuovo test</button>
         </div>
       )}
 
@@ -636,7 +649,7 @@ export default function QuizEditor({
         <div key={materia} style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, padding: "6px 0 6px 12px", borderLeft: `4px solid ${colore(materia)}` }}>
             <span style={{ fontWeight: 700, fontSize: 15, color: colore(materia) }}>{materia}</span>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>{qList.length} quiz</span>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>{qList.length} test</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {qList.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
@@ -654,7 +667,7 @@ export default function QuizEditor({
 
       {quizzes.length === 0 && !showForm && (
         <div style={{ textAlign: "center", padding: "48px 20px", color: "#9ca3af", fontSize: 13 }}>
-          Nessun quiz ancora. Crea il primo!
+          Nessun test ancora. Crea il primo!
         </div>
       )}
 

@@ -554,7 +554,7 @@ function LezioneDetailPageInner() {
                 {isAdmin && (
                   <div style={{ marginBottom: 12, display: "flex", justifyContent: "flex-end" }}>
                     <a href="/quiz" style={{ fontSize: 12, color: "#4268b3", fontWeight: 600, textDecoration: "none", border: "1px solid #dbe4f1", borderRadius: 7, padding: "5px 14px", background: "#f8faff" }}>
-                      ✏️ Gestisci quiz →
+                      ✏️ Gestisci test →
                     </a>
                   </div>
                 )}

@@ -39,7 +39,7 @@ export default function QuizPanelAula({ clienteId, coloreTema = "#1cb0f6" }: {
 
   useEffect(() => { load(); }, [clienteId]);
 
-  if (loading) return <Spinner text="Carico il quiz..." />;
+  if (loading) return <Spinner text="Carico i test..." />;
 
   if (quizAperto !== null) {
     return (
@@ -53,7 +53,7 @@ export default function QuizPanelAula({ clienteId, coloreTema = "#1cb0f6" }: {
     return (
       <div style={{ textAlign: "center", padding: "48px 20px", color: "#94a3b8", fontSize: 14 }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>📝</div>
-        Nessun quiz disponibile al momento.
+        Nessun test disponibile al momento.
       </div>
     );
   }
@@ -66,7 +66,7 @@ export default function QuizPanelAula({ clienteId, coloreTema = "#1cb0f6" }: {
       {/* Riepilogo */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         {[
-          { label: "Quiz totali", val: totalQuiz, bg: `${coloreTema}15`, color: coloreTema },
+          { label: "Test totali", val: totalQuiz, bg: `${coloreTema}15`, color: coloreTema },
           { label: "Completati", val: completati, bg: "#c7f7d7", color: "#12753a" },
           { label: "Da fare", val: totalQuiz - completati, bg: "#fef3c7", color: "#92400e" },
         ].map(({ label, val, bg, color }) => (

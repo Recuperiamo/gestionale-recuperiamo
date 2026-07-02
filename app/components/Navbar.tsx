@@ -26,7 +26,7 @@ const NAV_GROUPS = [
     links: [
       { href: "/pacchetti-lezioni", label: "Lezioni & Pacchetti" },
       { href: "/lezioni",           label: "Lezioni" },
-      { href: "/quiz",              label: "Quiz" },
+      { href: "/quiz",              label: "Test" },
       { href: "/lavagna",           label: "Lavagna" },
       { href: "/calendario",        label: "Calendario" },
     ],

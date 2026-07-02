@@ -10,6 +10,7 @@ interface Tentativo {
   id: number; quizId: number; risposte: Record<string, string>;
   punteggio: number | null; totaleAutomatico: number | null;
   correzioneManuale: Record<string, { corretto: boolean; nota?: string }> | null;
+  allegati?: string[] | null;
   completatoAt: string;
 }
 
@@ -92,6 +93,22 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
         <div style={{ fontSize: F.base, color: scoreColor(p), fontWeight: 600 }}>{scoreMsg(p)}</div>
       </div>
 
+      {/* Foto allegate (se presenti) */}
+      {tentativo.allegati?.length > 0 && (
+        <div style={{ marginBottom: "clamp(20px,2.5vw,36px)", padding: "clamp(14px,1.8vw,24px)", background: "#f8faff", border: "1.5px solid #c7d2fe", borderRadius: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: F.sm, color: "#4f46e5", marginBottom: 12 }}>
+            📎 Foto allegate ({tentativo.allegati.length})
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {tentativo.allegati.map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                <img src={url} alt={`Foto ${i + 1}`} style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 10, border: "2px solid #dbe4f1", cursor: "pointer", display: "block" }} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Domande */}
       <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px,1.2vw,16px)" }}>
         {domande.map((d, i) => {
@@ -171,9 +188,9 @@ export function QuizListLezione({ lezioneId }: { lezioneId: number }) {
 
   useEffect(() => { loadQuizzes(); }, [lezioneId]);
 
-  if (loading) return <Spinner text="Carico il quiz..." />;
+  if (loading) return <Spinner text="Carico i test..." />;
   if (aperto !== null) return <QuizPlayer quizId={aperto} onClose={() => { setAperto(null); loadQuizzes(); }} fullScreen />;
-  if (quizzes.length === 0) return <div style={{ textAlign: "center", padding: "40px 20px", color: "#aaa", fontSize: 13 }}>Nessun quiz disponibile.</div>;
+  if (quizzes.length === 0) return <div style={{ textAlign: "center", padding: "40px 20px", color: "#aaa", fontSize: 13 }}>Nessun test disponibile.</div>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -210,6 +227,8 @@ export default function QuizPlayer({ quizId, onClose, previewMode = false, fullS
   const [submitting, setSubmitting] = useState(false);
   const [inviato, setInviato] = useState(false);
   const [tentativo, setTentativo] = useState(null);
+  const [allegati, setAllegati] = useState<string[]>([]);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
 
   useEffect(() => {
     fetch(`/api/quiz/${quizId}`, { credentials: "include" })
@@ -221,6 +240,27 @@ export default function QuizPlayer({ quizId, onClose, previewMode = false, fullS
       .finally(() => setLoading(false));
   }, [quizId]);
 
+  async function handleAddFoto(e) {
+    const files = Array.from(e.target.files as FileList);
+    if (!files.length) return;
+    setUploadingFoto(true);
+    try {
+      const urls = await Promise.all(files.map(async (file: File) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch("/api/quiz/foto", { method: "POST", credentials: "include", body: fd });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error || "Upload fallito"); }
+        return (await r.json()).url as string;
+      }));
+      setAllegati(prev => [...prev, ...urls]);
+    } catch (e: any) {
+      alert("Errore nel caricamento della foto: " + e.message);
+    } finally {
+      setUploadingFoto(false);
+      e.target.value = "";
+    }
+  }
+
   async function handleSubmit() {
     if (!quiz) return;
     const nonRisposto = quiz.domande.some((_, i) => !risposte[String(i)]);
@@ -228,14 +268,14 @@ export default function QuizPlayer({ quizId, onClose, previewMode = false, fullS
     if (previewMode) { setTentativo(buildPreviewTentativo(quiz.domande, risposte)); setInviato(true); return; }
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/quiz/${quizId}/tentativo`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ risposte }) });
+      const res = await fetch(`/api/quiz/${quizId}/tentativo`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ risposte, allegati }) });
       if (!res.ok) { const err = await res.json(); alert(err.error || "Errore invio"); return; }
       setTentativo(await res.json()); setInviato(true);
     } finally { setSubmitting(false); }
   }
 
   if (loading || !quiz) {
-    const msg = <div style={{ padding: 40, textAlign: "center", color: "#20489a", fontSize: F.base }}>{loading ? "Caricamento..." : "Quiz non trovato."}</div>;
+    const msg = <div style={{ padding: 40, textAlign: "center", color: "#20489a", fontSize: F.base }}>{loading ? "Caricamento..." : "Test non trovato."}</div>;
     return fullScreen ? <FullScreenWrap onClose={onClose} title="" previewMode={previewMode}>{msg}</FullScreenWrap> : msg;
   }
 
@@ -324,12 +364,44 @@ export default function QuizPlayer({ quizId, onClose, previewMode = false, fullS
         })}
       </div>
 
+      {/* Sezione foto allegate */}
+      {!previewMode && (
+        <div style={{ marginBottom: "clamp(20px,2.5vw,36px)", padding: "clamp(16px,2vw,28px)", background: "#f8faff", border: "2px dashed #c7d2fe", borderRadius: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: F.sm, color: "#4f46e5", marginBottom: 12 }}>
+            📎 Allega foto del foglio{" "}
+            <span style={{ fontWeight: 400, color: "#9ca3af", fontSize: F.xs }}>(opzionale)</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            {allegati.map((url, i) => (
+              <div key={i} style={{ position: "relative", width: 80, height: 80 }}>
+                <img src={url} alt={`Allegato ${i + 1}`} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 10, border: "2px solid #dbe4f1", display: "block" }} />
+                <button
+                  onClick={() => setAllegati(prev => prev.filter((_, j) => j !== i))}
+                  style={{ position: "absolute", top: -6, right: -6, background: "#dc2626", color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 }}>
+                  ✕
+                </button>
+              </div>
+            ))}
+            {uploadingFoto && (
+              <div style={{ width: 80, height: 80, borderRadius: 10, background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: 20 }}>⏳</span>
+              </div>
+            )}
+            <label style={{ width: 80, height: 80, borderRadius: 10, border: "2px dashed #c7d2fe", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: uploadingFoto ? "not-allowed" : "pointer", color: "#818cf8", fontSize: 11, fontWeight: 700, gap: 4, userSelect: "none" }}>
+              <span style={{ fontSize: 24, lineHeight: 1 }}>+</span>
+              <span>Foto</span>
+              <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleAddFoto} disabled={uploadingFoto} />
+            </label>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "clamp(12px,1.5vw,24px)" }}>
         <span style={{ fontSize: F.sm, color: risposteCount === domande.length ? "#12753a" : "#6b7280", fontWeight: 600 }}>
           {risposteCount === domande.length ? "✓ Tutto risposto" : `${domande.length - risposteCount} senza risposta`}
         </span>
         <button onClick={handleSubmit} disabled={submitting} style={{ background: submitting ? "#d1d5db" : "#1cb0f6", color: "#fff", border: "none", borderRadius: 12, padding: "clamp(12px,1.4vw,20px) clamp(28px,3.5vw,52px)", fontWeight: 800, fontSize: F.md, cursor: submitting ? "not-allowed" : "pointer", transition: "background 0.2s" }}>
-          {submitting ? "Invio..." : previewMode ? "Vedi risultati" : "Invia quiz"}
+          {submitting ? "Invio..." : previewMode ? "Vedi risultati" : "Invia test"}
         </button>
       </div>
     </>

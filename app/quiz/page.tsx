@@ -41,7 +41,7 @@ function QuizPageInner() {
     }
   }
 
-  if (status === "loading" || loading) return <FullPageSpinner text="Carico i quiz..." />;
+  if (status === "loading" || loading) return <FullPageSpinner text="Carico i test..." />;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f0f4ff" }}>
@@ -50,7 +50,7 @@ function QuizPageInner() {
         <div style={{ maxWidth: "min(1400px, 96vw)", margin: "0 auto" }}>
           <PageCard
             icon="📝"
-            title="Quiz"
+            title="Test"
             subtitle={`${lezioni.length} lezioni disponibili`}
           >
             <div style={{ padding: "clamp(16px,2vw,28px) clamp(20px,2.5vw,36px)" }}>

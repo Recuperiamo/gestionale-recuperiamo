@@ -533,6 +533,7 @@ model TentativoQuiz {
   punteggio          Float?    // null = ha domande manuali non ancora corrette
   totaleAutomatico   Int?      // n. domande auto-gradabili
   correzioneManuale  Json?     // { [idx]: { corretto: bool, nota?: string } }
+  allegati           Json?     // string[] - URL foto allegate dallo studente
   completatoAt       DateTime  @default(now())
 
   @@unique([quizId, clienteId])

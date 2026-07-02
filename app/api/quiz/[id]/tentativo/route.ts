@@ -64,6 +64,7 @@ export async function POST(req, { params }) {
 
   const body = await req.json()
   const risposte = body.risposte || {}
+  const allegati = Array.isArray(body.allegati) ? body.allegati : []
 
   // Auto-grading
   const domande = quiz.domande as any[]
@@ -93,6 +94,7 @@ export async function POST(req, { params }) {
       risposte,
       punteggio: hasManual ? null : punteggio,
       totaleAutomatico: totaleAuto,
+      ...(allegati.length ? { allegati } : {}),
     },
   })
   return NextResponse.json({ ...tentativo, corrette, totaleAuto }, { status: 201 })
