@@ -178,15 +178,17 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
 }
 
 // ── Correzione tentativo ──────────────────────────────────────────────────────
-function TentativoDetail({ tentativo, domande, onCorrezione }: {
+function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
   tentativo: Tentativo;
   domande: Domanda[];
   onCorrezione: (tid: number, correzione: Record<string, { corretto: boolean; nota?: string }>) => void;
+  onAzzerato: (tid: number) => void;
 }) {
   const [corr, setCorr] = useState<Record<string, { corretto: boolean; nota?: string }>>(
     tentativo.correzioneManuale || {}
   );
   const [saving, setSaving] = useState(false);
+  const [azzerando, setAzzerando] = useState(false);
   const risposte = tentativo.risposte as Record<string, string>;
 
   const nomeStu = [tentativo.cliente.nomeReferente, tentativo.cliente.nome, tentativo.cliente.cognome]
@@ -210,13 +212,32 @@ function TentativoDetail({ tentativo, domande, onCorrezione }: {
     }
   }
 
+  async function azzeraTentativo() {
+    if (!confirm(`Azzerare il tentativo di ${nomeStu}? Lo studente potrà riconsegnare il test.`)) return;
+    setAzzerando(true);
+    try {
+      await fetch(`/api/quiz/${tentativo.quizId}/tentativo/${tentativo.id}`, {
+        method: "DELETE", credentials: "include",
+      });
+      onAzzerato(tentativo.id);
+    } finally {
+      setAzzerando(false);
+    }
+  }
+
   return (
     <div style={{ background: "#f8faff", border: "1px solid #dbe4f1", borderRadius: 10, padding: "12px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontWeight: 700, fontSize: 13, color: "#20489a" }}>{nomeStu}</span>
-        <span style={{ fontSize: 12, color: "#6b7280" }}>
-          {new Date(tentativo.completatoAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "#6b7280" }}>
+            {new Date(tentativo.completatoAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </span>
+          <button onClick={azzeraTentativo} disabled={azzerando}
+            style={{ background: "#fff0f0", color: "#c62828", border: "1px solid #fca5a5", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: azzerando ? "not-allowed" : "pointer", opacity: azzerando ? 0.6 : 1 }}>
+            {azzerando ? "..." : "Azzera"}
+          </button>
+        </div>
       </div>
       {tentativo.punteggio !== null && (
         <div style={{ marginBottom: 10 }}>
@@ -727,6 +748,12 @@ function QuizCard({ q, lezioni, expandedQuiz, tentativi, loadingTentativi, editi
                     onSetTentativi(prev => ({
                       ...prev,
                       [q.id]: prev[q.id].map(x => x.id === tid ? { ...x, correzioneManuale: corr } : x),
+                    }));
+                  }}
+                  onAzzerato={(tid) => {
+                    onSetTentativi(prev => ({
+                      ...prev,
+                      [q.id]: prev[q.id].filter(x => x.id !== tid),
                     }));
                   }} />
               ))}

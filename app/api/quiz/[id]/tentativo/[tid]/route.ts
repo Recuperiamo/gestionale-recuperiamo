@@ -49,3 +49,15 @@ export async function PATCH(req, { params }) {
   })
   return NextResponse.json(updated)
 }
+
+// DELETE /api/quiz/[id]/tentativo/[tid]  — azzera tentativo (admin)
+export async function DELETE(req, { params }) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user?.role !== 'admin' && session.user?.role !== 'operatore')) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 })
+  }
+
+  const tid = Number(params.tid)
+  await prisma.tentativoQuiz.delete({ where: { id: tid } })
+  return NextResponse.json({ ok: true })
+}
