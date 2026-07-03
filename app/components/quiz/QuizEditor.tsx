@@ -272,31 +272,31 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
   }
 
   return (
-    <div style={{ background: "#f8faff", border: "1px solid #dbe4f1", borderRadius: 10, padding: "12px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#20489a" }}>{nomeStu}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12, color: "#6b7280" }}>
+    <div style={{ background: "#f8faff", border: "1px solid #dbe4f1", borderRadius: 12, padding: "16px 20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontWeight: 700, fontSize: 16, color: "#20489a" }}>{nomeStu}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 14, color: "#6b7280" }}>
             {new Date(tentativo.completatoAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           </span>
           <button onClick={azzeraTentativo} disabled={azzerando}
-            style={{ background: "#fff0f0", color: "#c62828", border: "1px solid #fca5a5", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: azzerando ? "not-allowed" : "pointer", opacity: azzerando ? 0.6 : 1 }}>
+            style={{ background: "#fff0f0", color: "#c62828", border: "1px solid #fca5a5", borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: azzerando ? "not-allowed" : "pointer", opacity: azzerando ? 0.6 : 1 }}>
             {azzerando ? "..." : "Azzera"}
           </button>
         </div>
       </div>
       {tentativo.punteggio !== null && (
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 12 }}>
           <span style={{
             background: tentativo.punteggio >= 60 ? "#c7f7d7" : "#ffebee",
             color: tentativo.punteggio >= 60 ? "#12753a" : "#c62828",
-            borderRadius: 20, padding: "3px 12px", fontWeight: 700, fontSize: 13,
+            borderRadius: 20, padding: "4px 14px", fontWeight: 700, fontSize: 15,
           }}>
             Punteggio: {tentativo.punteggio.toFixed(0)}%
           </span>
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {domande.map((d, i) => {
           const risposta = risposte[String(i)];
           const isManuale = isManualeFn(d);
@@ -308,17 +308,17 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
               : false;
           }
           return (
-            <div key={i} style={{ background: "#fff", border: "1px solid #e8edf5", borderRadius: 8, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>
-                Dom. {i + 1} · <span style={{ fontStyle: "italic" }}>{TIPI.find(t => t.value === d.tipo)?.label}</span>
+            <div key={i} style={{ background: "#fff", border: "1px solid #e8edf5", borderRadius: 10, padding: "14px 16px" }}>
+              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 5 }}>
+                Domanda {i + 1} · <span style={{ fontStyle: "italic" }}>{TIPI.find(t => t.value === d.tipo)?.label}</span>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#20489a", marginBottom: 6 }}>{d.testo}</div>
-              <div style={{ fontSize: 13 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#20489a", marginBottom: 8, lineHeight: 1.5 }}>{d.testo}</div>
+              <div style={{ fontSize: 15, lineHeight: 1.5 }}>
                 <span style={{ color: "#6b7280" }}>Risposta: </span>
                 <span style={{ fontWeight: 600 }}>{risposta || <em style={{ color: "#aaa" }}>non risposto</em>}</span>
               </div>
               {!isManuale && d.tipo !== "testo_libero" && (
-                <div style={{ fontSize: 12, marginTop: 4 }}>
+                <div style={{ fontSize: 14, marginTop: 6 }}>
                   <span style={{ color: "#6b7280" }}>Corretta: </span>
                   <span style={{ fontWeight: 700 }}>{d.rispostaCorretta}</span>
                   <span style={{ marginLeft: 8, fontWeight: 700, color: autoCorretta ? "#12753a" : "#c62828" }}>
@@ -327,21 +327,21 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                 </div>
               )}
               {isManuale && d.tipo === "completamento" && (
-                <div style={{ marginTop: 8, padding: "8px 10px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>Correzione manuale</div>
+                <div style={{ marginTop: 10, padding: "12px 14px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#20489a", marginBottom: 8 }}>Correzione manuale</div>
                   {d.rispostaAttesa && (
-                    <div style={{ fontSize: 12, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "4px 10px", marginBottom: 8, fontWeight: 600 }}>
+                    <div style={{ fontSize: 14, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "6px 12px", marginBottom: 10, fontWeight: 600 }}>
                       Riferimento: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
                     {[{ v: "corretto", label: "Corretta", color: "#12753a" }, { v: "errato", label: "Errata", color: "#c62828" }].map(({ v, label, color }) => {
                       const sel = v === "corretto" ? corrInfo?.corretto === true : corrInfo?.corretto === false;
                       return (
-                        <label key={v} style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "5px 12px", borderRadius: 6, border: `1.5px solid ${sel ? color : "#e5e7eb"}`, background: sel ? `${color}12` : "#fff", fontSize: 12, fontWeight: sel ? 700 : 400, color: sel ? color : "#374151", userSelect: "none" }}>
+                        <label key={v} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${sel ? color : "#e5e7eb"}`, background: sel ? `${color}12` : "#fff", fontSize: 14, fontWeight: sel ? 700 : 400, color: sel ? color : "#374151", userSelect: "none" }}>
                           <input type="radio" name={`corrm-${tentativo.id}-${i}`} checked={!!sel}
                             onChange={() => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], corretto: v === "corretto" } }))}
-                            style={{ accentColor: color }} />
+                            style={{ accentColor: color, width: 16, height: 16 }} />
                           {label}
                         </label>
                       );
@@ -349,42 +349,42 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input value={corrInfo?.nota || ""} onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
-                      style={{ ...s.input, fontSize: 11, flex: 1 }} placeholder="Nota al docente (opzionale)" />
+                      style={{ ...s.input, fontSize: 14, flex: 1 }} placeholder="Nota al docente (opzionale)" />
                     <button type="button" onClick={() => setNotaPopupIdx(i)} title="Espandi nota"
-                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 10px", height: 34, cursor: "pointer", fontSize: 15, color: "#4f46e5", lineHeight: 1 }}>
+                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 12px", height: 38, cursor: "pointer", fontSize: 17, color: "#4f46e5", lineHeight: 1 }}>
                       ⛶
                     </button>
                   </div>
                 </div>
               )}
               {isManuale && d.tipo === "testo_libero" && (
-                <div style={{ marginTop: 8, padding: "8px 10px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ marginTop: 10, padding: "12px 14px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#20489a", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
                     Griglia di valutazione
                     {(d as any).peso > 1 && (
-                      <span style={{ background: "#e0e7ff", color: "#4f46e5", borderRadius: 10, padding: "1px 7px", fontSize: 10, fontWeight: 700 }}>
+                      <span style={{ background: "#e0e7ff", color: "#4f46e5", borderRadius: 10, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>
                         peso ×{(d as any).peso}
                       </span>
                     )}
                   </div>
                   {d.rispostaAttesa && (
-                    <div style={{ fontSize: 12, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "4px 10px", marginBottom: 8, fontWeight: 600 }}>
+                    <div style={{ fontSize: 14, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "6px 12px", marginBottom: 10, fontWeight: 600 }}>
                       Riferimento: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
                     </div>
                   )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
                     {LIVELLI_ORDER.map(livello => {
                       const info = LIVELLI[livello];
                       const criteri = (d as any).griglia?.[livello];
                       const sel = corrInfo?.livello === livello;
                       return (
-                        <label key={livello} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", padding: "6px 8px", borderRadius: 6, border: `1.5px solid ${sel ? info.color : "#e5e7eb"}`, background: sel ? `${info.color}12` : "#fff", userSelect: "none" }}>
+                        <label key={livello} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${sel ? info.color : "#e5e7eb"}`, background: sel ? `${info.color}12` : "#fff", userSelect: "none" }}>
                           <input type="radio" name={`corrm-${tentativo.id}-${i}`} checked={sel}
                             onChange={() => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], livello } }))}
-                            style={{ accentColor: info.color, marginTop: 2, flexShrink: 0 }} />
+                            style={{ accentColor: info.color, marginTop: 3, flexShrink: 0, width: 16, height: 16 }} />
                           <div style={{ flex: 1 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.label}</span>
-                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: info.color }}>{info.label}</span>
+                            <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2, lineHeight: 1.4 }}>
                               {criteri || info.desc}
                             </div>
                           </div>
@@ -394,9 +394,9 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input value={corrInfo?.nota || ""} onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
-                      style={{ ...s.input, fontSize: 11, flex: 1 }} placeholder="Nota al docente (opzionale)" />
+                      style={{ ...s.input, fontSize: 14, flex: 1 }} placeholder="Nota al docente (opzionale)" />
                     <button type="button" onClick={() => setNotaPopupIdx(i)} title="Espandi nota"
-                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 10px", height: 34, cursor: "pointer", fontSize: 15, color: "#4f46e5", lineHeight: 1 }}>
+                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 12px", height: 38, cursor: "pointer", fontSize: 17, color: "#4f46e5", lineHeight: 1 }}>
                       ⛶
                     </button>
                   </div>
@@ -407,21 +407,21 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
         })}
       </div>
       {(tentativo.allegati as string[])?.length > 0 && (
-        <div style={{ marginTop: 12, padding: "10px 12px", background: "#f0f7ff", border: "1px solid #c3d9f0", borderRadius: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#4f46e5", marginBottom: 8 }}>📎 Foto allegate ({(tentativo.allegati as string[]).length})</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ marginTop: 14, padding: "12px 14px", background: "#f0f7ff", border: "1px solid #c3d9f0", borderRadius: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#4f46e5", marginBottom: 10 }}>📎 Foto allegate ({(tentativo.allegati as string[]).length})</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {(tentativo.allegati as string[]).map((url, i) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                <img src={url} alt={`Foto ${i + 1}`} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "2px solid #dbe4f1", cursor: "pointer" }} />
+                <img src={url} alt={`Foto ${i + 1}`} style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 8, border: "2px solid #dbe4f1", cursor: "pointer" }} />
               </a>
             ))}
           </div>
         </div>
       )}
       {hasManuali && (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
           {correzioneParziale && (
-            <div style={{ fontSize: 11, color: "#92400e", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 7, padding: "5px 12px", fontWeight: 600 }}>
+            <div style={{ fontSize: 13, color: "#92400e", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 7, padding: "6px 14px", fontWeight: 600 }}>
               ⚠️ {nCorretteManuali}/{nManuali} domande aperte valutate — il punteggio sarà provvisorio
             </div>
           )}
