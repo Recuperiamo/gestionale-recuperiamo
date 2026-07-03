@@ -115,9 +115,9 @@ Esempi validi:
 | Livello | Punteggio | Criterio universale |
 |---|---|---|
 | `completo` | 100% del peso | Risposta esaustiva, corretta e ben strutturata |
-| `incompleto` | 70% del peso | Corretta ma manca qualcosa (passaggio, esempio, approfondimento) |
-| `parziale` | 35% del peso | Parzialmente corretta o con lacune significative |
-| `insufficiente` | 0% del peso | Assente, errata o non pertinente |
+| `incompleto` | 70% del peso | **Sufficiente** — corretta nei concetti chiave, ma manca qualcosa (un passaggio, un esempio, un approfondimento) |
+| `parziale` | 35% del peso | **Insufficiente** — qualche elemento corretto ma con lacune o errori significativi |
+| `insufficiente` | 0% del peso | Assente, errata o del tutto fuori tema |
 
 ---
 

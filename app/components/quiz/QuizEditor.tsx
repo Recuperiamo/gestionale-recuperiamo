@@ -64,9 +64,9 @@ const LIVELLI_ORDER = ['completo', 'incompleto', 'parziale', 'insufficiente'] as
 type Livello = typeof LIVELLI_ORDER[number];
 const LIVELLI: Record<Livello, { label: string; pct: number; color: string; desc: string }> = {
   completo:      { label: 'Completo',      pct: 100, color: '#12753a', desc: 'Risposta esaustiva, corretta e ben strutturata' },
-  incompleto:    { label: 'Incompleto',    pct: 70,  color: '#0369a1', desc: 'Corretta ma manca qualcosa (passaggio, esempio, approfondimento)' },
-  parziale:      { label: 'Parziale',      pct: 35,  color: '#d97706', desc: 'Parzialmente corretta o con lacune significative' },
-  insufficiente: { label: 'Insufficiente', pct: 0,   color: '#c62828', desc: 'Assente, errata o non pertinente' },
+  incompleto:    { label: 'Incompleto',    pct: 70,  color: '#0369a1', desc: 'Sufficiente — corretta nei concetti chiave, ma manca qualcosa (un passaggio, un esempio, un approfondimento)' },
+  parziale:      { label: 'Parziale',      pct: 35,  color: '#d97706', desc: 'Insufficiente — qualche elemento corretto ma con lacune o errori significativi' },
+  insufficiente: { label: 'Insufficiente', pct: 0,   color: '#c62828', desc: 'Assente, errata o del tutto fuori tema' },
 };
 
 const s = {
@@ -326,7 +326,38 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                   </span>
                 </div>
               )}
-              {isManuale && (
+              {isManuale && d.tipo === "completamento" && (
+                <div style={{ marginTop: 8, padding: "8px 10px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>Correzione manuale</div>
+                  {d.rispostaAttesa && (
+                    <div style={{ fontSize: 12, color: "#059669", background: "#d1fae5", borderRadius: 6, padding: "4px 10px", marginBottom: 8, fontWeight: 600 }}>
+                      Riferimento: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                    {[{ v: "corretto", label: "Corretta", color: "#12753a" }, { v: "errato", label: "Errata", color: "#c62828" }].map(({ v, label, color }) => {
+                      const sel = v === "corretto" ? corrInfo?.corretto === true : corrInfo?.corretto === false;
+                      return (
+                        <label key={v} style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", padding: "5px 12px", borderRadius: 6, border: `1.5px solid ${sel ? color : "#e5e7eb"}`, background: sel ? `${color}12` : "#fff", fontSize: 12, fontWeight: sel ? 700 : 400, color: sel ? color : "#374151", userSelect: "none" }}>
+                          <input type="radio" name={`corrm-${tentativo.id}-${i}`} checked={!!sel}
+                            onChange={() => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], corretto: v === "corretto" } }))}
+                            style={{ accentColor: color }} />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input value={corrInfo?.nota || ""} onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
+                      style={{ ...s.input, fontSize: 11, flex: 1 }} placeholder="Nota al docente (opzionale)" />
+                    <button type="button" onClick={() => setNotaPopupIdx(i)} title="Espandi nota"
+                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 10px", height: 34, cursor: "pointer", fontSize: 15, color: "#4f46e5", lineHeight: 1 }}>
+                      ⛶
+                    </button>
+                  </div>
+                </div>
+              )}
+              {isManuale && d.tipo === "testo_libero" && (
                 <div style={{ marginTop: 8, padding: "8px 10px", background: "#f0f7ff", borderRadius: 8, border: "1px solid #c3d9f0" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
                     Griglia di valutazione
@@ -353,7 +384,6 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                             style={{ accentColor: info.color, marginTop: 2, flexShrink: 0 }} />
                           <div style={{ flex: 1 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: info.color }}>{info.label}</span>
-                            <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 6 }}>{info.pct}%</span>
                             <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>
                               {criteri || info.desc}
                             </div>
@@ -365,8 +395,7 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input value={corrInfo?.nota || ""} onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
                       style={{ ...s.input, fontSize: 11, flex: 1 }} placeholder="Nota al docente (opzionale)" />
-                    <button type="button" onClick={() => setNotaPopupIdx(i)}
-                      title="Espandi nota"
+                    <button type="button" onClick={() => setNotaPopupIdx(i)} title="Espandi nota"
                       style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 10px", height: 34, cursor: "pointer", fontSize: 15, color: "#4f46e5", lineHeight: 1 }}>
                       ⛶
                     </button>
