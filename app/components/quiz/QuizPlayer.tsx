@@ -443,10 +443,15 @@ export default function QuizPlayer({ quizId, onClose, previewMode = false, fullS
   );
 
   if (fullScreen) {
+    const handleEsci = onClose
+      ? (!inviato
+          ? () => { if (confirm("Vuoi abbandonare il test? Le risposte inserite non verranno salvate.")) onClose(); }
+          : onClose)
+      : undefined;
     return (
       <FullScreenWrap
         title={quiz.titolo}
-        onClose={inviato ? onClose : undefined}
+        onClose={handleEsci}
         progress={inviato ? null : { pct: Math.round((risposteCount / domande.length) * 100), count: risposteCount, total: domande.length }}
         previewMode={previewMode}
       >
