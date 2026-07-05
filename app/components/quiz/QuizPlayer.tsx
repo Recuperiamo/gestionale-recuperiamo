@@ -155,12 +155,7 @@ function RisultatiView({ quiz, tentativo, previewMode }) {
                     Risposta corretta: {d.rispostaCorretta}
                   </div>
                 )}
-                {isManu && d.rispostaAttesa && (
-                  <div style={{ fontSize: F.sm, color: "#059669", fontWeight: 700, background: "#d1fae5", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1vw,16px)", display: "inline-block", marginTop: "clamp(4px,0.5vw,8px)" }}>
-                    Risposta attesa: <span style={{ fontWeight: 400 }}>{d.rispostaAttesa}</span>
-                  </div>
-                )}
-                {isManu && corrInfo?.nota && (
+                {corrInfo?.nota && (
                   <button onClick={() => setNotaPopup({ testo: d.testo, nota: corrInfo.nota, numero: i + 1 })}
                     style={{ marginTop: "clamp(6px,0.8vw,12px)", display: "inline-flex", alignItems: "center", gap: 6, background: "#ede9fe", border: "1.5px solid #c4b5fd", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1vw,16px)", cursor: "pointer", fontSize: F.sm, color: "#4f46e5", fontWeight: 600, fontStyle: "italic" }}>
                     💬 Nota del docente
@@ -387,7 +382,6 @@ export default function QuizPlayer({ quizId, onClose, previewMode = false, fullS
 
                 {d.tipo === "testo_libero" && (
                   <div>
-                    <p style={{ fontSize: F.xs, color: "#7c3aed", margin: "0 0 clamp(8px,0.9vw,14px)", background: "#f3f0ff", borderRadius: 8, padding: "clamp(5px,0.6vw,8px) clamp(10px,1.1vw,16px)", display: "inline-block", fontWeight: 600 }}>✍️ Risposta corretta dal docente</p>
                     <textarea value={risposta} onChange={e => set(e.target.value)} rows={5}
                       style={{ display: "block", width: "100%", border: `2px solid ${risposta ? "#7c3aed" : "#e5e7eb"}`, borderRadius: 12, padding: "clamp(12px,1.3vw,18px) clamp(14px,1.5vw,22px)", fontSize: F.base, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", outline: "none", transition: "border-color 0.2s" }}
                       placeholder="Scrivi qui la tua risposta..." />

@@ -80,6 +80,18 @@ Esempi validi:
 
 > `peso` e `griglia` sono campi **esclusivi di `testo_libero`** e facoltativi — non includerli per altri tipi.
 
+### Tabella riepilogativa — campi ammessi per tipo
+
+| Campo | `mcq` | `vero_falso` | `completamento` | `testo_libero` |
+|---|---|---|---|---|
+| `opzioni` | ✅ obbligatorio | ❌ | ❌ | ❌ |
+| `rispostaCorretta` | ✅ obbligatorio | ✅ obbligatorio | ❌ | ❌ |
+| `rispostaAttesa` | ✅ obbligatorio (concisa) | ✅ obbligatorio (concisa) | ✅ obbligatorio | ✅ obbligatorio |
+| `peso` | ❌ | ❌ | ❌ | facoltativo |
+| `griglia` | ❌ | ❌ | ❌ | facoltativo |
+
+**Ogni ❌ è un divieto assoluto, senza eccezioni.** In particolare: `peso` e `griglia` non vanno mai inseriti in domande `mcq`, `vero_falso` o `completamento`, nemmeno se sembrano "utili" per quella domanda specifica — sono pensati solo per la correzione manuale delle domande aperte più articolate.
+
 ### Campo `opzioni`
 - **Obbligatorio** solo per `mcq`
 - **Non includere** per `vero_falso`, `completamento`, `testo_libero`
@@ -91,11 +103,13 @@ Esempi validi:
 - `testo_libero` → **non includere** il campo (la correzione è manuale)
 
 ### Campo `rispostaAttesa`
-- **Obbligatorio** solo per `completamento`
-- Per `testo_libero` è **facoltativo** — usare se si vuole fornire al docente una risposta di riferimento sintetica
-- **Non includere** per `mcq`, `vero_falso`
-- È una risposta di riferimento a uso del docente in fase di correzione manuale — **non** viene usata dalla piattaforma per correggere automaticamente (a differenza di `rispostaCorretta`)
-- Se si accettano sinonimi o formulazioni alternative, indicarlo qui (es. "F=ma (accettato anche 'forza = massa per accelerazione')")
+- **Obbligatorio per tutti i tipi**: `mcq`, `vero_falso`, `completamento`, `testo_libero`
+- È un testo di riferimento a uso del docente in fase di correzione manuale — **non** viene usata dalla piattaforma per correggere automaticamente (a differenza di `rispostaCorretta`); per `mcq` e `vero_falso` compare solo in caso di risposta errata dello studente, ma questo è un comportamento gestito dalla piattaforma e non cambia nulla nella generazione del JSON
+- Per `mcq`: **una sola frase concisa** che spiega perché l'opzione corretta è quella giusta (non serve motivare perché i distrattori sono sbagliati)
+- Per `vero_falso`: **una sola frase concisa** che spiega perché l'affermazione è vera o falsa (non una spiegazione articolata, non è una domanda aperta)
+- Per `completamento`: la risposta di riferimento sintetica
+- Per `testo_libero`: un testo di riferimento completo — la risposta ideale (livello "Completo") o i punti essenziali che devono comparire
+- Se si accettano formulazioni alternative, indicarlo qui (es. "F=ma (accettato anche 'forza = massa per accelerazione')")
 
 ### Campo `peso` *(facoltativo, solo `testo_libero`)*
 - Intero da **1 a 10** (default: 1 se omesso)
@@ -115,9 +129,9 @@ Esempi validi:
 | Livello | Punteggio | Criterio universale |
 |---|---|---|
 | `completo` | 100% del peso | Risposta esaustiva, corretta e ben strutturata |
-| `incompleto` | 70% del peso | **Sufficiente** — corretta nei concetti chiave, ma manca qualcosa (un passaggio, un esempio, un approfondimento) |
-| `parziale` | 35% del peso | **Insufficiente** — qualche elemento corretto ma con lacune o errori significativi |
-| `insufficiente` | 0% del peso | Assente, errata o del tutto fuori tema |
+| `incompleto` | 70% del peso | Corretta ma manca qualcosa (passaggio, esempio, approfondimento) |
+| `parziale` | 35% del peso | Parzialmente corretta o con lacune significative |
+| `insufficiente` | 0% del peso | Assente, errata o non pertinente |
 
 ---
 
@@ -129,11 +143,13 @@ Esempi validi:
 - I distrattori devono essere plausibili, non inventati
 - Non usare "tutte le precedenti" o "nessuna delle precedenti"
 - Variare la posizione della risposta corretta tra le opzioni
+- Aggiungere sempre `rispostaAttesa` con una sola frase concisa che spiega perché l'opzione corretta è quella giusta
 
 ### `vero_falso`
 - Solo per affermazioni univoche e non ambigue
 - Evitare doppia negazione ("Non è vero che non...")
 - Alternare Vero e Falso — non mettere più di 3 dello stesso tipo consecutivi
+- Aggiungere sempre `rispostaAttesa` con una sola frase concisa che spiega perché l'affermazione è vera o falsa
 
 ### `completamento`
 - Il testo deve contenere il contesto completo, non solo la lacuna
@@ -143,9 +159,8 @@ Esempi validi:
 
 ### `testo_libero`
 - Usare per ragionamento e argomentazione, non per memoria semplice
-- Indicare nel testo la lunghezza attesa (es. "in 2–3 righe", "elenca almeno 3 esempi")
 - Non aggiungere `rispostaCorretta` — la correzione avviene manualmente nella piattaforma
-- Aggiungere `rispostaAttesa` (facoltativo) se si vuole fornire al docente un testo di riferimento sintetico
+- **Aggiungere sempre `rispostaAttesa`** con la risposta ideale completa o i punti chiave che devono comparire — il docente la vede durante la correzione accanto alla griglia, è fondamentale per valutare in modo coerente
 - **Peso:** usare il campo `peso` (intero 1–10) quando la domanda è più articolata e deve incidere di più sul voto finale. Una domanda complessa che richiede 5-6 elementi vale `"peso": 3`; una semplice 1-2 frasi vale `"peso": 1`. Se non specificato, vale 1.
 - **Griglia di valutazione:** aggiungere il campo `griglia` (facoltativo) con criteri personalizzati per livello, quando i criteri standard non bastano — es. "Completo: descrive tutti e 6 i passaggi della fotosintesi". Se omesso, il docente usa i criteri universali.
 - **Risposta su foglio fisico + foto:** la piattaforma permette allo studente di rispondere su un foglio fisico, fotografarlo e caricare l'immagine nel form (funzione disponibile per le domande `testo_libero`). Usa questa modalità quando l'argomento richiede una rappresentazione grafica o spaziale che sarebbe innaturale o poco chiara da descrivere solo a parole — es. strutture di Lewis, geometrie/modelli VSEPR, diagrammi di corpo libero, grafici, mappe concettuali, costruzioni geometriche, schemi di circuiti. In questi casi la domanda deve dirlo esplicitamente, con una frase del tipo: *"Disegna [cosa] su un foglio, poi fotografalo e carica l'immagine nel form."* Non usare questa modalità per domande a cui si può rispondere altrettanto bene in testo (non è un modo per essere pigri nella formulazione).
@@ -178,29 +193,34 @@ Se per un caso specifico non esiste un carattere Unicode adeguato, scrivi la not
     {
       "tipo": "vero_falso",
       "testo": "Un'equazione di 2° grado ha sempre due soluzioni reali distinte.",
-      "rispostaCorretta": "falso"
+      "rispostaCorretta": "falso",
+      "rispostaAttesa": "Falso: dipende dal discriminante. Se Δ<0 non ci sono soluzioni reali, se Δ=0 la soluzione è una sola (doppia)."
     },
     {
       "tipo": "vero_falso",
       "testo": "Se il discriminante è zero, l'equazione ha due soluzioni coincidenti.",
-      "rispostaCorretta": "vero"
+      "rispostaCorretta": "vero",
+      "rispostaAttesa": "Vero: quando Δ=0 la formula quadratica dà un'unica soluzione, detta radice doppia."
     },
     {
       "tipo": "vero_falso",
       "testo": "La formula quadratica si applica solo alle equazioni con coefficiente a = 1.",
-      "rispostaCorretta": "falso"
+      "rispostaCorretta": "falso",
+      "rispostaAttesa": "Falso: la formula quadratica vale per qualsiasi a ≠ 0, non solo per a = 1."
     },
     {
       "tipo": "mcq",
       "testo": "Qual è il discriminante dell'equazione x² - 5x + 6 = 0?",
       "opzioni": ["1", "25", "49", "11"],
-      "rispostaCorretta": "1"
+      "rispostaCorretta": "1",
+      "rispostaAttesa": "Δ = b² - 4ac = (-5)² - 4·1·6 = 25 - 24 = 1."
     },
     {
       "tipo": "mcq",
       "testo": "Quante soluzioni reali ha un'equazione con discriminante negativo?",
       "opzioni": ["Nessuna", "Una", "Due distinte", "Infinite"],
-      "rispostaCorretta": "Nessuna"
+      "rispostaCorretta": "Nessuna",
+      "rispostaAttesa": "Con Δ < 0 la radice quadrata del discriminante non è un numero reale, quindi non esistono soluzioni reali."
     },
     {
       "tipo": "mcq",
@@ -211,13 +231,15 @@ Se per un caso specifico non esiste un carattere Unicode adeguato, scrivi la not
         "x = (b ± √Δ) / 2a",
         "x = (-b ± Δ) / 2a"
       ],
-      "rispostaCorretta": "x = (-b ± √Δ) / 2a"
+      "rispostaCorretta": "x = (-b ± √Δ) / 2a",
+      "rispostaAttesa": "È la formula risolutiva standard: il denominatore è 2a e il numeratore contiene -b, non b, sommato o sottratto alla radice del discriminante."
     },
     {
       "tipo": "mcq",
       "testo": "Qual è la somma delle radici di x² - 3x + 2 = 0?",
       "opzioni": ["2", "3", "-3", "1"],
-      "rispostaCorretta": "3"
+      "rispostaCorretta": "3",
+      "rispostaAttesa": "Per le formule di Viète, la somma delle radici è -b/a = -(-3)/1 = 3."
     },
     {
       "tipo": "completamento",
@@ -231,7 +253,8 @@ Se per un caso specifico non esiste un carattere Unicode adeguato, scrivi la not
     },
     {
       "tipo": "testo_libero",
-      "testo": "Spiega in 2–3 righe come si determina il numero di soluzioni di un'equazione di 2° grado prima di risolverla, e perché è utile farlo.",
+      "testo": "Spiega come si determina il numero di soluzioni di un'equazione di 2° grado prima di risolverla, e perché è utile farlo.",
+      "rispostaAttesa": "Si calcola il discriminante Δ = b² - 4ac. Se Δ > 0 ci sono due soluzioni reali distinte; se Δ = 0 c'è una soluzione doppia; se Δ < 0 non ci sono soluzioni reali. È utile per anticipare il risultato senza applicare subito la formula quadratica.",
       "peso": 2,
       "griglia": {
         "completo": "Cita il discriminante, spiega i tre casi (Δ>0, Δ=0, Δ<0) e motiva l'utilità",
@@ -269,7 +292,7 @@ Quando l'utente chiede di generare un quiz, Claude deve seguire questi passi, in
 
 6. **Genera il JSON** rispettando esattamente lo schema e le regole di questa guida.
 
-7. **Autoconteggio obbligatorio — ultimo passaggio prima di rispondere.** Conta manualmente quanti elementi ci sono nell'array `domande` che hai appena scritto. Confronta il numero con il minimo assoluto della fascia scelta al punto 3 (4 / 8 / 14). Se il totale è inferiore, **non rispondere ancora**: aggiungi altre domande — rispettando tipo, ordine e regole — finché non raggiungi almeno quel minimo, poi riconta. Solo dopo aver verificato il conteggio, controlla anche che il JSON sia sintatticamente valido (parentesi, virgole, virgolette).
+7. **Autoconteggio e controllo campi — ultimo passaggio prima di rispondere.** Conta manualmente quanti elementi ci sono nell'array `domande` che hai appena scritto. Confronta il numero con il minimo assoluto della fascia scelta al punto 3 (4 / 8 / 14). Se il totale è inferiore, **non rispondere ancora**: aggiungi altre domande — rispettando tipo, ordine e regole — finché non raggiungi almeno quel minimo, poi riconta. Poi, **domanda per domanda**, controlla i campi presenti contro la tabella riepilogativa dei campi ammessi per tipo: in particolare verifica che `peso` e `griglia` compaiano solo nelle domande `testo_libero` e in nessun'altra — è l'errore più frequente, controllalo con attenzione. Rimuovi ogni campo non ammesso per quel tipo. Solo dopo questi due controlli, verifica che il JSON sia sintatticamente valido (parentesi, virgole, virgolette).
 
 8. **Crea un file scaricabile, non incollare il JSON in chat.** Genera un file `.json` con il contenuto del quiz (nome file: `quiz-[materia]-[argomento breve].json`, senza spazi, es. `quiz-chimica-legami-di-valenza.json`) e condividilo come allegato. Il messaggio di chat deve restare breve (una riga di conferma tipo "Quiz pronto, X domande"): il JSON non va mai ripetuto come testo o blocco di codice nella risposta, va solo nel file.
 
@@ -286,9 +309,12 @@ Note aggiuntive (opzionale): [...]
 **Vincoli che Claude deve rispettare:**
 - Il campo `tipo` deve essere esattamente uno tra: `mcq`, `vero_falso`, `completamento`, `testo_libero`
 - `rispostaCorretta` per `vero_falso` deve essere esattamente `"vero"` o `"falso"`
+- Ogni domanda `vero_falso` deve avere `rispostaAttesa` con una sola frase concisa di spiegazione
 - `rispostaCorretta` per `mcq` deve essere identica (carattere per carattere) a una delle `opzioni`
+- Ogni domanda `mcq` deve avere `rispostaAttesa` con una sola frase concisa di spiegazione
 - Non aggiungere `rispostaCorretta` nelle domande `completamento` o `testo_libero` (correzione manuale)
 - Ogni domanda `completamento` deve avere `rispostaAttesa` (risposta di riferimento per il docente, non usata per correggere automaticamente)
+- Ogni domanda `testo_libero` deve avere `rispostaAttesa` con la risposta ideale completa o i punti chiave — è visibile solo al docente durante la correzione
 - Non aggiungere `opzioni` nelle domande che non sono `mcq`
 - Non aggiungere `peso` o `griglia` nelle domande che non sono `testo_libero`
 - `peso` deve essere un intero da 1 a 10; se omesso vale 1
@@ -307,12 +333,13 @@ Note aggiuntive (opzionale): [...]
 
 - [ ] Il JSON è sintatticamente valido (nessuna virgola mancante, parentesi chiuse)
 - [ ] Il titolo segue il formato `[Materia] — [Argomento]`
-- [ ] Ogni `mcq` ha almeno 2 opzioni e `rispostaCorretta` identica a una di esse
-- [ ] Ogni `vero_falso` ha `rispostaCorretta` uguale a `"vero"` o `"falso"`
+- [ ] Ogni `mcq` ha almeno 2 opzioni, `rispostaCorretta` identica a una di esse e `rispostaAttesa` con una spiegazione concisa
+- [ ] Ogni `vero_falso` ha `rispostaCorretta` uguale a `"vero"` o `"falso"` e `rispostaAttesa` con una spiegazione concisa
 - [ ] Nessuna domanda `completamento` o `testo_libero` ha il campo `rispostaCorretta`
 - [ ] Ogni domanda `completamento` ha il campo `rispostaAttesa`
+- [ ] Ogni domanda `testo_libero` ha il campo `rispostaAttesa` con la risposta ideale o i punti chiave
 - [ ] Nessuna domanda non-`mcq` ha il campo `opzioni`
-- [ ] `peso` e `griglia` compaiono solo in domande `testo_libero` (se usati)
+- [ ] `peso` e `griglia` compaiono **solo** in domande `testo_libero` — controllato una per una, nessuna eccezione
 - [ ] `peso` è un intero da 1 a 10; le chiavi di `griglia` sono tra: completo, incompleto, parziale, insufficiente
 - [ ] Le domande sono ordinate: vero_falso → mcq → completamento → testo_libero
 - [ ] Il quiz include almeno vero_falso, mcq e completamento (non un solo tipo)

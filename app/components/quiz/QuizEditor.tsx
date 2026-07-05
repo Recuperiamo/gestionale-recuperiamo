@@ -155,6 +155,15 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
         </div>
       )}
 
+      {d.tipo === "mcq" && (
+        <label style={{ ...s.label, marginBottom: 10 }}>
+          Spiegazione risposta corretta
+          <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11, marginLeft: 4 }}>(opzionale — pre-compila la nota di correzione per le risposte errate)</span>
+          <textarea value={d.rispostaAttesa || ""} onChange={e => set({ rispostaAttesa: e.target.value })}
+            rows={2} style={{ ...s.input, resize: "vertical" as const }} placeholder="Spiega perché questa è la risposta corretta e le altre no..." />
+        </label>
+      )}
+
       {d.tipo === "vero_falso" && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#20489a", marginBottom: 6 }}>Risposta corretta</div>
@@ -170,6 +179,15 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
         </div>
       )}
 
+      {d.tipo === "vero_falso" && (
+        <label style={{ ...s.label, marginBottom: 10 }}>
+          Spiegazione
+          <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11, marginLeft: 4 }}>(opzionale — pre-compila la nota di correzione per le risposte errate)</span>
+          <textarea value={d.rispostaAttesa || ""} onChange={e => set({ rispostaAttesa: e.target.value })}
+            rows={2} style={{ ...s.input, resize: "vertical" as const }} placeholder="Spiega perché l'affermazione è vera/falsa..." />
+        </label>
+      )}
+
       {d.tipo === "completamento" && (
         <label style={{ ...s.label, marginBottom: 10 }}>
           Risposta di riferimento
@@ -183,7 +201,14 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
 
       {d.tipo === "testo_libero" && (
         <div>
-          <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 10px" }}>La risposta sarà corretta con la griglia di valutazione.</p>
+          <label style={{ ...s.label, marginBottom: 12 }}>
+            Risposta di riferimento
+            <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11, marginLeft: 4 }}>
+              (visibile solo al docente in fase di correzione — non usata per auto-grading)
+            </span>
+            <textarea value={d.rispostaAttesa || ""} onChange={e => set({ rispostaAttesa: e.target.value })}
+              rows={3} style={{ ...s.input, resize: "vertical" as const }} placeholder="Es. Descrivi i passaggi A, B, C. Accettato anche citare solo A e B se motivato." />
+          </label>
           <label style={{ ...s.label, marginBottom: 12 }}>
             Peso domanda
             <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 11, marginLeft: 4 }}>(default 1 — aumenta per domande più complesse)</span>
@@ -220,9 +245,16 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
   onCorrezione: (tid: number, correzione: Record<string, { livello?: string; nota?: string }>) => void;
   onAzzerato: (tid: number) => void;
 }) {
-  const [corr, setCorr] = useState<Record<string, { livello?: string; corretto?: boolean; nota?: string }>>(
-    tentativo.correzioneManuale || {}
-  );
+  const [corr, setCorr] = useState<Record<string, { livello?: string; corretto?: boolean; nota?: string }>>(() => {
+    const base: Record<string, any> = tentativo.correzioneManuale ? { ...(tentativo.correzioneManuale as Record<string, any>) } : {};
+    domande.forEach((d, i) => {
+      const key = String(i);
+      if (d.rispostaAttesa?.trim() && !base[key]?.nota?.trim()) {
+        base[key] = { ...(base[key] ?? {}), nota: d.rispostaAttesa.trim() };
+      }
+    });
+    return base;
+  });
   const [saving, setSaving] = useState(false);
   const [azzerando, setAzzerando] = useState(false);
   const [notaPopupIdx, setNotaPopupIdx] = useState<number | null>(null);
@@ -234,6 +266,11 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
   const isManualeFn = (d: Domanda) => d.tipo === "testo_libero" || (d.tipo === "completamento" && !d.rispostaCorretta?.trim());
   const hasManuali = domande.some(isManualeFn);
   const nManuali = domande.filter(isManualeFn).length;
+  const hasWrongAuto = domande.some((d, i) => {
+    if (isManualeFn(d)) return false;
+    const r = risposte[String(i)];
+    return !!r && String(r).trim() !== String(d.rispostaCorretta).trim();
+  });
   const nCorretteManuali = domande.filter((d, i) => isManualeFn(d) && (corr[String(i)]?.livello !== undefined || typeof corr[String(i)]?.corretto === "boolean")).length;
   const correzioneParziale = nCorretteManuali < nManuali;
 
@@ -324,6 +361,20 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
                   <span style={{ marginLeft: 8, fontWeight: 700, color: autoCorretta ? "#12753a" : "#c62828" }}>
                     {autoCorretta ? "✓" : "✗"}
                   </span>
+                </div>
+              )}
+              {!isManuale && autoCorretta === false && risposta && (
+                <div style={{ marginTop: 10, padding: "10px 14px", background: "#fff5f5", borderRadius: 8, border: "1px solid #fca5a5" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#c62828", marginBottom: 8 }}>Nota per lo studente</div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input value={corrInfo?.nota || ""}
+                      onChange={e => setCorr(prev => ({ ...prev, [String(i)]: { ...prev[String(i)], nota: e.target.value } }))}
+                      style={{ ...s.input, fontSize: 14, flex: 1 }} placeholder="Spiega l'errore o la risposta corretta..." />
+                    <button type="button" onClick={() => setNotaPopupIdx(i)} title="Espandi nota"
+                      style={{ flexShrink: 0, background: "#e0e7ff", border: "none", borderRadius: 6, padding: "0 12px", height: 38, cursor: "pointer", fontSize: 17, color: "#4f46e5", lineHeight: 1 }}>
+                      ⛶
+                    </button>
+                  </div>
                 </div>
               )}
               {isManuale && d.tipo === "completamento" && (
@@ -418,7 +469,7 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
           </div>
         </div>
       )}
-      {hasManuali && (
+      {(hasManuali || hasWrongAuto) && (
         <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
           {correzioneParziale && (
             <div style={{ fontSize: 13, color: "#92400e", background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 7, padding: "6px 14px", fontWeight: 600 }}>
@@ -652,8 +703,14 @@ function parseQuizJson(text: string): { titolo: string; domande: Domanda[] } | s
 
   const domande: Domanda[] = obj.domande.map((d: any) => {
     const out: Domanda = { tipo: d.tipo, testo: d.testo.trim() };
-    if (d.tipo === "mcq") { out.opzioni = d.opzioni.map(String); out.rispostaCorretta = d.rispostaCorretta; }
-    if (d.tipo === "vero_falso") out.rispostaCorretta = d.rispostaCorretta;
+    if (d.tipo === "mcq") {
+      out.opzioni = d.opzioni.map(String); out.rispostaCorretta = d.rispostaCorretta;
+      if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
+    }
+    if (d.tipo === "vero_falso") {
+      out.rispostaCorretta = d.rispostaCorretta;
+      if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
+    }
     if (d.tipo === "completamento") {
       if (d.rispostaAttesa?.trim()) out.rispostaAttesa = d.rispostaAttesa.trim();
       if (d.rispostaCorretta?.trim()) out.rispostaCorretta = d.rispostaCorretta.trim();
