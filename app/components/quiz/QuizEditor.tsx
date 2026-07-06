@@ -239,11 +239,12 @@ function DomandaEditor({ d, idx, onChange, onRemove }: {
 }
 
 // ── Correzione tentativo ──────────────────────────────────────────────────────
-function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
+function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato, quizTitolo }: {
   tentativo: Tentativo;
   domande: Domanda[];
   onCorrezione: (tid: number, correzione: Record<string, { livello?: string; nota?: string }>) => void;
   onAzzerato: (tid: number) => void;
+  quizTitolo?: string;
 }) {
   const [corr, setCorr] = useState<Record<string, { livello?: string; corretto?: boolean; nota?: string }>>(() => {
     const base: Record<string, any> = tentativo.correzioneManuale ? { ...(tentativo.correzioneManuale as Record<string, any>) } : {};
@@ -273,6 +274,86 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
   });
   const nCorretteManuali = domande.filter((d, i) => isManualeFn(d) && (corr[String(i)]?.livello !== undefined || typeof corr[String(i)]?.corretto === "boolean")).length;
   const correzioneParziale = nCorretteManuali < nManuali;
+
+  function esportaRisultati() {
+    const TIPI_LABEL: Record<string, string> = { mcq: "Scelta multipla", vero_falso: "Vero / Falso", completamento: "Completamento", testo_libero: "Risposta aperta" };
+    const LIVELLO_LABEL: Record<string, string> = { completo: "Completo (100%)", incompleto: "Incompleto (70%)", parziale: "Parziale (35%)", insufficiente: "Insufficiente (0%)" };
+    const dataConsegna = new Date(tentativo.completatoAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const pct = tentativo.punteggio;
+
+    let qHtml = "";
+    domande.forEach((d, i) => {
+      const risposta = risposte[String(i)];
+      const corrInfo = tentativo.correzioneManuale?.[String(i)];
+      const isManuale = isManualeFn(d);
+      let autoOk: boolean | null = null;
+      if (!isManuale && risposta) autoOk = String(risposta).trim() === String(d.rispostaCorretta).trim();
+
+      let esitoHtml = "";
+      if (!isManuale) {
+        esitoHtml = autoOk
+          ? `<span class="ok">✓ Corretta</span>`
+          : `<span class="ko">✗ Errata</span>${d.rispostaCorretta ? ` &nbsp;—&nbsp; risposta corretta: <strong>${d.rispostaCorretta}</strong>` : ""}`;
+      } else if (corrInfo?.livello) {
+        esitoHtml = `Valutazione: <strong>${LIVELLO_LABEL[corrInfo.livello] || corrInfo.livello}</strong>`;
+      } else if (typeof corrInfo?.corretto === "boolean") {
+        esitoHtml = corrInfo.corretto ? `<span class="ok">✓ Corretta</span>` : `<span class="ko">✗ Errata</span>`;
+      } else {
+        esitoHtml = `<span class="wait">⏳ In attesa di correzione</span>`;
+      }
+
+      const notaHtml = corrInfo?.nota
+        ? `<div class="nota">Nota del docente: ${corrInfo.nota.replace(/\n/g, "<br>")}</div>`
+        : (isManuale && !corrInfo ? `<div class="corr-box"><span class="placeholder">Spazio correzione manuale</span></div>` : "");
+
+      qHtml += `
+      <div class="domanda">
+        <div class="d-header">Domanda ${i + 1} &middot; ${TIPI_LABEL[d.tipo] || d.tipo}</div>
+        <div class="d-testo">${d.testo}</div>
+        <div class="riga"><strong>Risposta:</strong> ${risposta ? `<span class="ans">${risposta}</span>` : "<em>non risposto</em>"}</div>
+        <div class="riga">${esitoHtml}</div>
+        ${notaHtml}
+      </div>`;
+    });
+
+    const puntBg = pct === null ? "#fef3c7" : pct >= 60 ? "#d1fae5" : "#fee2e2";
+    const puntColor = pct === null ? "#92400e" : pct >= 60 ? "#12753a" : "#c62828";
+    const puntTesto = pct === null ? "In correzione" : `${pct.toFixed(0)}%`;
+
+    const html = `<!DOCTYPE html>
+<html lang="it"><head><meta charset="UTF-8">
+<title>Risultati — ${nomeStu}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; max-width: 820px; margin: 0 auto; padding: 28px 24px; color: #1a1a1a; font-size: 14px; }
+  h1 { font-size: 22px; color: #20489a; margin: 0 0 4px; }
+  .meta { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+  .badge { display: inline-block; padding: 5px 18px; border-radius: 20px; font-weight: 700; font-size: 15px; margin-bottom: 20px; background: ${puntBg}; color: ${puntColor}; }
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 0 0 20px; }
+  .domanda { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; break-inside: avoid; }
+  .d-header { font-size: 12px; color: #6b7280; margin-bottom: 5px; }
+  .d-testo { font-size: 15px; font-weight: 700; color: #20489a; margin-bottom: 8px; line-height: 1.45; }
+  .riga { margin-bottom: 5px; line-height: 1.4; }
+  .ans { font-weight: 600; }
+  .ok { color: #12753a; font-weight: 700; }
+  .ko { color: #c62828; font-weight: 700; }
+  .wait { color: #92400e; }
+  .nota { margin-top: 8px; background: #f3f0ff; border-left: 3px solid #7c3aed; padding: 7px 12px; border-radius: 0 6px 6px 0; font-style: italic; color: #4c1d95; font-size: 13px; white-space: pre-wrap; }
+  .corr-box { margin-top: 8px; border: 1px dashed #c3d9f0; border-radius: 6px; min-height: 56px; padding: 8px 12px; background: #f8faff; }
+  .placeholder { color: #aaa; font-size: 12px; }
+  @media print { body { padding: 12px; } }
+</style>
+</head><body>
+  <h1>${nomeStu}</h1>
+  <div class="meta">${quizTitolo ? `${quizTitolo} &nbsp;&middot;&nbsp; ` : ""}Consegnato: ${dataConsegna}</div>
+  <div class="badge">${puntTesto}</div>
+  <hr>
+  ${qHtml}
+</body></html>`;
+
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); }
+  }
 
   async function salvaCorrezione() {
     if (correzioneParziale) {
@@ -316,6 +397,10 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato }: {
           <span style={{ fontSize: 14, color: "#6b7280" }}>
             {new Date(tentativo.completatoAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           </span>
+          <button onClick={esportaRisultati}
+            style={{ background: "#f0f7ff", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            Esporta
+          </button>
           <button onClick={azzeraTentativo} disabled={azzerando}
             style={{ background: "#fff0f0", color: "#c62828", border: "1px solid #fca5a5", borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: azzerando ? "not-allowed" : "pointer", opacity: azzerando ? 0.6 : 1 }}>
             {azzerando ? "..." : "Azzera"}
@@ -964,7 +1049,7 @@ function QuizCard({ q, lezioni, expandedQuiz, tentativi, loadingTentativi, editi
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {tentativi[q.id].map(t => (
-                <TentativoDetail key={t.id} tentativo={t} domande={q.domande as Domanda[]}
+                <TentativoDetail key={t.id} tentativo={t} domande={q.domande as Domanda[]} quizTitolo={q.titolo}
                   onCorrezione={(tid, corr) => {
                     onSetTentativi(prev => ({
                       ...prev,
