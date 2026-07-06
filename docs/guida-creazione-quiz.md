@@ -169,16 +169,22 @@ Esempi validi:
 
 ## Notazione scientifica e formule
 
-Il testo delle domande è una stringa JSON semplice: non supporta HTML, LaTeX o markdown, quindi apici e pedici scritti come `^` o come numero in linea (es. `sp3`, `H2O`, `x^2`) **non vengono resi correttamente**. Usa sempre i caratteri Unicode per apici e pedici, in ogni campo `testo` e `opzioni`, per qualunque tipo di domanda.
+Il testo delle domande è una stringa JSON semplice: **non supporta HTML, LaTeX, MathJax, KaTeX o markdown**. Qualsiasi notazione matematica con `$...$`, `\(...\)`, `^`, `_` o numeri/lettere in linea (es. `$m_l$`, `sp3`, `H2O`, `x^2`) viene mostrata letteralmente sullo schermo — i simboli LaTeX non vengono interpretati. Usa **esclusivamente caratteri Unicode** per apici, pedici e simboli, in ogni campo `testo`, `opzioni` e `rispostaAttesa`, per qualunque tipo di domanda.
 
 - **Apici** (esponenti, orbitali ibridi, potenze, cariche): `⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ⁺ ⁻`
-  Corretto: `sp³` — Sbagliato: `sp3`
-  Corretto: `x²` — Sbagliato: `x^2`
-  Corretto: `10⁻⁵` — Sbagliato: `10^-5`
-- **Pedici** (indici di formule chimiche, numeri quantici): `₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉`
-  Corretto: `H₂O` — Sbagliato: `H2O`
+  Corretto: `sp³` — Sbagliato: `sp3` o `sp^3`
+  Corretto: `x²` — Sbagliato: `x^2` o `x²` in LaTeX
+  Corretto: `10⁻⁵` — Sbagliato: `10^-5` o `$10^{-5}$`
+- **Pedici cifre** (indici di formule chimiche): `₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉`
+  Corretto: `H₂O` — Sbagliato: `H2O` o `H_2O` o `$H_2O$`
   Corretto: `C₆H₁₂O₆` — Sbagliato: `C6H12O6`
+- **Pedici lettere** (numeri quantici, costanti con indice letterale): `ₐ ₑ ₒ ₓ ₕ ₖ ₗ ₘ ₙ ₚ ₛ ₜ`
+  Corretto: `mₗ` (numero quantico magnetico) — Sbagliato: `m_l` o `$m_l$`
+  Corretto: `mₛ` (numero quantico di spin) — Sbagliato: `m_s` o `$m_s$`
+  Corretto: `nₑ` (densità elettroni) — Sbagliato: `n_e` o `$n_e$`
 - **Simboli utili**: `→ ⇌ ° Å Δ π ± √ ≈ ≤ ≥`
+
+**Regola assoluta:** se vedi che stai scrivendo `$`, `\`, `^` o `_` in un campo JSON, fermati — stai usando LaTeX, che non funziona. Sostituisci con il carattere Unicode equivalente dalla lista sopra.
 
 Se per un caso specifico non esiste un carattere Unicode adeguato, scrivi la notazione nel modo più leggibile possibile e, se può generare ambiguità, chiarisci tra parentesi (es. "espresso in cm elevato alla meno uno").
 
@@ -324,7 +330,7 @@ Note aggiuntive (opzionale): [...]
 - Non generare il quiz finché argomento (specifico), classe e materia non sono noti
 - Il quiz non deve mai contenere un solo tipo di domanda: rispetta sempre i minimi per tipo della tabella
 - Il numero totale di domande deve riflettere l'ampiezza dell'argomento (fascia Ristretto/Medio/Ampio) e non scendere mai sotto il minimo assoluto della fascia scelta (4 / 8 / 14)
-- Apici e pedici (formule chimiche, esponenti, orbitali) vanno scritti con caratteri Unicode, mai con `^` o numeri in linea
+- Apici e pedici vanno scritti con caratteri Unicode, **mai** con `^`, `_`, numeri/lettere in linea o notazione LaTeX (`$...$`, `\(...\)`) — LaTeX non viene renderizzato dalla piattaforma e appare letteralmente sullo schermo
 - Il JSON va sempre creato come file scaricabile, mai incollato o ripetuto come testo/blocco di codice nella risposta in chat
 
 ---
@@ -344,5 +350,5 @@ Note aggiuntive (opzionale): [...]
 - [ ] Le domande sono ordinate: vero_falso → mcq → completamento → testo_libero
 - [ ] Il quiz include almeno vero_falso, mcq e completamento (non un solo tipo)
 - [ ] Il numero totale di domande rispetta il minimo assoluto della fascia scelta (Ristretto ≥4 / Medio ≥8 / Ampio ≥14)
-- [ ] Apici e pedici (formule, esponenti) usano caratteri Unicode e non `^` o numeri in linea
+- [ ] Apici e pedici usano caratteri Unicode — nessun `^`, `_`, LaTeX (`$...$`) o notazione in linea
 - [ ] Le domande che richiedono una rappresentazione grafica (Lewis, VSEPR, diagrammi...) chiedono esplicitamente foglio + foto
