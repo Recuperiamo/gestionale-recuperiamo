@@ -246,19 +246,13 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato, quizTit
   onAzzerato: (tid: number) => void;
   quizTitolo?: string;
 }) {
-  const [corr, setCorr] = useState<Record<string, { livello?: string; corretto?: boolean; nota?: string }>>(() => {
-    const base: Record<string, any> = tentativo.correzioneManuale ? { ...(tentativo.correzioneManuale as Record<string, any>) } : {};
-    domande.forEach((d, i) => {
-      const key = String(i);
-      if (d.rispostaAttesa?.trim() && !base[key]?.nota?.trim()) {
-        base[key] = { ...(base[key] ?? {}), nota: d.rispostaAttesa.trim() };
-      }
-    });
-    return base;
-  });
+  const [corr, setCorr] = useState<Record<string, { livello?: string; corretto?: boolean; nota?: string }>>(
+    () => (tentativo.correzioneManuale ? { ...(tentativo.correzioneManuale as Record<string, any>) } : {})
+  );
   const [saving, setSaving] = useState(false);
   const [azzerando, setAzzerando] = useState(false);
   const [notaPopupIdx, setNotaPopupIdx] = useState<number | null>(null);
+  const [precompilaNote, setPrecompilaNote] = useState(false);
   const risposte = tentativo.risposte as Record<string, string>;
 
   const nomeStu = [tentativo.cliente.nomeReferente, tentativo.cliente.nome, tentativo.cliente.cognome]
@@ -274,6 +268,23 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato, quizTit
   });
   const nCorretteManuali = domande.filter((d, i) => isManualeFn(d) && (corr[String(i)]?.livello !== undefined || typeof corr[String(i)]?.corretto === "boolean")).length;
   const correzioneParziale = nCorretteManuali < nManuali;
+  const hasRispostaAttesaManuali = domande.some((d, i) => isManualeFn(d) && d.rispostaAttesa?.trim());
+
+  function togglePrecompilaNote() {
+    const next = !precompilaNote;
+    setPrecompilaNote(next);
+    if (!next) return;
+    setCorr(prev => {
+      const updated = { ...prev };
+      domande.forEach((d, i) => {
+        const key = String(i);
+        if (isManualeFn(d) && d.rispostaAttesa?.trim() && !updated[key]?.nota?.trim()) {
+          updated[key] = { ...(updated[key] ?? {}), nota: d.rispostaAttesa.trim() };
+        }
+      });
+      return updated;
+    });
+  }
 
   function esportaRisultati() {
     const TIPI_LABEL: Record<string, string> = { mcq: "Scelta multipla", vero_falso: "Vero / Falso", completamento: "Completamento", testo_libero: "Risposta aperta" };
@@ -397,6 +408,25 @@ function TentativoDetail({ tentativo, domande, onCorrezione, onAzzerato, quizTit
           <span style={{ fontSize: 14, color: "#6b7280" }}>
             {new Date(tentativo.completatoAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           </span>
+          {hasRispostaAttesaManuali && (
+            <button type="button" onClick={togglePrecompilaNote}
+              title="Riporta la risposta attesa (impostata nell'editor del test) nel box di nota — resta comunque da validare"
+              style={{
+                display: "flex", alignItems: "center", gap: 7,
+                background: precompilaNote ? "#f3f0ff" : "#fff",
+                color: precompilaNote ? "#4f46e5" : "#6b7280",
+                border: `1px solid ${precompilaNote ? "#7c3aed" : "#dbe4f1"}`,
+                borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+              }}>
+              <span style={{
+                width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+                border: `1.5px solid ${precompilaNote ? "#4f46e5" : "#c7d2fe"}`,
+                background: precompilaNote ? "#4f46e5" : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff",
+              }}>{precompilaNote ? "✓" : ""}</span>
+              Precompila note
+            </button>
+          )}
           <button onClick={esportaRisultati}
             style={{ background: "#f0f7ff", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
             Esporta

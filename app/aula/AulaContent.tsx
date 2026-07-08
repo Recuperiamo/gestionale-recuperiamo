@@ -620,6 +620,8 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
   const [previewBatch, setPreviewBatch] = useState(null);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("bacheca"); // imposta default a "bacheca"
+  const [lezioniAssegnate, setLezioniAssegnate] = useState([]);
+  const [loadingLezioni, setLoadingLezioni] = useState(false);
   const headerRef = useRef(null);
   const [asideTop, setAsideTop] = useState(96);
   // Move sidebar refs near header ref to avoid referential TDZ issues in useEffect
@@ -681,6 +683,17 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
       }
     }
   }, [status, targetClienteId]);
+
+  // --- FETCH LEZIONI ASSEGNATE (tab "Lezioni") ---
+  useEffect(() => {
+    if (status !== "authenticated" || activeTab !== "lezioni" || !targetClienteId) return;
+    setLoadingLezioni(true);
+    fetch(`/api/lezioni?clienteId=${targetClienteId}`)
+      .then(r => r.json())
+      .then(data => setLezioniAssegnate(Array.isArray(data) ? data : []))
+      .catch(() => setLezioniAssegnate([]))
+      .finally(() => setLoadingLezioni(false));
+  }, [status, activeTab, targetClienteId]);
 
   // --- REALTIME: Auto-refresh quando viene caricato nuovo materiale ---
   useEffect(() => {
@@ -1198,7 +1211,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               marginBottom: "0",
               borderBottom: "2px solid #e0e4f0",
             }}>
-                {["bacheca", "compiti", "materiale", "programma", "voti", "quiz"].map((tab) => {
+                {["bacheca", "compiti", "materiale", "programma", "lezioni", "voti", "quiz"].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
                     <button
@@ -1229,7 +1242,7 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
           )}
 
           {/* Filtri inline: materie + sottocategoria + ricerca */}
-          {hasTarget && activeTab !== 'programma' && (materieSidebar.length > 0 || items.some(it => it.sottocategoria)) && (
+          {hasTarget && activeTab !== 'programma' && activeTab !== 'lezioni' && (materieSidebar.length > 0 || items.some(it => it.sottocategoria)) && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "12px 0 4px", borderBottom: "1px solid #f0f4f8", marginBottom: 4 }}>
               {materieSidebar.length > 0 && <>
                 <button onClick={() => setFiltroMateria("")} style={{ ...inlineFilterPill, background: filtroMateria === "" ? coloreTema : `${coloreTema}15`, color: filtroMateria === "" ? "#fff" : coloreTema }}>Tutte</button>
@@ -1307,12 +1320,43 @@ export default function AulaContent({ initialClienteId = null, hideSidebar = fal
               <QuizPanelAula clienteId={targetClienteId} coloreTema={coloreTema} />
             </div>
           )}
-          {visible.length === 0 && !loading && activeTab !== 'programma' && activeTab !== 'quiz' && (
+          {activeTab === 'lezioni' && targetClienteId && (
+            <div style={{ marginTop: 14, width: '100%' }}>
+              {loadingLezioni && <div style={{ margin: 30 }}>Caricamento…</div>}
+              {!loadingLezioni && lezioniAssegnate.length === 0 && (
+                <div style={emptyBox}>Nessuna lezione assegnata.</div>
+              )}
+              {!loadingLezioni && lezioniAssegnate.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {lezioniAssegnate.map(l => (
+                    <a
+                      key={l.id}
+                      href={`/lezioni/${l.id}`}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "12px 16px", borderRadius: 10,
+                        border: "1px solid #e8edf5", background: "#fff",
+                        textDecoration: "none", color: "#1a202c",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{l.titolo}</span>
+                      {l.materia && <span style={{ ...categoria, background: `${coloreTema}18`, color: coloreTema }}>{l.materia}</span>}
+                      {(l.argomento?.nome || l.macroArgomento?.nome) && (
+                        <span style={{ fontSize: 12, color: "#94a3b8" }}>{l.argomento?.nome || l.macroArgomento?.nome}</span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {visible.length === 0 && !loading && activeTab !== 'programma' && activeTab !== 'quiz' && activeTab !== 'lezioni' && (
             <div style={emptyBox}>Nessun materiale trovato.</div>
           )}
 
           {/* STREAM stile classroom con giorni e batch */}
-          <div style={{ ...streamWrap, display: activeTab === 'quiz' || activeTab === 'programma' ? 'none' : 'flex' }}>
+          <div style={{ ...streamWrap, display: (activeTab === 'quiz' || activeTab === 'programma' || activeTab === 'lezioni') ? 'none' : 'flex' }}>
             {grouped.map(([giorno, items]) => (
               <React.Fragment key={giorno}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "28px 0 10px" }}>

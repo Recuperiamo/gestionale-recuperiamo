@@ -6,15 +6,18 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// GET — admin: tutte; cliente: solo assegnate
-export async function GET() {
+// GET — admin senza clienteId: tutte; admin con ?clienteId=X: solo assegnate a quel cliente; cliente: solo le proprie assegnate
+export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
 
   const role = session.user?.role;
   const isAdmin = role === 'admin' || role === 'operatore';
 
-  if (isAdmin) {
+  const { searchParams } = new URL(req.url);
+  const clienteIdParam = searchParams.get('clienteId');
+
+  if (isAdmin && !clienteIdParam) {
     const lezioni = await prisma.lezione.findMany({
       orderBy: [{ materia: 'asc' }, { titolo: 'asc' }],
       include: {
@@ -28,7 +31,7 @@ export async function GET() {
     return NextResponse.json(lezioni);
   }
 
-  const clienteId = session.user?.clienteId;
+  const clienteId = isAdmin ? Number(clienteIdParam) : session.user?.clienteId;
   if (!clienteId) return NextResponse.json([]);
 
   const assegnazioni = await prisma.assegnazioneLezione.findMany({
