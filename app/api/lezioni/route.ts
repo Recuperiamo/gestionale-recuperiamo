@@ -44,7 +44,12 @@ export async function GET(req) {
         }
       }
     },
-    orderBy: [{ lezione: { materia: 'asc' } }, { lezione: { titolo: 'asc' } }]
+    orderBy: [
+      { lezione: { macroArgomento: { ordine: 'asc' } } },
+      { lezione: { argomento: { ordine: 'asc' } } },
+      { lezione: { ordine: 'asc' } },
+      { lezione: { titolo: 'asc' } },
+    ],
   });
 
   return NextResponse.json(assegnazioni.map(a => a.lezione));

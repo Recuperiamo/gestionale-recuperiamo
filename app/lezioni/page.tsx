@@ -266,13 +266,14 @@ function AssegnaModal({ lezione, clienti, onClose, onSaved }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // RIGA LEZIONE
 // ═══════════════════════════════════════════════════════════════════════════════
-function LezioneRow({ l, isAdmin, onEdit, onAssegna, onDelete, organizza, onDragStart, onDragOver, onDrop, isDragTarget }) {
+function LezioneRow({ l, isAdmin, onEdit, onAssegna, onDelete, organizza, onDragStart, onDragOver, onDragEnd, onDrop, isDragTarget }) {
   const sezioni = [l.mappaHtml&&"Mappa",l.teoriaHtml&&"Teoria",l.eserciziHtml&&"Esercizi"].filter(Boolean);
   return (
     <div
       draggable={!!organizza}
       onDragStart={organizza ? onDragStart : undefined}
-      onDragOver={organizza ? (e=>{e.preventDefault();onDragOver();}) : undefined}
+      onDragOver={organizza ? onDragOver : undefined}
+      onDragEnd={organizza ? onDragEnd : undefined}
       onDrop={organizza ? onDrop : undefined}
       style={{
         display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,
@@ -596,8 +597,8 @@ function LezioniPageInner() {
                   <div key={macro.id}
                     draggable={organizza}
                     onDragStart={organizza ? ()=>setDrag({type:'macro',id:macro.id,groupKey:materia}) : undefined}
-                    onDragOver={organizza ? (e=>{e.preventDefault();setDragOverKey(`macro:${macro.id}`);}) : undefined}
-                    onDrop={organizza ? ()=>handleDrop('macro',macro.id,materia) : undefined}
+                    onDragOver={organizza ? (e=>{if(drag?.type!=='macro')return;e.preventDefault();e.stopPropagation();setDragOverKey(`macro:${macro.id}`);}) : undefined}
+                    onDrop={organizza ? (e=>{e.stopPropagation();handleDrop('macro',macro.id,materia);}) : undefined}
                     onDragEnd={stopDrag}
                     style={{
                       marginBottom:8,
@@ -631,8 +632,8 @@ function LezioniPageInner() {
                             <div key={arg.id}
                               draggable={organizza}
                               onDragStart={organizza ? ()=>setDrag({type:'arg',id:arg.id,groupKey:String(macro.id)}) : undefined}
-                              onDragOver={organizza ? (e=>{e.preventDefault();setDragOverKey(`arg:${arg.id}`);}) : undefined}
-                              onDrop={organizza ? ()=>handleDrop('arg',arg.id,String(macro.id)) : undefined}
+                              onDragOver={organizza ? (e=>{if(drag?.type!=='arg')return;e.preventDefault();e.stopPropagation();setDragOverKey(`arg:${arg.id}`);}) : undefined}
+                              onDrop={organizza ? (e=>{e.stopPropagation();handleDrop('arg',arg.id,String(macro.id));}) : undefined}
                               onDragEnd={stopDrag}
                               style={{
                                 marginBottom:6,
@@ -667,8 +668,9 @@ function LezioniPageInner() {
                                         onDelete={()=>deleteLezione(l.id)}
                                         organizza={organizza}
                                         onDragStart={()=>setDrag({type:'lezione',id:l.id,groupKey:`arg:${arg.id}`})}
-                                        onDragOver={()=>setDragOverKey(`lezione:${l.id}`)}
-                                        onDrop={()=>handleDrop('lezione',l.id,`arg:${arg.id}`)}
+                                        onDragOver={drag?.type==='lezione'?(e=>{e.preventDefault();e.stopPropagation();setDragOverKey(`lezione:${l.id}`);}):(e=>{})}
+                                        onDragEnd={stopDrag}
+                                        onDrop={(e)=>{e.stopPropagation();handleDrop('lezione',l.id,`arg:${arg.id}`);}}
                                         isDragTarget={dragOverKey===`lezione:${l.id}`&&drag?.groupKey===`arg:${arg.id}`}/>
                                     ))
                                   }
@@ -689,8 +691,9 @@ function LezioniPageInner() {
                             onDelete={()=>deleteLezione(l.id)}
                             organizza={organizza}
                             onDragStart={()=>setDrag({type:'lezione',id:l.id,groupKey:`macro:${macro.id}`})}
-                            onDragOver={()=>setDragOverKey(`lezione:${l.id}`)}
-                            onDrop={()=>handleDrop('lezione',l.id,`macro:${macro.id}`)}
+                            onDragOver={drag?.type==='lezione'?(e=>{e.preventDefault();e.stopPropagation();setDragOverKey(`lezione:${l.id}`);}):(e=>{})}
+                            onDragEnd={stopDrag}
+                            onDrop={(e)=>{e.stopPropagation();handleDrop('lezione',l.id,`macro:${macro.id}`);}}
                             isDragTarget={dragOverKey===`lezione:${l.id}`&&drag?.groupKey===`macro:${macro.id}`}/>
                         ))}
 
