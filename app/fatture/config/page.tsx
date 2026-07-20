@@ -27,13 +27,17 @@ export default function ConfigFiskalePage() {
   const [cfg, setCfg] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loadErr, setLoadErr] = useState("");
 
   const isAdmin = session?.user?.role === "admin" || session?.user?.role === "operatore";
 
   useEffect(() => {
     if (status === "unauthenticated") { router.push("/login"); return; }
     if (status !== "authenticated" || !isAdmin) return;
-    fetch("/api/config-fiscale").then(r => r.json()).then(setCfg);
+    fetch("/api/config-fiscale")
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(setCfg)
+      .catch(e => setLoadErr(e.message || "Errore caricamento"));
   }, [status]);
 
   function update(field, val) { setCfg(prev => ({ ...prev, [field]: val })); setSaved(false); }
@@ -49,6 +53,20 @@ export default function ConfigFiskalePage() {
     setSaving(false);
   }
 
+  if (loadErr) return (
+    <div style={{ minHeight: "100vh", background: "#f0f4ff" }}>
+      <Navbar />
+      <div style={{ maxWidth: 500, margin: "80px auto", textAlign: "center", color: "#b91c1c", fontSize: 15 }}>
+        <p style={{ fontSize: 22 }}>⚠️</p>
+        <p><strong>Errore di caricamento:</strong> {loadErr}</p>
+        <p style={{ color: "#6b7280", fontSize: 13, marginTop: 8 }}>Prova a riavviare il server. Se il problema persiste controlla la console.</p>
+        <button onClick={() => { setLoadErr(""); window.location.reload(); }}
+          style={{ marginTop: 16, padding: "8px 20px", background: "#20489a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}>
+          Ricarica
+        </button>
+      </div>
+    </div>
+  );
   if (status === "loading" || !cfg) return <FullPageSpinner text="Carico configurazione…" />;
   if (!isAdmin) return <div style={{ padding: 40, textAlign: "center" }}>Accesso non autorizzato</div>;
 

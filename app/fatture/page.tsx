@@ -356,6 +356,7 @@ function FatturePageInner() {
   const [fatture, setFatture] = useState([]);
   const [clienti, setClienti] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState("");
   const [anno, setAnno] = useState(new Date().getFullYear());
   const [filtroStato, setFiltroStato] = useState("TUTTE");
   const [modal, setModal] = useState<null | "nuova" | any>(null); // null | "nuova" | fattura obj
@@ -371,13 +372,19 @@ function FatturePageInner() {
 
   async function loadAll() {
     setLoading(true);
-    const [rF, rC] = await Promise.all([
-      fetch(`/api/fatture?anno=${anno}`).then(r => r.json()),
-      fetch("/api/clienti").then(r => r.json()).catch(() => []),
-    ]);
-    setFatture(Array.isArray(rF) ? rF : []);
-    setClienti(Array.isArray(rC) ? rC : []);
-    setLoading(false);
+    setLoadErr("");
+    try {
+      const [rF, rC] = await Promise.all([
+        fetch(`/api/fatture?anno=${anno}`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch("/api/clienti").then(r => r.json()).catch(() => []),
+      ]);
+      setFatture(Array.isArray(rF) ? rF : []);
+      setClienti(Array.isArray(rC) ? rC : []);
+    } catch (e) {
+      setLoadErr(e.message || "Errore di caricamento");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleDelete(id) {
@@ -409,6 +416,20 @@ function FatturePageInner() {
   const filtriDisp = ["TUTTE", "BOZZA", "EMESSA", "PAGATA", "ANNULLATA"];
 
   if (status === "loading" || loading) return <FullPageSpinner text="Carico fatture…" />;
+  if (loadErr) return (
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      <Navbar />
+      <div style={{ maxWidth: 500, margin: "80px auto", textAlign: "center", color: "#b91c1c", fontSize: 15, padding: 24 }}>
+        <p style={{ fontSize: 22 }}>⚠️</p>
+        <p><strong>Errore di caricamento:</strong> {loadErr}</p>
+        <p style={{ color: "#6b7280", fontSize: 13, marginTop: 8 }}>Riavvia il server Next.js se l'errore è "HTTP 500". Se il problema persiste controlla la console.</p>
+        <button onClick={() => loadAll()}
+          style={{ marginTop: 16, padding: "8px 20px", background: C.primary, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}>
+          Riprova
+        </button>
+      </div>
+    </div>
+  );
   if (!isAdmin) return <div style={{ padding: 40, textAlign: "center" }}>Accesso non autorizzato</div>;
 
   return (
