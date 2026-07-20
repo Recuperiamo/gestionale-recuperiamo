@@ -96,6 +96,7 @@ model Client {
   lavagnaV2Abilitata Boolean              @default(false)
   lavagneV2          Lavagna[]
   tentativiQuiz      TentativoQuiz[]
+  fatture            Fattura[]
 
   @@index([email])
   @@index([referenteId])
@@ -545,4 +546,62 @@ model Config {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+/// *
+///  * ====================== FATTURAZIONE ELETTRONICA ======================
+
+enum StatoFattura {
+  BOZZA
+  EMESSA
+  PAGATA
+  ANNULLATA
+}
+
+model ConfigFiscale {
+  id            Int      @id @default(autoincrement())
+  nome          String   @default("")
+  cognome       String   @default("")
+  partitaIva    String   @default("")
+  codiceFiscale String   @default("")
+  indirizzo     String   @default("")
+  cap           String   @default("")
+  comune        String   @default("")
+  provincia     String   @default("")
+  paese         String   @default("IT")
+  email         String   @default("")
+  pec           String   @default("")
+  telefono      String   @default("")
+  iban          String   @default("")
+  banca         String   @default("")
+  regimeFiscale String   @default("RF19")
+  codiceAteco   String   @default("")
+  updatedAt     DateTime @updatedAt
+}
+
+model Fattura {
+  id                    Int           @id @default(autoincrement())
+  numero                Int
+  anno                  Int
+  data                  DateTime
+  clienteId             Int?
+  destinatario          Json
+  voci                  Json
+  totaleImponibile      Float
+  importoBollo          Float         @default(0)
+  totale                Float
+  modalitaPagamento     String        @default("MP05")
+  dataScadenzaPagamento DateTime?
+  stato                 StatoFattura  @default(BOZZA)
+  note                  String        @default("")
+  progressivoInvio      String?
+  dataInvioSdi          DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  cliente               Client?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@unique([numero, anno])
+  @@index([anno])
+  @@index([stato])
+  @@index([clienteId])
 }

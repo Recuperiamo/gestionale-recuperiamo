@@ -39,6 +39,13 @@ const NAV_GROUPS = [
       { href: "/admin/password-resets", label: "Reset Password" },
     ],
   },
+  {
+    id: "fatture", label: "Fatture",
+    adminLinks: [
+      { href: "/fatture",        label: "Gestione fatture" },
+      { href: "/fatture/config", label: "Dati fiscali" },
+    ],
+  },
 ];
 
 const NAV_CLIENTE = [
