@@ -134,7 +134,7 @@ function buildXml(fattura: any, cfg: any): string {
         <Natura>N2.2</Natura>
         <ImponibileImporto>${n2(fattura.totaleImponibile + inpsImporto)}</ImponibileImporto>
         <Imposta>0.00</Imposta>
-        <RiferimentoNormativo>Regime Forfettario ex art. 1, c. 54-89, L. 190/2014</RiferimentoNormativo>
+        <RiferimentoNormativo>Operazione in franchigia IVA ex art. 1, cc. 54-89, L. 190/2014 - Regime Forfettario</RiferimentoNormativo>
       </DatiRiepilogo>
     </DatiBeniServizi>
     <DatiPagamento>

@@ -279,7 +279,7 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
               </div>
             </div>
             <p style={{ margin: "10px 0 0", fontSize: 12, color: C.sub }}>
-              Operazione non soggetta ad IVA ex art. 1, c. 54-89, L. 190/2014 — Regime Forfettario (RF19)
+              Operazione in franchigia IVA e non soggetta a ritenuta d'acconto ex art. 1, commi da 54 a 89 della Legge n. 190/2014 – Regime forfettario (RF19)
             </p>
           </>}
 
@@ -407,7 +407,7 @@ function stampaPdf(f, clienti) {
     <tr class="total-row"><td colspan="3">TOTALE DA PAGARE</td><td style="text-align:right">€ ${Number(f.totale).toFixed(2)}</td></tr>
   </table>
   <div class="footer">
-    Operazione non soggetta ad IVA ex art. 1, c. 54-89, L. 190/2014 — Regime Forfettario RF19<br/>
+    Operazione in franchigia IVA e non soggetta a ritenuta d'acconto effettuata ai sensi dell'art. 1, commi da 54 a 89 della Legge n. 190/2014 &ndash; Regime forfettario.${f.importoBollo > 0 ? "<br/>Imposta di bollo assolta in modo virtuale ai sensi del D.M. 17 giugno 2014." : ""}<br/>
     Modalità di pagamento: ${MODALITA_PAG.find(m=>m.cod===f.modalitaPagamento)?.label ?? f.modalitaPagamento}
     ${f.note ? `<br/>${f.note}` : ""}
   </div>
