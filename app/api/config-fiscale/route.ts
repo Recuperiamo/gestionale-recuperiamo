@@ -13,10 +13,12 @@ function isAdmin(session) {
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
-  if (!session || !isAdmin(session)) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
+  if (!session) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
 
   let cfg = await prisma.configFiscale.findFirst();
   if (!cfg) {
+    // Auto-create solo se admin, altrimenti ritorna oggetto vuoto
+    if (!isAdmin(session)) return NextResponse.json({});
     cfg = await prisma.configFiscale.create({ data: {} });
   }
   return NextResponse.json(cfg);

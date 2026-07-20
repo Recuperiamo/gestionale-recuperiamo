@@ -351,6 +351,15 @@ export default function Navbar() {
                 >
                   <span>⚙️</span><span>Accesso e Sicurezza</span>
                 </button>
+                {!isStaff && (
+                  <button onClick={() => { setShowUserMenu(false); router.push("/documenti"); }}
+                    style={{ width: "100%", background: "transparent", border: "none", padding: "12px 16px", textAlign: "left", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#20489a", display: "flex", alignItems: "center", gap: 10 }}
+                    onMouseOver={e => e.currentTarget.style.background = "#f5f8ff"}
+                    onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <span>📄</span><span>I miei documenti</span>
+                  </button>
+                )}
                 <div style={{ borderTop: "1px solid #e8ecf3" }}>
                   <button onClick={() => { setShowUserMenu(false); signOut({ callbackUrl: "/signin" }); }}
                     style={{ width: "100%", background: "transparent", border: "none", padding: "12px 16px", textAlign: "left", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#d32f2f", display: "flex", alignItems: "center", gap: 10 }}
