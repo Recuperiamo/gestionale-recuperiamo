@@ -36,7 +36,11 @@ export async function POST(req) {
   if (!session || !isAdmin(session)) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
 
   const body = await req.json();
-  const { destinatario, voci, data, clienteId, modalitaPagamento, dataScadenzaPagamento, note, stato } = body;
+  const {
+    destinatario, voci, data, clienteId, modalitaPagamento,
+    dataScadenzaPagamento, note, stato,
+    applicaRivalsaInps, importoBollo: bolloBody,
+  } = body;
 
   if (!destinatario || !voci || !voci.length || !data) {
     return NextResponse.json({ error: 'Campi obbligatori mancanti' }, { status: 400 });
@@ -45,7 +49,6 @@ export async function POST(req) {
   const dataFattura = new Date(data);
   const anno = dataFattura.getFullYear();
 
-  // Calcola numero progressivo per l'anno
   const maxResult = await prisma.fattura.findFirst({
     where: { anno },
     orderBy: { numero: 'desc' },
@@ -53,20 +56,19 @@ export async function POST(req) {
   });
   const numero = (maxResult?.numero ?? 0) + 1;
 
-  // Calcola totali
   const totaleImponibile = voci.reduce((s, v) => s + (Number(v.totale) || 0), 0);
-  const importoBollo = totaleImponibile > 77.47 ? 2 : 0;
-  const totale = totaleImponibile + importoBollo;
+  const inpsFlag = applicaRivalsaInps === true;
+  const importoRivalsaInps = inpsFlag ? Math.round(totaleImponibile * 0.04 * 100) / 100 : 0;
+  const importoBollo = typeof bolloBody === 'number' ? bolloBody : (bolloBody ? 2 : 0);
+  const totale = totaleImponibile + importoRivalsaInps + importoBollo;
 
   const fattura = await prisma.fattura.create({
     data: {
-      numero,
-      anno,
-      data: dataFattura,
+      numero, anno, data: dataFattura,
       clienteId: clienteId ? Number(clienteId) : null,
-      destinatario,
-      voci,
-      totaleImponibile,
+      destinatario, voci, totaleImponibile,
+      applicaRivalsaInps: inpsFlag,
+      importoRivalsaInps,
       importoBollo,
       totale,
       modalitaPagamento: modalitaPagamento || 'MP05',

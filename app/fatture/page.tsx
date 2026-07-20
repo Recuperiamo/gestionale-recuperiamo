@@ -73,10 +73,15 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
   const [destEmail, setDestEmail] = useState(dest0.email ?? "");
   const [destPec, setDestPec] = useState(dest0.pec ?? "");
   const [destSdi, setDestSdi] = useState(dest0.codiceDestinatarioSdi ?? "");
+  const [destNote, setDestNote] = useState(""); // es. "intestata al referente di..."
 
   // Servizi
   const voce0 = { descrizione: "", quantita: 1, prezzoUnitario: 0, totale: 0, aliquotaIva: 0, natura: "N2.2" };
   const [voci, setVoci] = useState(fattura?.voci ?? [voce0]);
+
+  // Rivalsa INPS e bollo
+  const [applicaInps, setApplicaInps] = useState(fattura?.applicaRivalsaInps ?? false);
+  const [applicaBollo, setApplicaBollo] = useState(fattura ? (fattura.importoBollo > 0) : true);
 
   // Pagamento e metadati
   const [dataFattura, setDataFattura] = useState(
@@ -88,24 +93,38 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
   const [note, setNote] = useState(fattura?.note ?? "");
   const [stato, setStato] = useState(fattura?.stato ?? "BOZZA");
 
-  // Totali calcolati
+  // Totali calcolati live
   const totImponibile = voci.reduce((s, v) => s + (Number(v.totale) || 0), 0);
-  const bollo = totImponibile > 77.47 ? 2 : 0;
-  const totale = totImponibile + bollo;
+  const importoInps = applicaInps ? Math.round(totImponibile * 0.04 * 100) / 100 : 0;
+  const baseLorda = totImponibile + importoInps;
+  const bolloImporto = applicaBollo ? 2 : 0;
+  const totale = baseLorda + bolloImporto;
 
-  // Pre-fill da cliente selezionato
+  // Pre-fill da cliente selezionato — se studente usa i dati del referente
   function fillDaCliente(id) {
     setClienteId(id);
+    if (!id) { setDestNote(""); return; }
     const c = clienti.find(x => x.id === Number(id));
     if (!c) return;
-    const parts = (c.nomeReferente || "").split(" ");
+
+    let billing = c;
+    let nota = "";
+    if ((c.tipo === "STUDENTE" || c.tipo === "studente") && c.referenteId) {
+      const ref = clienti.find(x => x.id === c.referenteId);
+      if (ref) {
+        billing = ref;
+        nota = `Intestata al referente di ${c.nomeReferente}`;
+      }
+    }
+
+    const parts = (billing.nomeReferente || "").trim().split(/\s+/);
     setDestNome(parts[0] || "");
     setDestCognome(parts.slice(1).join(" ") || "");
-    setDestCf(c.codiceFiscale || "");
-    setDestPiva(c.partitaIva || "");
-    setDestEmail(c.email || "");
-    const addr = c.indirizzo || "";
-    if (addr) setDestIndirizzo(addr);
+    setDestCf(billing.codiceFiscale || "");
+    setDestPiva(billing.partitaIva || "");
+    setDestEmail(billing.email || "");
+    if (billing.indirizzo) setDestIndirizzo(billing.indirizzo);
+    setDestNote(nota);
   }
 
   function updateVoce(idx, v) { setVoci(prev => prev.map((x, i) => i === idx ? v : x)); }
@@ -115,6 +134,21 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
   async function handleSave() {
     if (!destNome.trim()) { setTab(0); return; }
     if (!voci.length || voci.every(v => !v.descrizione.trim())) { setTab(1); return; }
+
+    // Avvisi se mancano rivalsa INPS o bollo
+    if (!applicaInps) {
+      const ok = window.confirm(
+        "Non hai applicato la rivalsa INPS 4%.\n\nSe sei iscritto alla Gestione Separata INPS devi addebitarla al committente.\n\nConfermi di NON volerla applicare?"
+      );
+      if (!ok) { setTab(1); return; }
+    }
+    if (!applicaBollo && baseLorda > 77.47) {
+      const ok = window.confirm(
+        `Il totale (${fmtEur(baseLorda)}) supera €77,47: la marca da bollo virtuale (€2,00) è obbligatoria per legge sulle fatture esenti IVA sopra questa soglia.\n\nConfermi di procedere SENZA marca da bollo?`
+      );
+      if (!ok) { setTab(1); return; }
+    }
+
     setSaving(true);
     const body = {
       clienteId: clienteId || null,
@@ -128,6 +162,8 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
         codiceDestinatarioSdi: destSdi.trim(),
       },
       voci: voci.map(v => ({ ...v, totale: (Number(v.quantita) || 0) * (Number(v.prezzoUnitario) || 0), aliquotaIva: 0, natura: "N2.2" })),
+      applicaRivalsaInps: applicaInps,
+      importoBollo: bolloImporto,
       data: dataFattura, modalitaPagamento: modalitaPag,
       dataScadenzaPagamento: scadenza || null,
       note, stato,
@@ -168,8 +204,17 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
             <label style={lbl}>Seleziona da clienti esistenti</label>
             <select value={clienteId} onChange={e => fillDaCliente(e.target.value)} style={inp}>
               <option value="">— inserimento manuale —</option>
-              {clienti.map(c => <option key={c.id} value={c.id}>{c.nomeReferente}</option>)}
+              {clienti.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nomeReferente}{c.tipo === "STUDENTE" || c.tipo === "studente" ? " (studente)" : ""}
+                </option>
+              ))}
             </select>
+            {destNote && (
+              <div style={{ marginTop: 6, padding: "7px 12px", background: "#eff6ff", borderRadius: 7, fontSize: 13, color: "#1d4ed8", border: "1px solid #bfdbfe" }}>
+                ℹ️ {destNote}
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
               <div><label style={lbl}>Nome *</label><input value={destNome} onChange={e => setDestNome(e.target.value)} style={inp} placeholder="Mario"/></div>
               <div><label style={lbl}>Cognome</label><input value={destCognome} onChange={e => setDestCognome(e.target.value)} style={inp} placeholder="Rossi"/></div>
@@ -196,18 +241,38 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
             {voci.map((v, i) => <VoceRow key={i} v={v} idx={i} onChange={updateVoce} onRemove={removeVoce} />)}
             <button type="button" onClick={addVoce} style={{ ...btnSec, marginTop: 4, fontSize: 13 }}>+ Aggiungi voce</button>
 
-            {/* Riepilogo */}
-            <div style={{ marginTop: 20, padding: "14px 18px", background: "#f8faff", borderRadius: 10, border: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: C.sub, marginBottom: 6 }}>
-                <span>Totale imponibile</span>
-                <span style={{ fontWeight: 600, color: C.text }}>{fmtEur(totImponibile)}</span>
-              </div>
-              {bollo > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sub, marginBottom: 6 }}>
-                  <span>Marca da bollo virtuale (imponibile &gt; €77,47)</span>
-                  <span style={{ fontWeight: 600, color: C.text }}>{fmtEur(bollo)}</span>
+            {/* Toggle INPS e Bollo */}
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "10px 14px", borderRadius: 8, border: `1.5px solid ${applicaInps ? "#4f46e5" : C.border}`, background: applicaInps ? "#f5f3ff" : "#fafafa" }}>
+                <input type="checkbox" checked={applicaInps} onChange={e => setApplicaInps(e.target.checked)} style={{ marginTop: 2, accentColor: "#4f46e5", width: 16, height: 16, flexShrink: 0 }}/>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: applicaInps ? "#4f46e5" : C.text }}>Rivalsa INPS 4% — Gestione Separata</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+                    {applicaInps
+                      ? `+${fmtEur(importoInps)} sull'imponibile di ${fmtEur(totImponibile)}`
+                      : "Per liberi professionisti iscritti alla Gestione Separata INPS"}
+                  </div>
                 </div>
-              )}
+              </label>
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "10px 14px", borderRadius: 8, border: `1.5px solid ${applicaBollo ? "#b45309" : C.border}`, background: applicaBollo ? "#fffbeb" : "#fafafa" }}>
+                <input type="checkbox" checked={applicaBollo} onChange={e => setApplicaBollo(e.target.checked)} style={{ marginTop: 2, accentColor: "#b45309", width: 16, height: 16, flexShrink: 0 }}/>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: applicaBollo ? "#b45309" : C.text }}>Marca da bollo virtuale €2,00</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+                    {baseLorda > 77.47
+                      ? (applicaBollo ? "Applicata — obbligatoria per totale > €77,47" : "⚠️ Il totale supera €77,47: generalmente obbligatoria")
+                      : `Totale (${fmtEur(baseLorda)}) ≤ €77,47 — non obbligatoria`}
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Riepilogo */}
+            <div style={{ marginTop: 14, padding: "14px 18px", background: "#f8faff", borderRadius: 10, border: `1px solid ${C.border}` }}>
+              <RigaRiepilogo label="Totale imponibile" val={totImponibile} />
+              {applicaInps && <RigaRiepilogo label={`Rivalsa INPS 4%`} val={importoInps} color="#4f46e5" />}
+              {applicaBollo && <RigaRiepilogo label="Marca da bollo virtuale" val={2} color="#b45309" />}
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 4 }}>
                 <span style={{ fontWeight: 700, color: C.text }}>Totale fattura</span>
                 <span style={{ fontWeight: 800, color: C.primary, fontSize: 18 }}>{fmtEur(totale)}</span>
@@ -251,7 +316,8 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
         <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fafafa" }}>
           <div style={{ fontSize: 13, color: C.sub }}>
             Totale: <strong style={{ color: C.text }}>{fmtEur(totale)}</strong>
-            {bollo > 0 && <span style={{ marginLeft: 8, color: "#ca8a04" }}>+ €2 bollo</span>}
+            {applicaInps && <span style={{ marginLeft: 8, color: "#4f46e5" }}>+INPS</span>}
+            {applicaBollo && <span style={{ marginLeft: 6, color: "#b45309" }}>+bollo</span>}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={btnSec}>Annulla</button>
@@ -261,6 +327,16 @@ function FatturaModal({ fattura, clienti, onClose, onSaved }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Helper riepilogo ─────────────────────────────────────────────────────────
+function RigaRiepilogo({ label, val, color = undefined }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sub, marginBottom: 6 }}>
+      <span>{label}</span>
+      <span style={{ fontWeight: 600, color: color ?? C.text }}>{fmtEur(val)}</span>
     </div>
   );
 }
@@ -286,6 +362,8 @@ function stampaPdf(f, clienti) {
       <td style="text-align:right">€ ${Number(v.prezzoUnitario).toFixed(2)}</td>
       <td style="text-align:right">€ ${Number(v.totale).toFixed(2)}</td>
     </tr>`).join("");
+  const inpsRiga = f.applicaRivalsaInps && f.importoRivalsaInps > 0
+    ? `<tr><td colspan="3">Rivalsa INPS 4% — Gestione Separata</td><td style="text-align:right">€ ${Number(f.importoRivalsaInps).toFixed(2)}</td></tr>` : "";
   const bolloRiga = f.importoBollo > 0 ? `<tr><td colspan="3">Marca da bollo virtuale</td><td style="text-align:right">€ 2,00</td></tr>` : "";
   const html = `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"/>
   <title>Fattura N. ${f.numero}/${f.anno}</title>
@@ -324,6 +402,7 @@ function stampaPdf(f, clienti) {
     <tr><th>Descrizione</th><th style="text-align:right">Qtà</th><th style="text-align:right">€ Unitario</th><th style="text-align:right">Totale</th></tr>
     ${vociHtml}
     <tr><td colspan="3">Totale imponibile</td><td style="text-align:right">€ ${Number(f.totaleImponibile).toFixed(2)}</td></tr>
+    ${inpsRiga}
     ${bolloRiga}
     <tr class="total-row"><td colspan="3">TOTALE DA PAGARE</td><td style="text-align:right">€ ${Number(f.totale).toFixed(2)}</td></tr>
   </table>

@@ -593,6 +593,8 @@ model Fattura {
   modalitaPagamento     String        @default("MP05")
   dataScadenzaPagamento DateTime?
   stato                 StatoFattura  @default(BOZZA)
+  applicaRivalsaInps    Boolean       @default(false)
+  importoRivalsaInps    Float         @default(0)
   note                  String        @default("")
   progressivoInvio      String?
   dataInvioSdi          DateTime?

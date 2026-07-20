@@ -28,7 +28,11 @@ export async function PATCH(req, { params }) {
   if (!session || !isAdmin(session)) return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
 
   const body = await req.json();
-  const { destinatario, voci, data, clienteId, modalitaPagamento, dataScadenzaPagamento, note, stato } = body;
+  const {
+    destinatario, voci, data, clienteId, modalitaPagamento,
+    dataScadenzaPagamento, note, stato,
+    applicaRivalsaInps, importoBollo: bolloBody,
+  } = body;
 
   const update: any = {};
   if (destinatario !== undefined) update.destinatario = destinatario;
@@ -37,16 +41,21 @@ export async function PATCH(req, { params }) {
   if (modalitaPagamento !== undefined) update.modalitaPagamento = modalitaPagamento;
   if (dataScadenzaPagamento !== undefined) update.dataScadenzaPagamento = dataScadenzaPagamento ? new Date(dataScadenzaPagamento) : null;
   if (clienteId !== undefined) update.clienteId = clienteId ? Number(clienteId) : null;
-
   if (data !== undefined) update.data = new Date(data);
+  if (applicaRivalsaInps !== undefined) update.applicaRivalsaInps = applicaRivalsaInps;
 
-  if (voci !== undefined) {
-    update.voci = voci;
-    const totaleImponibile = voci.reduce((s, v) => s + (Number(v.totale) || 0), 0);
-    const importoBollo = totaleImponibile > 77.47 ? 2 : 0;
+  if (voci !== undefined || applicaRivalsaInps !== undefined || bolloBody !== undefined) {
+    const existing = await prisma.fattura.findUnique({ where: { id: Number(params.id) } });
+    const usaVoci = voci ?? (existing?.voci as any[]) ?? [];
+    const usaInps = applicaRivalsaInps ?? existing?.applicaRivalsaInps ?? false;
+    const totaleImponibile = usaVoci.reduce((s, v) => s + (Number(v.totale) || 0), 0);
+    const importoRivalsaInps = usaInps ? Math.round(totaleImponibile * 0.04 * 100) / 100 : 0;
+    const importoBollo = typeof bolloBody === 'number' ? bolloBody : (bolloBody === true ? 2 : bolloBody === false ? 0 : (existing?.importoBollo ?? 0));
+    update.voci = usaVoci;
     update.totaleImponibile = totaleImponibile;
+    update.importoRivalsaInps = importoRivalsaInps;
     update.importoBollo = importoBollo;
-    update.totale = totaleImponibile + importoBollo;
+    update.totale = totaleImponibile + importoRivalsaInps + importoBollo;
   }
 
   const fattura = await prisma.fattura.update({

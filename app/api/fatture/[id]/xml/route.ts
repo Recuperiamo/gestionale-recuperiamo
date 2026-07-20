@@ -71,6 +71,10 @@ function buildXml(fattura: any, cfg: any): string {
   const bolloXml = fattura.importoBollo > 0
     ? `\n        <DatiBollo>\n          <BolloVirtuale>SI</BolloVirtuale>\n          <ImportoBollo>${n2(fattura.importoBollo)}</ImportoBollo>\n        </DatiBollo>` : '';
 
+  const inpsImporto = fattura.importoRivalsaInps ?? 0;
+  const inpsXml = fattura.applicaRivalsaInps && inpsImporto > 0
+    ? `\n        <CassaPrevidenziale>\n          <TipoCassa>TC22</TipoCassa>\n          <AlCassa>4.00</AlCassa>\n          <ImportoContributoCassa>${n2(inpsImporto)}</ImportoContributoCassa>\n          <ImponibileCassa>${n2(fattura.totaleImponibile)}</ImponibileCassa>\n          <AliquotaIVA>0.00</AliquotaIVA>\n          <Ritenuta>NO</Ritenuta>\n          <Natura>N2.2</Natura>\n        </CassaPrevidenziale>` : '';
+
   const ibm = cfg.iban?.trim() ? `\n          <IBAN>${x(cfg.iban)}</IBAN>` : '';
 
   const provinciaLine = (s: string) => s?.trim() ? `\n        <Provincia>${x(s)}</Provincia>` : '';
@@ -121,14 +125,14 @@ function buildXml(fattura: any, cfg: any): string {
         <TipoDocumento>TD01</TipoDocumento>
         <Divisa>EUR</Divisa>
         <Data>${fmtDate(fattura.data)}</Data>
-        <Numero>${fattura.numero}</Numero>${bolloXml}
+        <Numero>${fattura.numero}</Numero>${bolloXml}${inpsXml}
       </DatiGeneraliDocumento>
     </DatiGenerali>
     <DatiBeniServizi>${linee}
       <DatiRiepilogo>
         <AliquotaIVA>0.00</AliquotaIVA>
         <Natura>N2.2</Natura>
-        <ImponibileImporto>${n2(fattura.totaleImponibile)}</ImponibileImporto>
+        <ImponibileImporto>${n2(fattura.totaleImponibile + inpsImporto)}</ImponibileImporto>
         <Imposta>0.00</Imposta>
         <RiferimentoNormativo>Regime Forfettario ex art. 1, c. 54-89, L. 190/2014</RiferimentoNormativo>
       </DatiRiepilogo>
