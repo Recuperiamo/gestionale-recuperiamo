@@ -370,6 +370,8 @@ function stampaPdf(f, clienti) {
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;font-size:10pt;color:#111;padding:18mm}
+    .cortesia{background:#fff8e1;border:1.5px solid #f59e0b;border-radius:6px;padding:7px 14px;margin-bottom:18px;font-size:8.5pt;color:#92400e;text-align:center}
+    .cortesia strong{display:block;font-size:10pt;margin-bottom:2px}
     h1{font-size:22pt;color:#20489a;margin-bottom:4px}
     .sub{font-size:9pt;color:#555;margin-bottom:24px}
     .two{display:flex;justify-content:space-between;margin-bottom:28px}
@@ -382,6 +384,10 @@ function stampaPdf(f, clienti) {
     .footer{margin-top:24px;font-size:8pt;color:#777;border-top:1px solid #ddd;padding-top:10px;line-height:1.6}
     @media print{body{padding:10mm}@page{size:A4}}
   </style></head><body>
+  <div class="cortesia">
+    <strong>Copia di cortesia</strong>
+    Questo documento non ha alcuna valenza fiscale
+  </div>
   <div class="two">
     <div>
       <h1>FATTURA</h1>
