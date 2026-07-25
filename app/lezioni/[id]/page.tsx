@@ -94,6 +94,26 @@ function buildIpynbHtml(ipynbText) {
   }
 }
 
+// ── Download strumento con copyright ─────────────────────────────────────────
+function downloadStrumento(html, titolo) {
+  const year = new Date().getFullYear();
+  const banner = `<div style="position:fixed;bottom:0;left:0;right:0;background:rgba(32,72,154,0.93);color:#fff;text-align:center;padding:6px 12px;font-size:11px;font-family:Arial,sans-serif;z-index:99999;letter-spacing:0.3px">© ${year} Recuperiamo · Materiale didattico riservato agli studenti della piattaforma · Vietata la riproduzione non autorizzata</div>`;
+  const comment = `\n<!-- © ${year} Recuperiamo - ${titolo} - Materiale protetto da copyright - Tutti i diritti riservati -->`;
+  const withCopyright = html.includes('</body>')
+    ? html.replace('</body>', banner + '\n</body>') + comment
+    : html + banner + comment;
+  const slug = titolo.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const blob = new Blob([withCopyright], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slug}-strumento.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 async function convertFileToHtml(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'ggb') {
@@ -238,7 +258,7 @@ function UploadSection({ label, htmlKey, value, onUploaded }) {
 }
 
 // ── Componente upload strumenti interattivi ───────────────────────────────────
-function UploadStrumenti({ value, onUploaded }) {
+function UploadStrumenti({ value, scaricabile, onUploaded, onToggleScaricabile }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -258,25 +278,37 @@ function UploadStrumenti({ value, onUploaded }) {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: "#20489a", minWidth: 60 }}>Strumenti</span>
-      {value ? (
-        <span style={{ fontSize: 12, color: "#12753a", fontWeight: 600, background: "#c7f7d7", borderRadius: 20, padding: "3px 10px" }}>✓ Caricato</span>
-      ) : (
-        <span style={{ fontSize: 12, color: "#aaa" }}>Nessun file</span>
-      )}
-      <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-        style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-        {uploading ? "Conversione…" : value ? "Sostituisci" : "Carica file"}
-      </button>
-      {value && (
-        <button type="button" onClick={() => onUploaded("strumentiHtml", null)}
-          style={{ background: "#ffebee", color: "#c62828", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-          Rimuovi
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#20489a", minWidth: 60 }}>Strumenti</span>
+        {value ? (
+          <span style={{ fontSize: 12, color: "#12753a", fontWeight: 600, background: "#c7f7d7", borderRadius: 20, padding: "3px 10px" }}>✓ Caricato</span>
+        ) : (
+          <span style={{ fontSize: 12, color: "#aaa" }}>Nessun file</span>
+        )}
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+          style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          {uploading ? "Conversione…" : value ? "Sostituisci" : "Carica file"}
         </button>
+        {value && (
+          <button type="button" onClick={() => onUploaded("strumentiHtml", null)}
+            style={{ background: "#ffebee", color: "#c62828", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            Rimuovi
+          </button>
+        )}
+        <span style={{ fontSize: 11, color: "#999" }}>.html · .json · .ggb · .ipynb · .svg</span>
+        <input ref={fileRef} type="file" accept=".html,.htm,.json,.ggb,.ipynb,.svg" style={{ display: "none" }} onChange={handleFile} />
+      </div>
+      {value && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 68, cursor: "pointer" }}>
+          <input type="checkbox" checked={!!scaricabile} onChange={onToggleScaricabile}
+            style={{ accentColor: "#20489a", width: 14, height: 14 }} />
+          <span style={{ fontSize: 12, color: scaricabile ? "#20489a" : "#6b7280", fontWeight: scaricabile ? 600 : 400 }}>
+            Permetti download agli studenti
+            {scaricabile && <span style={{ marginLeft: 6, fontSize: 11, color: "#6b7280", fontWeight: 400 }}>(con copyright Recuperiamo)</span>}
+          </span>
+        </label>
       )}
-      <span style={{ fontSize: 11, color: "#999" }}>.html · .json · .ggb · .ipynb · .svg</span>
-      <input ref={fileRef} type="file" accept=".html,.htm,.json,.ggb,.ipynb,.svg" style={{ display: "none" }} onChange={handleFile} />
     </div>
   );
 }
@@ -431,6 +463,15 @@ function LezioneDetailPageInner() {
 
   // Reset suggerimenti quando cambia tab
   useEffect(() => { setSuggestions(null); }, [tab]);
+
+  async function handleToggleScaricabile() {
+    const res = await fetch("/api/lezioni/" + id, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ strumentiScaricabile: !argomento.strumentiScaricabile }),
+    });
+    if (res.ok) { const updated = await res.json(); setLezione(prev => ({ ...prev, ...updated })); }
+  }
 
   async function handleUploaded(key, html) {
     setSaving(true);
@@ -624,7 +665,7 @@ function LezioneDetailPageInner() {
             <UploadSection label="Mappa" htmlKey="mappaHtml" value={argomento.mappaHtml} onUploaded={handleUploaded} />
             <UploadSection label="Teoria" htmlKey="teoriaHtml" value={argomento.teoriaHtml} onUploaded={handleUploaded} />
             <UploadSection label="Esercizi" htmlKey="eserciziHtml" value={argomento.eserciziHtml} onUploaded={handleUploaded} />
-            <UploadStrumenti value={argomento.strumentiHtml} onUploaded={handleUploaded} />
+            <UploadStrumenti value={argomento.strumentiHtml} scaricabile={argomento.strumentiScaricabile} onUploaded={handleUploaded} onToggleScaricabile={handleToggleScaricabile} />
           </div>
 
           {/* Pulsante suggerisci link — solo per contenuto didattico testuale, non per strumenti */}
@@ -668,6 +709,14 @@ function LezioneDetailPageInner() {
             ))}
             {currentHtml && tab !== "quiz" && (
               <div style={{ marginLeft: "auto", display: "flex", gap: 6, paddingRight: 8 }}>
+                {tab === "strumenti" && argomento.strumentiScaricabile && (
+                  <button
+                    onClick={() => downloadStrumento(currentHtml, argomento.titolo)}
+                    title="Scarica strumento"
+                    style={{ background: "#20489a", color: "#fff", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                    ⬇ Scarica
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     const blob = new Blob([currentHtml], { type: "text/html" });

@@ -53,6 +53,7 @@ export async function PATCH(req, { params }) {
   if (body.teoriaHtml !== undefined) data.teoriaHtml = body.teoriaHtml || null;
   if (body.eserciziHtml !== undefined) data.eserciziHtml = body.eserciziHtml || null;
   if (body.strumentiHtml !== undefined) data.strumentiHtml = body.strumentiHtml || null;
+  if (body.strumentiScaricabile !== undefined) data.strumentiScaricabile = Boolean(body.strumentiScaricabile);
 
   const updated = await prisma.lezione.update({ where: { id }, data });
   return NextResponse.json(updated);
