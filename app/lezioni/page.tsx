@@ -267,7 +267,7 @@ function AssegnaModal({ lezione, clienti, onClose, onSaved }) {
 // RIGA LEZIONE
 // ═══════════════════════════════════════════════════════════════════════════════
 function LezioneRow({ l, isAdmin, onEdit, onAssegna, onDelete, organizza, onDragStart, onDragOver, onDragEnd, onDrop, isDragTarget }) {
-  const sezioni = [l.mappaHtml&&"Mappa",l.teoriaHtml&&"Teoria",l.eserciziHtml&&"Esercizi"].filter(Boolean);
+  const sezioni = [l.mappaHtml&&"Mappa",l.teoriaHtml&&"Teoria",l.eserciziHtml&&"Esercizi",l.strumentiHtml&&"Strumenti"].filter(Boolean);
   return (
     <div
       draggable={!!organizza}

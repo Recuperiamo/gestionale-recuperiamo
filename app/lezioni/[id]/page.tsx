@@ -14,7 +14,7 @@ const MATERIE = [
 ];
 const ANNI = ["I","II","III","IV","V"];
 
-// ── Utility: legge file HTML ──────────────────────────────────────────────────
+// ── Utility: legge file come testo ───────────────────────────────────────────
 function readHtmlFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -22,6 +22,92 @@ function readHtmlFile(file) {
     reader.onerror = reject;
     reader.readAsText(file, "utf-8");
   });
+}
+
+function readBinaryFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── Convertitori per strumenti interattivi ────────────────────────────────────
+function buildGgbHtml(base64) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{overflow:hidden;background:#fff}
+#ggb-container{width:100vw;height:100vh}</style>
+<script src="https://www.geogebra.org/apps/deployggb.js"><\/script>
+</head><body><div id="ggb-container"></div>
+<script>
+var a=new GGBApplet({"appName":"geometry","width":window.innerWidth,"height":window.innerHeight,
+"ggbBase64":"${base64}","showToolBar":true,"showAlgebraInput":false,"showMenuBar":false,
+"enableRightClick":false,"scaleContainerClass":"ggb-container"},true);
+window.addEventListener("load",function(){a.inject("ggb-container");});
+<\/script></body></html>`;
+}
+
+function buildSvgHtml(svgText) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>*{margin:0;padding:0}body{display:flex;justify-content:center;align-items:flex-start;padding:20px;background:#fff}
+svg{max-width:100%;height:auto}</style>
+</head><body>${svgText}</body></html>`;
+}
+
+function buildJsonHtml(jsonText, filename) {
+  const escaped = jsonText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{margin:0;padding:16px;font-family:monospace;font-size:13px;background:#1e1e2e;color:#cdd6f4;white-space:pre-wrap;word-break:break-all}
+.title{color:#89b4fa;font-family:Arial;font-size:14px;font-weight:bold;margin-bottom:12px;display:block}</style>
+</head><body><span class="title">${filename}</span>${escaped}</body></html>`;
+}
+
+function buildIpynbHtml(ipynbText) {
+  try {
+    const nb = JSON.parse(ipynbText);
+    const cells = (nb.cells || []).map(cell => {
+      const src = Array.isArray(cell.source) ? cell.source.join('') : (cell.source || '');
+      const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if (cell.cell_type === 'markdown') {
+        return `<div class="cell md"><pre>${esc(src)}</pre></div>`;
+      }
+      if (cell.cell_type === 'code') {
+        const outs = (cell.outputs || []).map(o => {
+          const t = o.text ? (Array.isArray(o.text)?o.text.join(''):o.text)
+            : o.data?.['text/plain'] ? (Array.isArray(o.data['text/plain'])?o.data['text/plain'].join(''):o.data['text/plain']) : '';
+          return t ? `<div class="output">${esc(t)}</div>` : '';
+        }).join('');
+        return `<div class="cell code"><pre>${esc(src)}</pre>${outs}</div>`;
+      }
+      return '';
+    }).join('');
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;color:#111}
+.cell{border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;overflow:hidden}
+.cell.md pre{margin:0;padding:12px 16px;background:#f9fafb;font-family:inherit;font-size:14px;white-space:pre-wrap}
+.cell.code pre{margin:0;padding:12px 16px;background:#1e1e2e;color:#cdd6f4;font-size:13px;overflow-x:auto;white-space:pre}
+.output{padding:8px 16px;background:#f0f4ff;font-family:monospace;font-size:12px;white-space:pre-wrap;border-top:1px solid #e5e7eb}
+</style></head><body>${cells}</body></html>`;
+  } catch {
+    return `<!DOCTYPE html><html><body><pre style="padding:16px;font-family:monospace;white-space:pre-wrap">${ipynbText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></body></html>`;
+  }
+}
+
+async function convertFileToHtml(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'ggb') {
+    const buf = await readBinaryFile(file);
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+    return buildGgbHtml(btoa(bin));
+  }
+  const text = await readHtmlFile(file);
+  if (ext === 'svg') return buildSvgHtml(text);
+  if (ext === 'json') return buildJsonHtml(text, file.name);
+  if (ext === 'ipynb') return buildIpynbHtml(text);
+  return text; // html, htm e qualsiasi altro formato testuale
 }
 
 // ── Utility: scansiona HTML per titoli di altri argomenti ─────────────────────
@@ -108,7 +194,7 @@ function applyLinksToHtml(htmlString, approvedSuggestions) {
   return isFullDoc ? doc.documentElement.outerHTML : doc.body.innerHTML;
 }
 
-// ── Componente upload sezione ─────────────────────────────────────────────────
+// ── Componente upload sezione HTML ────────────────────────────────────────────
 function UploadSection({ label, htmlKey, value, onUploaded }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -147,6 +233,50 @@ function UploadSection({ label, htmlKey, value, onUploaded }) {
         </button>
       )}
       <input ref={fileRef} type="file" accept=".html,.htm" style={{ display: "none" }} onChange={handleFile} />
+    </div>
+  );
+}
+
+// ── Componente upload strumenti interattivi ───────────────────────────────────
+function UploadStrumenti({ value, onUploaded }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const html = await convertFileToHtml(file);
+      await onUploaded("strumentiHtml", html);
+    } catch (err) {
+      alert("Errore nella lettura del file: " + (err?.message || err));
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: "#20489a", minWidth: 60 }}>Strumenti</span>
+      {value ? (
+        <span style={{ fontSize: 12, color: "#12753a", fontWeight: 600, background: "#c7f7d7", borderRadius: 20, padding: "3px 10px" }}>✓ Caricato</span>
+      ) : (
+        <span style={{ fontSize: 12, color: "#aaa" }}>Nessun file</span>
+      )}
+      <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+        style={{ background: "#1cb0f6", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        {uploading ? "Conversione…" : value ? "Sostituisci" : "Carica file"}
+      </button>
+      {value && (
+        <button type="button" onClick={() => onUploaded("strumentiHtml", null)}
+          style={{ background: "#ffebee", color: "#c62828", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          Rimuovi
+        </button>
+      )}
+      <span style={{ fontSize: 11, color: "#999" }}>.html · .json · .ggb · .ipynb · .svg</span>
+      <input ref={fileRef} type="file" accept=".html,.htm,.json,.ggb,.ipynb,.svg" style={{ display: "none" }} onChange={handleFile} />
     </div>
   );
 }
@@ -294,6 +424,7 @@ function LezioneDetailPageInner() {
     if (argomento.mappaHtml) available.push("mappa");
     if (argomento.teoriaHtml) available.push("teoria");
     if (argomento.eserciziHtml) available.push("esercizi");
+    if (argomento.strumentiHtml) available.push("strumenti");
     if (urlTab && available.includes(urlTab)) { setTab(urlTab); return; }
     if (available.length > 0) setTab(available[0]);
   }, [argomento, searchParams]);
@@ -378,14 +509,15 @@ function LezioneDetailPageInner() {
   );
 
   const allSezioni = [
-    { key: "mappa", htmlKey: "mappaHtml", label: "Mappa concettuale" },
-    { key: "teoria", htmlKey: "teoriaHtml", label: "Teoria" },
-    { key: "esercizi", htmlKey: "eserciziHtml", label: "Esercizi" },
+    { key: "mappa",      htmlKey: "mappaHtml",      label: "Mappa concettuale" },
+    { key: "teoria",     htmlKey: "teoriaHtml",     label: "Teoria" },
+    { key: "esercizi",   htmlKey: "eserciziHtml",   label: "Esercizi" },
+    { key: "strumenti",  htmlKey: "strumentiHtml",  label: "Strumenti interattivi" },
   ];
   const sezioniConContenuto = allSezioni.filter(s => argomento[s.htmlKey]);
   // Il tab "quiz" è sempre visibile (admin: editor; studente: player)
   const tuttiTab = [...sezioniConContenuto, { key: "quiz", htmlKey: null, label: "Mettiti alla prova" }];
-  const htmlContent = { mappa: argomento.mappaHtml, teoria: argomento.teoriaHtml, esercizi: argomento.eserciziHtml };
+  const htmlContent = { mappa: argomento.mappaHtml, teoria: argomento.teoriaHtml, esercizi: argomento.eserciziHtml, strumenti: argomento.strumentiHtml };
   const currentHtml = htmlContent[tab] || "";
 
   return (
@@ -492,10 +624,11 @@ function LezioneDetailPageInner() {
             <UploadSection label="Mappa" htmlKey="mappaHtml" value={argomento.mappaHtml} onUploaded={handleUploaded} />
             <UploadSection label="Teoria" htmlKey="teoriaHtml" value={argomento.teoriaHtml} onUploaded={handleUploaded} />
             <UploadSection label="Esercizi" htmlKey="eserciziHtml" value={argomento.eserciziHtml} onUploaded={handleUploaded} />
+            <UploadStrumenti value={argomento.strumentiHtml} onUploaded={handleUploaded} />
           </div>
 
-          {/* Pulsante suggerisci link — visibile solo se c'è contenuto nel tab corrente */}
-          {currentHtml && (
+          {/* Pulsante suggerisci link — solo per contenuto didattico testuale, non per strumenti */}
+          {currentHtml && tab !== "strumenti" && (
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #dbe4f1" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button

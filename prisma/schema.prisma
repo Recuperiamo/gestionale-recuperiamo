@@ -474,6 +474,7 @@ model Lezione {
   mappaHtml        String?
   teoriaHtml       String?
   eserciziHtml     String?
+  strumentiHtml    String?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   argomento        Argomento?            @relation(fields: [argomentoId], references: [id], onDelete: SetNull)
