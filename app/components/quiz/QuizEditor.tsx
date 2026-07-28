@@ -681,6 +681,27 @@ function QuizForm({ lezioni, defaultLezioneIds, initial, draft, onSaved, onCance
   );
   const [saving, setSaving] = useState(false);
 
+  // Editor JSON grezzo
+  const [showJson, setShowJson] = useState(false);
+  const [jsonText, setJsonText] = useState("");
+  const [jsonError, setJsonError] = useState("");
+
+  function openJsonEditor() {
+    const obj = { titolo, domande };
+    setJsonText(JSON.stringify(obj, null, 2));
+    setJsonError("");
+    setShowJson(true);
+  }
+
+  function applyJson() {
+    const result = parseQuizJson(jsonText);
+    if (typeof result === "string") { setJsonError(result); return; }
+    setTitolo(result.titolo);
+    setDomande(result.domande);
+    setJsonError("");
+    setShowJson(false);
+  }
+
   const aggiornaDomanda = (i: number, d: Domanda) => setDomande(prev => prev.map((x, j) => j === i ? d : x));
   const rimuoviDomanda = (i: number) => setDomande(prev => prev.filter((_, j) => j !== i));
 
@@ -718,39 +739,72 @@ function QuizForm({ lezioni, defaultLezioneIds, initial, draft, onSaved, onCance
 
   return (
     <div style={{ background: "#fff", border: "1.5px solid #1cb0f6", borderRadius: 12, padding: "18px 20px" }}>
-      <h3 style={{ margin: "0 0 14px", color: "#20489a", fontSize: 15, fontWeight: 800 }}>
-        {initial ? "Modifica test" : "Nuovo test"}
-      </h3>
-
-      <label style={{ ...s.label, marginBottom: 14 }}>
-        Titolo del test
-        <input value={titolo} onChange={e => setTitolo(e.target.value)} style={s.input} placeholder="Es. Verifica capitolo 3" />
-      </label>
-
-      <div style={{ marginBottom: 14 }}>
-        <LezioniSelect lezioni={lezioni} selected={selectedLezioneIds} onChange={setSelectedLezioneIds} />
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
-        {domande.map((d, i) => (
-          <DomandaEditor key={i} d={d} idx={i}
-            onChange={updated => aggiornaDomanda(i, updated)}
-            onRemove={() => rimuoviDomanda(i)} />
-        ))}
-      </div>
-
-      <button onClick={() => setDomande(prev => [...prev, domandaVuota()])}
-        style={{ ...s.btnOutline, marginBottom: 16 }}>
-        + Aggiungi domanda
-      </button>
-
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button onClick={onCancel} style={s.btnOutline}>Annulla</button>
-        <button onClick={handleSave} disabled={saving || !canSave}
-          style={{ ...s.btn(), opacity: saving || !canSave ? 0.6 : 1 }}>
-          {saving ? "Salvataggio..." : initial ? "Salva modifiche" : "Crea test"}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <h3 style={{ margin: 0, color: "#20489a", fontSize: 15, fontWeight: 800 }}>
+          {initial ? "Modifica test" : "Nuovo test"}
+        </h3>
+        <button
+          onClick={showJson ? applyJson : openJsonEditor}
+          style={{ background: showJson ? "#4f46e5" : "#f3f4f6", color: showJson ? "#fff" : "#374151", border: "1.5px solid " + (showJson ? "#4f46e5" : "#e5e7eb"), borderRadius: 7, padding: "5px 13px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "monospace" }}>
+          {showJson ? "✓ Applica JSON" : "{ } JSON"}
         </button>
       </div>
+
+      {/* ── Editor JSON grezzo ── */}
+      {showJson && (
+        <div style={{ marginBottom: 14 }}>
+          <textarea
+            value={jsonText}
+            onChange={e => { setJsonText(e.target.value); setJsonError(""); }}
+            rows={20}
+            style={{ ...s.input, fontFamily: "monospace", fontSize: 12, resize: "vertical", background: "#1e1e2e", color: "#cdd6f4", border: "1.5px solid #4f46e5", lineHeight: 1.6 }}
+            spellCheck={false}
+          />
+          {jsonError && (
+            <p style={{ fontSize: 12, color: "#c62828", margin: "6px 0 0", fontWeight: 600 }}>⚠ {jsonError}</p>
+          )}
+          <p style={{ fontSize: 11, color: "#6b7280", margin: "6px 0 0" }}>
+            Modifica il JSON e clicca <strong>✓ Applica JSON</strong> per sincronizzare con il form. Le lezioni collegate non vengono modificate.
+          </p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+            <button onClick={() => { setShowJson(false); setJsonError(""); }} style={s.btnOutline}>Annulla</button>
+            <button onClick={applyJson} style={{ ...s.btn("#4f46e5") }}>✓ Applica JSON</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Form visuale ── */}
+      {!showJson && <>
+        <label style={{ ...s.label, marginBottom: 14 }}>
+          Titolo del test
+          <input value={titolo} onChange={e => setTitolo(e.target.value)} style={s.input} placeholder="Es. Verifica capitolo 3" />
+        </label>
+
+        <div style={{ marginBottom: 14 }}>
+          <LezioniSelect lezioni={lezioni} selected={selectedLezioneIds} onChange={setSelectedLezioneIds} />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
+          {domande.map((d, i) => (
+            <DomandaEditor key={i} d={d} idx={i}
+              onChange={updated => aggiornaDomanda(i, updated)}
+              onRemove={() => rimuoviDomanda(i)} />
+          ))}
+        </div>
+
+        <button onClick={() => setDomande(prev => [...prev, domandaVuota()])}
+          style={{ ...s.btnOutline, marginBottom: 16 }}>
+          + Aggiungi domanda
+        </button>
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button onClick={onCancel} style={s.btnOutline}>Annulla</button>
+          <button onClick={handleSave} disabled={saving || !canSave}
+            style={{ ...s.btn(), opacity: saving || !canSave ? 0.6 : 1 }}>
+            {saving ? "Salvataggio..." : initial ? "Salva modifiche" : "Crea test"}
+          </button>
+        </div>
+      </>}
     </div>
   );
 }

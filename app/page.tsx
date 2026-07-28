@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [pacchetti, setPacchetti] = useState([]);
   const [attivita, setAttivita] = useState([]);
   const [richieste, setRichieste] = useState([]);
+  const [testDaCorreggere, setTestDaCorreggere] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,19 +22,22 @@ export default function DashboardPage() {
 
   async function fetchData() {
     try {
-      const [pacchettiRes, attivitaRes, richiesteRes] = await Promise.all([
+      const [pacchettiRes, attivitaRes, richiesteRes, testDaCorreggereRes] = await Promise.all([
         fetch("/api/pacchetti"),
         fetch("/api/attivita"),
         fetch("/api/modifiche?stato=pending"),
+        fetch("/api/quiz/tentativi-da-correggere"),
       ]);
-      
+
       const pacchettiData = await pacchettiRes.json();
       const attivitaData = await attivitaRes.json();
       const richiesteData = await richiesteRes.json();
-      
+      const testDaCorreggereData = await testDaCorreggereRes.json();
+
       setPacchetti(Array.isArray(pacchettiData) ? pacchettiData : []);
       setAttivita(Array.isArray(attivitaData) ? attivitaData : []);
       setRichieste(Array.isArray(richiesteData) ? richiesteData : []);
+      setTestDaCorreggere(Array.isArray(testDaCorreggereData) ? testDaCorreggereData : []);
     } catch (err) {
       console.error("Errore caricamento dati dashboard:", err);
     } finally {
@@ -168,12 +172,44 @@ export default function DashboardPage() {
               </section>
 
               {/* Alert Prioritari */}
-              {(pacchettiInScadenza.length > 0 || richieste.length > 0) && (
+              {(pacchettiInScadenza.length > 0 || richieste.length > 0 || testDaCorreggere.length > 0) && (
                 <section style={{ marginBottom: 32 }}>
                   <h2 style={{ fontSize: 20, fontWeight: 700, color: "#20489a", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                     ⚠️ Alert Prioritari
                   </h2>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {/* Test da correggere */}
+                    {testDaCorreggere.length > 0 && (
+                      <div
+                        onClick={() => router.push("/quiz")}
+                        style={{
+                          background: "#fff",
+                          borderRadius: 12,
+                          padding: "20px",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                          borderLeft: "4px solid #7c3aed",
+                          cursor: "pointer",
+                          transition: "box-shadow 0.2s"
+                        }}
+                        onMouseOver={e => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.12)"}
+                        onMouseOut={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontSize: 18, fontWeight: 600, color: "#7c3aed", marginBottom: 4 }}>
+                              📝 {testDaCorreggere.length} Test da correggere
+                            </div>
+                            <div style={{ fontSize: 14, color: "#666" }}>
+                              Test consegnati in attesa di correzione manuale
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 32, fontWeight: 700, color: "#7c3aed" }}>
+                            {testDaCorreggere.length}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Richieste pendenti */}
                     {richieste.length > 0 && (
                       <div
