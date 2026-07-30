@@ -33,6 +33,32 @@ function readBinaryFile(file) {
   });
 }
 
+// ── Patch HTML per navigazione sicura nell'iframe ────────────────────────────
+// Senza questo, i link <a href="#id"> in srcDoc navigano il parent (Next.js router),
+// e i link relativi caricano la app dentro l'iframe.
+function injectIframeNav(html: string): string {
+  if (!html) return html;
+  const baseTag = '<base target="_blank">';
+  const fixScript = `<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href) return;
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      var el = document.getElementById(href.slice(1));
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, true);
+})();
+<\/script>`;
+  if (html.includes('</head>')) return html.replace('</head>', baseTag + '\n' + fixScript + '\n</head>');
+  if (html.includes('<head>')) return html.replace('<head>', '<head>' + baseTag + '\n' + fixScript);
+  return baseTag + fixScript + html;
+}
+
 // ── Convertitori per strumenti interattivi ────────────────────────────────────
 function buildGgbHtml(base64) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -743,7 +769,7 @@ function LezioneDetailPageInner() {
                 <QuizListLezione lezioneId={Number(id)} />
               </div>
             ) : currentHtml ? (
-              <iframe key={tab} srcDoc={currentHtml} style={{ width: "100%", minHeight: 620, border: "none", display: "block" }} sandbox="allow-scripts allow-same-origin allow-forms" />
+              <iframe key={tab} srcDoc={injectIframeNav(currentHtml)} style={{ width: "100%", minHeight: 620, border: "none", display: "block" }} sandbox="allow-scripts allow-same-origin allow-forms" />
             ) : (
               <div style={{ padding: 40, textAlign: "center", color: "#aaa" }}>
                 {isAdmin ? "Carica i file HTML qui sopra per aggiungere contenuto." : "Nessun contenuto per questa sezione."}
