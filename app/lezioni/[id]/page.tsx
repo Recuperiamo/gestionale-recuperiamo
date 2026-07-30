@@ -41,6 +41,7 @@ function injectIframeNav(html: string): string {
   const baseTag = '<base target="_blank">';
   const fixScript = `<script>
 (function(){
+  // Anchor nav: scrollIntoView invece di navigare il parent
   document.addEventListener('click', function(e){
     var a = e.target.closest('a');
     if (!a) return;
@@ -52,6 +53,16 @@ function injectIframeNav(html: string): string {
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, true);
+  // Auto-resize: segnala l'altezza reale del contenuto al parent
+  function sendHeight() {
+    var h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);
+    window.parent.postMessage({ iframeHeight: h }, '*');
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(sendHeight).observe(document.body);
+  }
+  window.addEventListener('load', sendHeight);
+  sendHeight();
 })();
 <\/script>`;
   if (html.includes('</head>')) return html.replace('</head>', baseTag + '\n' + fixScript + '\n</head>');
@@ -407,6 +418,19 @@ function LezioneDetailPageInner() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(searchParams?.get("tab") || null);
   const [saving, setSaving] = useState(false);
+  const [iframeHeight, setIframeHeight] = useState(620);
+
+  // Ascolta l'altezza reale dell'iframe per eliminare lo scroll interno
+  useEffect(() => {
+    function onMessage(e) {
+      if (e.data?.iframeHeight) setIframeHeight(Math.max(400, e.data.iframeHeight));
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  // Reset altezza iframe al cambio tab
+  useEffect(() => { setIframeHeight(620); }, [tab]);
 
   // Modifica info
   const [editingInfo, setEditingInfo] = useState(false);
@@ -769,7 +793,7 @@ function LezioneDetailPageInner() {
                 <QuizListLezione lezioneId={Number(id)} />
               </div>
             ) : currentHtml ? (
-              <iframe key={tab} srcDoc={injectIframeNav(currentHtml)} style={{ width: "100%", minHeight: 620, border: "none", display: "block" }} sandbox="allow-scripts allow-same-origin allow-forms" />
+              <iframe key={tab} srcDoc={injectIframeNav(currentHtml)} style={{ width: "100%", height: iframeHeight, border: "none", display: "block", overflow: "hidden" }} sandbox="allow-scripts allow-same-origin allow-forms" />
             ) : (
               <div style={{ padding: 40, textAlign: "center", color: "#aaa" }}>
                 {isAdmin ? "Carica i file HTML qui sopra per aggiungere contenuto." : "Nessun contenuto per questa sezione."}
