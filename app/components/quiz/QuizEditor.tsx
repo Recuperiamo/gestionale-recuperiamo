@@ -895,6 +895,15 @@ export default function QuizEditor({
   const [tentativi, setTentativi] = useState<Record<number, Tentativo[]>>({});
   const [loadingTentativi, setLoadingTentativi] = useState<number | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [expandedMaterie, setExpandedMaterie] = useState<Set<string>>(new Set());
+
+  function toggleMateria(m: string) {
+    setExpandedMaterie(prev => {
+      const next = new Set(prev);
+      next.has(m) ? next.delete(m) : next.add(m);
+      return next;
+    });
+  }
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
   const [importDraft, setImportDraft] = useState<{ titolo: string; domande: Domanda[] } | null>(null);
@@ -1033,25 +1042,42 @@ export default function QuizEditor({
       )}
 
       {/* Lista quiz per materia */}
-      {Object.entries(perMateria).map(([materia, qList]) => (
-        <div key={materia} style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, padding: "6px 0 6px 12px", borderLeft: `4px solid ${colore(materia)}` }}>
-            <span style={{ fontWeight: 700, fontSize: 15, color: colore(materia) }}>{materia}</span>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>{qList.length} test</span>
+      {Object.entries(perMateria).map(([materia, qList]) => {
+        const isOpen = expandedMaterie.has(materia);
+        return (
+          <div key={materia} style={{ marginBottom: 8 }}>
+            <button
+              onClick={() => toggleMateria(materia)}
+              style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 12px", marginBottom: isOpen ? 10 : 0, background: "none", border: "none", borderLeft: `4px solid ${colore(materia)}`, borderRadius: "0 6px 6px 0", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: colore(materia) }}>{materia}</span>
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>{qList.length} test</span>
+              <span style={{ marginLeft: "auto", fontSize: 13, color: "#9ca3af", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.18s" }}>▼</span>
+            </button>
+            {isOpen && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                {qList.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {qList.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Quiz senza lezione */}
-      {senzaMateria.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#9ca3af", marginBottom: 10 }}>Senza lezione collegata</div>
-          {senzaMateria.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
-        </div>
-      )}
+      {senzaMateria.length > 0 && (() => {
+        const isOpen = expandedMaterie.has("__senza__");
+        return (
+          <div style={{ marginBottom: 8 }}>
+            <button
+              onClick={() => toggleMateria("__senza__")}
+              style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 12px", marginBottom: isOpen ? 10 : 0, background: "none", border: "none", borderLeft: "4px solid #d1d5db", borderRadius: "0 6px 6px 0", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "#9ca3af" }}>Senza lezione collegata</span>
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>{senzaMateria.length} test</span>
+              <span style={{ marginLeft: "auto", fontSize: 13, color: "#9ca3af", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.18s" }}>▼</span>
+            </button>
+            {isOpen && senzaMateria.map(q => <QuizCard key={q.id} q={q} lezioni={lezioni} expandedQuiz={expandedQuiz} tentativi={tentativi} loadingTentativi={loadingTentativi} editingQuiz={editingQuiz} onEdit={setEditingQuiz} onSaved={handleSaved} onDelete={handleDelete} onLoadTentativi={loadTentativi} onPreview={setPreviewQuizId} onSetTentativi={setTentativi} setExpandedQuiz={setExpandedQuiz} />)}
+          </div>
+        );
+      })()}
 
       {quizzes.length === 0 && !showForm && (
         <div style={{ textAlign: "center", padding: "48px 20px", color: "#9ca3af", fontSize: 13 }}>
