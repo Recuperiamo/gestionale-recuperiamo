@@ -13,7 +13,7 @@ import { Stroke, Shape, prepareStroke, strokeBBox } from '../engine/strokeUtils'
 
 export type Tool = 'pen' | 'highlighter' | 'eraser' | 'hand' | 'select' | 'laser'
   | 'rect' | 'ellipse' | 'line' | 'arrow' | 'diamond' | 'triangle' | 'text'
-  | 'axis2' | 'axis3'
+  | 'axis2' | 'axis3' | 'ruler' | 'compass'
 
 export type Background = 'white' | 'black' | 'grid' | 'lines' | 'dots'
 

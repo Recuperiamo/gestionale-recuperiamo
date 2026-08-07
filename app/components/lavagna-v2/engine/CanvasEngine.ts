@@ -166,6 +166,41 @@ function drawShape(ctx: CanvasRenderingContext2D, s: Shape, imageCache?: Map<str
     ctx.stroke()
   } else if (s.type === 'line') {
     ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x2 ?? s.x, s.y2 ?? s.y); ctx.stroke()
+  } else if (s.type === 'ruler') {
+    const x1 = s.x, y1 = s.y, x2 = s.x2 ?? s.x, y2 = s.y2 ?? s.y
+    const len = Math.hypot(x2 - x1, y2 - y1)
+    if (len < 0.1) { ctx.restore(); return }
+    const dx = (x2 - x1) / len, dy = (y2 - y1) / len
+    const nx = -dy, ny = dx
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke()
+    // End-caps
+    const cap = Math.max(s.strokeWidth * 2.5, 7)
+    ctx.beginPath()
+    ctx.moveTo(x1 + nx * cap / 2, y1 + ny * cap / 2); ctx.lineTo(x1 - nx * cap / 2, y1 - ny * cap / 2)
+    ctx.moveTo(x2 + nx * cap / 2, y2 + ny * cap / 2); ctx.lineTo(x2 - nx * cap / 2, y2 - ny * cap / 2)
+    ctx.stroke()
+    // Tick marks every 20 world units
+    const tickStep = 20
+    const numTicks = Math.floor(len / tickStep) - 1
+    for (let i = 1; i <= numTicks; i++) {
+      const t = (i * tickStep) / len
+      const tx = x1 + t * (x2 - x1), ty = y1 + t * (y2 - y1)
+      const tick = (i % 5 === 0) ? Math.max(s.strokeWidth * 2, 6) : Math.max(s.strokeWidth * 1, 3)
+      ctx.beginPath()
+      ctx.moveTo(tx + nx * tick / 2, ty + ny * tick / 2)
+      ctx.lineTo(tx - nx * tick / 2, ty - ny * tick / 2)
+      ctx.stroke()
+    }
+  } else if (s.type === 'compass') {
+    const r = Math.hypot((s.x2 ?? s.x) - s.x, (s.y2 ?? s.y) - s.y)
+    if (r < 0.1) { ctx.restore(); return }
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.stroke()
+    // Center cross
+    const cr = Math.max(s.strokeWidth * 2.5, 6)
+    ctx.beginPath()
+    ctx.moveTo(s.x - cr, s.y); ctx.lineTo(s.x + cr, s.y)
+    ctx.moveTo(s.x, s.y - cr); ctx.lineTo(s.x, s.y + cr)
+    ctx.stroke()
   } else if (s.type === 'arrow') {
     const tx = s.x2 ?? s.x, ty = s.y2 ?? s.y
     const angle = Math.atan2(ty - s.y, tx - s.x)
@@ -694,7 +729,7 @@ export class CanvasEngine {
     // Live shape preview (rubber-band)
     if (this.liveShape) {
       const ls = this.liveShape
-      const isLine = ls.type === 'line' || ls.type === 'arrow'
+      const isLine = ls.type === 'line' || ls.type === 'arrow' || ls.type === 'ruler' || ls.type === 'compass'
       const tempShape = {
         id: 'live', type: ls.type,
         x: isLine ? ls.x : Math.min(ls.x, ls.x2),

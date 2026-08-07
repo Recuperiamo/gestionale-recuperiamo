@@ -10,7 +10,7 @@ import { CanvasEngine } from '../engine/CanvasEngine'
 import { simplifyPoints, generateId, hitTestStroke, hitTestShape } from '../engine/strokeUtils'
 import { useWhiteboardStore } from '../store/whiteboardStore'
 
-const SHAPE_TOOLS = new Set(['rect', 'ellipse', 'line', 'arrow', 'diamond', 'triangle', 'axis2', 'axis3'])
+const SHAPE_TOOLS = new Set(['rect', 'ellipse', 'line', 'arrow', 'diamond', 'triangle', 'axis2', 'axis3', 'ruler', 'compass'])
 
 interface Options {
   engineRef: React.RefObject<CanvasEngine>
@@ -175,17 +175,26 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       const pt = getPoint(e)
       if (pt) {
         let ex = pt.x, ey = pt.y
-        if (native.shiftKey) {
+        const shapeTl = useWhiteboardStore.getState().tool
+        if (shapeTl === 'ruler') {
+          // Ruler: snap automatico a multipli di 15°
           const dx = pt.x - shapeStart.current.x
           const dy = pt.y - shapeStart.current.y
-          const shapeTl = useWhiteboardStore.getState().tool
+          const angle = Math.atan2(dy, dx)
+          const snapped = Math.round(angle / (Math.PI / 12)) * (Math.PI / 12)
+          const dist = Math.hypot(dx, dy)
+          ex = shapeStart.current.x + dist * Math.cos(snapped)
+          ey = shapeStart.current.y + dist * Math.sin(snapped)
+        } else if (native.shiftKey) {
+          const dx = pt.x - shapeStart.current.x
+          const dy = pt.y - shapeStart.current.y
           if (shapeTl === 'line' || shapeTl === 'arrow') {
             const angle = Math.atan2(dy, dx)
             const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4)
             const dist = Math.hypot(dx, dy)
             ex = shapeStart.current.x + dist * Math.cos(snapped)
             ey = shapeStart.current.y + dist * Math.sin(snapped)
-          } else {
+          } else if (shapeTl !== 'compass') {
             const size = Math.min(Math.abs(dx), Math.abs(dy))
             ex = shapeStart.current.x + Math.sign(dx) * size
             ey = shapeStart.current.y + Math.sign(dy) * size
@@ -271,7 +280,7 @@ export function usePointerHandlers({ engineRef, onStrokeCommit, onStrokeCancel, 
       const pt = getPoint(e)
       if (!pt || (Math.abs(pt.x - start.x) < 3 && Math.abs(pt.y - start.y) < 3)) return
       const { tool: shapeTool, color: shapeColor, strokeWidth: shapeWidth } = useWhiteboardStore.getState()
-      const isLine = shapeTool === 'line' || shapeTool === 'arrow'
+      const isLine = shapeTool === 'line' || shapeTool === 'arrow' || shapeTool === 'ruler' || shapeTool === 'compass'
       const shape = {
         id: generateId(),
         type: shapeTool,

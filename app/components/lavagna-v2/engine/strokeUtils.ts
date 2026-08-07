@@ -103,13 +103,17 @@ export function hitTestShape(shape: Shape, wx: number, wy: number, zoom: number)
 
 export function shapeBBox(s: Shape): BBox {
   const hw = (s.strokeWidth || 1) / 2
-  if (s.type === 'line' || s.type === 'arrow') {
+  if (s.type === 'line' || s.type === 'arrow' || s.type === 'ruler') {
     return {
       minX: Math.min(s.x, s.x2 ?? s.x) - hw,
       minY: Math.min(s.y, s.y2 ?? s.y) - hw,
       maxX: Math.max(s.x, s.x2 ?? s.x) + hw,
       maxY: Math.max(s.y, s.y2 ?? s.y) + hw,
     }
+  }
+  if (s.type === 'compass') {
+    const r = Math.hypot((s.x2 ?? s.x) - s.x, (s.y2 ?? s.y) - s.y)
+    return { minX: s.x - r - hw, minY: s.y - r - hw, maxX: s.x + r + hw, maxY: s.y + r + hw }
   }
   if (s.type === 'text') {
     const fontSize = s.fontSize || 18

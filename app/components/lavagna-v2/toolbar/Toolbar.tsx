@@ -49,11 +49,15 @@ const SHAPES = [
   { id: 'ellipse', label: 'Ellisse', icon: <ellipse cx="12" cy="12" rx="9" ry="7" stroke="currentColor" strokeWidth="2" fill="none"/> },
   { id: 'line', label: 'Linea', icon: <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/> },
   { id: 'arrow', label: 'Freccia', icon: <><line x1="4" y1="20" x2="19" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="19,5 14,5 19,10" stroke="currentColor" strokeWidth="1.5" fill="currentColor"/></> },
+  { id: 'ruler', label: 'Righello', icon: <><rect x="2" y="9" width="20" height="6" rx="1" stroke="currentColor" strokeWidth="1.8" fill="none"/><line x1="6" y1="9" x2="6" y2="13" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="9" x2="10" y2="13" stroke="currentColor" strokeWidth="1.5"/><line x1="14" y1="9" x2="14" y2="13" stroke="currentColor" strokeWidth="1.5"/><line x1="18" y1="9" x2="18" y2="13" stroke="currentColor" strokeWidth="1.5"/><line x1="8" y1="9" x2="8" y2="11" stroke="currentColor" strokeWidth="1.2"/><line x1="12" y1="9" x2="12" y2="11" stroke="currentColor" strokeWidth="1.2"/><line x1="16" y1="9" x2="16" y2="11" stroke="currentColor" strokeWidth="1.2"/></> },
+  { id: 'compass', label: 'Compasso', icon: <><circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" fill="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><line x1="12" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2 1.5"/></> },
   { id: 'diamond', label: 'Rombo', icon: <polygon points="12,3 21,12 12,21 3,12" stroke="currentColor" strokeWidth="2" fill="none"/> },
   { id: 'triangle', label: 'Triangolo', icon: <polygon points="12,4 22,20 2,20" stroke="currentColor" strokeWidth="2" fill="none"/> },
   { id: 'axis2', label: 'Assi 2D', icon: <><line x1="4" y1="20" x2="4" y2="5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="4,4 2,8 6,8" fill="currentColor"/><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="21,20 17,18 17,22" fill="currentColor"/></> },
   { id: 'axis3', label: 'Assi 3D', icon: <><line x1="10" y1="14" x2="10" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="10,2 8,6 12,6" fill="currentColor"/><line x1="10" y1="14" x2="21" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="22,14 18,12 18,16" fill="currentColor"/><line x1="10" y1="14" x2="3" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><polygon points="2,22 6,21 3,18" fill="currentColor"/></> },
 ]
+
+const SHAPE_IDS = SHAPES.map(s => s.id)
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -501,7 +505,7 @@ export default function Toolbar({ engineRef, isAdmin, readOnly, canStudentDraw, 
         <div style={{ ...S.divider, ...(toolbarVertical ? { width: 28, height: 1, margin: '4px 0' } : {}) }} />
 
         {/* ── Shapes ── */}
-        <button ref={shapesBtnRef} style={S.btn(['rect','ellipse','line','arrow','diamond','triangle'].includes(tool))} onClick={() => togglePop('shapes', shapesBtnRef)} title="Forme">
+        <button ref={shapesBtnRef} style={S.btn(SHAPE_IDS.includes(tool))} onClick={() => togglePop('shapes', shapesBtnRef)} title="Forme">
           <Icon.Shapes />
         </button>
 
@@ -773,7 +777,7 @@ function MorePopover({ rect, vertical, isMobile, isAdmin, canStudentDraw, onClea
               <button
                 key={s.id}
                 title={s.label}
-                style={{ ...S.btn(['rect','ellipse','line','arrow','diamond','triangle','axis2','axis3'].includes(tool) && tool === s.id), flexDirection: 'column', gap: 2, height: 48, fontSize: 9, fontWeight: 600 }}
+                style={{ ...S.btn(SHAPE_IDS.includes(tool) && tool === s.id), flexDirection: 'column', gap: 2, height: 48, fontSize: 9, fontWeight: 600 }}
                 onClick={() => { setTool(s.id as Tool); onClose() }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24">{s.icon}</svg>
