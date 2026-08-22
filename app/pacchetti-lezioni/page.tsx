@@ -362,8 +362,12 @@ export default function PacchettiLezioniPage() {
   }
 
   function buildExportFileName(ext: string) {
-    const da = filtroAdminDa || filtroDataDa || "";
-    const a  = filtroAdminA  || filtroDataA  || "";
+    const MESI = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+
+    function toMeseAnno(d: Date | null) {
+      if (!d || isNaN(d.getTime())) return null;
+      return { mese: MESI[d.getMonth()], anno: d.getFullYear() };
+    }
 
     const cognome = (() => {
       if (!filtroCliente) return "";
@@ -373,9 +377,32 @@ export default function PacchettiLezioniPage() {
       return slugify(parts[parts.length - 1] || nome);
     })();
 
-    if (da || a) {
-      const parts = [cognome, da, a].filter(Boolean);
-      return `${parts.join("_")}.${ext}`;
+    // Date da filtri espliciti
+    let startDate: Date | null = (filtroAdminDa || filtroDataDa) ? new Date(filtroAdminDa || filtroDataDa) : null;
+    let endDate: Date | null   = (filtroAdminA  || filtroDataA)  ? new Date(filtroAdminA  || filtroDataA)  : null;
+
+    // Se nessun filtro data, derivale dalle attività visibili
+    if (!startDate && !endDate) {
+      const tutte = [...(prenotate || []), ...(svolte || []), ...(cancellate || [])];
+      const dates = tutte.map(a => parseStart(a)).filter(d => !isNaN(d.getTime()));
+      if (dates.length > 0) {
+        startDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        endDate   = new Date(Math.max(...dates.map(d => d.getTime())));
+      }
+    }
+
+    const start = toMeseAnno(startDate);
+    const end   = toMeseAnno(endDate);
+
+    if (start || end) {
+      const parts: string[] = [];
+      if (cognome) parts.push(cognome);
+      if (start) parts.push(start.mese);
+      // mese fine solo se diverso dal mese di inizio
+      if (end && (!start || end.mese !== start.mese || end.anno !== start.anno)) parts.push(end.mese);
+      const anno = (end || start)?.anno;
+      if (anno) parts.push(String(anno));
+      return `${parts.join("-")}.${ext}`;
     }
 
     if (filtroPacchettiIds.length > 0) {
@@ -383,7 +410,7 @@ export default function PacchettiLezioniPage() {
         const p = pacchetti.find(x => String(x.id) === id);
         return p ? slugify(p.descrizione || `pacchetto_${p.id}`) : `pacchetto_${id}`;
       });
-      return `${names.join("-")}.${ext}`;
+      return `${[cognome, ...names].filter(Boolean).join("-")}.${ext}`;
     }
 
     return `lezioni_${new Date().toISOString().split("T")[0]}.${ext}`;
