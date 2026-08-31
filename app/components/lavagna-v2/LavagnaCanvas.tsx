@@ -383,9 +383,16 @@ export default function LavagnaCanvas({
   const { onPointerDown: selDown, onPointerMove: selMove, onPointerUp: selUp } = useSelectionTool(
     engineRef,
     async () => {
+      const { selectedShapeIds, selectedStrokeIds, strokes } = useWhiteboardStore.getState()
       // Persist moved shapes to DB + Ably
-      const { selectedShapeIds } = useWhiteboardStore.getState()
       for (const id of selectedShapeIds) onSaveShape(id)
+      // Persist moved strokes to DB + broadcast live
+      for (const id of selectedStrokeIds) {
+        const s = strokes.find(x => x.id === id)
+        if (!s) continue
+        saveStroke(s)
+        emitStrokeEvent({ type: 'move-stroke', stroke: s })
+      }
     }
   )
 
